@@ -1,13 +1,13 @@
-ERROR := "\e[31m"
-WARN := "\e[33m"
-NORMAL := "\e[32m"
-RESET := "\e[0m"
-
 OS_NAME := "NoAxiom-OS"
 BOOTLOADER := ./others/bootloader/rustsbi-qemu.bin
 KERNEL := target/riscv64gc-unknown-none-elf/release/$(OS_NAME)
 KERNEL_BIN := target/riscv64gc-unknown-none-elf/release/$(OS_NAME).bin
 KERNEL_ENTRY_PA := 0x80200000
+
+ERROR := "\e[31m"
+WARN := "\e[33m"
+NORMAL := "\e[32m"
+RESET := "\e[0m"
 
 run: $(KERNEL_BIN)
 	@echo -e $(NORMAL)"Running..."$(RESET)
@@ -25,7 +25,7 @@ $(KERNEL_BIN): build
 
 clean:
 	cargo clean
-
+	rm -rf tmp
 
 env:
 	@echo -e $(NORMAL)"Check environment..."$(RESET)
@@ -37,6 +37,9 @@ env:
 	@echo -e $(NORMAL)"should be "$(RESET)"rustc 1.83.0-nightly\n"
 	@cargo --version
 	@echo -e $(NORMAL)"should be "$(RESET)"cargo 1.83.0-nightly\n"
+	@make clean
+	@tree .
+	@cloc .
 
 help:
 	@echo -e "Usage: make [target]"
