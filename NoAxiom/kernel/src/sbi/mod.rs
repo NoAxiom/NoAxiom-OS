@@ -1,7 +1,8 @@
 mod consts;
 
-use consts::*;
 use core::arch::asm;
+
+use consts::*;
 
 /// general sbi call
 #[inline(always)]

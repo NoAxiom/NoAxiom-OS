@@ -1,0 +1,95 @@
+[package]
+edition = "2021"
+name = "kernel"
+version = "0.1.0"
+
+[features]
+# multicore = []
+# dev = []
+# vf2 = ["config/vf2"]
+# qemu_riscv = ["config/qemu_riscv"]
+# busybox = []
+# preliminary = []
+# customized-sh = []
+# runtests = []
+# uitest = []
+# ramdisk = []
+# uart = []
+
+
+[dependencies]
+# Local crates
+config = { path = "../lib/config", default-features = false }
+# klog = { path = "../lib/klog" }
+# kmem = { path = "../lib/kmem" }
+# hart = { path = "../lib/hart" }
+# kalloc = { path = "../lib/kalloc" }
+# utils = { path = "../lib/utils" }
+# nix = { path = "../lib/nix" }
+# arch = { path = "../lib/arch" }
+# trap = { path = "../lib/trap" }
+# vfs = { path = "../lib/vfs" }
+# task = { path = "../lib/task" }
+# kpath = { path = "../lib/kpath" }
+# ksync = { path = "../lib/ksync" }
+# fat32 = { path = "../lib/fat32" }
+# executor = { path = "../lib/executor" }
+# ktime = { path = "../lib/ktime" }
+# virtio-drivers2 = { path = "../lib/virtio-drivers2" }
+# lwext4_rust = { path = "../lib/lwext4_rust" }
+# visionfive2-sd = { path = "../lib/visionfive2-sd-0.1.0" }
+
+# External crates
+log = "0"
+spin = "0"
+riscv = "0"
+bitflags = "1.2.1"
+xmas-elf = "0.9.0"
+virtio-drivers = "0.6.0"
+crate_interface = "0.1"
+hashbrown = "0.14"
+lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
+kernel-sync = { git = "https://github.com/os-module/kernel-sync.git" }
+smoltcp = { version = "0.11.0", default-features = false, features = [
+    "alloc",
+    "log",
+    "medium-ethernet",
+    "medium-ip",
+    "proto-ipv4",
+    "proto-ipv6",
+    "proto-dhcpv4",
+    "proto-ipv4-fragmentation",
+    "socket-udp",
+    "socket-tcp",
+    "socket-dhcpv4",
+    "async",
+    "log",
+] }
+rand_core = "0.6.4"
+num-traits = { version = "0.2", default-features = false }
+num-derive = "0.3"
+managed = { version = "0.8.0", default-features = false, features = ["map"] }
+#uart
+uart16550 = { version = "0.0.1" }
+uart8250 = { git = "https://github.com/os-module/uart-rs.git" }
+plic = { git = "https://github.com/os-module/plic" }
+ringbuffer = "0.13.0"
+
+fdt = { git = "https://github.com/repnop/fdt" }
+sbi-rt = { version = "0.0.2", features = ["legacy"] }
+
+# riscv = { git = "https://github.com/rcore-os/riscv", features = ["inline-asm"] }
+# lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
+# buddy_system_allocator = "0.6"
+# bitflags = "1.2.1"
+# xmas-elf = "0.7.0"
+# volatile = "0.3"
+# virtio-drivers = { git = "https://github.com/rcore-os/virtio-drivers", rev = "4ee80e5" }
+# lose-net-stack = { git = "https://github.com/yfblock/lose-net-stack", rev = "db42380" }
+# embedded-graphics = "0.7.1"
+# tinybmp = "0.3.1"
+# log = "0.4"
+# sbi-rt = { version = "0.0.2", features = ["legacy"] }
+
+[build-dependencies]
+config = { path = "../lib/config", default-features = false }

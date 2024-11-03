@@ -1,31 +1,52 @@
-ERROR := "\e[31m"
-WARN := "\e[33m"
-NORMAL := "\e[32m"
-RESET := "\e[0m"
+# NoAxiom Makefile
 
-OS_NAME := "NoAxiom-OS"
-BOOTLOADER := ./others/bootloader/rustsbi-qemu.bin
-KERNEL := target/riscv64gc-unknown-none-elf/release/$(OS_NAME)
-KERNEL_BIN := target/riscv64gc-unknown-none-elf/release/$(OS_NAME).bin
+# general project config
+export PROJECT_NAME := NoAxiom
+export TARGET := riscv64gc-unknown-none-elf
+export MODE ?= release
+export BOARD ?= qemu-virt
+
+# top config
+PROJECT_DIR := $(PROJECT_NAME)
+TARGET_DIR := target/$(TARGET)/$(MODE)
+BOOTLOADER_BIN := $(PROJECT_NAME)/bootloader/rustsbi-qemu.bin
+
+# kernel config
+export KERNEL_NAME := kernel
+KERNEL_DIR := $(PROJECT_DIR)/$(KERNEL_NAME)
+KERNEL_ELF := $(TARGET_DIR)/$(KERNEL_NAME)
+KERNEL_BIN := $(KERNEL_ELF).bin
 KERNEL_ENTRY_PA := 0x80200000
 
+# console output colors
+export ERROR := "\e[31m"
+export WARN := "\e[33m"
+export NORMAL := "\e[32m"
+export RESET := "\e[0m"
+
+all: build run
+
+# TODO: split qemu tags to separated tag configs
 run: $(KERNEL_BIN)
 	@echo -e $(NORMAL)"Running..."$(RESET)
 	@qemu-system-riscv64 \
             -machine virt \
             -nographic \
-            -bios $(BOOTLOADER) \
+            -bios $(BOOTLOADER_BIN) \
             -device loader,file=$(KERNEL_BIN),addr=$(KERNEL_ENTRY_PA)
 
-build:
-	cargo build --release
+build: vendor
+	@cd $(KERNEL_DIR) && make
 
 $(KERNEL_BIN): build
 	@rust-objcopy --binary-architecture=riscv64 $(KERNEL) --strip-all -O binary $(KERNEL_BIN)
 
 clean:
-	cargo clean
+	@cargo clean
 
+vendor: $(KERNEL_DIR)/Cargo.toml
+	@echo -e $(NORMAL)"Updating vendored files..."$(RESET)
+	@cargo vendor
 
 env:
 	@echo -e $(NORMAL)"Check environment..."$(RESET)
@@ -45,6 +66,7 @@ help:
 	@echo -e $(NORMAL)"  env:       "$(RESET)"Check the environment"
 	@echo -e $(NORMAL)"  build:     "$(RESET)"Build the OS"
 	@echo -e $(NORMAL)"  clean:     "$(RESET)"Clean the OS"
+	@echo -e $(NORMAL)"  vendor:    "$(RESET)"Vendor the dependencies"
 	@echo -e $(NORMAL)"  help:      "$(RESET)"Show this help message"
 
-.Phony: env build clean help
+.PHONY: env build clean help

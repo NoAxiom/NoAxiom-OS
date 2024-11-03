@@ -1,8 +1,21 @@
-[build]
-target = "riscv64gc-unknown-none-elf"
+[source.crates-io]
+replace-with = "vendored-sources"
 
-[target.riscv64gc-unknown-none-elf]
-rustflags = [
-    "-Clink-arg=-Tothers/linker_script/linker.ld",
-    "-Cforce-frame-pointers=yes",
-]
+[source."git+https://github.com/os-module/kernel-sync.git"]
+git = "https://github.com/os-module/kernel-sync.git"
+replace-with = "vendored-sources"
+
+[source."git+https://github.com/os-module/plic"]
+git = "https://github.com/os-module/plic"
+replace-with = "vendored-sources"
+
+[source."git+https://github.com/os-module/uart-rs.git"]
+git = "https://github.com/os-module/uart-rs.git"
+replace-with = "vendored-sources"
+
+[source."git+https://github.com/repnop/fdt"]
+git = "https://github.com/repnop/fdt"
+replace-with = "vendored-sources"
+
+[source.vendored-sources]
+directory = "vendor"
