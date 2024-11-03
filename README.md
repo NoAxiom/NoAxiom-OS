@@ -2,30 +2,16 @@
 
 ## Run
 
-Check your environment:
-
-```shell
-make env
-```
-
-Run this manually if detect `vendor/` isn't under current directory:
-
-```shell
-make vendor
-```
-
-Run NoAxiom-OS:
+Run NoAxiom-OS in shell:
 
 ```shell
 make clean
-make run
+make
 ```
 
 ## File structure
 
-Temporarily using [Pantheon](https://gitee.com/LiLiangF/pantheon_visionfive) project structure.
-
-Plan to re-structure later.
+Temporarily using Pantheon's file structure.
 
 ## Toolchain
 
@@ -36,3 +22,7 @@ Basic information is listed as below.
  - rust version: `nightly-2024-09-15`
 
  - rust target `riscv64gc-unknown-none-elf`
+
+## Thanks
+
+[Pantheon](https://gitee.com/LiLiangF/pantheon_visionfive)
