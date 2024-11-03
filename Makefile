@@ -1,22 +1,35 @@
 # NoAxiom Makefile
 
-# general project config
-export PROJECT_NAME := NoAxiom
+# general config
+export PROJECT := NoAxiom
 export TARGET := riscv64gc-unknown-none-elf
 export MODE ?= release
 export BOARD ?= qemu-virt
+export KERNEL ?= kernel
 
-# top config
-PROJECT_DIR := $(PROJECT_NAME)
-TARGET_DIR := target/$(TARGET)/$(MODE)
-BOOTLOADER_BIN := $(PROJECT_NAME)/bootloader/rustsbi-qemu.bin
+export ROOT := $(shell pwd)
+export TARGET_DIR := $(ROOT)/target/$(TARGET)/$(MODE)
+export SBI ?= $(ROOT)/$(PROJECT)/bootloader/rustsbi-qemu.bin
+
+# partition config
+# export ROOTFS  ?= $(ROOT)/part/img/sdcard-riscv.img
+# export TESTFS  ?= $(ROOT)/fs.img
+
 
 # kernel config
-export KERNEL_NAME := kernel
-KERNEL_DIR := $(PROJECT_DIR)/$(KERNEL_NAME)
-KERNEL_ELF := $(TARGET_DIR)/$(KERNEL_NAME)
+KERNEL_ELF := ./target/$(TARGET)/$(MODE)/$(KERNEL)
 KERNEL_BIN := $(KERNEL_ELF).bin
-KERNEL_ENTRY_PA := 0x80200000
+
+# TFTPBOOT := /work/tftpboot/
+
+# SDCARD_BAK = $(ROOTFS).bak
+# FS_BAK = $(TESTFS).bak
+
+# TEST_DIR := ./tests/final
+# FS_IMG := ./sdcard.img
+
+export OBJCOPY := rust-objcopy --binary-architecture=riscv64
+
 
 # console output colors
 export ERROR := "\e[31m"
@@ -24,52 +37,102 @@ export WARN := "\e[33m"
 export NORMAL := "\e[32m"
 export RESET := "\e[0m"
 
-all: build run
+all: sbi-qemu run
+	@cp $(KERNEL_BIN) kernel-qemu
 
-# TODO: split qemu tags to separated tag configs
-run: $(KERNEL_BIN)
-	@echo -e $(NORMAL)"Running..."$(RESET)
-	@qemu-system-riscv64 \
-            -machine virt \
-            -nographic \
-            -bios $(BOOTLOADER_BIN) \
-            -device loader,file=$(KERNEL_BIN),addr=$(KERNEL_ENTRY_PA)
+build: 
+	@cd $(PROJECT)/kernel && make build
 
-build: vendor
-	@cd $(KERNEL_DIR) && make
+# TODO: impl flags
+QFLAGS := 
+QFLAGS += -m 128
+QFLAGS += -machine virt
+QFLAGS += -nographic
+QFLAGS += -smp 1
+QFLAGS += -kernel kernel-qemu
+# QFLAGS += -drive file=$(SDCARD_BAK),if=none,format=raw,id=x0 
+# QFLAGS += -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 
+# QFLAGS += -device virtio-net-device,netdev=net -netdev user,id=net
+ifeq ($(BOARD), qemu-virt)
+	QFLAGS += -bios sbi-qemu
+endif
 
-$(KERNEL_BIN): build
-	@rust-objcopy --binary-architecture=riscv64 $(KERNEL) --strip-all -O binary $(KERNEL_BIN)
+
+# backup: 
+# 	@cp $(ROOTFS) $(SDCARD_BAK) 
+
+# fs-backup: 
+# 	@cp $(TESTFS) $(FS_BAK) 
+
+sbi-qemu:
+	@cp $(SBI) sbi-qemu
+
+run: sbi-qemu build # backup
+	@cp $(KERNEL_BIN) kernel-qemu
+	qemu-system-riscv64 $(QFLAGS)
+# rm -f $(SDCARD_BAK)
+
+# qemu-dtb:backup
+# 	qemu-system-riscv64 $(QFLAGS) -machine dumpdtb=qemu.dtb
+# 	@dtc -o qemu.dts -O dts -I dtb qemu.dtb
+# 	rm -f $(ROOTFS)
+# 	mv $(SDCARD_BAK) $(ROOTFS)
+
+# debug: build
+# 	qemu-system-riscv64 $(QFLAGS) -s -S
+
+# debug-client:
+# 	@riscv64-unknown-elf-gdb -ex 'file $(KERNEL_BIN)' -ex 'set arch riscv:rv64' -ex 'target remote localhost:1234'
 
 clean:
-	@cargo clean
+	@rm -f kernel-qemu
+	@rm -f sbi-qemu
+	# @rm -f sdcard.img
+	cargo clean
 
-vendor: $(KERNEL_DIR)/Cargo.toml
-	@echo -e $(NORMAL)"Updating vendored files..."$(RESET)
-	@cargo vendor
+# sdcard:
+# 	@echo "\e[49;34m\e[1m----------Making sdcard-----------\e[0m"
+# 	@rm -f $(FS_IMG)
+# 	@dd if=/dev/zero of=$(FS_IMG) count=2048 bs=1M
+# 	@sudo losetup -f $(FS_IMG)
+# 	@mkfs.ext4  -F -O ^metadata_csum_seed $(FS_IMG)
+# 	@mkdir -p mnt
+# 	@sudo mount $(FS_IMG) mnt
+# 	@sudo cp -r $(TEST_DIR)/* mnt
+# 	@sudo umount mnt
+# 	@sudo rm -rf mnt
+# 	@sudo chmod 777 $(FS_IMG)
+# 	@echo "\e[49;34m\e[1m----------Making sdcard finished-----------\e[0m"
 
-env:
-	@echo -e $(NORMAL)"Check environment..."$(RESET)
-	@qemu-riscv64 --version
-	@echo -e $(NORMAL)"should be "$(RESET)"qemu-riscv64 version >= 7.0.0\n"
-	@riscv64-unknown-elf-gcc --version
-	@echo -e $(NORMAL)"should be "$(RESET)"riscv64-unknown-elf-gcc (SiFive GCC x.x.0-20xx.xx.xx)\n"
-	@rustc --version
-	@echo -e $(NORMAL)"should be "$(RESET)"rustc 1.83.0-nightly\n"
-	@cargo --version
-	@echo -e $(NORMAL)"should be "$(RESET)"cargo 1.83.0-nightly\n"
-	@make clean
-	@tree .
-	@cloc .
 
-help:
-	@echo -e "Usage: make [target]"
-	@echo -e "Targets:"
-	@echo -e $(NORMAL)"  run:       "$(RESET)"Run the OS in QEMU"
-	@echo -e $(NORMAL)"  env:       "$(RESET)"Check the environment"
-	@echo -e $(NORMAL)"  build:     "$(RESET)"Build the OS"
-	@echo -e $(NORMAL)"  clean:     "$(RESET)"Clean the OS"
-	@echo -e $(NORMAL)"  vendor:    "$(RESET)"Vendor the dependencies"
-	@echo -e $(NORMAL)"  help:      "$(RESET)"Show this help message"
+# build-gui:
+# 	@echo "\e[49;34m\e[1m----------Building user-----------\e[0m"
+# 	@cd $(PROJECT)/user/apps && make build
+# 	@echo "\e[49;34m\e[1m----------Making fs.img-----------\e[0m"
+# 	@./make_fs.sh
+# 	@echo "\e[49;34m\e[1m----------Building kernel---------\e[0m"
+# 	@cd $(PROJECT)/kernel && make kernel
 
-.PHONY: env build clean help
+# run-uitest: sbi-qemu
+# 	@echo "\e[49;34m\e[1m----------GUI Test-----------\e[0m"
+# 	@cp $(KERNEL_BIN) kernel-qemu
+# 	@qemu-system-riscv64 \
+# 		-machine virt \
+# 		-nographic \
+# 		-kernel kernel-qemu \
+# 		-drive file=$(TESTFS),if=none,format=raw,id=x0 \
+# 		-vnc :0\
+# 	        -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 \
+# 		-device virtio-net-device,netdev=net -netdev user,id=net\
+# 		-device virtio-gpu-device,xres=640,yres=480\
+# 		-device virtio-mouse-device\
+# 		-device virtio-keyboard-device
+
+# gvnc:
+# 	@echo "\e[49;34m\e[1m----------Open Viewer-----------\e[0m"
+# 	gvncviewer localhost
+
+# board:
+# 	@cp $(TARGET_DIR)/$(KERNEL).bin  $(TFTPBOOT)
+
+.PHONY: all build run debug clean debug-client sbi-qemu backup sdcard build-gui board

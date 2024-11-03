@@ -1,4 +1,4 @@
-KERNEL_ELF := ../../target/$(TARGET)/$(MODE)/$(KERNEL_NAME)
+KERNEL_ELF := ../../target/$(TARGET)/$(MODE)/$(KERNEL)
 KERNEL_BIN := $(KERNEL_ELF).bin
 
 CARGO_ARGS :=
@@ -82,8 +82,9 @@ kernel:
 	@cargo build $(CARGO_ARGS)
 	@$(OBJCOPY) $(KERNEL_ELF) --strip-all -O binary $(KERNEL_BIN)
 
-build: initproc kernel
-	@echo -e $(NORMAL)"Build Finish."$(RESET)
+# TODO: add initproc dependency when impl user
+build: kernel
+	@echo -e $(NORMAL)"Kernel Build Finished."$(RESET)
 
 initproc:
 	@cd ../user/apps && make build
