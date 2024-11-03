@@ -58,6 +58,9 @@ env:
 	@echo -e $(NORMAL)"should be "$(RESET)"rustc 1.83.0-nightly\n"
 	@cargo --version
 	@echo -e $(NORMAL)"should be "$(RESET)"cargo 1.83.0-nightly\n"
+	@make clean
+	@tree .
+	@cloc .
 
 help:
 	@echo -e "Usage: make [target]"
