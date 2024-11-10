@@ -3,6 +3,7 @@ edition = "2021"
 name = "kernel"
 version = "0.1.0"
 
+
 [features]
 # multicore = []
 # dev = []
@@ -18,11 +19,14 @@ version = "0.1.0"
 
 
 [dependencies]
-# Local crates
+# local
 config = { path = "../lib/config", default-features = false }
-# klog = { path = "../lib/klog" }
+arch = { path = "../lib/arch" }
+klog = { path = "../lib/klog" }
+ksync = { path = "../lib/ksync" }
+sbi = { path = "../lib/sbi" }
 # kmem = { path = "../lib/kmem" }
-# hart = { path = "../lib/hart" }
+# kpath = { path = "../lib/kpath" }
 # kalloc = { path = "../lib/kalloc" }
 # utils = { path = "../lib/utils" }
 # nix = { path = "../lib/nix" }
@@ -30,8 +34,6 @@ config = { path = "../lib/config", default-features = false }
 # trap = { path = "../lib/trap" }
 # vfs = { path = "../lib/vfs" }
 # task = { path = "../lib/task" }
-# kpath = { path = "../lib/kpath" }
-# ksync = { path = "../lib/ksync" }
 # fat32 = { path = "../lib/fat32" }
 # executor = { path = "../lib/executor" }
 # ktime = { path = "../lib/ktime" }
@@ -39,10 +41,10 @@ config = { path = "../lib/config", default-features = false }
 # lwext4_rust = { path = "../lib/lwext4_rust" }
 # visionfive2-sd = { path = "../lib/visionfive2-sd-0.1.0" }
 
-# External crates
-log = "0"
-spin = "0"
-riscv = "0"
+# extern
+log = "0.4"
+spin = "0.9"
+riscv = "0.12"
 bitflags = "1.2.1"
 xmas-elf = "0.9.0"
 virtio-drivers = "0.6.0"
@@ -69,27 +71,12 @@ rand_core = "0.6.4"
 num-traits = { version = "0.2", default-features = false }
 num-derive = "0.3"
 managed = { version = "0.8.0", default-features = false, features = ["map"] }
-#uart
 uart16550 = { version = "0.0.1" }
 uart8250 = { git = "https://github.com/os-module/uart-rs.git" }
 plic = { git = "https://github.com/os-module/plic" }
-ringbuffer = "0.13.0"
-
+ringbuffer = "0.15.0"
 fdt = { git = "https://github.com/repnop/fdt" }
-sbi-rt = { version = "0.0.2", features = ["legacy"] }
 
-# riscv = { git = "https://github.com/rcore-os/riscv", features = ["inline-asm"] }
-# lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
-# buddy_system_allocator = "0.6"
-# bitflags = "1.2.1"
-# xmas-elf = "0.7.0"
-# volatile = "0.3"
-# virtio-drivers = { git = "https://github.com/rcore-os/virtio-drivers", rev = "4ee80e5" }
-# lose-net-stack = { git = "https://github.com/yfblock/lose-net-stack", rev = "db42380" }
-# embedded-graphics = "0.7.1"
-# tinybmp = "0.3.1"
-# log = "0.4"
-# sbi-rt = { version = "0.0.2", features = ["legacy"] }
 
 [build-dependencies]
 config = { path = "../lib/config", default-features = false }

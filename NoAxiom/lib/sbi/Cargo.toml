@@ -1,0 +1,8 @@
+[package]
+name = "sbi"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+riscv = "0.12"
+thiserror = { version = "1.0", package = "thiserror-core", default-features = false }

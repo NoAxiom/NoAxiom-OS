@@ -90,6 +90,10 @@ clean:
 	# @rm -f sdcard.img
 	cargo clean
 
+vendor:
+	cargo clean
+	cargo vendor
+
 # sdcard:
 # 	@echo "\e[49;34m\e[1m----------Making sdcard-----------\e[0m"
 # 	@rm -f $(FS_IMG)
@@ -135,4 +139,4 @@ clean:
 # board:
 # 	@cp $(TARGET_DIR)/$(KERNEL).bin  $(TFTPBOOT)
 
-.PHONY: all build run debug clean debug-client sbi-qemu backup sdcard build-gui board
+.PHONY: all build run debug clean debug-client sbi-qemu backup sdcard build-gui board vendor

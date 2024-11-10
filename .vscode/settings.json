@@ -1,0 +1,8 @@
+{
+    "search.exclude": {
+        "**/.tmp": true,
+        "**/.trashbin": true
+    },
+    "rust-analyzer.cargo.target": "riscv64gc-unknown-none-elf",
+    "rust-analyzer.check.allTargets": false,
+}

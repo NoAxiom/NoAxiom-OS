@@ -2,6 +2,8 @@ target/
 tmp/
 .*/
 !.cargo/
+!.vscode/
 vendor/
 *-qemu
 *.img
+.vscode-ctags

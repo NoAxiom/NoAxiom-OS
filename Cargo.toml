@@ -3,6 +3,9 @@
 members = [
     "NoAxiom/kernel",
     # "NoAxiom/user/apps/*",
-    "NoAxiom/lib/*",
+    # "NoAxiom/lib/*",
+]
+exclude = [
+    "NoAxiom/lib/.trashbin",
 ]
 resolver = "2"

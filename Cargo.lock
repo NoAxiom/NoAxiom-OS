@@ -16,9 +16,18 @@ dependencies = [
 
 [[package]]
 name = "allocator-api2"
-version = "0.2.18"
+version = "0.2.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c6cb57a04249c6480766f7f7cef5467412af1490f8d1e243141daddada3264f"
+checksum = "611cc2ae7d2e242c457e4be7f97036b8ad9ca152b499f53faf99b1ed8fc2553f"
+
+[[package]]
+name = "arch"
+version = "0.1.0"
+dependencies = [
+ "config",
+ "kernel-sync",
+ "riscv",
+]
 
 [[package]]
 name = "autocfg"
@@ -110,10 +119,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "361a90feb7004eca4019fb28352a9465666b24f840f5c3cddf0ff13920590b89"
 
 [[package]]
-name = "executor"
-version = "0.1.0"
-
-[[package]]
 name = "fdt"
 version = "0.2.0-alpha1"
 source = "git+https://github.com/repnop/fdt#059bb2383873f8001959456e36ec123228f67642"
@@ -151,12 +156,15 @@ dependencies = [
 name = "kernel"
 version = "0.1.0"
 dependencies = [
+ "arch",
  "bitflags 1.3.2",
  "config",
  "crate_interface",
  "fdt",
  "hashbrown",
  "kernel-sync",
+ "klog",
+ "ksync",
  "lazy_static",
  "log",
  "managed",
@@ -166,7 +174,7 @@ dependencies = [
  "rand_core",
  "ringbuffer",
  "riscv",
- "sbi-rt",
+ "sbi",
  "smoltcp",
  "spin",
  "uart16550",
@@ -181,6 +189,30 @@ version = "0.1.1"
 source = "git+https://github.com/os-module/kernel-sync.git#4483c08ee46998eb6d2167f848054194c20d1bb7"
 dependencies = [
  "lock_api",
+]
+
+[[package]]
+name = "klog"
+version = "0.1.0"
+dependencies = [
+ "crate_interface",
+ "ksync",
+ "log",
+ "sbi",
+ "spin",
+ "thiserror-core",
+]
+
+[[package]]
+name = "ksync"
+version = "0.1.0"
+dependencies = [
+ "arch",
+ "config",
+ "kernel-sync",
+ "log",
+ "riscv",
+ "spin",
 ]
 
 [[package]]
@@ -301,9 +333,9 @@ checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
 
 [[package]]
 name = "ringbuffer"
-version = "0.13.0"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b6e4fbb37fd18bd949f42583141d650fcdce49dbf759264e4dd3a5df0bc15dc6"
+checksum = "3df6368f71f205ff9c33c076d170dd56ebf68e8161c733c0caa07a7a5509ed53"
 
 [[package]]
 name = "riscv"
@@ -336,21 +368,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8188909339ccc0c68cfb5a04648313f09621e8b87dc03095454f1a11f6c5d436"
 
 [[package]]
-name = "sbi-rt"
-version = "0.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c113c53291db8ac141e01f43224ed488b8d6001ab66737b82e04695a43a42b7"
+name = "sbi"
+version = "0.1.0"
 dependencies = [
- "sbi-spec",
-]
-
-[[package]]
-name = "sbi-spec"
-version = "0.0.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d4027cf9bb591a9fd0fc0e283be6165c5abe96cb73e9f0e24738c227f425377"
-dependencies = [
- "static_assertions",
+ "riscv",
+ "thiserror-core",
 ]
 
 [[package]]
@@ -390,12 +412,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
 
 [[package]]
-name = "static_assertions"
-version = "1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
-
-[[package]]
 name = "syn"
 version = "1.0.109"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -419,18 +435,38 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "1.0.66"
+version = "1.0.68"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d171f59dbaa811dbbb1aee1e73db92ec2b122911a48e1390dfe327a821ddede"
+checksum = "02dd99dc800bbb97186339685293e1cc5d9df1f8fae2d0aecd9ff1c77efea892"
 dependencies = [
  "thiserror-impl",
 ]
 
 [[package]]
-name = "thiserror-impl"
-version = "1.0.66"
+name = "thiserror-core"
+version = "1.0.50"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b08be0f17bd307950653ce45db00cd31200d82b624b36e181337d9c7d92765b5"
+checksum = "c001ee18b7e5e3f62cbf58c7fe220119e68d902bb7443179c0c8aef30090e999"
+dependencies = [
+ "thiserror-core-impl",
+]
+
+[[package]]
+name = "thiserror-core-impl"
+version = "1.0.50"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e4c60d69f36615a077cc7663b9cb8e42275722d23e58a7fa3d2c7f2915d09d04"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.87",
+]
+
+[[package]]
+name = "thiserror-impl"
+version = "1.0.68"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a7c61ec9a6f64d2793d8a45faba21efbe3ced62a886d44c36a009b2b519b4c7e"
 dependencies = [
  "proc-macro2",
  "quote",

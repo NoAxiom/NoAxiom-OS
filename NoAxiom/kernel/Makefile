@@ -79,8 +79,8 @@ all: kernel
 
 kernel:
 	@echo -e $(NORMAL)"Building Kernel..."$(RESET)
-	@cargo build $(CARGO_ARGS)
-	@$(OBJCOPY) $(KERNEL_ELF) --strip-all -O binary $(KERNEL_BIN)
+	cargo build $(CARGO_ARGS)
+	$(OBJCOPY) $(KERNEL_ELF) --strip-all -O binary $(KERNEL_BIN)
 
 # TODO: add initproc dependency when impl user
 build: kernel
