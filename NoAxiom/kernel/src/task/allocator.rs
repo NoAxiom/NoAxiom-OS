@@ -2,14 +2,10 @@ use alloc::vec::Vec;
 
 use ksync::mutex::SpinMutex;
 
-static TID_ALLOCATOR: SpinMutex<TidAllocator> = SpinMutex::new(TidAllocator::new());
-
 struct TidAllocator {
     current: usize,
     recycled: Vec<usize>,
 }
-
-pub struct TaskId(pub usize);
 
 impl TidAllocator {
     pub const fn new() -> Self {
@@ -38,6 +34,11 @@ impl TidAllocator {
         self.recycled.push(tid);
     }
 }
+
+static TID_ALLOCATOR: SpinMutex<TidAllocator> = SpinMutex::new(TidAllocator::new());
+
+/// bind task id lifetime
+pub struct TaskId(pub usize);
 
 impl Drop for TaskId {
     fn drop(&mut self) {

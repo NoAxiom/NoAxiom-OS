@@ -3,7 +3,5 @@
 #![feature(sync_unsafe_cell)]
 #![feature(negative_impls)]
 
-extern crate alloc;
-
 pub mod cell;
 pub mod mutex;

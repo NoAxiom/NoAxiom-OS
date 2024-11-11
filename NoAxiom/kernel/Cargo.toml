@@ -43,7 +43,6 @@ sbi = { path = "../lib/sbi" }
 
 # extern
 log = "0.4"
-spin = "0.9"
 riscv = "0.12"
 bitflags = "1.2.1"
 xmas-elf = "0.9.0"
@@ -51,7 +50,6 @@ virtio-drivers = "0.6.0"
 crate_interface = "0.1"
 hashbrown = "0.14"
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
-kernel-sync = { git = "https://github.com/os-module/kernel-sync.git" }
 smoltcp = { version = "0.11.0", default-features = false, features = [
     "alloc",
     "log",
@@ -76,6 +74,12 @@ uart8250 = { git = "https://github.com/os-module/uart-rs.git" }
 plic = { git = "https://github.com/os-module/plic" }
 ringbuffer = "0.15.0"
 fdt = { git = "https://github.com/repnop/fdt" }
+async-task = { version = "4", default-features = false }
+buddy_system_allocator = "0.6" # for temporarily use
+
+# use ksync::SpinMutex rather than kernel-sync::SpinMutex or spin::SpinMutex
+# kernel-sync = { git = "https://github.com/os-module/kernel-sync.git" }
+# spin = "0.9"
 
 
 [build-dependencies]

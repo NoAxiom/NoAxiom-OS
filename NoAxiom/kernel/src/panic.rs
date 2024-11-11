@@ -1,4 +1,4 @@
-//! panic impl for no_std
+//! panic for no_std
 
 use core::panic::PanicInfo;
 

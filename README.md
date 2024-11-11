@@ -2,10 +2,15 @@
 
 ## Run
 
-Run NoAxiom-OS in shell:
+Note that if it's first time to run this project, you may update vendor files:
 
 ```shell
-make clean
+make vendor
+```
+
+Then you can run NoAxiom-OS in shell:
+
+```shell
 make
 ```
 
@@ -19,10 +24,16 @@ View `./rust-toolchain.toml` for further infomation.
 
 Basic information is listed as below.
 
- - rust version: `nightly-2024-09-15`
+ - rust version: `nightly-2024-05-01`
 
  - rust target `riscv64gc-unknown-none-elf`
 
 ## Thanks
 
 [Pantheon](https://gitee.com/LiLiangF/pantheon_visionfive)
+
+[rCore](https://rcore-os.cn/rCore-Tutorial-Book-v3/index.html)
+
+[DragonOS](https://github.com/DragonOS-Community/DragonOS)
+
+[Titanix](https://gitlab.eduxiji.net/202318123101314/oskernel2023-Titanix)

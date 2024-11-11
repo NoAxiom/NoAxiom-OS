@@ -3,4 +3,4 @@
 #![allow(unused)]
 
 pub mod console;
-pub mod logging;
+pub mod log;

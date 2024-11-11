@@ -1,4 +1,4 @@
-struct Task {
+pub struct Task {
     tid: usize,
-
+    
 }
