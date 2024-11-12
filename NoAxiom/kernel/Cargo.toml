@@ -3,7 +3,6 @@ edition = "2021"
 name = "kernel"
 version = "0.1.0"
 
-
 [features]
 # multicore = []
 # dev = []
@@ -17,31 +16,7 @@ version = "0.1.0"
 # ramdisk = []
 # uart = []
 
-
 [dependencies]
-# local
-config = { path = "../lib/config", default-features = false }
-arch = { path = "../lib/arch" }
-klog = { path = "../lib/klog" }
-ksync = { path = "../lib/ksync" }
-sbi = { path = "../lib/sbi" }
-# kmem = { path = "../lib/kmem" }
-# kpath = { path = "../lib/kpath" }
-# kalloc = { path = "../lib/kalloc" }
-# utils = { path = "../lib/utils" }
-# nix = { path = "../lib/nix" }
-# arch = { path = "../lib/arch" }
-# trap = { path = "../lib/trap" }
-# vfs = { path = "../lib/vfs" }
-# task = { path = "../lib/task" }
-# fat32 = { path = "../lib/fat32" }
-# executor = { path = "../lib/executor" }
-# ktime = { path = "../lib/ktime" }
-# virtio-drivers2 = { path = "../lib/virtio-drivers2" }
-# lwext4_rust = { path = "../lib/lwext4_rust" }
-# visionfive2-sd = { path = "../lib/visionfive2-sd-0.1.0" }
-
-# extern
 log = "0.4"
 riscv = "0.12"
 bitflags = "1.2.1"
@@ -76,11 +51,6 @@ ringbuffer = "0.15.0"
 fdt = { git = "https://github.com/repnop/fdt" }
 async-task = { version = "4", default-features = false }
 buddy_system_allocator = "0.6" # for temporarily use
-
-# use ksync::SpinMutex rather than kernel-sync::SpinMutex or spin::SpinMutex
-# kernel-sync = { git = "https://github.com/os-module/kernel-sync.git" }
+thiserror = { version = "1.0", package = "thiserror-core", default-features = false }
+kernel-sync = { git = "https://github.com/os-module/kernel-sync.git" }
 # spin = "0.9"
-
-
-[build-dependencies]
-config = { path = "../lib/config", default-features = false }

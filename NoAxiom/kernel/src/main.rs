@@ -15,33 +15,32 @@
 // #![feature(custom_mir)]
 // #![feature(core_intrinsics)]
 
-#[macro_use]
-extern crate arch;
-#[macro_use]
 extern crate alloc;
-#[macro_use]
-extern crate log;
-#[macro_use]
-extern crate klog;
 
+#[macro_use]
+mod arch;
+mod config;
+mod cpu;
+#[macro_use]
+mod driver;
 mod entry;
 mod mm;
 mod panic;
 mod sched;
+mod sync;
 mod syscall;
 mod task;
 
 #[no_mangle]
 pub fn rust_main() -> ! {
     entry::clear_bss();
-    trace!("[kernel] launched");
+    println!("[kernel] Hello, world!");
     println!("{}", config::NOAXIOM_BANNER);
-    println!("[kernel] Hello, NoAxiom!");
-
-    trace!("[kernel] shutdown");
-    sbi::shutdown();
-
-    // loop {
-    //     sched::run();
-    // }
+    println!("[kernel] init memory management...");
+    mm::init();
+    println!("[kernel] executor is running...");
+    driver::sbi::shutdown();
+    loop {
+        sched::executor::run();
+    }
 }

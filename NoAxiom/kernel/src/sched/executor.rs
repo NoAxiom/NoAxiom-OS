@@ -1,30 +1,33 @@
-//! executor
+//! ## async executor
+//! - [`spawn`] to add a task
+//! - [`run`] to run next task
 
 use alloc::collections::vec_deque::VecDeque;
 use core::future::Future;
 
 use async_task::{Runnable, ScheduleInfo, WithInfo};
-use ksync::mutex::SpinMutex;
 use lazy_static::lazy_static;
 
-struct Executor {
-    scheduler: SpinMutex<VecDeque<Runnable>>,
+use crate::sync::mutex::SpinMutex;
+
+pub(crate) struct Executor {
+    queue: SpinMutex<VecDeque<Runnable>>,
 }
 
 impl Executor {
     pub fn new() -> Self {
         Self {
-            scheduler: SpinMutex::new(VecDeque::new()),
+            queue: SpinMutex::new(VecDeque::new()),
         }
     }
-    pub fn push_back(&self, runnable: Runnable) {
-        self.scheduler.lock().push_back(runnable);
+    fn push_back(&self, runnable: Runnable) {
+        self.queue.lock().push_back(runnable);
     }
-    pub fn push_front(&self, runnable: Runnable) {
-        self.scheduler.lock().push_front(runnable);
+    fn push_front(&self, runnable: Runnable) {
+        self.queue.lock().push_front(runnable);
     }
-    pub fn pop_front(&self) -> Option<Runnable> {
-        self.scheduler.lock().pop_front()
+    fn pop_front(&self) -> Option<Runnable> {
+        self.queue.lock().pop_front()
     }
 }
 
@@ -38,7 +41,6 @@ where
     F: Future<Output = R> + Send + 'static,
     R: Send + 'static,
 {
-    // TODO: add MLFQ scheduler here
     let (task, handle) = async_task::spawn(
         future,
         WithInfo(move |task: Runnable, info: ScheduleInfo| {
@@ -53,9 +55,13 @@ where
     handle.detach();
 }
 
+/// Pop a task and run it
 pub fn run() {
-    if let Some(task) = EXECUTOR.pop_front() {
-        let runnable_task: Runnable = task;
-        runnable_task.run();
+    // spin until find a valid task
+    loop {
+        if let Some(task) = EXECUTOR.pop_front() {
+            task.run();
+            break;
+        }
     }
 }

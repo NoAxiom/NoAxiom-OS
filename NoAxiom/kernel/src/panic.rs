@@ -2,10 +2,10 @@
 
 use core::panic::PanicInfo;
 
-use sbi::shutdown;
+use crate::{driver::sbi::shutdown, hartid, println};
 
 #[panic_handler]
-fn _panic(info: &PanicInfo) -> ! {
+fn panic(info: &PanicInfo) -> ! {
     if let Some(location) = info.location() {
         println!(
             "[kernel] hart {} panicked at {}:{} {}",

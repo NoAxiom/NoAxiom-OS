@@ -21,15 +21,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "611cc2ae7d2e242c457e4be7f97036b8ad9ca152b499f53faf99b1ed8fc2553f"
 
 [[package]]
-name = "arch"
-version = "0.1.0"
-dependencies = [
- "config",
- "kernel-sync",
- "riscv",
-]
-
-[[package]]
 name = "async-task"
 version = "4.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -73,10 +64,6 @@ name = "cfg-if"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
-
-[[package]]
-name = "config"
-version = "0.1.0"
 
 [[package]]
 name = "crate_interface"
@@ -171,16 +158,13 @@ dependencies = [
 name = "kernel"
 version = "0.1.0"
 dependencies = [
- "arch",
  "async-task",
  "bitflags 1.3.2",
  "buddy_system_allocator",
- "config",
  "crate_interface",
  "fdt",
  "hashbrown",
- "klog",
- "ksync",
+ "kernel-sync",
  "lazy_static",
  "log",
  "managed",
@@ -190,8 +174,8 @@ dependencies = [
  "rand_core",
  "ringbuffer",
  "riscv",
- "sbi",
  "smoltcp",
+ "thiserror-core",
  "uart16550",
  "uart8250",
  "virtio-drivers",
@@ -204,30 +188,6 @@ version = "0.1.1"
 source = "git+https://github.com/os-module/kernel-sync.git#4483c08ee46998eb6d2167f848054194c20d1bb7"
 dependencies = [
  "lock_api",
-]
-
-[[package]]
-name = "klog"
-version = "0.1.0"
-dependencies = [
- "crate_interface",
- "ksync",
- "log",
- "sbi",
- "spin 0.9.8",
- "thiserror-core",
-]
-
-[[package]]
-name = "ksync"
-version = "0.1.0"
-dependencies = [
- "arch",
- "config",
- "kernel-sync",
- "log",
- "riscv",
- "spin 0.9.8",
 ]
 
 [[package]]
@@ -383,14 +343,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8188909339ccc0c68cfb5a04648313f09621e8b87dc03095454f1a11f6c5d436"
 
 [[package]]
-name = "sbi"
-version = "0.1.0"
-dependencies = [
- "riscv",
- "thiserror-core",
-]
-
-[[package]]
 name = "scopeguard"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -422,9 +374,6 @@ name = "spin"
 version = "0.9.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6980e8d7511241f8acf4aebddbb1ff938df5eebe98691418c4468d0b72a96a67"
-dependencies = [
- "lock_api",
-]
 
 [[package]]
 name = "stable_deref_trait"

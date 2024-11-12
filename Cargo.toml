@@ -5,7 +5,7 @@ members = [
     # "NoAxiom/user/apps/*",
     # "NoAxiom/lib/*",
 ]
-exclude = [
-    "NoAxiom/lib/.trashbin",
-]
+# exclude = [
+#     "NoAxiom/lib/.trashbin",
+# ]
 resolver = "2"

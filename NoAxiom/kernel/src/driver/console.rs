@@ -1,12 +1,8 @@
 use core::fmt::{self, Write};
 
-use ksync::mutex::SpinMutex;
+use crate::{driver::sbi::console_putchar, sync::mutex::SpinMutex};
 
-use sbi::console_putchar;
-
-type Mutex<T> = SpinMutex<T>;
-
-static PRINT_MUTEX: Mutex<()> = Mutex::new(());
+static PRINT_MUTEX: SpinMutex<()> = SpinMutex::new(());
 struct Stdout;
 
 impl Write for Stdout {
@@ -26,13 +22,13 @@ pub fn print(args: fmt::Arguments<'_>) {
 #[macro_export]
 macro_rules! print {
     ($fmt: literal $(, $($arg: tt)+)?) => {
-        $crate::console::print(format_args!($fmt $(, $($arg)+)?));
+        $crate::driver::console::print(format_args!($fmt $(, $($arg)+)?));
     }
 }
 
 #[macro_export]
 macro_rules! println {
     ($fmt: literal $(, $($arg: tt)+)?) => {
-        $crate::console::print(format_args!(concat!($fmt, "\n") $(, $($arg)+)?));
+        $crate::driver::console::print(format_args!(concat!($fmt, "\n") $(, $($arg)+)?));
     }
 }

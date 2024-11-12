@@ -1,8 +1,5 @@
 //! NoAxiom Configs
-//! this lib provides constants for kernel config
-
-#![no_std]
-#![no_main]
+//! this mod provides constants for kernel config
 
 /// NoAxiom banner for kernel init message
 pub const NOAXIOM_BANNER: &str = r#"
@@ -15,7 +12,6 @@ pub const NOAXIOM_BANNER: &str = r#"
 
 /// CPU count for multi-core
 pub const CPU_NUM: usize = 2;
-
 
 /// kernel heap size for heap allocator
 pub const KERNEL_HEAP_SIZE: usize = 0x200_0000;

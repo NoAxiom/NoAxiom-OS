@@ -1,32 +1,33 @@
 use alloc::vec::Vec;
 
-use ksync::mutex::SpinMutex;
+use crate::sync::mutex::SpinMutex;
 
+/// Task ID allocator
 struct TidAllocator {
     current: usize,
     recycled: Vec<usize>,
 }
 
 impl TidAllocator {
-    pub const fn new() -> Self {
+    const fn new() -> Self {
         TidAllocator {
-            current: 1,
-            recycled: vec![],
+            current: 0,
+            recycled: Vec::new(),
         }
     }
 
-    pub fn alloc(&mut self) -> TaskId {
+    fn alloc(&mut self) -> TaskId {
         if let Some(tid) = self.recycled.pop() {
             TaskId(tid)
         } else {
             self.current += 1;
-            TaskId(self.current - 1)
+            TaskId(self.current)
         }
     }
 
-    pub fn dealloc(&mut self, tid: usize) {
-        assert!(tid < self.current);
-        assert!(
+    fn dealloc(&mut self, tid: usize) {
+        debug_assert!(tid <= self.current);
+        debug_assert!(
             !self.recycled.iter().any(|ttid| *ttid == tid),
             "tid {} has been deallocated!",
             tid
@@ -37,8 +38,20 @@ impl TidAllocator {
 
 static TID_ALLOCATOR: SpinMutex<TidAllocator> = SpinMutex::new(TidAllocator::new());
 
-/// bind task id lifetime
+/// 使用TaskID包装, 保证自动Dealloc
 pub struct TaskId(pub usize);
+
+impl Into<usize> for TaskId {
+    fn into(self) -> usize {
+        self.0
+    }
+}
+
+impl From<usize> for TaskId {
+    fn from(tid: usize) -> Self {
+        TaskId(tid)
+    }
+}
 
 impl Drop for TaskId {
     fn drop(&mut self) {

@@ -15,10 +15,7 @@ impl<T> SyncRefCell<T> {
     }
 }
 
-unsafe impl<T> Sync for SyncRefCell<T> {
-    // impl Sync for ref cell
-    // can used in multi-thread
-}
+unsafe impl<T> Sync for SyncRefCell<T> {}
 
 impl<T> SyncRefCell<T> {
     pub const fn new(value: T) -> Self {
