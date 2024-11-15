@@ -31,6 +31,12 @@ mod sync;
 mod syscall;
 mod task;
 
+async fn test_main() {
+    println!("[test] Hello, world! before yield");
+    sched::yield_now().await;
+    println!("[test] Hello, world! after yield");
+}
+
 #[no_mangle]
 pub fn rust_main() {
     entry::clear_bss();
@@ -39,8 +45,11 @@ pub fn rust_main() {
     println!("[kernel] init memory management...");
     mm::init();
     println!("[kernel] executor is running...");
-    driver::sbi::shutdown();
-    // loop {
-    //     sched::executor::run();
-    // }
+    sched::spawn_utask(alloc::sync::Arc::from(crate::task::Task {
+        debug_message: alloc::string::String::from("hello world from test_task"),
+    }));
+    sched::spawn(test_main());
+    loop {
+        sched::run();
+    }
 }

@@ -1,3 +1,4 @@
-pub mod schedule;
-pub mod task;
+mod task;
 mod taskid;
+
+pub use task::Task;

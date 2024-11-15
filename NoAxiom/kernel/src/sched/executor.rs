@@ -35,7 +35,7 @@ lazy_static! {
     static ref EXECUTOR: Executor = Executor::new();
 }
 
-/// Add a task into task queue
+/// Add a raw task into task queue
 pub fn spawn<F, R>(future: F)
 where
     F: Future<Output = R> + Send + 'static,

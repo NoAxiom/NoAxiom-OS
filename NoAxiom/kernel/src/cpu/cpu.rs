@@ -1,6 +1,6 @@
 use alloc::sync::Arc;
 
-use crate::{config::CPU_NUM, sync::cell::SyncUnsafeCell, task::task::Task};
+use crate::{config::CPU_NUM, sync::cell::SyncUnsafeCell, task::Task};
 
 #[inline(always)]
 pub fn hartid() -> usize {
