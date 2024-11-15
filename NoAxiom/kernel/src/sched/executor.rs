@@ -15,7 +15,7 @@ pub(crate) struct Executor {
 }
 
 impl Executor {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             queue: SpinMutex::new(VecDeque::new()),
         }

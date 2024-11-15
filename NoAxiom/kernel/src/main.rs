@@ -7,7 +7,7 @@
 #![feature(naked_functions)]
 #![feature(panic_info_message)]
 #![feature(alloc_error_handler)]
-// #![feature(slice_from_ptr_range)]
+#![feature(slice_from_ptr_range)]
 // #![feature(error_in_core)]
 // #![feature(negative_impls)]
 // #![feature(ascii_char)]
@@ -17,9 +17,9 @@
 
 extern crate alloc;
 
-#[macro_use]
 mod arch;
 mod config;
+#[macro_use]
 mod cpu;
 #[macro_use]
 mod driver;
@@ -32,7 +32,7 @@ mod syscall;
 mod task;
 
 #[no_mangle]
-pub fn rust_main() -> ! {
+pub fn rust_main() {
     entry::clear_bss();
     println!("[kernel] Hello, world!");
     println!("{}", config::NOAXIOM_BANNER);
@@ -40,7 +40,7 @@ pub fn rust_main() -> ! {
     mm::init();
     println!("[kernel] executor is running...");
     driver::sbi::shutdown();
-    loop {
-        sched::executor::run();
-    }
+    // loop {
+    //     sched::executor::run();
+    // }
 }

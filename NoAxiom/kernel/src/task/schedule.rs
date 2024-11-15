@@ -10,7 +10,7 @@ use core::{
 };
 
 use super::task::Task;
-use crate::sched::executor;
+use crate::{cpu::current_cpu, sched::executor};
 
 pub async fn user_loop(task: Arc<Task>) {
     // task.set_waker(utils::take_waker().await);
@@ -51,10 +51,10 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = unsafe { self.get_unchecked_mut() };
-        // let p = get_current_processor();
-        // p.push_utask(&mut this.task);
+        let p = current_cpu();
+        p.set_task(&mut this.task);
         let ret = unsafe { Pin::new_unchecked(&mut this.task_future).poll(cx) };
-        // p.pop_utask();
+        p.clear_task();
         ret
     }
 }

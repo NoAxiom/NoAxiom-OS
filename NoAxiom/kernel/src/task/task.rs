@@ -6,7 +6,7 @@ use core::{
     task::Waker,
 };
 
-use super::tid_allocator::TaskId;
+use super::taskid::TaskId;
 use crate::{println, sync::mutex::SpinMutex};
 
 pub struct ProcessControlBlock {

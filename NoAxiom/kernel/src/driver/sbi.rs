@@ -27,20 +27,20 @@ pub const SBI_ERR_ALREADY_STOPPED: isize = -8;
 /// Shared memory not available
 pub const SBI_ERR_NO_SHMEM: isize = -9;
 
-/// SBI 基本扩展
+/// SBI base extension
 pub const EXTENSION_BASE: usize = 0x10;
-/// SBI 时钟扩展
+/// SBI timer extension
 pub const EXTENSION_TIMER: usize = 0x54494D45;
-// pub const EXTENSION_IPI: usize = 0x735049;
-// pub const EXTENSION_RFENCE: usize = 0x52464E43;
-/// SBI HSM 扩展
+pub const EXTENSION_IPI: usize = 0x735049;
+pub const EXTENSION_RFENCE: usize = 0x52464E43;
+/// SBI HSM extension
 pub const EXTENSION_HSM: usize = 0x48534D;
-// pub const EXTENSION_SRST: usize = 0x53525354;
+pub const EXTENSION_SRST: usize = 0x53525354;
 
 /// SBI HSM扩展的启动cpu功能
 const FUNCTION_HSM_HART_START: usize = 0x0;
-// const FUNCTION_HSM_HART_STOP: usize = 0x1;
-// const FUNCTION_HSM_HART_GET_STATUS: usize = 0x2;
+const FUNCTION_HSM_HART_STOP: usize = 0x1;
+const FUNCTION_HSM_HART_GET_STATUS: usize = 0x2;
 const FUNCTION_HSM_HART_SUSPEND: usize = 0x3;
 
 /// sbi调用返回值
