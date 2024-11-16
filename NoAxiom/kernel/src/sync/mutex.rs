@@ -6,8 +6,8 @@ use kernel_sync::{ticket::TicketMutexGuard, LockAction};
 
 use crate::{
     arch::interrupt::{interrupt_disable, interrupt_enable, is_interrupt_enable},
-    config::CPU_NUM,
-    cpu::hartid,
+    config::arch::CPU_NUM,
+    arch::hartid,
 };
 
 pub type SpinMutex<T> = kernel_sync::spin::SpinMutex<T, KernelLockAction>;

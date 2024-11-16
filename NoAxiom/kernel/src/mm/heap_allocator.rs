@@ -2,7 +2,7 @@
 
 use buddy_system_allocator::LockedHeap;
 
-use crate::{config::KERNEL_HEAP_SIZE, println};
+use crate::{config::mm::KERNEL_HEAP_SIZE, println};
 
 #[global_allocator]
 /// heap allocator instance

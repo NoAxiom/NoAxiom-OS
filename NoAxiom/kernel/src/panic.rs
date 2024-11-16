@@ -2,7 +2,7 @@
 
 use core::panic::PanicInfo;
 
-use crate::{cpu::hartid, driver::sbi::shutdown, println};
+use crate::{arch::hartid, driver::sbi::shutdown, println};
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {

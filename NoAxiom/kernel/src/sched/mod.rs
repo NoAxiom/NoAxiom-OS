@@ -1,4 +1,9 @@
-//! async coroutine and task schedule
+//! # async task schedule
+//! ## usages
+//! - [`utask`] provides user task behaviour
+//! - [`executor`] provides general executor for all types of async tasks
+//! - [`utils`] contains useful func for async tasks execution
+
 mod executor;
 mod utask;
 mod utils;

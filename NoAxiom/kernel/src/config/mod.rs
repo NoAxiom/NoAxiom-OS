@@ -1,5 +1,8 @@
-//! NoAxiom Configs
-//! this mod provides constants for kernel config
+//! NoAxiom global configs
+//! provides constants for kernel config
+//! [`arch`] contains configs for architecture and cpus
+//! [`mm`] contains configs for memory management
+//! [`sched`] contains configs for task / coroutine schedule
 
 /// NoAxiom banner for kernel init message
 pub const NOAXIOM_BANNER: &str = r#"
@@ -10,8 +13,6 @@ pub const NOAXIOM_BANNER: &str = r#"
 /_/ |_/\____/_/  |_/_/|_/_/\____/_/ /_/ /_/ 
 "#;
 
-/// CPU count for multi-core
-pub const CPU_NUM: usize = 2;
-
-/// kernel heap size for heap allocator
-pub const KERNEL_HEAP_SIZE: usize = 0x200_0000;
+pub mod arch;
+pub mod mm;
+pub mod sched;

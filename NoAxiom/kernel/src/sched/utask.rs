@@ -1,6 +1,6 @@
-//! task future
+//! ## task future
 //! [`UserTaskFuture`] runs in user mode,
-//! [`KernelTaskFuture`] runs in supervisor mode.
+//! use [`spawn_utask`] to spawn user tasks
 
 use alloc::sync::Arc;
 use core::{
@@ -10,11 +10,11 @@ use core::{
 };
 
 use super::executor;
-use crate::{cpu::current_cpu, task::Task};
+use crate::{arch::current_cpu, task::Task};
 
-pub async fn utask_main(_task: Arc<Task>) {
+pub async fn utask_main(task: Arc<Task>) {
     // TODO: this is for test
-    _task.test();
+    task.test();
 
     // task.set_waker(utils::take_waker().await);
     // loop {
@@ -62,7 +62,7 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
     }
 }
 
-// spawn a user task
+/// spawn a user task
 pub fn spawn_utask(task: Arc<Task>) {
     executor::spawn(UserTaskFuture::new(task.clone(), utask_main(task)));
 }

@@ -20,8 +20,6 @@ extern crate alloc;
 mod arch;
 mod config;
 #[macro_use]
-mod cpu;
-#[macro_use]
 mod driver;
 mod entry;
 mod mm;
