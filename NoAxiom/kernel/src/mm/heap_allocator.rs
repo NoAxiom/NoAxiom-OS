@@ -13,8 +13,10 @@ static HEAP_ALLOCATOR: LockedHeap = LockedHeap::empty();
 pub fn handle_alloc_error(layout: core::alloc::Layout) -> ! {
     panic!("Heap allocation error, layout = {:?}", layout);
 }
+
 /// heap space ([u8; KERNEL_HEAP_SIZE])
 static mut HEAP_SPACE: [u8; KERNEL_HEAP_SIZE] = [0; KERNEL_HEAP_SIZE];
+
 /// initiate heap allocator
 pub fn init_heap() {
     unsafe {
@@ -25,7 +27,7 @@ pub fn init_heap() {
 }
 
 #[allow(unused)]
-pub fn heap_test() {
+pub async fn heap_test() {
     use alloc::{boxed::Box, vec::Vec};
     extern "C" {
         fn sbss();

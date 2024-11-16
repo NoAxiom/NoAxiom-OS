@@ -29,12 +29,6 @@ mod sync;
 mod syscall;
 mod task;
 
-async fn test_main() {
-    println!("[test] Hello, world! before yield");
-    sched::yield_now().await;
-    println!("[test] Hello, world! after yield");
-}
-
 #[no_mangle]
 pub fn rust_main() {
     entry::clear_bss();
@@ -46,8 +40,6 @@ pub fn rust_main() {
     sched::spawn_utask(alloc::sync::Arc::from(crate::task::Task {
         debug_message: alloc::string::String::from("hello world from test_task"),
     }));
-    sched::spawn_raw(test_main());
-    loop {
-        sched::run();
-    }
+    sched::run();
+    driver::sbi::shutdown();
 }

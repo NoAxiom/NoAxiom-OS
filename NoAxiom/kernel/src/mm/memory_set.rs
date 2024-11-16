@@ -1,17 +1,22 @@
 //! Address Space [`MemorySet`] management of Process
 
-use super::{frame_alloc, FrameTracker};
-use super::{PTEFlags, PageTable, PageTableEntry};
-use super::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum};
-use super::{StepByOne, VPNRange};
-use crate::config::{MEMORY_END, MMIO, PAGE_SIZE, TRAMPOLINE};
-use crate::sync::UPSafeCell;
-use alloc::collections::BTreeMap;
-use alloc::sync::Arc;
-use alloc::vec::Vec;
+use alloc::{collections::BTreeMap, sync::Arc, vec::Vec};
 use core::arch::asm;
+
+use bitflags::bitflags;
+use kernel_sync::SpinMutex;
 use lazy_static::*;
+use log::info;
 use riscv::register::satp;
+
+use super::{
+    frame_alloc, FrameTracker, PTEFlags, PageTable, PageTableEntry, PhysAddr, PhysPageNum,
+    StepByOne, VPNRange, VirtAddr, VirtPageNum,
+};
+use crate::{
+    config::mm::{MEMORY_END, PAGE_SIZE, TRAMPOLINE},
+    println,
+};
 
 extern "C" {
     fn stext();
@@ -28,13 +33,13 @@ extern "C" {
 
 lazy_static! {
     /// The kernel's initial memory mapping(kernel address space)
-    pub static ref KERNEL_SPACE: Arc<UPSafeCell<MemorySet>> =
-        Arc::new(unsafe { UPSafeCell::new(MemorySet::new_kernel()) });
+    pub static ref KERNEL_SPACE: SpinMutex<MemorySet> =
+         SpinMutex::new(MemorySet::new_kernel()) ;
 }
 
 /// the kernel token
 pub fn kernel_token() -> usize {
-    KERNEL_SPACE.exclusive_access().token()
+    KERNEL_SPACE.lock().token()
 }
 
 /// address space
@@ -165,18 +170,18 @@ impl MemorySet {
             ),
             None,
         );
-        info!("mapping memory-mapped registers");
-        for pair in MMIO {
-            memory_set.push(
-                MapArea::new(
-                    (*pair).0.into(),
-                    ((*pair).0 + (*pair).1).into(),
-                    MapType::Identical,
-                    MapPermission::R | MapPermission::W,
-                ),
-                None,
-            );
-        }
+        // info!("mapping memory-mapped registers");
+        // for pair in MMIO {
+        //     memory_set.push(
+        //         MapArea::new(
+        //             (*pair).0.into(),
+        //             ((*pair).0 + (*pair).1).into(),
+        //             MapType::Identical,
+        //             MapPermission::R | MapPermission::W,
+        //         ),
+        //         None,
+        //     );
+        // }
         memory_set
     }
     /// Include sections in elf and trampoline and TrapContext and user stack,
@@ -226,7 +231,8 @@ impl MemorySet {
             elf.header.pt2.entry_point() as usize,
         )
     }
-    /// Create a new address space by copy code&data from a exited process's address space.
+    /// Create a new address space by copy code&data from a exited process's
+    /// address space.
     pub fn from_existed_user(user_space: &Self) -> Self {
         let mut memory_set = Self::new_bare();
         // map trampoline
@@ -259,7 +265,7 @@ impl MemorySet {
         self.page_table.translate(vpn)
     }
 
-    ///Remove all `MapArea`
+    /// Remove all `MapArea`
     pub fn recycle_data_pages(&mut self) {
         self.areas.clear();
     }
@@ -415,27 +421,27 @@ bitflags! {
     }
 }
 
-/// test map function in page table
-#[allow(unused)]
-pub fn remap_test() {
-    let mut kernel_space = KERNEL_SPACE.exclusive_access();
-    let mid_text: VirtAddr = ((stext as usize + etext as usize) / 2).into();
-    let mid_rodata: VirtAddr = ((srodata as usize + erodata as usize) / 2).into();
-    let mid_data: VirtAddr = ((sdata as usize + edata as usize) / 2).into();
-    assert!(!kernel_space
-        .page_table
-        .translate(mid_text.floor())
-        .unwrap()
-        .writable(),);
-    assert!(!kernel_space
-        .page_table
-        .translate(mid_rodata.floor())
-        .unwrap()
-        .writable(),);
-    assert!(!kernel_space
-        .page_table
-        .translate(mid_data.floor())
-        .unwrap()
-        .executable(),);
-    println!("remap_test passed!");
-}
+// test map function in page table
+// #[allow(unused)]
+// pub fn remap_test() {
+//     let mut kernel_space = KERNEL_SPACE.lock().deref();
+//     let mid_text: VirtAddr = ((stext as usize + etext as usize) / 2).into();
+//     let mid_rodata: VirtAddr = ((srodata as usize + erodata as usize) /
+// 2).into();     let mid_data: VirtAddr = ((sdata as usize + edata as usize) /
+// 2).into();     assert!(!kernel_space
+//         .page_table
+//         .translate(mid_text.floor())
+//         .unwrap()
+//         .writable(),);
+//     assert!(!kernel_space
+//         .page_table
+//         .translate(mid_rodata.floor())
+//         .unwrap()
+//         .writable(),);
+//     assert!(!kernel_space
+//         .page_table
+//         .translate(mid_data.floor())
+//         .unwrap()
+//         .executable(),);
+//     println!("remap_test passed!");
+// }
