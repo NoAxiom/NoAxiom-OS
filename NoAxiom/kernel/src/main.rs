@@ -46,7 +46,7 @@ pub fn rust_main() {
     sched::spawn_utask(alloc::sync::Arc::from(crate::task::Task {
         debug_message: alloc::string::String::from("hello world from test_task"),
     }));
-    sched::spawn(test_main());
+    sched::spawn_raw(test_main());
     loop {
         sched::run();
     }

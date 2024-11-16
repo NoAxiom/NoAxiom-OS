@@ -1,5 +1,5 @@
 //! ## task future
-//! [`UserTaskFuture`] runs in user mode,
+//! [`UserTaskFuture`] basically runs in user mode,
 //! use [`spawn_utask`] to spawn user tasks
 
 use alloc::sync::Arc;
@@ -64,5 +64,5 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
 
 /// spawn a user task
 pub fn spawn_utask(task: Arc<Task>) {
-    executor::spawn(UserTaskFuture::new(task.clone(), utask_main(task)));
+    executor::spawn_raw(UserTaskFuture::new(task.clone(), utask_main(task)));
 }

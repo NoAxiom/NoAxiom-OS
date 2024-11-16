@@ -1,5 +1,5 @@
 //! ## async executor
-//! - [`spawn`] to add a task
+//! - [`spawn_raw`] to add a task
 //! - [`run`] to run next task
 
 use alloc::collections::vec_deque::VecDeque;
@@ -36,7 +36,7 @@ lazy_static! {
 }
 
 /// Add a raw task into task queue
-pub fn spawn<F, R>(future: F)
+pub fn spawn_raw<F, R>(future: F)
 where
     F: Future<Output = R> + Send + 'static,
     R: Send + 'static,
