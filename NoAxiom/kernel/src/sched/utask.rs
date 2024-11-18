@@ -37,15 +37,12 @@ pub async fn utask_main(task: Arc<Task>) {
 
 pub struct UserTaskFuture<F: Future + Send + 'static> {
     task: Arc<Task>,
-    task_future: F,
+    future: F,
 }
 
 impl<F: Future + Send + 'static> UserTaskFuture<F> {
     pub fn new(task: Arc<Task>, future: F) -> Self {
-        Self {
-            task,
-            task_future: future,
-        }
+        Self { task, future }
     }
 }
 
@@ -56,7 +53,7 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
         let this = unsafe { self.get_unchecked_mut() };
         let p = current_cpu();
         p.set_task(&mut this.task);
-        let ret = unsafe { Pin::new_unchecked(&mut this.task_future).poll(cx) };
+        let ret = unsafe { Pin::new_unchecked(&mut this.future).poll(cx) };
         p.clear_task();
         ret
     }
@@ -65,4 +62,26 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
 /// spawn a user task
 pub fn spawn_utask(task: Arc<Task>) {
     executor::spawn_raw(UserTaskFuture::new(task.clone(), utask_main(task)));
+}
+
+/// all types of futures should be wrapped in this struct
+pub struct TaskFuture<F: Future + Send + 'static> {
+    future: F,
+    prio: usize,
+}
+
+impl<F: Future + Send + 'static> TaskFuture<F> {
+    pub fn new(future: F, prio: usize) -> Self {
+        Self { future, prio }
+    }
+}
+
+impl<F: Future + Send + 'static> Future for TaskFuture<F> {
+    type Output = F::Output;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = unsafe { self.get_unchecked_mut() };
+        let ret = unsafe { Pin::new_unchecked(&mut this.future).poll(cx) };
+        ret
+    }
 }

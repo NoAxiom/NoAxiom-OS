@@ -8,7 +8,7 @@
 #![feature(panic_info_message)]
 #![feature(alloc_error_handler)]
 #![feature(slice_from_ptr_range)]
-#![allow(dead_code, unused_imports, unused_variables)]
+// #![allow(dead_code, unused_imports, unused_variables)]
 // #![feature(error_in_core)]
 // #![feature(negative_impls)]
 // #![feature(ascii_char)]
@@ -32,14 +32,18 @@ mod task;
 #[no_mangle]
 pub fn rust_main() {
     entry::clear_bss();
-    println!("[kernel] Hello, world!");
     println!("{}", config::NOAXIOM_BANNER);
-    println!("[kernel] init memory management...");
+    println!("[kernel] Hello, world!");
+
+    println!("[kernel] init memory management");
     mm::init();
-    println!("[kernel] executor is running...");
+
+    println!("[kernel] push init_proc to executor");
     sched::spawn_utask(alloc::sync::Arc::from(crate::task::Task {
         debug_message: alloc::string::String::from("hello world from test_task"),
     }));
+
+    println!("[kernel] executor is running...");
     sched::run();
     driver::sbi::shutdown();
 }

@@ -94,6 +94,10 @@ vendor:
 	cargo clean
 	cargo vendor
 
+count:
+	@echo "kernel code statistic:"
+	@cd $(PROJECT) && cloc $(KERNEL)
+
 # sdcard:
 # 	@echo "\e[49;34m\e[1m----------Making sdcard-----------\e[0m"
 # 	@rm -f $(FS_IMG)
@@ -139,4 +143,4 @@ vendor:
 # board:
 # 	@cp $(TARGET_DIR)/$(KERNEL).bin  $(TFTPBOOT)
 
-.PHONY: all build run debug clean debug-client sbi-qemu backup sdcard build-gui board vendor
+.PHONY: all build run debug clean debug-client sbi-qemu backup sdcard build-gui board vendor count
