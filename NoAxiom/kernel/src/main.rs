@@ -15,6 +15,8 @@
 // #![feature(custom_mir)]
 // #![feature(core_intrinsics)]
 
+use log::info;
+
 extern crate alloc;
 
 mod arch;
@@ -32,8 +34,9 @@ mod task;
 #[no_mangle]
 pub fn rust_main() {
     entry::clear_bss();
-    println!("{}", config::NOAXIOM_BANNER);
-    println!("[kernel] Hello, world!");
+    driver::log::init();
+    info!("{}", config::NOAXIOM_BANNER);
+    info!("[kernel] Hello, world!");
 
     println!("[kernel] init memory management");
     mm::init();
