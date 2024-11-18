@@ -35,18 +35,21 @@ mod task;
 pub fn rust_main() {
     entry::clear_bss();
     driver::log::init();
-    info!("{}", config::NOAXIOM_BANNER);
-    info!("[kernel] Hello, world!");
+    println!("{}", config::NOAXIOM_BANNER);
+    println!("[kernel] Hello, world!");
 
     println!("[kernel] init memory management");
     mm::init();
 
     println!("[kernel] push init_proc to executor");
-    sched::spawn_utask(alloc::sync::Arc::from(crate::task::Task {
-        debug_message: alloc::string::String::from("hello world from test_task"),
-    }));
+    sched::spawn_raw(sched::sched_test());
+    // sched::spawn_utask(alloc::sync::Arc::from(crate::task::Task {
+    //     debug_message: alloc::string::String::from("hello world from test_task"),
+    // }));
 
     println!("[kernel] executor is running...");
-    sched::run();
+    loop {
+        sched::run();
+    }
     driver::sbi::shutdown();
 }
