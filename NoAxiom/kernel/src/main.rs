@@ -31,6 +31,13 @@ mod sync;
 mod syscall;
 mod task;
 
+core::arch::global_asm!(include_str!("link_apps.S"));
+
+async fn temp_test_task() {
+    println!("[kernel] read_user_task is running...");
+    let mut task = task::Task::new(0).await;
+}
+
 #[no_mangle]
 pub fn rust_main() {
     entry::clear_bss();
@@ -40,16 +47,18 @@ pub fn rust_main() {
 
     println!("[kernel] init memory management");
     mm::init();
+    mm::remap_test();
 
     println!("[kernel] push init_proc to executor");
-    sched::spawn_raw(sched::sched_test());
-    // sched::spawn_utask(alloc::sync::Arc::from(crate::task::Task {
-    //     debug_message: alloc::string::String::from("hello world from test_task"),
-    // }));
+    sched::spawn_utask(alloc::sync::Arc::from(crate::task::Task {
+        tid: crate::task::tid_alloc(),
+        debug_message: alloc::string::String::from("[kernel] hello world from kernel"),
+    }));
+
+    sched::spawn_raw(temp_test_task());
 
     println!("[kernel] executor is running...");
     loop {
         sched::run();
     }
-    driver::sbi::shutdown();
 }

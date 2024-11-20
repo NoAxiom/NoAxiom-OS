@@ -8,8 +8,12 @@ use core::future::Future;
 
 use async_task::{Builder, Runnable, ScheduleInfo, WithInfo};
 use lazy_static::lazy_static;
+use log::info;
 
-use crate::{config::sched::MLFQ_LEVELS, sync::{cell::SyncRefCell, mutex::SpinMutex}};
+use crate::{
+    config::sched::MLFQ_LEVELS,
+    sync::{cell::SyncRefCell, mutex::SpinMutex},
+};
 
 struct TaskScheduleInfoInner {
     prio: usize,
@@ -82,8 +86,14 @@ lazy_static! {
 fn schedule(task: Runnable<TaskScheduleInfo>, info: ScheduleInfo) {
     info!("[sched] schedule task, prio: {}", task.metadata().level());
     task.metadata().update();
-    info!("[sched] schedule task, new prio: {}", task.metadata().level());
-    info!("[sched] schedule task, woken_while_running: {}", info.woken_while_running);
+    info!(
+        "[sched] schedule task, new prio: {}",
+        task.metadata().level()
+    );
+    info!(
+        "[sched] schedule task, woken_while_running: {}",
+        info.woken_while_running
+    );
     if info.woken_while_running {
         EXECUTOR.lock().push_front(task);
     } else {
