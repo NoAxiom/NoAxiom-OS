@@ -52,6 +52,7 @@ pub fn trap_restore(task: &Arc<Task>) {
 }
 
 /// debug: show sstatus
+#[allow(unused)]
 pub fn show_sstatus() {
     println!("show sstatus");
     let sstatus = sstatus::read();

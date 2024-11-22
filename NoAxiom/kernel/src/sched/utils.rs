@@ -34,6 +34,7 @@ impl Future for YieldFuture {
 
 /// yield current task by awaiting this future
 #[inline(always)]
+#[allow(unused)]
 pub async fn yield_now() {
     YieldFuture::new().await;
 }
@@ -52,6 +53,7 @@ impl Future for TakeWakerFuture {
 
 /// Take the waker of the current future
 #[inline(always)]
+#[allow(unused)]
 pub async fn take_waker() -> Waker {
     TakeWakerFuture.await
 }

@@ -3,13 +3,12 @@
 use alloc::sync::Arc;
 
 use riscv::register::{
-    scause::{self, Exception, Interrupt, Trap},
-    sepc, stval,
-    stvec::{self, TrapMode},
+    scause::{self, Exception, Trap},
+    stval,
 };
 
 use super::trap::set_kernel_trap_entry;
-use crate::{constant::register::A0, cpu::current_cpu, mm::VirtAddr, syscall::syscall, task::Task};
+use crate::{constant::register::A0, syscall::syscall, task::Task};
 
 /// kernel trap handler
 #[no_mangle]

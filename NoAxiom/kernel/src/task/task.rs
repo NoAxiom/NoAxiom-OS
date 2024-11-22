@@ -7,16 +7,11 @@ use super::taskid::TaskId;
 use crate::{
     arch::interrupt::is_interrupt_enable,
     mm::MemorySet,
-    println,
     sched::spawn_task,
     sync::{cell::SyncUnsafeCell, mutex::SpinMutex},
     task::{load_app::get_app_data, taskid::tid_alloc},
     trap::{trap_restore, user_trap_handler, TrapContext},
 };
-
-pub struct ProcessControlBlock {
-    pub pid: AtomicUsize,
-}
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum TaskStatus {
@@ -27,6 +22,9 @@ pub enum TaskStatus {
 
 /// process resources info
 pub struct ProcessInfo {
+    /// process id
+    pub pid: AtomicUsize,
+
     /// memory set
     pub memory_set: MemorySet,
 }
@@ -60,6 +58,7 @@ pub struct Task {
 
 /// user tasks
 /// - usage: wrap it in Arc<Task>
+#[allow(unused)]
 impl Task {
     /// tid
     pub fn tid(&self) -> usize {
@@ -156,7 +155,10 @@ pub fn spawn_new_process(app_id: usize) {
     info!("[kernel] succeed to load elf data");
     let task = Arc::new(Task {
         tid: tid_alloc(),
-        process: Arc::new(SpinMutex::new(ProcessInfo { memory_set })),
+        process: Arc::new(SpinMutex::new(ProcessInfo {
+            pid: AtomicUsize::new(0), // TODO: pid_alloc()
+            memory_set,
+        })),
         thread: SyncUnsafeCell::new(ThreadInfo {
             trap_context: TrapContext::app_init_cx(elf_entry, user_sp),
         }),

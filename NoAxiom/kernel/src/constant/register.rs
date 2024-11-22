@@ -1,3 +1,4 @@
+#![allow(unused)]
 pub const ZERO: usize = 0;
 pub const RA: usize = 1;
 pub const SP: usize = 2;
