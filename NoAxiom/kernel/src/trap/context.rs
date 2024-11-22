@@ -29,13 +29,14 @@
 //! X10 ~ X17	     a0 ~ a7    用于函数调用，被调用函数需要保存的数据
 //! X18 ~ X27	     s2 ~ s11   用于函数调用，传递参数和返回值
 
-use riscv::register::sstatus::{self, Sstatus, SPP};
+use riscv::register::sstatus::SPP;
 
-use crate::constant::register::*;
+use crate::{arch::regs::Sstatus, constant::register::*};
 
 /// Trap Context
 /// save registers when trap occurs
 /// we don't expect this to derive Clone
+#[repr(C)]
 pub struct TrapContext {
     /// 0: 32 general registers
     pub regs: [usize; 32],
@@ -66,8 +67,8 @@ pub struct TrapContext {
 
 impl TrapContext {
     pub fn app_init_cx(entry: usize, sp: usize) -> Self {
-        let sstatus = sstatus::read();
-        unsafe { sstatus::set_spp(SPP::User) };
+        let mut sstatus = Sstatus::read();
+        sstatus.set_spp(SPP::User);
         let mut cx = Self {
             regs: [0; 32],
             sstatus,
