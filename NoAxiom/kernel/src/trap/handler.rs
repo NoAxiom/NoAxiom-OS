@@ -8,19 +8,8 @@ use riscv::register::{
     stvec::{self, TrapMode},
 };
 
-use crate::{
-    arch::regs::gpr_const::A0, cpu::current_cpu, mm::VirtAddr, syscall::syscall, task::Task,
-};
-
-/// set trap entry in smode
-fn set_kernel_trap_entry() {
-    unsafe { stvec::write(super::trap_from_kernel as usize, TrapMode::Direct) }
-}
-
-/// set trap entry in umode
-fn set_user_trap_entry() {
-    unsafe { stvec::write(super::user_trapvec as usize, TrapMode::Direct) }
-}
+use super::trap::set_kernel_trap_entry;
+use crate::{constant::register::A0, cpu::current_cpu, mm::VirtAddr, syscall::syscall, task::Task};
 
 /// kernel trap handler
 #[no_mangle]
@@ -31,12 +20,13 @@ pub fn kernel_trap_handler() {
 /// user trap handler
 #[no_mangle]
 pub async fn user_trap_handler(task: &Arc<Task>) {
+    info!("call: trap handler");
     set_kernel_trap_entry();
     let mut cx = task.trap_context_mut();
     let scause = scause::read();
     let stval = stval::read();
     match scause.cause() {
-        // 陷入：系统调用请求
+        // syscall
         Trap::Exception(Exception::UserEnvCall) => {
             cx.sepc += 4;
             let result = syscall(task, cx).await;

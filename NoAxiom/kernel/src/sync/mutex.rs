@@ -48,7 +48,7 @@ const DEFAULT_CPU: SafeRefCell<Cpu> = SafeRefCell::new(Cpu::new());
 
 static CPUS: [SafeRefCell<Cpu>; CPU_NUM] = [DEFAULT_CPU; CPU_NUM];
 
-fn mycpu() -> RefMut<'static, Cpu> {
+fn current_cpu() -> RefMut<'static, Cpu> {
     CPUS[hartid()].0.borrow_mut()
 }
 
@@ -70,7 +70,7 @@ impl LockAction for KernelLockAction {
 pub(crate) fn push_off() {
     let old = is_interrupt_enable();
     interrupt_disable();
-    let mut cpu = mycpu();
+    let mut cpu = current_cpu();
     if cpu.push_off_depth == 0 {
         cpu.interrupt_enable = old;
     }
@@ -79,7 +79,7 @@ pub(crate) fn push_off() {
 
 /// enable interrupt if depth decline to 0
 pub(crate) fn pop_off() {
-    let mut cpu = mycpu();
+    let mut cpu = current_cpu();
     cpu.push_off_depth -= 1;
     let should_enable = cpu.push_off_depth == 0 && cpu.interrupt_enable;
     drop(cpu); // drop before int_en

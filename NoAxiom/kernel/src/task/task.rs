@@ -5,12 +5,13 @@ use core::sync::atomic::{AtomicI8, AtomicUsize};
 
 use super::taskid::TaskId;
 use crate::{
+    arch::interrupt::is_interrupt_enable,
     mm::MemorySet,
     println,
     sched::spawn_task,
     sync::{cell::SyncUnsafeCell, mutex::SpinMutex},
     task::{load_app::get_app_data, taskid::tid_alloc},
-    trap::{context::TrapContext, handler::user_trap_handler, trap_return},
+    trap::{trap_restore, user_trap_handler, TrapContext},
 };
 
 pub struct ProcessControlBlock {
@@ -51,7 +52,7 @@ pub struct Task {
     thread: SyncUnsafeCell<ThreadInfo>,
 
     /// task status: ready / running / zombie
-    status: SpinMutex<TaskStatus>,
+    status: SyncUnsafeCell<TaskStatus>,
 
     /// task exit code
     exit_code: AtomicI8,
@@ -66,17 +67,23 @@ impl Task {
     }
 
     /// status
+    pub fn status(&self) -> &TaskStatus {
+        unsafe { &(*self.status.get()) }
+    }
+    pub fn status_mut(&self) -> &mut TaskStatus {
+        unsafe { &mut (*self.status.get()) }
+    }
     pub fn set_status(&self, status: TaskStatus) {
-        *self.status.lock() = status;
+        *self.status_mut() = status;
     }
     pub fn is_zombie(&self) -> bool {
-        *self.status.lock() == TaskStatus::Zombie
+        *self.status() == TaskStatus::Zombie
     }
     pub fn is_running(&self) -> bool {
-        *self.status.lock() == TaskStatus::Running
+        *self.status() == TaskStatus::Running
     }
     pub fn is_ready(&self) -> bool {
-        *self.status.lock() == TaskStatus::Ready
+        *self.status() == TaskStatus::Ready
     }
 
     /// exit code
@@ -96,12 +103,20 @@ impl Task {
         unsafe { &mut (*self.thread.get()) }
     }
 
+    /// process info
+    pub fn process(&self) -> &SpinMutex<ProcessInfo> {
+        &self.process
+    }
+
     /// memory set
+    pub fn memory_activate(&self) {
+        self.process.lock().memory_set.activate();
+    }
+    pub fn token(&self) -> usize {
+        self.process.lock().memory_set.token()
+    }
     pub fn set_memory_set(&self, memory_set: MemorySet) {
         self.process.lock().memory_set = memory_set;
-    }
-    pub fn token(&self) {
-        self.process.lock().memory_set.token();
     }
 
     /// trap context
@@ -120,11 +135,15 @@ impl Task {
 pub async fn task_main(task: Arc<Task>) {
     while !task.is_zombie() {
         // kernel -> user
-        trap_return(&task);
+        info!("task_main: trap_restore");
+        trap_restore(&task);
+        info!("task_main: trap_restore done, {}", is_interrupt_enable());
         if task.is_zombie() {
+            info!("task {} is zombie, break", task.tid());
             break;
         }
         // user -> kernel
+        info!("task_main: user_trap_handler");
         user_trap_handler(&task).await;
     }
 }
@@ -134,14 +153,14 @@ pub fn spawn_new_process(app_id: usize) {
     info!("[kernel] spawn new process from elf");
     let elf_data = get_app_data(app_id);
     let (memory_set, user_sp, elf_entry) = MemorySet::from_elf(elf_data);
-    info!("[kernel] success to load elf data");
+    info!("[kernel] succeed to load elf data");
     let task = Arc::new(Task {
         tid: tid_alloc(),
         process: Arc::new(SpinMutex::new(ProcessInfo { memory_set })),
         thread: SyncUnsafeCell::new(ThreadInfo {
             trap_context: TrapContext::app_init_cx(elf_entry, user_sp),
         }),
-        status: SpinMutex::new(TaskStatus::Ready),
+        status: SyncUnsafeCell::new(TaskStatus::Ready),
         exit_code: AtomicI8::new(0),
     });
     info!("create a new task, tid {}", task.tid.0);

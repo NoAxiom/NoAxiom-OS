@@ -1,6 +1,6 @@
 use alloc::sync::Arc;
 
-use crate::{arch::regs::gpr_const::*, task::Task, trap::context::TrapContext};
+use crate::{constant::register::*, task::Task, trap::TrapContext};
 
 mod syscall;
 

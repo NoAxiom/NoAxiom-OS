@@ -250,6 +250,7 @@ impl MemorySet {
     }
     /// Change page table by writing satp CSR Register.
     pub fn activate(&self) {
+        info!("activate");
         let satp = self.page_table.token();
         unsafe {
             satp::write(satp);

@@ -31,7 +31,7 @@
 
 use riscv::register::sstatus::{self, Sstatus, SPP};
 
-use crate::arch::regs::gpr_const::*;
+use crate::constant::register::*;
 
 /// Trap Context
 /// save registers when trap occurs

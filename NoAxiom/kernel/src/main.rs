@@ -15,7 +15,7 @@
 // #![feature(custom_mir)]
 // #![feature(core_intrinsics)]
 
-#[macro_use]
+// #[macro_use]
 extern crate alloc;
 #[macro_use]
 extern crate log;
@@ -41,7 +41,7 @@ core::arch::global_asm!(include_str!("link_apps.S"));
 pub fn rust_main() {
     entry::clear_bss();
     driver::log::init();
-    println!("{}", config::NOAXIOM_BANNER);
+    println!("{}", constant::banner::NOAXIOM_BANNER);
     println!("[kernel] Hello, world!");
     println!("[kernel] init memory management");
     mm::init();
