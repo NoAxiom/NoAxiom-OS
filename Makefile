@@ -11,6 +11,8 @@ export ROOT := $(shell pwd)
 export TARGET_DIR := $(ROOT)/target/$(TARGET)/$(MODE)
 export SBI ?= $(ROOT)/$(PROJECT)/bootloader/rustsbi-qemu.bin
 
+export LOG ?= INFO
+
 # partition config
 # export ROOTFS  ?= $(ROOT)/part/img/sdcard-riscv.img
 # export TESTFS  ?= $(ROOT)/fs.img

@@ -10,30 +10,10 @@ use core::{
 };
 
 use super::executor;
-use crate::{arch::current_cpu, task::Task};
-
-pub async fn utask_main(task: Arc<Task>) {
-    // TODO: this is for test
-    task.test();
-
-    // task.set_waker(utils::take_waker().await);
-    // loop {
-    // if task.is_zombie() {
-    //     break;
-    // }
-    // trap_return(&task); // kernel -> user
-    // if task.is_zombie() {
-    //     break;
-    // }
-    // user_trap_handler(&task).await; // user -> kernel
-    // if task.is_zombie() {
-    //     break;
-    // }
-    // check_interval_timer(&task);
-    // let _ = check_signal(&task);
-    // }
-    // handle_exit(&task);
-}
+use crate::{
+    cpu::current_cpu,
+    task::{task_main, Task},
+};
 
 pub struct UserTaskFuture<F: Future + Send + 'static> {
     task: Arc<Task>,
@@ -60,8 +40,8 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
 }
 
 /// spawn a user task
-pub fn spawn_utask(task: Arc<Task>) {
-    executor::spawn_raw(UserTaskFuture::new(task.clone(), utask_main(task)));
+pub fn spawn_task(task: Arc<Task>) {
+    executor::spawn_raw(UserTaskFuture::new(task.clone(), task_main(task)));
 }
 
 // all types of futures should be wrapped in this struct

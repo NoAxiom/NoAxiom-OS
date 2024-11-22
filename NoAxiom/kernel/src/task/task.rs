@@ -1,21 +1,16 @@
 //! # Task
 
-use alloc::{
-    string::{String, ToString},
-    sync::Arc,
-};
-use core::{
-    sync::atomic::{AtomicI8, AtomicUsize},
-    task::Waker,
-};
+use alloc::sync::Arc;
+use core::sync::atomic::{AtomicI8, AtomicUsize};
 
 use super::taskid::TaskId;
 use crate::{
     mm::MemorySet,
     println,
-    sched::spawn_utask,
-    sync::mutex::SpinMutex,
+    sched::spawn_task,
+    sync::{cell::SyncUnsafeCell, mutex::SpinMutex},
     task::{load_app::get_app_data, taskid::tid_alloc},
+    trap::{context::TrapContext, handler::user_trap_handler, trap_return},
 };
 
 pub struct ProcessControlBlock {
@@ -29,111 +24,126 @@ pub enum TaskStatus {
     Zombie,
 }
 
-/// Task Control Block
-/// 使用了细粒度的Arc进行锁定, 而不是使用大锁+inner进行锁定
-pub struct Task {
-    /// task id
-    pub tid: TaskId,
-
-    // only for temporary debug
-    pub debug_message: String,
-    // task status: ready / running / zombie
-    // pub status: SpinMutex<TaskStatus>,
-
-    // task exit code
-    // pub exit_code: AtomicI8,
-
-    // async waker
-    // TODO: consider move to other struct
-    // pub waker: Option<Waker>,
+/// process resources info
+pub struct ProcessInfo {
+    /// memory set
+    pub memory_set: MemorySet,
 }
 
+/// thread resources info
+pub struct ThreadInfo {
+    /// trap context,
+    /// contains stack ptr, registers, etc.
+    pub trap_context: TrapContext,
+}
+
+/// task control block for a coroutine,
+/// a.k.a thread in current project structure
+pub struct Task {
+    /// task identifier
+    tid: TaskId,
+
+    /// process control block ptr,
+    /// also belongs to other threads
+    process: Arc<SpinMutex<ProcessInfo>>,
+
+    /// thread control block ptr
+    thread: SyncUnsafeCell<ThreadInfo>,
+
+    /// task status: ready / running / zombie
+    status: SpinMutex<TaskStatus>,
+
+    /// task exit code
+    exit_code: AtomicI8,
+}
+
+/// user tasks
+/// - usage: wrap it in Arc<Task>
 impl Task {
-    // status
-    // pub fn set_status(&self, status: TaskStatus) {
-    //     *self.status.lock() = status;
-    // }
-    // pub fn is_zombie(&self) -> bool {
-    //     *self.status.lock() == TaskStatus::Zombie
-    // }
-    // pub fn is_running(&self) -> bool {
-    //     *self.status.lock() == TaskStatus::Running
-    // }
-    // pub fn is_ready(&self) -> bool {
-    //     *self.status.lock() == TaskStatus::Ready
-    // }
-
-    // exit code
-    // pub fn exit_code(&self) -> i8 {
-    //     self.exit_code.load(core::sync::atomic::Ordering::Relaxed)
-    // }
-    // pub fn set_exit_code(&self, exit_code: i8) {
-    //     self.exit_code
-    //         .store(exit_code, core::sync::atomic::Ordering::Relaxed);
-    // }
-
-    // debug message
-    pub fn set_debug_message(&mut self, message: String) {
-        self.debug_message = message;
-    }
-    pub fn test(&self) {
-        println!(
-            "[test] Task is running, Debug message: {}",
-            self.debug_message
-        );
+    /// tid
+    pub fn tid(&self) -> usize {
+        self.tid.0
     }
 
-    /// 通过 elf 数据新建一个任务控制块，
-    pub async fn new(app_id: usize) {
-        let elf_data = get_app_data(app_id);
-        // println!("elf_data: {:?}", elf_data);
-        // 解析传入的 ELF 格式数据构造应用的地址空间 memory_set 并获得其他信息
-        let (memory_set, user_sp, elf_entry) = MemorySet::from_elf(elf_data);
-        log::info!("success to load elf data");
-        let taskid = tid_alloc();
-        let task = Arc::new(Self {
-            tid: taskid,
-            debug_message: "CRATE new task".to_string(),
-            // task_status: SpinMutex::new(TaskStatus::Ready),
-            // pgid: AtomicUsize::new(0),
-            // tgid: AtomicUsize::new(tgid),
-            // pending_signals: Arc::new(SpinMutex::new(PendingSigs::new())),
-            // sigactions: Arc::new(SpinMutex::new(SigActions::new())),
-            // memory_set: Arc::new(SpinMutex::new(memory_set)),
-            // fd_table: Arc::new(SpinMutex::new(FdTable::new())),
-            // thread_group: Arc::new(SpinMutex::new(ThreadGroup::new())),
-            // futex_queue: Arc::new(SpinMutex::new(FutexQueue::new())),
-            // pcb: Arc::new(SpinMutex::new(ProcessInfo {
-            //     trap_cause: None,
-            //     parent: None,
-            //     children: Vec::new(),
-            //     // thread_group: ThreadGroup::new(),
-            //     // exit_code: None,
-            //     current_path: AbsolutePath::from_str("/"), // cwd
-            //     interval_timer: None,
-            //     rlimit_nofile: RLimit::new(FD_LIMIT, FD_LIMIT),
-            //     robust_list: RobustList::default(),
-            //     // futex_queue: FutexQueue::new(),
-            //     // #[cfg(not(feature = "multicore"))]
-            //     // pselect_times: 0,
-            // })),
-            // threadinfo: SyncUnsafeCell::new(ThreadInfo {
-            //     trap_context: {
-            //         let trap_cx = TrapContext::app_init_context(entry_point, user_sp);
-            //         trap_cx
-            //     },
-            //     cpu_mask: CpuMask::new(),
-            //     waker: None,
-            //     clear_child_tid: None,
-            //     set_child_tid: None,
-            //     timeinfo: TimeInfo::new(),
-            // }),
-            // exit_signal: AtomicU8::new(0),
-            // sig_struct: SyncUnsafeCell::new(SignalStruct::new()),
-            // interrupt_count: SpinMutex::new(BTreeMap::new()),
-            // exitcode: AtomicI32::new(0),
-        });
-        log::info!("create a new task, tid {}", task.tid.0);
-        spawn_utask(task);
+    /// status
+    pub fn set_status(&self, status: TaskStatus) {
+        *self.status.lock() = status;
     }
+    pub fn is_zombie(&self) -> bool {
+        *self.status.lock() == TaskStatus::Zombie
+    }
+    pub fn is_running(&self) -> bool {
+        *self.status.lock() == TaskStatus::Running
+    }
+    pub fn is_ready(&self) -> bool {
+        *self.status.lock() == TaskStatus::Ready
+    }
+
+    /// exit code
+    pub fn exit_code(&self) -> i8 {
+        self.exit_code.load(core::sync::atomic::Ordering::Relaxed)
+    }
+    pub fn set_exit_code(&self, exit_code: i8) {
+        self.exit_code
+            .store(exit_code, core::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// thread info
+    pub fn thread(&self) -> &ThreadInfo {
+        unsafe { &(*self.thread.get()) }
+    }
+    pub fn thread_mut(&self) -> &mut ThreadInfo {
+        unsafe { &mut (*self.thread.get()) }
+    }
+
+    /// memory set
+    pub fn set_memory_set(&self, memory_set: MemorySet) {
+        self.process.lock().memory_set = memory_set;
+    }
+    pub fn token(&self) {
+        self.process.lock().memory_set.token();
+    }
+
+    /// trap context
+    pub fn trap_context(&self) -> &TrapContext {
+        &self.thread().trap_context
+    }
+    pub fn trap_context_mut(&self) -> &mut TrapContext {
+        &mut self.thread_mut().trap_context
+    }
+    pub fn set_trap_context(&self, trap_context: TrapContext) {
+        self.thread_mut().trap_context = trap_context;
+    }
+}
+
+/// user task main
+pub async fn task_main(task: Arc<Task>) {
+    while !task.is_zombie() {
+        // kernel -> user
+        trap_return(&task);
+        if task.is_zombie() {
+            break;
+        }
+        // user -> kernel
+        user_trap_handler(&task).await;
+    }
+}
+
+/// create new process from elf
+pub fn spawn_new_process(app_id: usize) {
+    info!("[kernel] spawn new process from elf");
+    let elf_data = get_app_data(app_id);
+    let (memory_set, user_sp, elf_entry) = MemorySet::from_elf(elf_data);
+    info!("[kernel] success to load elf data");
+    let task = Arc::new(Task {
+        tid: tid_alloc(),
+        process: Arc::new(SpinMutex::new(ProcessInfo { memory_set })),
+        thread: SyncUnsafeCell::new(ThreadInfo {
+            trap_context: TrapContext::app_init_cx(elf_entry, user_sp),
+        }),
+        status: SpinMutex::new(TaskStatus::Ready),
+        exit_code: AtomicI8::new(0),
+    });
+    info!("create a new task, tid {}", task.tid.0);
+    spawn_task(task);
 }

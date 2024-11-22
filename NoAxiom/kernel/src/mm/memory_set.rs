@@ -1,22 +1,18 @@
 //! Address Space [`MemorySet`] management of Process
 
-use alloc::{collections::BTreeMap, sync::Arc, vec::Vec};
+use alloc::{collections::BTreeMap, vec::Vec};
 use core::arch::asm;
 
 use bitflags::bitflags;
 use kernel_sync::SpinMutex;
 use lazy_static::*;
-use log::info;
 use riscv::register::satp;
 
 use super::{
     frame_alloc, FrameTracker, PTEFlags, PageTable, PageTableEntry, PhysAddr, PhysPageNum,
     StepByOne, VPNRange, VirtAddr, VirtPageNum,
 };
-use crate::{
-    config::mm::{MEMORY_END, PAGE_SIZE, TRAMPOLINE},
-    println,
-};
+use crate::config::mm::{MEMORY_END, PAGE_SIZE, TRAMPOLINE};
 
 extern "C" {
     fn stext();

@@ -18,7 +18,7 @@ version = "0.1.0"
 
 [dependencies]
 log = "0.4"
-riscv = "0.12"
+riscv = "0.11"
 bitflags = "1.2.1"
 xmas-elf = "0.9.0"
 virtio-drivers = "0.6.0"
@@ -53,4 +53,5 @@ async-task = { version = "4", default-features = false }
 buddy_system_allocator = "0.6" # for temporarily use
 thiserror = { version = "1.0", package = "thiserror-core", default-features = false }
 kernel-sync = { git = "https://github.com/os-module/kernel-sync.git" }
+paste = "1"
 # spin = "0.9"

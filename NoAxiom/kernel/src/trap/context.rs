@@ -23,7 +23,7 @@
 //! X2	             sp	        栈指针寄存器，指向栈的地址
 //! X3	             gp	        全局寄存器，用于链接器松弛优化
 //! X4	             tp	        线程寄存器
-//! X5 ~ X7 X28 ~ X31 t0 ~ t6    常用于在OS中保存指向进程控制块数据结构的指针
+//! X5 ~ X7 X28 ~ X31 t0 ~ t6   常用于在OS中保存指向进程控制块数据结构的指针
 //! X8	             s0/fp	    临时寄存器/帧指针寄存器
 //! X9	             s1         用于函数调用，被调用函数需保存数据
 //! X10 ~ X17	     a0 ~ a7    用于函数调用，被调用函数需要保存的数据
@@ -31,42 +31,11 @@
 
 use riscv::register::sstatus::{self, Sstatus, SPP};
 
-const ZERO: usize = 0;
-const RA: usize = 1;
-const SP: usize = 2;
-const GP: usize = 3;
-const TP: usize = 4;
-const T0: usize = 5;
-const T1: usize = 6;
-const T2: usize = 7;
-const S0: usize = 8;
-const FP: usize = 8;
-const S1: usize = 9;
-const A0: usize = 10;
-const A1: usize = 11;
-const A2: usize = 12;
-const A3: usize = 13;
-const A4: usize = 14;
-const A5: usize = 15;
-const A6: usize = 16;
-const A7: usize = 17;
-const S2: usize = 18;
-const S3: usize = 19;
-const S4: usize = 20;
-const S5: usize = 21;
-const S6: usize = 22;
-const S7: usize = 23;
-const S8: usize = 24;
-const S9: usize = 25;
-const S10: usize = 26;
-const S11: usize = 27;
-const T3: usize = 28;
-const T4: usize = 29;
-const T5: usize = 30;
-const T6: usize = 31;
+use crate::arch::regs::gpr_const::*;
 
-/// # Trap Context
+/// Trap Context
 /// save registers when trap occurs
+/// we don't expect this to derive Clone
 pub struct TrapContext {
     /// 0: 32 general registers
     pub regs: [usize; 32],
@@ -76,12 +45,12 @@ pub struct TrapContext {
 
     /// 33: exception pc
     pub sepc: usize,
-    // 34: process kernel stack top (virtual address)
-    // pub kernel_sp: usize,
 
-    // 35
-    // pub kernel_ra: usize,
+    /// 34: process kernel stack top (virtual address)
+    pub kernel_sp: usize,
 
+    /// 35
+    pub kernel_ra: usize,
     // 36 - 47
     // pub kernel_s: [usize; 12],
 
@@ -103,8 +72,8 @@ impl TrapContext {
             regs: [0; 32],
             sstatus,
             sepc: entry,
-            // kernel_sp: 0,
-            // kernel_ra: 0,
+            kernel_sp: 0,
+            kernel_ra: 0,
             // kernel_s: [0; 12],
             // kernel_fp: 0,
             // todo: hart_id for multi-core

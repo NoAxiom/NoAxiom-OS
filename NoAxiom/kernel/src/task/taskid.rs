@@ -38,7 +38,7 @@ impl TidAllocator {
 
 static TID_ALLOCATOR: SpinMutex<TidAllocator> = SpinMutex::new(TidAllocator::new());
 
-/// 使用TaskID包装, 保证自动Dealloc
+/// task id with auto dealloc
 pub struct TaskId(pub usize);
 
 impl Into<usize> for TaskId {

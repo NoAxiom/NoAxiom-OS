@@ -3,12 +3,10 @@
 //! - [`run`] to run next task
 
 use alloc::{collections::vec_deque::VecDeque, vec::Vec};
-use log::info;
 use core::future::Future;
 
 use async_task::{Builder, Runnable, ScheduleInfo, WithInfo};
 use lazy_static::lazy_static;
-use log::info;
 
 use crate::{
     config::sched::MLFQ_LEVELS,

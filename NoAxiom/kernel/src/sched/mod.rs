@@ -9,7 +9,7 @@ mod utask;
 mod utils;
 
 pub use executor::{run, spawn_raw};
-pub use utask::spawn_utask;
+pub use utask::spawn_task;
 pub use utils::{take_waker, yield_now};
 
 // schedule test
