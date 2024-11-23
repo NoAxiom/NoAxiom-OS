@@ -4,7 +4,7 @@
         {
             "type": "cppdbg",
             "request": "launch",
-            "name": "Attach to gdbserver",
+            "name": "Debug RISC-V",
             "program": "${workspaceFolder}/target/riscv64gc-unknown-none-elf/release/kernel",
             "cwd": "${workspaceFolder}/NoAxiom/kernel",
             "stopAtEntry": true,
@@ -13,7 +13,7 @@
             "MIMode": "gdb",
             "setupCommands": [
                 {
-                    "description": "为 gdb 启用整齐打印",
+                    "description": "Enable pretty-printing for gdb",
                     "text": "-enable-pretty-printing",
                     "ignoreFailures": true
                 },
@@ -29,7 +29,7 @@
                 // },
             ],
             "miDebuggerServerAddress": "localhost:1234",
-            "miDebuggerPath": "/home/yuxuaan/os/riscv64-unknown-elf-gcc-8.3.0-2020.04.1-x86_64-linux-ubuntu14/bin/riscv64-unknown-elf-gdb",
+            "miDebuggerPath": "/usr/bin/riscv64-unknown-elf-gcc-8.3.0-2020.04.1-x86_64-linux-ubuntu14/bin/riscv64-unknown-elf-gdb",
             "args": ["-ex 'file target/riscv64gc-unknown-none-elf/release/kernel.bin'"], 
             "preLaunchTask": "qemu",
         }

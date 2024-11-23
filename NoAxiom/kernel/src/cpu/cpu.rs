@@ -18,17 +18,17 @@ impl Cpu {
         Self { task: None }
     }
 
-    pub fn set_raw_task(&mut self, task: Arc<Task>) {
+    fn set_raw_task(&mut self, task: Arc<Task>) {
         self.task = Some(task);
     }
-    pub fn clear_raw_task(&mut self) {
+    fn clear_raw_task(&mut self) {
         self.task = None;
     }
 
     // TODO: mm
     pub fn set_task(&mut self, task: &mut Arc<Task>) {
         self.set_raw_task(task.clone());
-        task.memory_activate();
+        // task.memory_activate();
     }
     pub fn clear_task(&mut self) {
         self.clear_raw_task();

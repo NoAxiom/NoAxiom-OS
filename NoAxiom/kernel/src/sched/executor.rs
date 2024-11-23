@@ -24,7 +24,8 @@ impl TaskScheduleInfoInner {
         self.prio
     }
     pub fn update(&mut self) {
-        self.prio = self.prio + 1;
+        info!("update task prio");
+        // self.prio = self.prio + 1;
     }
 }
 

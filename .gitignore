@@ -1,6 +1,7 @@
 target/
 tmp/
 .*/
+.*
 !.cargo/
 !.vscode/
 vendor/
