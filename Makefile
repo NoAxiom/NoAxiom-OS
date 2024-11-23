@@ -52,6 +52,7 @@ QFLAGS += -machine virt
 QFLAGS += -nographic
 QFLAGS += -smp 1
 QFLAGS += -kernel kernel-qemu
+QFLAGS += -device loader,file=$(KERNEL_BIN),addr=0x80200000
 # QFLAGS += -drive file=$(SDCARD_BAK),if=none,format=raw,id=x0 
 # QFLAGS += -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 
 # QFLAGS += -device virtio-net-device,netdev=net -netdev user,id=net
@@ -80,8 +81,18 @@ run: sbi-qemu build # backup
 # 	rm -f $(ROOTFS)
 # 	mv $(SDCARD_BAK) $(ROOTFS)
 
-# debug: build
-# 	qemu-system-riscv64 $(QFLAGS) -s -S
+# KERNEL_ENTRY_PA := 0x80200000
+# QEMU_ARGS := -machine virt \
+# 			 -nographic \
+# 			 -bios $(SBI) \
+# 			 -device loader,file=$(KERNEL_BIN),addr=$(KERNEL_ENTRY_PA)
+
+# gdb-server: build
+# 	qemu-system-riscv64 $(QEMU_ARGS) -s -S
+
+gdb-server: build
+	qemu-system-riscv64 $(QFLAGS) -s -S
+
 
 # debug-client:
 # 	@riscv64-unknown-elf-gdb -ex 'file $(KERNEL_BIN)' -ex 'set arch riscv:rv64' -ex 'target remote localhost:1234'

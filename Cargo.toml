@@ -9,3 +9,8 @@ members = [
 #     "NoAxiom/lib/.trashbin",
 # ]
 resolver = "2"
+
+[profile.release]
+debug = true
+# opt-level = 0           # 优化级别,最低是0,最高是3, 0方便debug
+# overflow-checks = false # 关闭整数溢出检查
