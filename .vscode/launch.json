@@ -1,0 +1,36 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "cppdbg",
+            "request": "launch",
+            "name": "Attach to gdbserver",
+            "program": "${workspaceFolder}/target/riscv64gc-unknown-none-elf/release/kernel",
+            "cwd": "${workspaceFolder}/NoAxiom/kernel",
+            "stopAtEntry": true,
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "为 gdb 启用整齐打印",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set architecture to riscv:rv64",
+                    "text": "set arch riscv:rv64",
+                    "ignoreFailures": false
+                },
+                // {
+                //     "description": "Set remote working directory",
+                //     "text": "file ${workspaceFolder}/target/riscv64gc-unknown-none-elf/release/kernel.bin",
+                //     "ignoreFailures": false
+                // },
+            ],
+            "miDebuggerServerAddress": "localhost:1234",
+            "miDebuggerPath": "/home/yuxuaan/os/riscv64-unknown-elf-gcc-8.3.0-2020.04.1-x86_64-linux-ubuntu14/bin/riscv64-unknown-elf-gdb",
+            "args": ["-ex 'file target/riscv64gc-unknown-none-elf/release/kernel.bin'"], 
+        }
+    ]
+}
