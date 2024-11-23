@@ -31,6 +31,7 @@
             "miDebuggerServerAddress": "localhost:1234",
             "miDebuggerPath": "/home/yuxuaan/os/riscv64-unknown-elf-gcc-8.3.0-2020.04.1-x86_64-linux-ubuntu14/bin/riscv64-unknown-elf-gdb",
             "args": ["-ex 'file target/riscv64gc-unknown-none-elf/release/kernel.bin'"], 
+            "preLaunchTask": "qemu",
         }
     ]
 }
