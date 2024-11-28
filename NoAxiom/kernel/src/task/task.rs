@@ -5,8 +5,6 @@ use core::sync::atomic::{AtomicI8, AtomicUsize};
 
 use super::taskid::TaskId;
 use crate::{
-    arch::interrupt::is_interrupt_enable,
-    mm::MemorySet,
     sched::spawn_task,
     sync::{cell::SyncUnsafeCell, mutex::SpinMutex},
     task::{load_app::get_app_data, taskid::tid_alloc},
@@ -136,7 +134,6 @@ pub async fn task_main(task: Arc<Task>) {
         // kernel -> user
         info!("task_main: trap_restore");
         trap_restore(&task);
-        info!("task_main: trap_restore done, {}", is_interrupt_enable());
         if task.is_zombie() {
             info!("task {} is zombie, break", task.tid());
             break;

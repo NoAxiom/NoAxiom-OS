@@ -28,7 +28,6 @@ impl Cpu {
     // TODO: mm
     pub fn set_task(&mut self, task: &mut Arc<Task>) {
         self.set_raw_task(task.clone());
-        // task.memory_activate();
     }
     pub fn clear_task(&mut self) {
         self.clear_raw_task();

@@ -8,9 +8,7 @@ use riscv::register::{
 
 use super::context::TrapContext;
 use crate::{
-    arch::interrupt::{enable_stimer_interrupt, external_interrupt_enable},
-    println,
-    task::Task,
+    arch::interrupt::{enable_stimer_interrupt, external_interrupt_enable}, config::mm::TRAMPOLINE, println, task::Task
 };
 
 global_asm!(include_str!("./trap.S"));
@@ -44,11 +42,11 @@ pub fn trap_restore(task: &Arc<Task>) {
     let cx = task.trap_context_mut();
     info!("trap_restore: sepc {:#x}", cx.sepc);
     info!("trap_restore: sp {:#x}", cx.regs[2]);
+    info!("cx ptr offset: {}", TRAMPOLINE - cx as *const TrapContext as usize);
     // kernel -> user
     unsafe {
         user_trapret(task.trap_context_mut());
     }
-    info!("trap_restore: done");
 }
 
 /// debug: show sstatus

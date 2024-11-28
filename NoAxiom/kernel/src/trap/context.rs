@@ -38,7 +38,7 @@ use crate::{arch::regs::Sstatus, constant::register::*};
 /// we don't expect this to derive Clone
 #[repr(C)]
 pub struct TrapContext {
-    /// 0: 32 general registers
+    /// 0 ~ 31: general registers
     pub regs: [usize; 32],
 
     /// 32: cpu status
@@ -47,10 +47,11 @@ pub struct TrapContext {
     /// 33: exception pc
     pub sepc: usize,
 
-    /// 34: process kernel stack top (virtual address)
+    /// 34: kernel stack top (va)
     pub kernel_sp: usize,
 
-    /// 35
+    /// 35: kernel return address (va),
+    /// returns to this when utrap happens
     pub kernel_ra: usize,
     // 36 - 47
     // pub kernel_s: [usize; 12],

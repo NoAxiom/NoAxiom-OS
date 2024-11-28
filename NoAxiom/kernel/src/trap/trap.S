@@ -8,6 +8,7 @@
 # 280 - kernel_sp
 # 288 - trap_handler
 
+# 宏定义
     .altmacro
     .macro            STORE_X n
     sd                x\n, \n*8(sp)
@@ -41,26 +42,7 @@
     sd                t1, 33*8(sp)
     .endm
 
-    .macro            LOAD_GENERAL_REG
-# 在恢复所有通用寄存器前，通用寄存器中大部分可以随意使用，这里选择
-# t0, t1 两个寄存器，用来将内存中的 sstatus 和 sepc 恢复到相应寄存器
-    ld                t0, 32*8(sp)
-    ld                t1, 33*8(sp)
-    csrw              sstatus, t0
-    csrw              sepc, t1
-# 开始恢复除了 x0 和 sp 以外的通用寄存器
-# 因为 sp 在宏中是作为偏移的基址使用的，所以现在不能从内存中恢复它的值
-    ld                ra, 1*8(sp)
-    .set              n, 3
-    .rept             29
-    LOAD_X            %n
-    .set              n, n+1
-    .endr
-
-# 其他通用寄存器(除 x0 外)，已全部恢复，恢复 sp
-    ld                sp, 2*8(sp)
-    .endm
-
+# 代码段
     .section          .text.trampoline
     .globl            user_trapvec
     .globl            user_trapret
@@ -112,7 +94,23 @@ user_trapret:
     sd                tp, 49*8(a0)
 # 将 a0 的值转存到 sp，是为了使用宏
     mv                sp, a0
-    LOAD_GENERAL_REG
+
+# 在恢复所有通用寄存器前，通用寄存器中大部分可以随意使用，这里选择
+# t0, t1 两个寄存器，用来将内存中的 sstatus 和 sepc 恢复到相应寄存器
+    ld                t0, 32*8(sp)
+    ld                t1, 33*8(sp)
+    csrw              sstatus, t0
+    csrw              sepc, t1
+# 开始恢复除了 x0 和 sp 以外的通用寄存器
+# 因为 sp 在宏中是作为偏移的基址使用的，所以现在不能从内存中恢复它的值
+    ld                ra, 1*8(sp)
+    .set              n, 3
+    .rept             29
+    LOAD_X            %n
+    .set              n, n+1
+    .endr
+# 其他通用寄存器(除 x0 外)，已全部恢复，恢复 sp
+    ld                sp, 2*8(sp)
 
     sret
 

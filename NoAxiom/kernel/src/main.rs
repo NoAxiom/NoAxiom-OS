@@ -34,6 +34,7 @@ mod sync;
 mod syscall;
 mod task;
 mod trap;
+mod utils;
 
 core::arch::global_asm!(include_str!("link_apps.S"));
 
@@ -45,7 +46,6 @@ pub fn rust_main() {
     println!("[kernel] Hello, world!");
     println!("[kernel] init memory management");
     mm::init();
-    mm::remap_test();
     trap::init();
     println!("[kernel] push init_proc to executor");
     task::spawn_new_process(0);
