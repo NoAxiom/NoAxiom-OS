@@ -19,7 +19,7 @@ version = "0.1.0"
 [dependencies]
 log = "0.4"
 riscv = "0.11"
-bitflags = "1.2.1"
+bitflags = "2.6.0"
 xmas-elf = "0.9.0"
 virtio-drivers = "0.6.0"
 crate_interface = "0.1"

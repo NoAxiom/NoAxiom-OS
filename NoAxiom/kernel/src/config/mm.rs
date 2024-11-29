@@ -1,4 +1,4 @@
-//! memory management configs
+//! Memory management configuration
 
 /// user app's stack size
 pub const USER_STACK_SIZE: usize = 4096 * 2;
@@ -28,7 +28,7 @@ pub const TRAMPOLINE: usize = usize::MAX - PAGE_SIZE + 1;
 pub const TRAP_CONTEXT_BASE: usize = TRAMPOLINE - PAGE_SIZE;
 
 mod sv39 {
-    use super::PAGE_WIDTH;
+    use super::PAGE_WIDTH; // 12
 
     /// physical address width
     pub const PA_WIDTH: usize = 56;
@@ -41,5 +41,14 @@ mod sv39 {
 
     /// virtual page number width
     pub const VPN_WIDTH: usize = VA_WIDTH - PAGE_WIDTH; // 27
+
+    /// index level number of sv39
+    pub const INDEX_LEVELS: usize = 3;
+
+    /// raw vpn & ppn width of sv39
+    pub const PAGE_NUM_WIDTH: usize = VPN_WIDTH / INDEX_LEVELS; // 9
+
+    /// page table entry per page
+    pub const PTE_PER_PAGE: usize = 1 << PAGE_NUM_WIDTH; // 512
 }
 pub use sv39::*;

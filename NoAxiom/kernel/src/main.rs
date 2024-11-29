@@ -15,7 +15,7 @@
 // #![feature(custom_mir)]
 // #![feature(core_intrinsics)]
 
-// #[macro_use]
+#[macro_use]
 extern crate alloc;
 #[macro_use]
 extern crate log;
@@ -24,6 +24,7 @@ mod arch;
 mod config;
 mod constant;
 mod cpu;
+// todo: move this outer
 #[macro_use]
 mod driver;
 mod entry;

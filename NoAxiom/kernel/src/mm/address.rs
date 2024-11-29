@@ -1,7 +1,9 @@
 //! Physical and virtual address types.
 
+use super::pte::PageTableEntry;
 use crate::{config::mm::*, utils::signed_extend};
 
+/// addr type def
 macro_rules! gen_new_type {
     ($name:ident) => {
         #[repr(C)]
@@ -14,20 +16,7 @@ gen_new_type!(VirtAddr);
 gen_new_type!(PhysPageNum);
 gen_new_type!(VirtPageNum);
 
-macro_rules! impl_width {
-    ($t:ty, $width:expr) => {
-        impl $t {
-            pub fn width() -> usize {
-                $width
-            }
-        }
-    };
-}
-impl_width!(PhysAddr, PA_WIDTH);
-impl_width!(VirtAddr, VA_WIDTH);
-impl_width!(PhysPageNum, PPN_WIDTH);
-impl_width!(VirtPageNum, VPN_WIDTH);
-
+/// addr -> usize
 macro_rules! impl_from_types {
     ($from:ty, | $param:ident | $body:expr) => {
         impl From<$from> for usize {
@@ -40,8 +29,9 @@ macro_rules! impl_from_types {
 impl_from_types!(PhysAddr, |x| x.0);
 impl_from_types!(PhysPageNum, |x| x.0);
 impl_from_types!(VirtPageNum, |x| x.0);
-impl_from_types!(VirtAddr, |x| signed_extend(x.0, VirtAddr::width()));
+impl_from_types!(VirtAddr, |x| signed_extend(x.0, VA_WIDTH));
 
+/// usize -> addr
 macro_rules! impl_from_usize {
     ($to:ty) => {
         impl From<usize> for $to {
@@ -56,63 +46,88 @@ impl_from_usize!(VirtAddr);
 impl_from_usize!(PhysPageNum);
 impl_from_usize!(VirtPageNum);
 
-macro_rules! impl_add_sub_usize {
-    ($t:ty) => {
-        impl core::ops::Add<usize> for $t {
+/// add & sub
+macro_rules! impl_add_sub {
+    ($name:ty, $offset:ty, | $param:ident | $body:expr) => {
+        impl core::ops::Add<$offset> for $name {
             type Output = Self;
-            fn add(self, rhs: usize) -> Self {
-                Self(self.0 + rhs)
+            fn add(self, $param: $offset) -> Self {
+                Self(self.0 + $body)
             }
         }
-        impl core::ops::Sub<usize> for $t {
+        impl core::ops::Sub<$offset> for $name {
             type Output = Self;
-            fn sub(self, rhs: usize) -> Self {
-                Self(self.0 - rhs)
+            fn sub(self, $param: $offset) -> Self {
+                Self(self.0 - $body)
             }
         }
     };
 }
-impl_add_sub_usize!(PhysAddr);
-impl_add_sub_usize!(VirtAddr);
-impl_add_sub_usize!(PhysPageNum);
-impl_add_sub_usize!(VirtPageNum);
+impl_add_sub!(VirtAddr, usize, |offset| offset);
+impl_add_sub!(VirtAddr, VirtAddr, |offset| offset.0);
 
-macro_rules! impl_add_sub_self {
-    ($t:ty) => {
-        impl core::ops::Add<$t> for $t {
-            type Output = Self;
-            fn add(self, rhs: $t) -> Self {
-                Self(self.0 + rhs.0)
-            }
-        }
-        impl core::ops::Sub<$t> for $t {
-            type Output = Self;
-            fn sub(self, rhs: $t) -> Self {
-                Self(self.0 - rhs.0)
-            }
-        }
-    };
+/// virtual address
+impl VirtAddr {
+    pub fn offset(&self) -> usize {
+        self.0 & ((1 << PAGE_WIDTH) - 1)
+    }
+    pub fn is_aligned(&self) -> bool {
+        self.offset() == 0
+    }
 }
-impl_add_sub_self!(PhysAddr);
-impl_add_sub_self!(VirtAddr);
-impl_add_sub_self!(PhysPageNum);
-impl_add_sub_self!(VirtPageNum);
 
-macro_rules! impl_raw_address {
-    ($t:ty) => {
-        impl $t {
-            fn offset(&self) -> usize {
-                self.0 & ((1 << PAGE_WIDTH) - 1)
-            }
-            fn is_aligned(&self) -> bool {
-                self.offset() == 0
-            }
+/// virtual page number
+impl VirtPageNum {
+    pub fn get_index(&self) -> [usize; INDEX_LEVELS] {
+        let mut vpn = self.0;
+        let mut idx = [0; INDEX_LEVELS];
+        for i in (0..INDEX_LEVELS).rev() {
+            idx[i] = vpn & ((1 << PAGE_NUM_WIDTH) - 1);
+            vpn >>= PAGE_NUM_WIDTH;
         }
-    };
+        idx
+    }
 }
-impl_raw_address!(VirtAddr);
-impl_raw_address!(PhysAddr);
 
+/// physical address
+impl PhysAddr {
+    pub fn offset(&self) -> usize {
+        self.0 & ((1 << PAGE_WIDTH) - 1)
+    }
+    pub fn is_aligned(&self) -> bool {
+        self.offset() == 0
+    }
+    pub fn as_ref<T>(&self) -> &'static T {
+        unsafe { (self.0 as *const T).as_ref().unwrap() }
+    }
+    pub fn as_mut<T>(&self) -> &'static mut T {
+        unsafe { (self.0 as *mut T).as_mut().unwrap() }
+    }
+}
+
+/// physical page number
+impl PhysPageNum {
+    /// convert self into physical address
+    pub fn into_pa(&self) -> PhysAddr {
+        (*self).into()
+    }
+    /// get pte array from self pointing address
+    pub fn get_pte_array(&self) -> &'static mut [PageTableEntry] {
+        unsafe {
+            core::slice::from_raw_parts_mut(self.into_pa().0 as *mut PageTableEntry, PTE_PER_PAGE)
+        }
+    }
+    /// get bytes array from self pointing address
+    pub fn get_bytes_array(&self) -> &'static mut [u8] {
+        unsafe { core::slice::from_raw_parts_mut(self.into_pa().0 as *mut u8, PAGE_SIZE) }
+    }
+    /// return self as a mut generic reference
+    pub fn as_mut<T>(&self) -> &'static mut T {
+        self.into_pa().as_mut()
+    }
+}
+
+/// addr <> page_num
 macro_rules! impl_mutual_convert {
     ($from:ident, $to:ident) => {
         impl $from {
@@ -138,3 +153,70 @@ macro_rules! impl_mutual_convert {
 }
 impl_mutual_convert!(VirtAddr, VirtPageNum);
 impl_mutual_convert!(PhysAddr, PhysPageNum);
+
+/// virtual page number range,
+/// which is used to iterate over vpn ranges
+pub struct VPNRange {
+    start: VirtPageNum,
+    end: VirtPageNum,
+}
+impl VPNRange {
+    pub fn new(start: VirtPageNum, end: VirtPageNum) -> Self {
+        assert!(start <= end, "start {:?} > end {:?}!", start, end);
+        Self { start, end }
+    }
+    pub fn from_va(start_va: VirtAddr, end_va: VirtAddr) -> Self {
+        let start = start_va.floor();
+        let end = end_va.ceil();
+        assert!(start <= end, "start {:?} > end {:?}!", start, end);
+        Self { start, end }
+    }
+    pub fn start(&self) -> VirtPageNum {
+        self.start
+    }
+    pub fn end(&self) -> VirtPageNum {
+        self.end
+    }
+}
+
+/// step one and return the previous value,
+/// for iterator usage
+pub trait StepOne {
+    fn step(&mut self) -> Self;
+}
+impl StepOne for VirtPageNum {
+    fn step(&mut self) -> Self {
+        let tmp = self.clone();
+        self.0 += 1;
+        tmp
+    }
+}
+
+/// iterator for vpn range
+impl IntoIterator for VPNRange {
+    type Item = VirtPageNum;
+    type IntoIter = IntoIter<Self::Item>;
+    fn into_iter(self) -> Self::IntoIter {
+        Self::IntoIter {
+            next: self.start,
+            end: self.end,
+        }
+    }
+}
+pub struct IntoIter<T> {
+    next: T,
+    end: T,
+}
+impl<T> Iterator for IntoIter<T>
+where
+    T: PartialEq + StepOne,
+{
+    type Item = T;
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.next == self.end {
+            None
+        } else {
+            Some(self.next.step())
+        }
+    }
+}
