@@ -24,8 +24,6 @@ mod arch;
 mod config;
 mod constant;
 mod cpu;
-// todo: move this outer
-#[macro_use]
 mod driver;
 mod entry;
 mod mm;

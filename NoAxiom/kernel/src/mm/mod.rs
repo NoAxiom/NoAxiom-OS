@@ -3,16 +3,20 @@
 mod address;
 mod frame;
 mod heap;
+mod kernel_map;
 mod kmm;
+mod map_area;
 mod memory_set;
 mod page_table;
 mod permission;
 mod pte;
 
+pub use memory_set::MemorySet;
+
 pub fn init() {
     frame::init();
     heap::init();
-    // todo: memory set init
+    // TODO: memory set init
     crate::println!("[kernel] memory management initialized.");
 }
 
@@ -21,8 +25,8 @@ pub fn init() {
 macro_rules! pte_flags {
     ($($flag:ident),*) => {
         {
-            let mut flags = PTEFlags::empty();
-            $(flags |= PTEFlags::$flag;)*
+            let mut flags = crate::mm::pte::PTEFlags::empty();
+            $(flags |= crate::mm::pte::PTEFlags::$flag;)*
             flags
         }
     };
@@ -33,8 +37,8 @@ macro_rules! pte_flags {
 macro_rules! map_permission {
     ($($flag:ident),*) => {
         {
-            let mut flags = MapPermission::empty();
-            $(flags |= MapPermission::$flag;)*
+            let mut flags = crate::mm::permission::MapPermission::empty();
+            $(flags |= crate::mm::permission::MapPermission::$flag;)*
             flags
         }
     };

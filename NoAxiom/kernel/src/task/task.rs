@@ -5,6 +5,7 @@ use core::sync::atomic::{AtomicI8, AtomicUsize};
 
 use super::taskid::TaskId;
 use crate::{
+    mm::MemorySet,
     sched::spawn_task,
     sync::{cell::SyncUnsafeCell, mutex::SpinMutex},
     task::{load_app::get_app_data, taskid::tid_alloc},
@@ -106,8 +107,8 @@ impl Task {
     }
 
     /// memory set
-    pub fn memory_activate(&self) {
-        self.process.lock().memory_set.activate();
+    pub unsafe fn memory_activate(&self) {
+        unsafe { self.process.lock().memory_set.activate() };
     }
     pub fn token(&self) -> usize {
         self.process.lock().memory_set.token()

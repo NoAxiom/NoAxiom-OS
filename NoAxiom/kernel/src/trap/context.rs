@@ -38,20 +38,21 @@ use crate::{arch::regs::Sstatus, constant::register::*};
 /// we don't expect this to derive Clone
 #[repr(C)]
 pub struct TrapContext {
-    /// 0 ~ 31: general registers
+    /// [0~31]/[0~255]: general registers
     pub regs: [usize; 32],
 
-    /// 32: cpu status
+    /// [32]/[256~263]: cpu status
     pub sstatus: Sstatus,
 
-    /// 33: exception pc
+    /// [33]/[264~271]: exception pc (va)
     pub sepc: usize,
 
-    /// 34: kernel stack top (va)
+    /// [34]/[272~279]: kernel stack top (va)
     pub kernel_sp: usize,
 
-    /// 35: kernel return address (va),
-    /// returns to this when utrap happens
+    /// [35]/[280~287]: kernel return address (va),
+    /// returns to this addr when utrap happens,
+    /// actually returns to async func
     pub kernel_ra: usize,
     // 36 - 47
     // pub kernel_s: [usize; 12],
@@ -78,7 +79,7 @@ impl TrapContext {
             kernel_ra: 0,
             // kernel_s: [0; 12],
             // kernel_fp: 0,
-            // todo: hart_id for multi-core
+            // TODO: hart_id for multi-core
             // cpu_id: 0,
             // freg: UserFloatContext::new(),
         };

@@ -1,7 +1,10 @@
 //! Physical and virtual address types.
 
 use super::pte::PageTableEntry;
-use crate::{config::mm::*, utils::signed_extend};
+use crate::{
+    config::mm::*,
+    utils::{kernel_va_to_pa, kernel_vpn_to_ppn, signed_extend},
+};
 
 /// addr type def
 macro_rules! gen_new_type {
@@ -74,6 +77,10 @@ impl VirtAddr {
     pub fn is_aligned(&self) -> bool {
         self.offset() == 0
     }
+    pub fn kernel_translate_into_pa(&self) -> PhysAddr {
+        let pa = kernel_va_to_pa(self.0);
+        PhysAddr::from(pa)
+    }
 }
 
 /// virtual page number
@@ -86,6 +93,10 @@ impl VirtPageNum {
             vpn >>= PAGE_NUM_WIDTH;
         }
         idx
+    }
+    pub fn kernel_translate_into_ppn(&self) -> PhysPageNum {
+        let pa = kernel_vpn_to_ppn(self.0);
+        PhysPageNum::from(pa)
     }
 }
 
@@ -156,16 +167,17 @@ impl_mutual_convert!(PhysAddr, PhysPageNum);
 
 /// virtual page number range,
 /// which is used to iterate over vpn ranges
-pub struct VPNRange {
+#[derive(Clone, Copy, Debug)]
+pub struct VpnRange {
     start: VirtPageNum,
     end: VirtPageNum,
 }
-impl VPNRange {
+impl VpnRange {
     pub fn new(start: VirtPageNum, end: VirtPageNum) -> Self {
         assert!(start <= end, "start {:?} > end {:?}!", start, end);
         Self { start, end }
     }
-    pub fn from_va(start_va: VirtAddr, end_va: VirtAddr) -> Self {
+    pub fn new_from_va(start_va: VirtAddr, end_va: VirtAddr) -> Self {
         let start = start_va.floor();
         let end = end_va.ceil();
         assert!(start <= end, "start {:?} > end {:?}!", start, end);
@@ -193,7 +205,7 @@ impl StepOne for VirtPageNum {
 }
 
 /// iterator for vpn range
-impl IntoIterator for VPNRange {
+impl IntoIterator for VpnRange {
     type Item = VirtPageNum;
     type IntoIter = IntoIter<Self::Item>;
     fn into_iter(self) -> Self::IntoIter {

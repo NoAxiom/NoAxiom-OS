@@ -17,13 +17,15 @@ pub struct PageTable {
     /// root ppn, serves as an identifier of this page table
     root_ppn: PhysPageNum,
 
-    /// saves all frame trackers to preserve its life cycle
+    /// page table frame tracker holder,
+    /// doesn't track data pages
     frames: Vec<FrameTracker>,
 }
 
 impl PageTable {
     /// create a new page table,
     /// with allocating a frame for root node
+    /// used in raw memory_set initialization
     pub fn new() -> Self {
         let frame = frame_alloc().unwrap();
         PageTable {
@@ -35,6 +37,7 @@ impl PageTable {
     /// use satp[43:0] to generate a new pagetable,
     /// note that the frame won't be saved,
     /// so do assure that it's already wrapped in tcb
+    /// todo: should we clone the root frame?
     pub fn from_token(satp: usize) -> Self {
         Self {
             root_ppn: PhysPageNum::from(satp & ((1usize << 44) - 1)),
@@ -121,9 +124,9 @@ impl PageTable {
         })
     }
 
-    /// get the token of this page table (sv39 only)
+    /// get the token of this page table (WARNING: sv39 only)
+    /// which will be written into satp
     pub fn token(&self) -> usize {
-        // sv39
         8usize << 60 | self.root_ppn.0
     }
 
@@ -151,7 +154,7 @@ impl PageTable {
     }
 
     /// switch into this page table,
-    /// PLEASE make sure the context is mapped in both page tables
+    /// PLEASE make sure context around is mapped into both page tables
     pub unsafe fn activate(&self) {
         let satp: usize = self.token();
         unsafe {

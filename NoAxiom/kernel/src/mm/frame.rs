@@ -4,7 +4,10 @@ use core::fmt::{self, Debug, Formatter};
 use lazy_static::lazy_static;
 
 use super::address::PhysPageNum;
-use crate::{config::mm::MEMORY_END, mm::address::PhysAddr, println, sync::mutex::SpinMutex};
+use crate::{
+    config::mm::KERNEL_PHYS_MEMORY_END, mm::address::PhysAddr, println, sync::mutex::SpinMutex,
+    utils::kernel_va_to_pa,
+};
 
 pub struct FrameTracker {
     pub ppn: PhysPageNum,
@@ -100,11 +103,11 @@ pub fn frame_dealloc(ppn: PhysPageNum) {
 /// init frame allocator
 pub fn init() {
     extern "C" {
-        fn ekernel();
+        fn ekernel(); // virt address
     }
     FRAME_ALLOCATOR.lock().init(
-        PhysAddr::from(ekernel as usize).ceil(),
-        PhysAddr::from(MEMORY_END).floor(),
+        PhysAddr::from(kernel_va_to_pa(ekernel as usize)).ceil(),
+        PhysAddr::from(KERNEL_PHYS_MEMORY_END).floor(),
     );
 }
 

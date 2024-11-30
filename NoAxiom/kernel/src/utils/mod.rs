@@ -1,9 +1,26 @@
 //! utility functions
 
+use crate::config::mm::{KERNEL_ADDR_OFFSET, KERNEL_PAGENUM_OFFSET};
+
+/// signed extend for number without 64/32 bits width
 pub fn signed_extend(num: usize, width: usize) -> usize {
     if num & (1 << (width - 1)) != 0 {
         num | (!((1 << width) - 1))
     } else {
         num
     }
+}
+
+/// translate a raw usize type kernel virt address into phys address
+pub fn kernel_va_to_pa(virt: usize) -> usize {
+    assert!(
+        virt & KERNEL_ADDR_OFFSET == KERNEL_ADDR_OFFSET,
+        "invalid kernel virt address"
+    );
+    virt - KERNEL_ADDR_OFFSET
+}
+
+/// translate a raw usize type kernel vpn into ppn
+pub fn kernel_vpn_to_ppn(vpn: usize) -> usize {
+    vpn - KERNEL_PAGENUM_OFFSET
 }
