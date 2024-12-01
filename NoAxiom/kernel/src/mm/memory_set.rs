@@ -1,5 +1,7 @@
 use alloc::vec::Vec;
 
+use lazy_static::lazy_static;
+
 use super::{map_area::MapArea, page_table::PageTable};
 use crate::{
     config::mm::{PAGE_SIZE, USER_HEAP_SIZE, USER_STACK_SIZE},
@@ -9,11 +11,18 @@ use crate::{
         map_area::MapAreaType,
         permission::MapType,
     },
+    sync::mutex::SpinMutex,
 };
 
-/// elf load result information
+lazy_static! {
+    pub static ref KERNEL_SPACE: SpinMutex<MemorySet> =
+        SpinMutex::new(MemorySet::init_kernel_space());
+}
+
+/// elf load result
 pub struct ElfMemoryInfo {
     pub memory_set: MemorySet,
+    pub user_sp: usize,
     pub elf_entry: usize,
 }
 
@@ -39,7 +48,8 @@ pub struct MemorySet {
 
 impl MemorySet {
     /// create an new empty memory set without any allocation
-    pub fn new() -> Self {
+    /// do not use this function directly, use [`new_with_kernel`] instead
+    pub fn new_bare() -> Self {
         Self {
             page_table: PageTable::new(),
             areas: Vec::new(),
@@ -72,6 +82,55 @@ impl MemorySet {
         self.areas.push(map_area); // bind life cycle
     }
 
+    /// create kernel space, used in [`KERNEL_SPACE`] initialization
+    pub fn init_kernel_space() -> Self {
+        extern "C" {
+            fn skernel();
+            fn ekernel();
+            fn stext();
+            fn etext();
+            fn srodata();
+            fn erodata();
+            fn sdata();
+            fn edata();
+            fn sbss();
+            fn ebss();
+        }
+        let mut memory_set = MemorySet::new_bare();
+        macro_rules! kernel_push_area {
+            ($($start:expr, $end:expr, $permission:expr)*) => {
+                $(
+                    memory_set.push_area(
+                        MapArea::new(
+                            ($start as usize).into(),
+                            ($end as usize).into(),
+                            MapType::Direct,
+                            $permission,
+                            MapAreaType::KernelSpace,
+                        ),
+                        None
+                    );
+                )*
+            };
+        }
+        kernel_push_area!(
+            stext,   etext,   map_permission!(R, X)
+            srodata, erodata, map_permission!(R)
+            sdata,   edata,   map_permission!(R, W)
+            sbss,    ebss,    map_permission!(R, W)
+        );
+        memory_set
+    }
+
+    /// create a new memory set with kernel space mapped,
+    pub fn new_with_kernel() -> Self {
+        let mut memory_set = Self::new_bare();
+        let kernel_space = KERNEL_SPACE.lock();
+        memory_set.page_table = PageTable::clone_from_other(&kernel_space.page_table);
+        drop(kernel_space);
+        memory_set
+    }
+
     /// map user_stack_area lazily
     pub fn map_user_stack(&mut self, start: usize, end: usize) {
         self.user_stack_base = start;
@@ -98,9 +157,9 @@ impl MemorySet {
 
     /// load data from elf file
     /// TODO: use file to read elf
-    /// TODO: map trampoline
-    pub fn new_from_elf(elf_data: &[u8]) -> ElfMemoryInfo {
-        let mut memory_set = Self::new();
+    /// TODO: map trampoline?
+    pub fn load_from_elf(elf_data: &[u8]) -> ElfMemoryInfo {
+        let mut memory_set = Self::new_with_kernel();
         let elf = xmas_elf::ElfFile::new(elf_data).unwrap();
 
         let elf_header = elf.header;
@@ -140,6 +199,7 @@ impl MemorySet {
 
         ElfMemoryInfo {
             memory_set,
+            user_sp: user_stack_end, // stack grows downward
             elf_entry,
         }
     }

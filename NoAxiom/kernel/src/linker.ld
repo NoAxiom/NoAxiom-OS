@@ -11,8 +11,6 @@ SECTIONS
     .text : {
         *(.text.entry)
         . = ALIGN(4K);
-        strampoline = .;
-        . = ALIGN(4K);
         *(.text .text.*)
     }
 

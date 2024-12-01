@@ -3,8 +3,6 @@
 mod address;
 mod frame;
 mod heap;
-mod kernel_map;
-mod kmm;
 mod map_area;
 mod memory_set;
 mod page_table;
@@ -16,8 +14,6 @@ pub use memory_set::MemorySet;
 pub fn init() {
     frame::init();
     heap::init();
-    // TODO: memory set init
-    crate::println!("[kernel] memory management initialized.");
 }
 
 /// returns pte flags with multiple flag bits

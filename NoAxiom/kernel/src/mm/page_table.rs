@@ -45,8 +45,21 @@ impl PageTable {
         }
     }
 
+    /// clone from another page table, only direct page will be copied
+    pub fn clone_from_other(other: &PageTable) -> Self {
+        let new_frame = frame_alloc().unwrap();
+        new_frame
+            .ppn
+            .get_bytes_array()
+            .copy_from_slice(other.root_ppn.get_bytes_array());
+        PageTable {
+            root_ppn: new_frame.ppn,
+            frames: vec![new_frame],
+        }
+    }
+
     /// insert new pte into the page table trie
-    fn insert_pte(&mut self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
+    fn insert(&mut self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
         let index = vpn.get_index();
         let mut ppn = self.root_ppn;
         let mut result: Option<&mut PageTableEntry> = None;
@@ -87,7 +100,7 @@ impl PageTable {
 
     /// map vpn -> ppn
     pub fn map(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: PTEFlags) {
-        let pte = self.insert_pte(vpn).unwrap();
+        let pte = self.insert(vpn).unwrap();
         assert!(
             !pte.flags().is_valid(),
             "{:?} is mapped before mapping",
@@ -132,22 +145,22 @@ impl PageTable {
 
     /// set copy-on-write for a vpn
     pub fn set_cow(&mut self, vpn: VirtPageNum) {
-        self.insert_pte(vpn).unwrap().set_cow();
+        self.insert(vpn).unwrap().set_cow();
     }
 
     /// reset copy-on-write for a vpn
     pub fn reset_cow(&mut self, vpn: VirtPageNum) {
-        self.insert_pte(vpn).unwrap().reset_cow();
+        self.insert(vpn).unwrap().reset_cow();
     }
 
     /// set flags for a vpn
     pub fn set_flags(&mut self, vpn: VirtPageNum, flags: PTEFlags) {
-        self.insert_pte(vpn).unwrap().set_flags(flags);
+        self.insert(vpn).unwrap().set_flags(flags);
     }
 
     /// remap a vpn with new ppn
     pub fn remap_cow(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, former_ppn: PhysPageNum) {
-        let pte = self.insert_pte(vpn).unwrap();
+        let pte = self.insert(vpn).unwrap();
         *pte = PageTableEntry::new(ppn, pte.flags() | pte_flags!(W));
         ppn.get_bytes_array()
             .copy_from_slice(former_ppn.get_bytes_array());

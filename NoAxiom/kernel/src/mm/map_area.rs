@@ -17,6 +17,7 @@ pub enum MapAreaType {
     UserHeap,
     ElfBinary,
     File,
+    KernelSpace,
 }
 
 // TODO: file & file offset
@@ -107,6 +108,7 @@ impl MapArea {
         }
     }
 
+    // TODO: offset
     /// load data from byte slice
     pub fn load_data(&mut self, page_table: &PageTable, data: &[u8]) {
         // should only load user data
