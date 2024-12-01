@@ -2,53 +2,57 @@ use alloc::sync::Arc;
 use core::arch::global_asm;
 
 use riscv::register::{
-    sstatus,
+    scause, sstatus, stval,
     stvec::{self, TrapMode},
 };
 
-use super::context::TrapContext;
 use crate::{
-    arch::interrupt::{enable_stimer_interrupt, external_interrupt_enable},
+    config::mm::{TRAMPOLINE, TRAP_CONTEXT_BASE},
     println,
     task::Task,
 };
 
 global_asm!(include_str!("./trap.S"));
-extern "C" {
-    fn user_trapvec();
-    fn user_trapret(cx: *mut TrapContext);
-    fn trap_from_kernel();
-}
 
-/// set trap entry in supervisor mode
-pub fn set_kernel_trap_entry() {
-    unsafe { stvec::write(trap_from_kernel as usize, TrapMode::Direct) }
-}
-
-/// set trap entry in user mode
-pub fn set_user_trap_entry() {
-    unsafe { stvec::write(user_trapvec as usize, TrapMode::Direct) }
-}
-
-/// trap init
+/// Initialize trap handling
 pub fn init() {
     set_kernel_trap_entry();
-    external_interrupt_enable();
-    enable_stimer_interrupt();
+}
+
+pub fn set_kernel_trap_entry() {
+    unsafe {
+        stvec::write(trap_from_kernel as usize, TrapMode::Direct);
+    }
+}
+
+fn set_user_trap_entry() {
+    unsafe {
+        stvec::write(TRAMPOLINE as usize, TrapMode::Direct);
+    }
 }
 
 #[no_mangle]
 /// kernel back to user
 pub fn trap_restore(task: &Arc<Task>) {
     set_user_trap_entry();
-    let cx = task.trap_context_mut();
-    info!("trap_restore: sepc {:#x}", cx.sepc);
-    info!("trap_restore: sp {:#x}", cx.regs[2]);
-    // kernel -> user
-    unsafe {
-        user_trapret(task.trap_context_mut());
+    let trap_cx_ptr = TRAP_CONTEXT_BASE;
+    let user_satp = task.token();
+    extern "C" {
+        fn __alltraps();
+        fn __restore();
     }
-    info!("trap_restore: done");
+    let restore_va = __restore as usize - __alltraps as usize + TRAMPOLINE;
+    info!("[kernel] trap_return: ..before return");
+    unsafe {
+        core::arch::asm!(
+            "fence.i",
+            "jr {restore_va}",         // jump to new addr of __restore asm function
+            restore_va = in(reg) restore_va,
+            in("a0") trap_cx_ptr,      // a0 = virt addr of Trap Context
+            in("a1") user_satp,        // a1 = phy addr of usr page table
+            options(noreturn)
+        );
+    }
 }
 
 /// debug: show sstatus
@@ -60,4 +64,10 @@ pub fn show_sstatus() {
     let sie = sstatus.sie();
     println!("spie:{:?}", spie);
     println!("sie:{:?}", sie);
+}
+
+pub fn trap_from_kernel() -> ! {
+    use riscv::register::sepc;
+    info!("stval = {:#x}, sepc = {:#x}", stval::read(), sepc::read());
+    panic!("a trap {:?} from kernel!", scause::read().cause());
 }

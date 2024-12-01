@@ -29,57 +29,51 @@
 //! X10 ~ X17	     a0 ~ a7    用于函数调用，被调用函数需要保存的数据
 //! X18 ~ X27	     s2 ~ s11   用于函数调用，传递参数和返回值
 
-use riscv::register::sstatus::SPP;
+use riscv::register::sstatus::{self, Sstatus, SPP};
 
-use crate::{arch::regs::Sstatus, constant::register::*};
+use crate::constant::register::*;
 
 /// Trap Context
 /// save registers when trap occurs
 /// we don't expect this to derive Clone
 #[repr(C)]
+#[derive(Debug)]
 pub struct TrapContext {
-    /// 0: 32 general registers
+    /// General-Purpose Register x0-31
     pub regs: [usize; 32],
-
-    /// 32: cpu status
+    /// Supervisor Status Register
     pub sstatus: Sstatus,
-
-    /// 33: exception pc
+    /// Supervisor Exception Program Counter
     pub sepc: usize,
-
-    /// 34: process kernel stack top (virtual address)
+    /// Token of kernel address space
+    pub kernel_satp: usize,
+    /// Kernel stack pointer of the current application
     pub kernel_sp: usize,
-
-    /// 35
-    pub kernel_ra: usize,
-    // 36 - 47
-    // pub kernel_s: [usize; 12],
-
-    // 48
-    // pub kernel_fp: usize,
-
-    // 49
-    // pub cpu_id: usize,
-
-    // 50: Floating point registers
-    // pub freg: UserFloatContext,
+    /// Virtual address of trap handler entry point in kernel
+    pub trap_handler: usize,
 }
 
 impl TrapContext {
-    pub fn app_init_cx(entry: usize, sp: usize) -> Self {
-        let mut sstatus = Sstatus::read();
+    pub fn app_init_cx(
+        entry: usize,
+        sp: usize,
+        kernel_satp: usize,
+        kernel_sp: usize,
+        trap_handler: usize,
+    ) -> Self {
+        let mut sstatus = sstatus::read();
         sstatus.set_spp(SPP::User);
         let mut cx = Self {
             regs: [0; 32],
             sstatus,
             sepc: entry,
-            kernel_sp: 0,
-            kernel_ra: 0,
-            // kernel_s: [0; 12],
-            // kernel_fp: 0,
-            // todo: hart_id for multi-core
-            // cpu_id: 0,
-            // freg: UserFloatContext::new(),
+            kernel_sp,
+            kernel_satp,
+            trap_handler, /* kernel_s: [0; 12],
+                           * kernel_fp: 0,
+                           * todo: hart_id for multi-core
+                           * cpu_id: 0,
+                           * freg: UserFloatContext::new(), */
         };
         cx.regs[SP] = sp;
         cx

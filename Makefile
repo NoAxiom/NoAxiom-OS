@@ -94,8 +94,8 @@ gdb-server: build
 	qemu-system-riscv64 $(QFLAGS) -s -S
 
 
-# debug-client:
-# 	@riscv64-unknown-elf-gdb -ex 'file $(KERNEL_BIN)' -ex 'set arch riscv:rv64' -ex 'target remote localhost:1234'
+debug-client:
+	@riscv64-unknown-elf-gdb -ex 'file $(KERNEL_BIN)' -ex 'set arch riscv:rv64' -ex 'target remote localhost:1234'
 
 clean:
 	@rm -f kernel-qemu
@@ -110,6 +110,9 @@ vendor:
 count:
 	@echo "kernel code statistic:"
 	@cd $(PROJECT) && cloc $(KERNEL)
+
+asm:
+	rust-objdump -S $(KERNEL_ELF) > $(KERNEL_ELF).asm
 
 # sdcard:
 # 	@echo "\e[49;34m\e[1m----------Making sdcard-----------\e[0m"

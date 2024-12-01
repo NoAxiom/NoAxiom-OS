@@ -6,7 +6,8 @@ use core::sync::atomic::{AtomicI8, AtomicUsize};
 use super::taskid::TaskId;
 use crate::{
     arch::interrupt::is_interrupt_enable,
-    mm::MemorySet,
+    config::mm::{kernel_stack_position, TRAP_CONTEXT_BASE},
+    mm::{MapPermission, MemorySet, PhysPageNum, VirtAddr, KERNEL_SPACE},
     sched::spawn_task,
     sync::{cell::SyncUnsafeCell, mutex::SpinMutex},
     task::{load_app::get_app_data, taskid::tid_alloc},
@@ -31,9 +32,8 @@ pub struct ProcessInfo {
 
 /// thread resources info
 pub struct ThreadInfo {
-    /// trap context,
-    /// contains stack ptr, registers, etc.
-    pub trap_context: TrapContext,
+    /// The phys page number of trap context
+    pub trap_cx_ppn: PhysPageNum,
 }
 
 /// task control block for a coroutine,
@@ -118,15 +118,8 @@ impl Task {
         self.process.lock().memory_set = memory_set;
     }
 
-    /// trap context
-    pub fn trap_context(&self) -> &TrapContext {
-        &self.thread().trap_context
-    }
-    pub fn trap_context_mut(&self) -> &mut TrapContext {
-        &mut self.thread_mut().trap_context
-    }
-    pub fn set_trap_context(&self, trap_context: TrapContext) {
-        self.thread_mut().trap_context = trap_context;
+    pub fn get_trap_cx(&self) -> &'static mut TrapContext {
+        self.thread().trap_cx_ppn.get_mut()
     }
 }
 
@@ -135,6 +128,7 @@ pub async fn task_main(task: Arc<Task>) {
     while !task.is_zombie() {
         // kernel -> user
         info!("task_main: trap_restore");
+        info!("trap context:{:?}", task.get_trap_cx());
         trap_restore(&task);
         info!("task_main: trap_restore done, {}", is_interrupt_enable());
         if task.is_zombie() {
@@ -152,19 +146,46 @@ pub fn spawn_new_process(app_id: usize) {
     info!("[kernel] spawn new process from elf");
     let elf_data = get_app_data(app_id);
     let (memory_set, user_sp, elf_entry) = MemorySet::from_elf(elf_data);
-    info!("[kernel] succeed to load elf data");
-    let task = Arc::new(Task {
+    info!(
+        "memory_set_token: {}, user_sp: {}, elf_entry: {}",
+        memory_set.token(),
+        user_sp,
+        elf_entry
+    );
+    // info!("[kernel] succeed to load elf data {:?}", elf_data);
+    // map a kernel-stack in kernel space
+    let trap_cx_ppn = memory_set
+        .translate(VirtAddr::from(TRAP_CONTEXT_BASE).into())
+        .unwrap()
+        .ppn();
+    let (kernel_stack_bottom, kernel_stack_top) = kernel_stack_position(app_id);
+    KERNEL_SPACE.lock().insert_framed_area(
+        kernel_stack_bottom.into(),
+        kernel_stack_top.into(),
+        MapPermission::R | MapPermission::W,
+    );
+    info!("kernel_sp: {:#x}", kernel_stack_top);
+    let task = Task {
         tid: tid_alloc(),
         process: Arc::new(SpinMutex::new(ProcessInfo {
             pid: AtomicUsize::new(0), // TODO: pid_alloc()
             memory_set,
         })),
-        thread: SyncUnsafeCell::new(ThreadInfo {
-            trap_context: TrapContext::app_init_cx(elf_entry, user_sp),
-        }),
+        thread: SyncUnsafeCell::new(ThreadInfo { trap_cx_ppn }),
         status: SyncUnsafeCell::new(TaskStatus::Ready),
         exit_code: AtomicI8::new(0),
-    });
+    };
+
+    let trap_context = task.get_trap_cx();
+    *trap_context = TrapContext::app_init_cx(
+        elf_entry,
+        user_sp,
+        KERNEL_SPACE.lock().token(),
+        kernel_stack_top,
+        user_trap_handler as usize,
+    );
+
+    info!("trap context:{:?}", trap_context);
     info!("create a new task, tid {}", task.tid.0);
-    spawn_task(task);
+    spawn_task(Arc::new(task));
 }
