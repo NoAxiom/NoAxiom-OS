@@ -42,7 +42,11 @@ pub fn trap_restore(task: &Arc<Task>) {
         fn __restore();
     }
     let restore_va = __restore as usize - __alltraps as usize + TRAMPOLINE;
-    info!("[kernel] trap_return: ..before return");
+    info!(
+        "[kernel] trap_return: ..before return, task-token: {:#x}  {}",
+        task.token(),
+        task.token()
+    );
     unsafe {
         core::arch::asm!(
             "fence.i",

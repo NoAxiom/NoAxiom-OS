@@ -41,3 +41,10 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
         ),
     }
 }
+
+#[no_mangle]
+pub fn temp_trap_handler() {
+    info!("trap!!!!!!!!");
+
+    panic!("shut down");
+}

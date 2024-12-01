@@ -41,6 +41,8 @@ __alltraps:
     csrw satp, t0
     sfence.vma
     # jump to trap_handler
+    # loop:
+        # j loop
     jr t1
 
 __restore:

@@ -11,7 +11,7 @@ use crate::{
     sched::spawn_task,
     sync::{cell::SyncUnsafeCell, mutex::SpinMutex},
     task::{load_app::get_app_data, taskid::tid_alloc},
-    trap::{trap_restore, user_trap_handler, TrapContext},
+    trap::{temp_trap_handler, trap_restore, user_trap_handler, TrapContext},
 };
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -182,7 +182,7 @@ pub fn spawn_new_process(app_id: usize) {
         user_sp,
         KERNEL_SPACE.lock().token(),
         kernel_stack_top,
-        user_trap_handler as usize,
+        temp_trap_handler as usize,
     );
 
     info!("trap context:{:?}", trap_context);
