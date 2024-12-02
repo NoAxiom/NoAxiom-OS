@@ -22,8 +22,8 @@ lazy_static! {
 /// elf load result
 pub struct ElfMemoryInfo {
     pub memory_set: MemorySet,
-    pub user_sp: usize,
     pub elf_entry: usize,
+    pub user_sp: usize,
 }
 
 pub struct MemorySet {
@@ -159,6 +159,7 @@ impl MemorySet {
     /// TODO: use file to read elf
     /// TODO: map trampoline?
     pub fn load_from_elf(elf_data: &[u8]) -> ElfMemoryInfo {
+        info!("[memory_set] load elf begins");
         let mut memory_set = Self::new_with_kernel();
         let elf = xmas_elf::ElfFile::new(elf_data).unwrap();
 
@@ -168,6 +169,7 @@ impl MemorySet {
         let ph_count = elf_header.pt2.ph_count();
         let mut end_vpn = VirtPageNum(0);
 
+        info!("[memory_set] data loaded! start to map data pages");
         for i in 0..ph_count {
             let ph = elf.program_header(i).unwrap();
             if ph.get_type().unwrap() == xmas_elf::program::Type::Load {
@@ -186,6 +188,7 @@ impl MemorySet {
             }
         }
 
+        info!("[memory_set] load complete! start to map stack and heap");
         let end_va: VirtAddr = end_vpn.into();
         let elf_entry = elf.header.pt2.entry_point() as usize;
 
@@ -199,8 +202,8 @@ impl MemorySet {
 
         ElfMemoryInfo {
             memory_set,
-            user_sp: user_stack_end, // stack grows downward
             elf_entry,
+            user_sp: user_stack_end, // stack grows downward
         }
     }
 }

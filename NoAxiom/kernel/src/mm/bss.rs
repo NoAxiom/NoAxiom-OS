@@ -1,5 +1,3 @@
-core::arch::global_asm!(include_str!("./entry.asm"));
-
 pub fn clear_bss() {
     extern "C" {
         fn sbss();

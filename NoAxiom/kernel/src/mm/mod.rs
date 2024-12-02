@@ -1,13 +1,14 @@
 //! memory management
 
 mod address;
+pub mod bss;
 mod frame;
 mod heap;
 mod map_area;
 mod memory_set;
 mod page_table;
-mod permission;
-mod pte;
+pub mod permission;
+pub mod pte;
 
 pub use memory_set::MemorySet;
 

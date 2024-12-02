@@ -6,13 +6,13 @@ use super::pte::PTEFlags;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum MapType {
-    /// Identical mapping, no translation
+    /// Identical mapping, no translation, not used
     Identical,
 
     /// Framed mapping, with page table translation
     Framed,
 
-    /// Direct mapping, with simple translation
+    /// Direct mapping, with simple translation, only for kernel
     Direct,
 }
 

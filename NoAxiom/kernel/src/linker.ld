@@ -1,16 +1,22 @@
 OUTPUT_ARCH(riscv)
-ENTRY(_start)
+ENTRY(_entry)
 BASE_ADDRESS = 0xffffffc080200000;
 
 SECTIONS
 {
-    . = BASE_ADDRESS;
+    . =  BASE_ADDRESS; 
     skernel = .;
 
     stext = .;
     .text : {
         *(.text.entry)
         . = ALIGN(4K);
+        /*
+        ssignal = .;
+        *(.text.signal);
+        . = ALIGN(4K);
+        esignal = .;
+        */
         *(.text .text.*)
     }
 
@@ -26,16 +32,22 @@ SECTIONS
     erodata = .;
     sdata = .;
     .data : {
+        . = ALIGN(4K);
+        *(.data.prepage .data.prepage.*)
+        . = ALIGN(4K);
         *(.data .data.*)
         *(.sdata .sdata.*)
     }
 
     . = ALIGN(4K);
     edata = .;
-    sbss_with_stack = .;
+ 
+    sbss = .;
     .bss : {
+        skstack0 = .;
         *(.bss.stack)
-        sbss = .;
+        . = ALIGN(4K);
+        ekstack0 = .;
         *(.bss .bss.*)
         *(.sbss .sbss.*)
     }

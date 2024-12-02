@@ -30,7 +30,7 @@ pub fn set_user_trap_entry() {
     unsafe { stvec::write(user_trapvec as usize, TrapMode::Direct) }
 }
 
-/// trap init
+/// trap init of current hart
 pub fn init() {
     set_kernel_trap_entry();
     external_interrupt_enable();
@@ -44,10 +44,6 @@ pub fn trap_restore(task: &Arc<Task>) {
     let cx = task.trap_context_mut();
     info!("trap_restore: sepc {:#x}", cx.sepc);
     info!("trap_restore: sp {:#x}", cx.regs[2]);
-    info!(
-        "cx ptr offset: {}",
-        TRAMPOLINE - cx as *const TrapContext as usize
-    );
     // kernel -> user
     unsafe {
         user_trapret(task.trap_context_mut());

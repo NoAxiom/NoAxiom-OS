@@ -5,6 +5,11 @@ pub const PAGE_WIDTH: usize = 12;
 /// page size : 4KB, 4096 bytes
 pub const PAGE_SIZE: usize = 1 << PAGE_WIDTH;
 
+/// boot stack, only used when kernel initializes
+pub const BOOT_STACK_WIDTH: usize = 16;
+/// boot stack size: 16KB
+pub const BOOT_STACK_SIZE: usize = 1 << BOOT_STACK_WIDTH;
+
 /// user app's stack size: 8KB
 pub const USER_STACK_SIZE: usize = 4096 * 2;
 /// user app's heap size: 120MB

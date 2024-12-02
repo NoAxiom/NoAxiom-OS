@@ -133,14 +133,14 @@ impl Task {
 pub async fn task_main(task: Arc<Task>) {
     while !task.is_zombie() {
         // kernel -> user
-        info!("task_main: trap_restore");
+        info!("[task_main] trap_restore");
         trap_restore(&task);
         if task.is_zombie() {
             info!("task {} is zombie, break", task.tid());
             break;
         }
         // user -> kernel
-        info!("task_main: user_trap_handler");
+        info!("[task_main] user_trap_handler");
         user_trap_handler(&task).await;
     }
 }
@@ -149,8 +149,12 @@ pub async fn task_main(task: Arc<Task>) {
 pub fn spawn_new_process(app_id: usize) {
     info!("[kernel] spawn new process from elf");
     let elf_data = get_app_data(app_id);
-    let (memory_set, user_sp, elf_entry) = MemorySet::from_elf(elf_data);
+    let elf_memory_info = MemorySet::load_from_elf(elf_data);
+    let memory_set = elf_memory_info.memory_set;
+    let elf_entry = elf_memory_info.elf_entry;
+    let user_sp = elf_memory_info.user_sp;
     info!("[kernel] succeed to load elf data");
+
     let task = Arc::new(Task {
         tid: tid_alloc(),
         process: Arc::new(SpinMutex::new(ProcessInfo {
@@ -164,5 +168,6 @@ pub fn spawn_new_process(app_id: usize) {
         exit_code: AtomicI8::new(0),
     });
     info!("create a new task, tid {}", task.tid.0);
+
     spawn_task(task);
 }

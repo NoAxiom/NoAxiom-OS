@@ -15,6 +15,10 @@
 // #![feature(custom_mir)]
 // #![feature(core_intrinsics)]
 
+use core::sync::atomic::{AtomicBool, Ordering};
+
+use driver::sbi::shutdown;
+
 #[macro_use]
 extern crate alloc;
 #[macro_use]
@@ -37,19 +41,29 @@ mod utils;
 
 core::arch::global_asm!(include_str!("link_apps.S"));
 
+static mut BOOT_FLAG: AtomicBool = AtomicBool::new(false);
+
+/// boot a hardware thread
 #[no_mangle]
-pub fn rust_main() {
-    entry::clear_bss();
-    driver::log::init();
-    println!("{}", constant::banner::NOAXIOM_BANNER);
-    println!("[kernel] Hello, world!");
-    println!("[kernel] init memory management");
-    mm::init();
-    trap::init();
-    println!("[kernel] push init_proc to executor");
-    task::spawn_new_process(0);
-    println!("[kernel] executor is running...");
-    loop {
-        sched::run();
+pub fn rust_main(hart_id: usize) {
+    println!("[kernel] hart id {} has been booted", hart_id);
+    if unsafe {
+        BOOT_FLAG
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_ok()
+    } {
+        println!("[kernel] main init");
+    } else {
+        shutdown();
     }
+    // println!("{}", constant::banner::NOAXIOM_BANNER);
+    // println!("[kernel] Hello, world!");
+    // println!("[kernel] init memory management");
+    // trap::init();
+    // println!("[kernel] push init_proc to executor");
+    // task::spawn_new_process(0);
+    // println!("[kernel] executor is running...");
+    // loop {
+    //     sched::run();
+    // }
 }

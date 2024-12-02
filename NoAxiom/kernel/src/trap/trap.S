@@ -27,7 +27,6 @@
 
     .macro    STORE_GENERAL_REG
     sd        ra, 1*8(sp)
-# sd gp, 3*8(sp)
     .set      n, 3
     .rept     29
     STORE_X   %n
@@ -69,11 +68,8 @@
     STORE_GENERAL_REG
     sd        t2, 2*8(sp)
 
-# move to kernel_sp
-    ld        ra, 35*8(sp)
-
-# load callee-saved regs
-    .set      n, 0
+    ld        ra, 35*8(sp)             # move to kernel_sp
+    .set      n, 0                     # load callee-saved regs
     .set      offset, 36
     .rept     12
     LOAD_S    %n offset
@@ -81,13 +77,11 @@
     .set      offset, offset+1
     .endr
 
-# load kernel fp
-    ld        fp, 48*8(sp)
+    ld        fp, 48*8(sp)             # load kernel fp
     ld        tp, 49*8(sp)
     ld        sp, 34*8(sp)
 
-# return to kernel ra
-    ret
+    ret                                # return to kernel ra
 
 
 # kernel -> user
@@ -95,8 +89,7 @@
 
     csrw      sscratch, a0
 
-# save kernel callee-saved regs
-    sd        sp, 34*8(a0)
+    sd        sp, 34*8(a0)             # save kernel callee-saved regs
     sd        ra, 35*8(a0)
 
     .set      n, 0
@@ -110,16 +103,15 @@
     sd        fp, 48*8(a0)
     sd        tp, 49*8(a0)
 
-# to use macros
-    mv        sp, a0
+    mv        sp, a0                   # to use macros
     LOAD_GENERAL_REG
 
     sret
 
 # kernel -> kernel
-    trap_from_kernel:
 # only need to save caller-saved regs
 # note that we don't save sepc & stvec here
+    trap_from_kernel:
     addi      sp, sp, -17*8
     sd        ra,  1*8(sp)
     sd        t0,  2*8(sp)
