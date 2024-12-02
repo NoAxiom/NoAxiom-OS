@@ -1,15 +1,24 @@
-use core::arch::asm;
+use core::{
+    arch::asm,
+    sync::atomic::{AtomicBool, Ordering},
+};
 
 use crate::{
     arch::interrupt::enable_visit_user_memory,
     config::{
         arch::CPU_NUM,
-        mm::{BOOT_STACK_SIZE, BOOT_STACK_WIDTH, KERNEL_ADDR_OFFSET, PTE_PER_PAGE},
+        mm::{
+            BOOT_STACK_SIZE, BOOT_STACK_WIDTH, KERNEL_ADDR_OFFSET, KERNEL_PHYS_ENTRY, PTE_PER_PAGE,
+        },
     },
+    cpu::hartid,
     driver::sbi::hart_start,
     mm::pte::PageTableEntry,
     println, rust_main,
 };
+
+static mut BOOT_FLAG: AtomicBool = AtomicBool::new(false);
+static mut INIT_FLAG: AtomicBool = AtomicBool::new(false);
 
 /// temp stack for kernel booting
 #[link_section = ".bss.stack"]
@@ -81,67 +90,36 @@ unsafe extern "C" fn _entry() -> ! {
 /// init bss, mm, console, and other drivers,
 /// then jump to rust_main
 #[no_mangle]
-pub(crate) fn init(hart_id: usize, _dtb: usize) {
-    crate::mm::bss::bss_init();
-    crate::driver::log::log_init();
-    crate::mm::mm_init();
-    info!("[entry] first init hart_id: {}", hart_id);
-
-    // let platform_info = platform_info_from_dtb(dtb);
-    // platform::init(hart_id, dtb);
-    // interrupt::init_plic(platform_info.plic.start + KERNEL_ADDR_OFFSET);
-
-    #[cfg(feature = "multicore")]
-    init_other_hart(hart_id);
-
+pub(crate) fn init(_hart_id: usize, _dtb: usize) {
+    let hart_id = hartid();
+    if unsafe {
+        BOOT_FLAG
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_ok()
+    } {
+        crate::mm::bss::bss_init();
+        crate::driver::log::log_init();
+        crate::mm::mm_init();
+        println!("[entry] first init hart_id: {}", hart_id);
+        println!("{}", crate::constant::banner::NOAXIOM_BANNER);
+        crate::task::spawn_new_process(0);
+        unsafe {
+            INIT_FLAG.store(true, Ordering::SeqCst);
+        }
+        // init_other_hart(hart_id);
+    } else {
+        while unsafe { !INIT_FLAG.load(Ordering::SeqCst) } {}
+        println!("[entry] second init hart_id: {}", hart_id);
+    }
     enable_visit_user_memory();
-    rust_main(hart_id);
-}
-
-#[naked]
-#[no_mangle]
-pub(crate) unsafe extern "C" fn other_hart_entry() {
-    asm!("
-            mv      tp, a0
-            mv      t0, a0
-            slli    t0, t0, {kernel_stack_size}
-            la      sp, {boot_stack}
-            add     sp, sp, t0
-
-            li      s0, {kernel_addr_offset}
-            or      sp, sp, s0
-
-            // activate page table
-            la      t0, {page_table}
-            srli    t0, t0, 12
-            li      t1, 8 << 60
-            or      t0, t0, t1
-            csrw    satp, t0
-            sfence.vma
-
-            la      t0, {entry}
-            or      t0, t0, s0
-            jalr    t0
-        ",
-        boot_stack = sym BOOT_STACK,
-        page_table = sym PAGE_TABLE,
-        kernel_addr_offset = const KERNEL_ADDR_OFFSET,
-        kernel_stack_size = const BOOT_STACK_WIDTH,
-        entry = sym call_other_hart_main,
-        options(noreturn),
-    )
-}
-
-#[no_mangle]
-pub(crate) extern "C" fn call_other_hart_main(hart_id: usize, _dtb: usize) {
-    enable_visit_user_memory();
-    rust_main(hart_id);
+    rust_main();
 }
 
 /// awake other core
 #[allow(unused)]
 pub fn init_other_hart(forbid_hart_id: usize) {
-    let aux_core_func = (other_hart_entry as usize) & (!KERNEL_ADDR_OFFSET);
+    // let aux_core_func = (other_hart_entry as usize) & (!KERNEL_ADDR_OFFSET);
+    // println!("aux_core_func: {:#x}", aux_core_func);
 
     let start_id = 0;
     // there's no need to wake hart 0 on vf2 platform
@@ -151,11 +129,16 @@ pub fn init_other_hart(forbid_hart_id: usize) {
     info!("init_other_hart, forbid hart: {}", forbid_hart_id);
     for i in start_id..CPU_NUM {
         if i != forbid_hart_id {
-            info!("[init_other_hart] secondary addr: {:#x}", aux_core_func);
-            let res = hart_start(i, aux_core_func, 0);
-            if res.error == 0 {
-                info!("[init_other_hart] hart {:x} start successfully", i);
+            // info!("[init_other_hart] secondary addr: {:#x}", aux_core_func);
+            let result = hart_start(i, KERNEL_PHYS_ENTRY, 0);
+            if result.error != 0 {
+                println!(
+                    "[init_other_hart] error when waking {}, error code: {:?}",
+                    i,
+                    result.get_sbi_error()
+                );
             }
+            info!("[init_other_hart] hart {:x} start successfully", i);
         }
     }
 }

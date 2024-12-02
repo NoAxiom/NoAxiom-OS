@@ -26,9 +26,9 @@ pub const KERNEL_ADDR_OFFSET: usize = 0xffff_ffc0_0000_0000;
 pub const KERNEL_PAGENUM_OFFSET: usize = KERNEL_ADDR_OFFSET >> PAGE_WIDTH;
 
 /// kernel phys memory start address
-pub const KERNEL_PHYS_MEMORY_START: usize = 0x8020_0000;
+pub const KERNEL_PHYS_ENTRY: usize = 0x8020_0000;
 /// kernel virt memory start address
-pub const KERNEL_VIRT_MEMORY_START: usize = KERNEL_ADDR_OFFSET | KERNEL_PHYS_MEMORY_START;
+pub const KERNEL_VIRT_ENTRY: usize = KERNEL_ADDR_OFFSET | KERNEL_PHYS_ENTRY;
 
 /// kernel phys memory end address
 pub const KERNEL_PHYS_MEMORY_END: usize = 0x8800_0000;
