@@ -9,8 +9,7 @@ use async_task::{Builder, Runnable, ScheduleInfo, WithInfo};
 use lazy_static::lazy_static;
 
 use crate::{
-    config::sched::MLFQ_LEVELS,
-    sync::{cell::SyncRefCell, mutex::SpinMutex},
+    config::sched::MLFQ_LEVELS, driver::sbi::shutdown, sync::{cell::SyncRefCell, mutex::SpinMutex}
 };
 
 struct TaskScheduleInfoInner {

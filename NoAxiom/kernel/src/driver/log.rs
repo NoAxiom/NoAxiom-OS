@@ -33,7 +33,6 @@ impl Log for SimpleLogger {
     fn flush(&self) {}
 }
 
-pub static mut LOG_INIT_FLAG: AtomicBool = AtomicBool::new(false);
 pub fn log_init() {
     static LOGGER: SimpleLogger = SimpleLogger;
     log::set_logger(&LOGGER).unwrap();
@@ -45,5 +44,4 @@ pub fn log_init() {
         Some("TRACE") => LevelFilter::Trace,
         _ => LevelFilter::Off,
     });
-    unsafe { LOG_INIT_FLAG.store(true, Ordering::SeqCst) };
 }

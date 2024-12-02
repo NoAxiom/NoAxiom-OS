@@ -14,6 +14,9 @@ impl Sstatus {
         }
         Sstatus(val)
     }
+    pub fn sum() -> usize {
+        (Self::read().0 >> 18) & 1
+    }
     pub fn set_value(&mut self, val: usize) {
         self.0 = val;
     }

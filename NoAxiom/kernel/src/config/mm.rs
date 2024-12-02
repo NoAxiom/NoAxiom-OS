@@ -12,8 +12,10 @@ pub const BOOT_STACK_SIZE: usize = 1 << BOOT_STACK_WIDTH;
 
 /// user app's stack size: 8KB
 pub const USER_STACK_SIZE: usize = 4096 * 2;
-/// user app's heap size: 120MB
-pub const USER_HEAP_SIZE: usize = 4096 * 30000;
+// /// user app's heap size: 120MB
+// pub const USER_HEAP_SIZE: usize = 4096 * 30000;
+/// user app's heap size: 8KB
+pub const USER_HEAP_SIZE: usize = 4096 * 2;
 
 /// kernel stack size: 8KB
 pub const KERNEL_STACK_SIZE: usize = 4096 * 2;

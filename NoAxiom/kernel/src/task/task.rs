@@ -5,7 +5,9 @@ use core::sync::atomic::{AtomicI8, AtomicUsize};
 
 use super::taskid::TaskId;
 use crate::{
+    arch::regs::Sstatus,
     mm::MemorySet,
+    println,
     sched::spawn_task,
     sync::{cell::SyncUnsafeCell, mutex::SpinMutex},
     task::{load_app::get_app_data, taskid::tid_alloc},

@@ -19,6 +19,9 @@ impl Cpu {
     }
 
     fn set_raw_task(&mut self, task: Arc<Task>) {
+        unsafe {
+            task.memory_activate();
+        }
         self.task = Some(task);
     }
     fn clear_raw_task(&mut self) {
@@ -31,6 +34,10 @@ impl Cpu {
     }
     pub fn clear_task(&mut self) {
         self.clear_raw_task();
+    }
+    pub fn token(&self) -> usize {
+        let task = self.task.clone();
+        task.unwrap().token()
     }
 }
 

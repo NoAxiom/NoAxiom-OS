@@ -4,7 +4,7 @@ use core::{
 };
 
 use crate::{
-    arch::interrupt::enable_visit_user_memory,
+    arch::{interrupt::enable_visit_user_memory, regs::Sstatus},
     config::{
         arch::CPU_NUM,
         mm::{
@@ -75,6 +75,7 @@ unsafe extern "C" fn _entry() -> ! {
             mv      a1, gp
             la      t0, {entry}
             or      t0, t0, t1
+            mv      a0, tp
             jalr    t0
         ",
         page_table = sym PAGE_TABLE,
@@ -91,7 +92,6 @@ unsafe extern "C" fn _entry() -> ! {
 /// then jump to rust_main
 #[no_mangle]
 pub(crate) fn init(_hart_id: usize, _dtb: usize) {
-    let hart_id = hartid();
     if unsafe {
         BOOT_FLAG
             .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
@@ -100,18 +100,21 @@ pub(crate) fn init(_hart_id: usize, _dtb: usize) {
         crate::mm::bss::bss_init();
         crate::driver::log::log_init();
         crate::mm::mm_init();
-        println!("[entry] first init hart_id: {}", hart_id);
+        enable_visit_user_memory();
+        println!("[entry] first init hart_id: {}", hartid(),);
         println!("{}", crate::constant::banner::NOAXIOM_BANNER);
         crate::task::spawn_new_process(0);
+        crate::task::spawn_new_process(1);
+        crate::task::spawn_new_process(2);
         unsafe {
             INIT_FLAG.store(true, Ordering::SeqCst);
         }
         // init_other_hart(hart_id);
     } else {
+        enable_visit_user_memory();
         while unsafe { !INIT_FLAG.load(Ordering::SeqCst) } {}
-        println!("[entry] second init hart_id: {}", hart_id);
+        println!("[entry] second init current_hart_id: {}", hartid(),);
     }
-    enable_visit_user_memory();
     rust_main();
 }
 

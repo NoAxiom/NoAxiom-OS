@@ -31,7 +31,7 @@
 
 use riscv::register::sstatus::SPP;
 
-use crate::{arch::regs::Sstatus, constant::register::*};
+use crate::{arch::regs::Sstatus, constant::register::*, println};
 
 /// Trap Context
 /// save registers when trap occurs
@@ -69,6 +69,7 @@ pub struct TrapContext {
 
 impl TrapContext {
     pub fn app_init_cx(entry: usize, sp: usize) -> Self {
+        info!("[app_init_cx] entry: {:#x}, sp: {:#x}", entry, sp);
         let mut sstatus = Sstatus::read();
         sstatus.set_spp(SPP::User);
         let mut cx = Self {

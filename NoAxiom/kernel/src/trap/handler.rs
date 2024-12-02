@@ -8,12 +8,27 @@ use riscv::register::{
 };
 
 use super::trap::set_kernel_trap_entry;
-use crate::{constant::register::A0, syscall::syscall, task::Task};
+use crate::{
+    constant::register::A0,
+    cpu::{current_cpu, hartid},
+    syscall::syscall,
+    task::Task,
+};
 
 /// kernel trap handler
 #[no_mangle]
 pub fn kernel_trap_handler() {
-    panic!("a trap in kernel");
+    let task = current_cpu().task.clone().unwrap();
+    let cx = task.trap_context_mut();
+    let scause = scause::read();
+    let stval = stval::read();
+    panic!(
+            "a trap in kernel\nhart: {}, trap {:?} is unsupported, stval = {:#x}!, error address = {:#x}",
+            hartid(),
+            scause.cause(),
+            stval,
+            cx.sepc
+        );
 }
 
 /// user trap handler
@@ -34,9 +49,11 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
             cx.regs[A0] = result as usize;
         }
         _ => panic!(
-            "trap {:?} is unsupported, stval = {:#x}!",
+            "hart: {}, trap {:?} is unsupported, stval = {:#x}!, error address = {:#x}",
+            hartid(),
             scause.cause(),
-            stval
+            stval,
+            cx.sepc
         ),
     }
 }

@@ -15,6 +15,7 @@
 // #![feature(custom_mir)]
 // #![feature(core_intrinsics)]
 
+use arch::regs::Sstatus;
 use cpu::hartid;
 
 #[macro_use]
@@ -42,6 +43,7 @@ core::arch::global_asm!(include_str!("link_apps.S"));
 /// boot a hardware thread
 #[no_mangle]
 pub fn rust_main() {
+    println!("[debug2] hart id {} has been booted", hartid());
     crate::trap::trap_init();
     println!("[kernel] hart id {} has been booted", hartid());
     loop {

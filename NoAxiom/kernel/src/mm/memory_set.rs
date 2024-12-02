@@ -4,14 +4,11 @@ use lazy_static::lazy_static;
 
 use super::{map_area::MapArea, page_table::PageTable};
 use crate::{
-    config::mm::{PAGE_SIZE, USER_HEAP_SIZE, USER_STACK_SIZE},
-    map_permission,
-    mm::{
+    config::mm::{PAGE_SIZE, PAGE_WIDTH, USER_HEAP_SIZE, USER_STACK_SIZE}, map_permission, mm::{
         address::{VirtAddr, VirtPageNum},
         map_area::MapAreaType,
         permission::MapType,
-    },
-    sync::mutex::SpinMutex,
+    }, println, sync::mutex::SpinMutex
 };
 
 lazy_static! {
@@ -75,6 +72,7 @@ impl MemorySet {
     /// push a map area into current memory set
     /// load data if provided
     pub fn push_area(&mut self, mut map_area: MapArea, data: Option<&[u8]>) {
+        println!("push_area: [{:#X}, {:#X})", map_area.vpn_range().start().0 << PAGE_WIDTH, map_area.vpn_range().end().0 << PAGE_WIDTH);
         map_area.map_each(&mut self.page_table);
         if let Some(data) = data {
             map_area.load_data(&mut self.page_table, data);
@@ -131,27 +129,31 @@ impl MemorySet {
 
     /// map user_stack_area lazily
     pub fn map_user_stack(&mut self, start: usize, end: usize) {
-        // fixme: is using start correct?
+        // FIXME: is using start correct?
         self.user_stack_base = start;
-        self.user_stack_area = Some(MapArea::new(
+        let mut map_area = MapArea::new(
             start.into(),
             end.into(),
             MapType::Framed,
             map_permission!(U, R, W),
             MapAreaType::UserStack,
-        ));
+        );
+        map_area.map_each(&mut self.page_table);
+        self.user_stack_area = Some(map_area);
     }
 
     /// map user_heap_area lazily
     pub fn map_user_heap(&mut self, start: usize, end: usize) {
         self.user_heap_base = start;
-        self.user_heap_area = Some(MapArea::new(
+        let mut map_area = MapArea::new(
             start.into(),
             end.into(),
             MapType::Framed,
             map_permission!(U, R, W),
             MapAreaType::UserHeap,
-        ));
+        );
+        map_area.map_each(&mut self.page_table); // todo ...
+        self.user_heap_area = Some(map_area);
     }
 
     /// load data from elf file
@@ -161,6 +163,7 @@ impl MemorySet {
         info!("[memory_set] load elf begins");
         let mut memory_set = Self::new_with_kernel();
         let elf = xmas_elf::ElfFile::new(elf_data).unwrap();
+        info!("elf header: {:?}", elf.header);
 
         let elf_header = elf.header;
         let magic = elf_header.pt1.magic;
@@ -187,7 +190,7 @@ impl MemorySet {
             }
         }
 
-        info!("[memory_set] load complete! start to map stack and heap");
+        info!("[memory_set] elf data load complete! start to map user stack");
         let end_va: VirtAddr = end_vpn.into();
         let elf_entry = elf.header.pt2.entry_point() as usize;
 
@@ -195,10 +198,12 @@ impl MemorySet {
         let user_stack_end = user_stack_base + USER_STACK_SIZE; // stack top
         memory_set.map_user_stack(user_stack_base.into(), user_stack_end.into());
 
+        info!("[memory_set] user stack mapped! start to map user heap");
         let user_heap_base: usize = user_stack_end + PAGE_SIZE;
         let user_heap_end: usize = user_heap_base + USER_HEAP_SIZE;
         memory_set.map_user_heap(user_heap_base, user_heap_end);
 
+        info!("[memory_set] user heap mapped! elf load complete!");
         ElfMemoryInfo {
             memory_set,
             elf_entry,

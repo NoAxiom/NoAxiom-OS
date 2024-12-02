@@ -9,7 +9,7 @@ use super::{
     permission::{MapPermission, MapType},
     pte::PTEFlags,
 };
-use crate::{config::mm::PAGE_SIZE, mm::address::StepOne};
+use crate::{config::mm::{PAGE_SIZE, PAGE_WIDTH}, mm::address::StepOne, println};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MapAreaType {
@@ -88,6 +88,7 @@ impl MapArea {
             MapType::Framed => {
                 for vpn in self.vpn_range.into_iter() {
                     let frame = frame_alloc().unwrap();
+                    println!("map_each: vpn = {:#X}, frame: {:#X}", vpn.0 << PAGE_WIDTH, frame.ppn.0 << PAGE_WIDTH);
                     let ppn = frame.ppn;
                     if self.frame_map.contains_key(&vpn) {
                         panic!("vm area overlap");
@@ -95,6 +96,7 @@ impl MapArea {
                     self.frame_map.insert(vpn, frame);
                     let flags = PTEFlags::from_bits(self.map_permission.bits()).unwrap();
                     page_table.map(vpn, ppn, flags);
+                    assert!(page_table.find_pte(vpn).is_some());
                 }
             }
             // direct: kernel space
