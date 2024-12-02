@@ -7,6 +7,7 @@ use super::taskid::TaskId;
 use crate::{
     arch::interrupt::is_interrupt_enable,
     config::mm::{kernel_stack_position, TRAP_CONTEXT_BASE},
+    constant::register::RA,
     mm::{MapPermission, MemorySet, PhysPageNum, VirtAddr, KERNEL_SPACE},
     sched::spawn_task,
     sync::{cell::SyncUnsafeCell, mutex::SpinMutex},
@@ -182,7 +183,7 @@ pub fn spawn_new_process(app_id: usize) {
         user_sp,
         KERNEL_SPACE.lock().token(),
         kernel_stack_top,
-        temp_trap_handler as usize,
+        0, // modified in trap.S
     );
 
     info!("trap context:{:?}", trap_context);

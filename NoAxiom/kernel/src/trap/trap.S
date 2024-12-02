@@ -33,8 +33,8 @@ __alltraps:
     sd t2, 2*8(sp)
     # load kernel_satp into t0
     ld t0, 34*8(sp)
-    # load trap_handler into t1
-    ld t1, 36*8(sp)
+    # load return_address into t1
+    ld ra, 36*8(sp)
     # move to kernel_sp
     ld sp, 35*8(sp)
     # switch to kernel space
@@ -43,7 +43,7 @@ __alltraps:
     # jump to trap_handler
     # loop:
         # j loop
-    jr t1
+    ret
 
 __restore:
     # a0: *TrapContext in user space(Constant); a1: user space token
@@ -51,6 +51,7 @@ __restore:
     csrw satp, a1
     sfence.vma
     csrw sscratch, a0
+    sd a2, 36*8(a0)
     mv sp, a0
     # now sp points to TrapContext in user space, start restoring based on it
     # restore sstatus/sepc

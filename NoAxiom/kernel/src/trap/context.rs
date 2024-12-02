@@ -50,7 +50,7 @@ pub struct TrapContext {
     /// Kernel stack pointer of the current application
     pub kernel_sp: usize,
     /// Virtual address of trap handler entry point in kernel
-    pub trap_handler: usize,
+    pub ra: usize,
 }
 
 impl TrapContext {
@@ -59,7 +59,7 @@ impl TrapContext {
         sp: usize,
         kernel_satp: usize,
         kernel_sp: usize,
-        trap_handler: usize,
+        return_ra: usize,
     ) -> Self {
         let mut sstatus = sstatus::read();
         sstatus.set_spp(SPP::User);
@@ -69,11 +69,11 @@ impl TrapContext {
             sepc: entry,
             kernel_sp,
             kernel_satp,
-            trap_handler, /* kernel_s: [0; 12],
-                           * kernel_fp: 0,
-                           * todo: hart_id for multi-core
-                           * cpu_id: 0,
-                           * freg: UserFloatContext::new(), */
+            ra: return_ra, /* kernel_s: [0; 12],
+                            * kernel_fp: 0,
+                            * todo: hart_id for multi-core
+                            * cpu_id: 0,
+                            * freg: UserFloatContext::new(), */
         };
         cx.regs[SP] = sp;
         cx
