@@ -10,10 +10,16 @@ endif
 FEATURES :=
 
 # feature flags
-MULTICORE := 
+
+# arch, multicore config is passed from ../makefile
+MULTICORE ?=
+SV39 := 1
+
+# platform
 VF2 :=
+QEMU_RISCV := 1
+
 UART := 
-QEMU_RISCV :=
 PRELIMINARY :=
 BUSYBOX :=
 RUNTESTS :=
@@ -25,6 +31,10 @@ RAMDISK :=
 
 ifneq ($(MULTICORE), )
 	FEATURES += multicore
+endif
+
+ifneq ($(SV39), )
+	FEATURES += sv39
 endif
 
 ifneq ($(UART), )

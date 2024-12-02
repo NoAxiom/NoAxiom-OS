@@ -4,7 +4,7 @@ use crate::{
     arch::interrupt::enable_visit_user_memory,
     config::{
         arch::CPU_NUM,
-        mm::{BOOT_STACK_SIZE, BOOT_STACK_WIDTH, KERNEL_ADDR_OFFSET},
+        mm::{BOOT_STACK_SIZE, BOOT_STACK_WIDTH, KERNEL_ADDR_OFFSET, PTE_PER_PAGE},
     },
     driver::sbi::hart_start,
     mm::pte::PageTableEntry,
@@ -17,8 +17,8 @@ static BOOT_STACK: [u8; BOOT_STACK_SIZE * CPU_NUM] = [0; BOOT_STACK_SIZE * CPU_N
 
 /// temp page table for kernel booting, hard linked
 #[link_section = ".data.prepage"]
-static PAGE_TABLE: [PageTableEntry; 512] = {
-    let mut arr: [PageTableEntry; 512] = [PageTableEntry(0); 512];
+static PAGE_TABLE: [PageTableEntry; PTE_PER_PAGE] = {
+    let mut arr: [PageTableEntry; PTE_PER_PAGE] = [PageTableEntry(0); PTE_PER_PAGE];
     // create pte with all flags set
     macro_rules! page_table_config {
         ($($id:expr, $addr:expr)*) => {
@@ -82,15 +82,19 @@ unsafe extern "C" fn _entry() -> ! {
 /// then jump to rust_main
 #[no_mangle]
 pub(crate) fn init(hart_id: usize, _dtb: usize) {
-    crate::mm::bss::clear_bss();
-    crate::driver::log::init();
-    crate::mm::init();
+    // if hart_id == 0 {
+    crate::mm::bss::bss_init();
+    crate::driver::log::log_init();
+    crate::mm::mm_init();
+    // }
+    println!("[entry] first init hart_id: {}", hart_id);
 
     // let platform_info = platform_info_from_dtb(dtb);
     // platform::init(hart_id, dtb);
     // interrupt::init_plic(platform_info.plic.start + KERNEL_ADDR_OFFSET);
-    // #[cfg(feature = "multicore")]
-    // init_other_hart(hart_id);
+
+    #[cfg(feature = "multicore")]
+    init_other_hart(hart_id);
 
     enable_visit_user_memory();
     rust_main(hart_id);
@@ -125,35 +129,35 @@ pub(crate) unsafe extern "C" fn other_hart_entry() {
         page_table = sym PAGE_TABLE,
         kernel_addr_offset = const KERNEL_ADDR_OFFSET,
         kernel_stack_size = const BOOT_STACK_WIDTH,
-        entry = sym other_hart_call_main,
+        entry = sym call_other_hart_main,
         options(noreturn),
     )
 }
 
 #[no_mangle]
-pub(crate) extern "C" fn other_hart_call_main(hart_id: usize, _dtb: usize) {
+pub(crate) extern "C" fn call_other_hart_main(hart_id: usize, _dtb: usize) {
     enable_visit_user_memory();
     rust_main(hart_id);
 }
 
 /// awake other core
 #[allow(unused)]
-pub fn init_other_hart(hart_id: usize) {
+pub fn init_other_hart(forbid_hart_id: usize) {
     let aux_core_func = (other_hart_entry as usize) & (!KERNEL_ADDR_OFFSET);
-    // let start_hart = if cfg!(any(feature = "vf2", feature = "hifive")) {
-    //     1
-    // } else {
-    //     0
-    // };
-    let start_hart = 1;
-    for i in start_hart..CPU_NUM {
-        if i != hart_id {
+
+    let start_id = 0;
+    // there's no need to wake hart 0 on vf2 platform
+    #[cfg(feature = "vf2")]
+    let start_id = 1;
+
+    println!("init_other_hart, previous hart: {}", forbid_hart_id);
+    for i in start_id..CPU_NUM {
+        if i != forbid_hart_id {
             println!("[init_other_hart] secondary addr: {:#x}", aux_core_func);
 
             let res = hart_start(i, aux_core_func, 0);
             if res.error == 0 {
                 println!("[init_other_hart] hart {:x} start successfully", i);
-                break;
             }
         }
     }

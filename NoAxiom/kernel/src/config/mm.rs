@@ -35,6 +35,7 @@ pub const KERNEL_PHYS_MEMORY_END: usize = 0x8800_0000;
 /// kernel virt memory end address
 pub const KERNEL_VIRT_MEMORY_END: usize = KERNEL_ADDR_OFFSET | KERNEL_PHYS_MEMORY_END;
 
+#[cfg(feature = "sv39")]
 mod sv39 {
     use super::PAGE_WIDTH; // 12
 
@@ -55,7 +56,29 @@ mod sv39 {
     /// page table entry per page
     pub const PTE_PER_PAGE: usize = 1 << PAGE_NUM_WIDTH; // 512
 }
+#[cfg(feature = "sv39")]
 pub use sv39::*;
 
-// todo: add more sv modes
-// mod sv48 {}
+#[cfg(feature = "sv48")]
+mod sv48 {
+    use super::PAGE_WIDTH; // 12
+
+    /// physical address width
+    pub const PA_WIDTH: usize = 56;
+    /// virtual address width
+    pub const VA_WIDTH: usize = 48;
+
+    /// physical page number width
+    pub const PPN_WIDTH: usize = PA_WIDTH - PAGE_WIDTH; // 44
+    /// virtual page number width
+    pub const VPN_WIDTH: usize = VA_WIDTH - PAGE_WIDTH; // 36
+
+    /// index level number of sv48
+    pub const INDEX_LEVELS: usize = 4;
+    /// raw vpn & ppn width of sv48
+    pub const PAGE_NUM_WIDTH: usize = VPN_WIDTH / INDEX_LEVELS; // 9
+    /// page table entry per page
+    pub const PTE_PER_PAGE: usize = 1 << PAGE_NUM_WIDTH; // 512
+}
+#[cfg(feature = "sv48")]
+pub use sv48::*;

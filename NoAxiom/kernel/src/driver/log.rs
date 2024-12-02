@@ -34,7 +34,7 @@ impl Log for SimpleLogger {
 }
 
 pub static mut LOG_INIT_FLAG: AtomicBool = AtomicBool::new(false);
-pub fn init() {
+pub fn log_init() {
     static LOGGER: SimpleLogger = SimpleLogger;
     log::set_logger(&LOGGER).unwrap();
     log::set_max_level(match option_env!("LOG") {

@@ -1,4 +1,4 @@
-pub fn clear_bss() {
+pub fn bss_init() {
     extern "C" {
         fn sbss();
         fn ebss();

@@ -17,8 +17,6 @@
 
 use core::sync::atomic::{AtomicBool, Ordering};
 
-use driver::sbi::shutdown;
-
 #[macro_use]
 extern crate alloc;
 #[macro_use]
@@ -52,18 +50,12 @@ pub fn rust_main(hart_id: usize) {
             .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
             .is_ok()
     } {
-        println!("[kernel] main init");
+        crate::trap::trap_init();
+        println!("{}", constant::banner::NOAXIOM_BANNER);
+        crate::task::spawn_new_process(0);
     } else {
-        shutdown();
     }
-    // println!("{}", constant::banner::NOAXIOM_BANNER);
-    // println!("[kernel] Hello, world!");
-    // println!("[kernel] init memory management");
-    // trap::init();
-    // println!("[kernel] push init_proc to executor");
-    // task::spawn_new_process(0);
-    // println!("[kernel] executor is running...");
-    // loop {
-    //     sched::run();
-    // }
+    loop {
+        sched::run();
+    }
 }

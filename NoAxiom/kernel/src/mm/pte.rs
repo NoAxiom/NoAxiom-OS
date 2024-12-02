@@ -78,7 +78,7 @@ impl PageTableEntry {
     }
     /// get the pte permission flags
     pub fn flags(&self) -> PTEFlags {
-        PTEFlags::from_bits(self.0 as FlagInnerType).unwrap()
+        PTEFlags::from_bits((self.0 & ((1 << PTE_WIDTH) - 1)) as FlagInnerType).unwrap()
     }
     /// set flags
     pub fn set_flags(&mut self, flags: PTEFlags) {

@@ -125,7 +125,6 @@ pub fn run() {
             info!("[sched] task done");
             break;
         } else {
-            crate::driver::sbi::shutdown();
             // todo!()
         }
     }

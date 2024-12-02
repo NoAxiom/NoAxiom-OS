@@ -177,16 +177,16 @@ impl VpnRange {
         assert!(start <= end, "start {:?} > end {:?}!", start, end);
         Self { start, end }
     }
+    #[inline(always)]
     pub fn new_from_va(start_va: VirtAddr, end_va: VirtAddr) -> Self {
-        let start = start_va.floor();
-        let end = end_va.ceil();
-        assert!(start <= end, "start {:?} > end {:?}!", start, end);
-        Self { start, end }
+        Self::new(start_va.floor(), end_va.ceil())
     }
-    pub fn start(&self) -> VirtPageNum {
+    #[inline(always)]
+    pub const fn start(&self) -> VirtPageNum {
         self.start
     }
-    pub fn end(&self) -> VirtPageNum {
+    #[inline(always)]
+    pub const fn end(&self) -> VirtPageNum {
         self.end
     }
 }
@@ -210,8 +210,8 @@ impl IntoIterator for VpnRange {
     type IntoIter = IntoIter<Self::Item>;
     fn into_iter(self) -> Self::IntoIter {
         Self::IntoIter {
-            next: self.start,
-            end: self.end,
+            next: self.start(),
+            end: self.end(),
         }
     }
 }

@@ -45,7 +45,7 @@ all: sbi-qemu run
 build: 
 	@cd $(PROJECT)/kernel && make build
 
-MULTICORE ?= 2
+MULTICORE := 2
 
 # TODO: impl flags
 QFLAGS := 

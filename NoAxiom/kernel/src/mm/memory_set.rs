@@ -85,8 +85,6 @@ impl MemorySet {
     /// create kernel space, used in [`KERNEL_SPACE`] initialization
     pub fn init_kernel_space() -> Self {
         extern "C" {
-            fn skernel();
-            fn ekernel();
             fn stext();
             fn etext();
             fn srodata();
@@ -133,6 +131,7 @@ impl MemorySet {
 
     /// map user_stack_area lazily
     pub fn map_user_stack(&mut self, start: usize, end: usize) {
+        // fixme: is using start correct?
         self.user_stack_base = start;
         self.user_stack_area = Some(MapArea::new(
             start.into(),

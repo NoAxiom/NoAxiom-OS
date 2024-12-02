@@ -12,7 +12,7 @@ pub mod pte;
 
 pub use memory_set::MemorySet;
 
-pub fn init() {
+pub fn mm_init() {
     frame::init();
     heap::init();
 }

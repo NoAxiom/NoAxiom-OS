@@ -31,7 +31,7 @@ pub fn set_user_trap_entry() {
 }
 
 /// trap init of current hart
-pub fn init() {
+pub fn trap_init() {
     set_kernel_trap_entry();
     external_interrupt_enable();
     enable_stimer_interrupt();
