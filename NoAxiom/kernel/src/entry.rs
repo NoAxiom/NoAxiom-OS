@@ -82,12 +82,10 @@ unsafe extern "C" fn _entry() -> ! {
 /// then jump to rust_main
 #[no_mangle]
 pub(crate) fn init(hart_id: usize, _dtb: usize) {
-    // if hart_id == 0 {
     crate::mm::bss::bss_init();
     crate::driver::log::log_init();
     crate::mm::mm_init();
-    // }
-    println!("[entry] first init hart_id: {}", hart_id);
+    info!("[entry] first init hart_id: {}", hart_id);
 
     // let platform_info = platform_info_from_dtb(dtb);
     // platform::init(hart_id, dtb);
@@ -150,14 +148,13 @@ pub fn init_other_hart(forbid_hart_id: usize) {
     #[cfg(feature = "vf2")]
     let start_id = 1;
 
-    println!("init_other_hart, previous hart: {}", forbid_hart_id);
+    info!("init_other_hart, forbid hart: {}", forbid_hart_id);
     for i in start_id..CPU_NUM {
         if i != forbid_hart_id {
-            println!("[init_other_hart] secondary addr: {:#x}", aux_core_func);
-
+            info!("[init_other_hart] secondary addr: {:#x}", aux_core_func);
             let res = hart_start(i, aux_core_func, 0);
             if res.error == 0 {
-                println!("[init_other_hart] hart {:x} start successfully", i);
+                info!("[init_other_hart] hart {:x} start successfully", i);
             }
         }
     }

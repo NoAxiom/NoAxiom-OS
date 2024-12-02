@@ -45,14 +45,14 @@ all: sbi-qemu run
 build: 
 	@cd $(PROJECT)/kernel && make build
 
-MULTICORE := 2
+MULTICORE_COUNT := 2
 
 # TODO: impl flags
 QFLAGS := 
 QFLAGS += -m 128
 QFLAGS += -machine virt
 QFLAGS += -nographic
-QFLAGS += -smp $(MULTICORE)
+QFLAGS += -smp $(MULTICORE_COUNT)
 QFLAGS += -kernel kernel-qemu
 QFLAGS += -device loader,file=$(KERNEL_BIN),addr=0x80200000
 # QFLAGS += -drive file=$(SDCARD_BAK),if=none,format=raw,id=x0 
