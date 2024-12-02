@@ -4,6 +4,7 @@ use bitflags::bitflags;
 
 use super::pte::PTEFlags;
 
+#[allow(unused)]
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum MapType {
     /// Identical mapping, no translation, not used
@@ -32,6 +33,7 @@ bitflags! {
     }
 }
 
+#[allow(unused)]
 impl MapPermission {
     pub fn readable(&self) -> bool {
         self.contains(MapPermission::R)

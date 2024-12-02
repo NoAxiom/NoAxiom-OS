@@ -8,7 +8,7 @@ use riscv::register::{
 
 use super::context::TrapContext;
 use crate::{
-    arch::{interrupt::{enable_stimer_interrupt, external_interrupt_enable}, regs::Sstatus},
+    arch::interrupt::{enable_stimer_interrupt, external_interrupt_enable},
     println,
     task::Task,
 };

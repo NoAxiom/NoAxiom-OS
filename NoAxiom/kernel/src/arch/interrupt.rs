@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use riscv::{asm::sfence_vma_all, register::satp};
 
 /// 检查全局中断是否开启

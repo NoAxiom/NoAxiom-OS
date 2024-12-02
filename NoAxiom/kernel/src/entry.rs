@@ -4,7 +4,7 @@ use core::{
 };
 
 use crate::{
-    arch::{interrupt::enable_visit_user_memory, regs::Sstatus},
+    arch::interrupt::enable_visit_user_memory,
     config::{
         arch::CPU_NUM,
         mm::{
@@ -101,7 +101,7 @@ pub(crate) fn init(_hart_id: usize, _dtb: usize) {
         crate::driver::log::log_init();
         crate::mm::mm_init();
         enable_visit_user_memory();
-        println!("[entry] first init hart_id: {}", hartid(),);
+        println!("[entry] entry init hart_id: {}", hartid());
         println!("{}", crate::constant::banner::NOAXIOM_BANNER);
         crate::task::spawn_new_process(0);
         crate::task::spawn_new_process(1);
@@ -113,7 +113,6 @@ pub(crate) fn init(_hart_id: usize, _dtb: usize) {
     } else {
         enable_visit_user_memory();
         while unsafe { !INIT_FLAG.load(Ordering::SeqCst) } {}
-        println!("[entry] second init current_hart_id: {}", hartid(),);
     }
     rust_main();
 }

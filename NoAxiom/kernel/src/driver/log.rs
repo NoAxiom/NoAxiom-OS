@@ -1,7 +1,5 @@
 // ! log
 
-use core::sync::atomic::{AtomicBool, Ordering};
-
 use log::{self, Level, LevelFilter, Log, Metadata, Record};
 
 use crate::println;

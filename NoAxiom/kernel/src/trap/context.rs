@@ -31,7 +31,7 @@
 
 use riscv::register::sstatus::SPP;
 
-use crate::{arch::regs::Sstatus, constant::register::*, println};
+use crate::{arch::regs::Sstatus, constant::register::*};
 
 /// Trap Context
 /// save registers when trap occurs

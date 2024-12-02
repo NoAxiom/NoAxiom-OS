@@ -9,8 +9,12 @@ use super::{
     permission::{MapPermission, MapType},
     pte::PTEFlags,
 };
-use crate::{config::mm::{PAGE_SIZE, PAGE_WIDTH}, mm::address::StepOne, println};
+use crate::{
+    config::mm::{PAGE_SIZE, PAGE_WIDTH},
+    mm::address::StepOne,
+};
 
+#[allow(unused)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MapAreaType {
     UserStack,
@@ -88,7 +92,11 @@ impl MapArea {
             MapType::Framed => {
                 for vpn in self.vpn_range.into_iter() {
                     let frame = frame_alloc().unwrap();
-                    println!("map_each: vpn = {:#X}, frame: {:#X}", vpn.0 << PAGE_WIDTH, frame.ppn.0 << PAGE_WIDTH);
+                    info!(
+                        "map_each: vpn = {:#X}, frame: {:#X}",
+                        vpn.0 << PAGE_WIDTH,
+                        frame.ppn.0 << PAGE_WIDTH
+                    );
                     let ppn = frame.ppn;
                     if self.frame_map.contains_key(&vpn) {
                         panic!("vm area overlap");

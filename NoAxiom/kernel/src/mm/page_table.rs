@@ -22,6 +22,7 @@ pub struct PageTable {
     frames: Vec<FrameTracker>,
 }
 
+#[allow(unused)]
 impl PageTable {
     /// create a new page table,
     /// with allocating a frame for root node

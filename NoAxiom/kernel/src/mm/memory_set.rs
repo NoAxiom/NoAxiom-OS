@@ -4,11 +4,14 @@ use lazy_static::lazy_static;
 
 use super::{map_area::MapArea, page_table::PageTable};
 use crate::{
-    config::mm::{PAGE_SIZE, PAGE_WIDTH, USER_HEAP_SIZE, USER_STACK_SIZE}, map_permission, mm::{
+    config::mm::{PAGE_SIZE, PAGE_WIDTH, USER_HEAP_SIZE, USER_STACK_SIZE},
+    map_permission,
+    mm::{
         address::{VirtAddr, VirtPageNum},
         map_area::MapAreaType,
         permission::MapType,
-    }, println, sync::mutex::SpinMutex
+    },
+    sync::mutex::SpinMutex,
 };
 
 lazy_static! {
@@ -72,7 +75,11 @@ impl MemorySet {
     /// push a map area into current memory set
     /// load data if provided
     pub fn push_area(&mut self, mut map_area: MapArea, data: Option<&[u8]>) {
-        println!("push_area: [{:#X}, {:#X})", map_area.vpn_range().start().0 << PAGE_WIDTH, map_area.vpn_range().end().0 << PAGE_WIDTH);
+        info!(
+            "push_area: [{:#X}, {:#X})",
+            map_area.vpn_range().start().0 << PAGE_WIDTH,
+            map_area.vpn_range().end().0 << PAGE_WIDTH
+        );
         map_area.map_each(&mut self.page_table);
         if let Some(data) = data {
             map_area.load_data(&mut self.page_table, data);
