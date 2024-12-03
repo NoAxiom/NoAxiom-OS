@@ -9,23 +9,32 @@ _num_app:
     .quad app_2_start
     .quad app_2_end
 
+    .global _app_names
+_app_names:
+    .string "hello_world"
+    .string "initprocess"
+    .string "ktest"
+
     .section .data
     .global app_0_start
     .global app_0_end
+    .align 3
 app_0_start:
-    .incbin "./NoAxiom/user/apps/hello_world_0.elf"
+    .incbin "./NoAxiom/user/elfs/hello_world"
 app_0_end:
 
     .section .data
     .global app_1_start
     .global app_1_end
+    .align 3
 app_1_start:
-    .incbin "./NoAxiom/user/apps/hello_world_1.elf"
+    .incbin "./NoAxiom/user/elfs/initprocess"
 app_1_end:
 
     .section .data
     .global app_2_start
     .global app_2_end
+    .align 3
 app_2_start:
-    .incbin "./NoAxiom/user/apps/hello_world_2.elf"
+    .incbin "./NoAxiom/user/elfs/ktest"
 app_2_end:

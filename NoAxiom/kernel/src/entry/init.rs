@@ -38,6 +38,7 @@ pub(crate) fn init(_hart_id: usize, _dtb: usize) {
         println!("{}", crate::constant::banner::NOAXIOM_BANNER);
         // TODO: spawn init_proc
         schedule_spawn_new_process(0);
+        schedule_spawn_new_process(1);
         unsafe {
             INIT_FLAG.store(true, Ordering::SeqCst);
         }

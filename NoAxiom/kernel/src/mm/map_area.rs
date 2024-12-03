@@ -92,11 +92,6 @@ impl MapArea {
             MapType::Framed => {
                 for vpn in self.vpn_range.into_iter() {
                     let frame = frame_alloc().unwrap();
-                    info!(
-                        "map_each: vpn = {:#X}, frame: {:#X}",
-                        vpn.0 << PAGE_WIDTH,
-                        frame.ppn.0 << PAGE_WIDTH
-                    );
                     let ppn = frame.ppn;
                     if self.frame_map.contains_key(&vpn) {
                         panic!("vm area overlap");

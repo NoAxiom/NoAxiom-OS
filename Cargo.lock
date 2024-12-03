@@ -54,6 +54,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "buddy_system_allocator"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d44d578cadd17312c75e7d0ef489361f160ace58f7139aa32001fee1a51b89b5"
+dependencies = [
+ "spin 0.9.8",
+]
+
+[[package]]
 name = "byteorder"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -155,12 +164,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "hello_world"
+version = "0.1.0"
+dependencies = [
+ "userlibs",
+]
+
+[[package]]
+name = "initprocess"
+version = "0.1.0"
+dependencies = [
+ "userlibs",
+]
+
+[[package]]
 name = "kernel"
 version = "0.1.0"
 dependencies = [
  "async-task",
  "bitflags 2.6.0",
- "buddy_system_allocator",
+ "buddy_system_allocator 0.6.0",
  "crate_interface",
  "fdt",
  "hashbrown",
@@ -190,6 +213,13 @@ version = "0.1.1"
 source = "git+https://github.com/os-module/kernel-sync.git#4483c08ee46998eb6d2167f848054194c20d1bb7"
 dependencies = [
  "lock_api",
+]
+
+[[package]]
+name = "ktest"
+version = "0.1.0"
+dependencies = [
+ "userlibs",
 ]
 
 [[package]]
@@ -448,6 +478,13 @@ name = "unicode-ident"
 version = "1.0.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e91b56cd4cadaeb79bbf1a5645f6b4f8dc5bde8834ad5894a8db35fda9efa1fe"
+
+[[package]]
+name = "userlibs"
+version = "0.1.0"
+dependencies = [
+ "buddy_system_allocator 0.9.1",
+]
 
 [[package]]
 name = "vcell"

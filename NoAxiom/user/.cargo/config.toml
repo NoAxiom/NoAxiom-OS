@@ -1,0 +1,9 @@
+[build]
+target = "riscv64gc-unknown-none-elf"
+
+[target.riscv64gc-unknown-none-elf]
+linker = "rust-lld"
+rustflags = [
+    "-Clink-arg=-TNoAxiom/user/apps/linker.ld",
+    # "-Cforce-frame-pointers=yes",
+]

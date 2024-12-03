@@ -43,6 +43,7 @@ all: sbi-qemu run
 	@cp $(KERNEL_BIN) kernel-qemu
 
 build: 
+	@cd $(PROJECT)/user && make build
 	@cd $(PROJECT)/kernel && make build
 
 MULTICORE_COUNT := 2

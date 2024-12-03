@@ -1,10 +1,6 @@
 # complete these after
 [workspace]
-members = [
-    "NoAxiom/kernel",
-    # "NoAxiom/user/apps/*",
-    # "NoAxiom/lib/*",
-]
+members = ["NoAxiom/kernel", "NoAxiom/user/apps/*", "NoAxiom/user/libs"]
 # exclude = [
 #     "NoAxiom/lib/.trashbin",
 # ]

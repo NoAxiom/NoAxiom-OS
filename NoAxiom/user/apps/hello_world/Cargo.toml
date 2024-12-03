@@ -1,0 +1,9 @@
+[package]
+edition = "2021"
+name = "hello_world"
+version = "0.1.0"
+
+[features]
+
+[dependencies]
+userlibs = { path = "../../libs" }
