@@ -46,20 +46,11 @@ checksum = "b048fb63fd8b5923fc5aa7b340d8e156aec7ec02f0c78fa8a6ddc2613f6f71de"
 
 [[package]]
 name = "buddy_system_allocator"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b4e85e760e105b46ae0bd1236578793c6c147ae7463fe95c8350296b8bfcb830"
-dependencies = [
- "spin 0.7.1",
-]
-
-[[package]]
-name = "buddy_system_allocator"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d44d578cadd17312c75e7d0ef489361f160ace58f7139aa32001fee1a51b89b5"
 dependencies = [
- "spin 0.9.8",
+ "spin",
 ]
 
 [[package]]
@@ -167,14 +158,14 @@ dependencies = [
 name = "hello_world"
 version = "0.1.0"
 dependencies = [
- "userlibs",
+ "userlib",
 ]
 
 [[package]]
 name = "initprocess"
 version = "0.1.0"
 dependencies = [
- "userlibs",
+ "userlib",
 ]
 
 [[package]]
@@ -183,7 +174,7 @@ version = "0.1.0"
 dependencies = [
  "async-task",
  "bitflags 2.6.0",
- "buddy_system_allocator 0.6.0",
+ "buddy_system_allocator",
  "crate_interface",
  "fdt",
  "hashbrown",
@@ -199,7 +190,7 @@ dependencies = [
  "ringbuffer",
  "riscv",
  "smoltcp",
- "spin 0.9.8",
+ "spin",
  "thiserror-core",
  "uart16550",
  "uart8250",
@@ -219,7 +210,7 @@ dependencies = [
 name = "ktest"
 version = "0.1.0"
 dependencies = [
- "userlibs",
+ "userlib",
 ]
 
 [[package]]
@@ -228,7 +219,7 @@ version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 dependencies = [
- "spin 0.9.8",
+ "spin",
 ]
 
 [[package]]
@@ -377,12 +368,6 @@ dependencies = [
 
 [[package]]
 name = "spin"
-version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "13287b4da9d1207a4f4929ac390916d64eacfe236a487e9a9f5b3be392be5162"
-
-[[package]]
-name = "spin"
 version = "0.9.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6980e8d7511241f8acf4aebddbb1ff938df5eebe98691418c4468d0b72a96a67"
@@ -480,10 +465,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e91b56cd4cadaeb79bbf1a5645f6b4f8dc5bde8834ad5894a8db35fda9efa1fe"
 
 [[package]]
-name = "userlibs"
+name = "userlib"
 version = "0.1.0"
 dependencies = [
- "buddy_system_allocator 0.9.1",
+ "buddy_system_allocator",
 ]
 
 [[package]]

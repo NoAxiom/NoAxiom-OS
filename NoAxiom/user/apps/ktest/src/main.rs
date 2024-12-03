@@ -1,7 +1,7 @@
 #![no_std]
 #![no_main]
 
-use userlibs::println;
+use userlib::println;
 
 #[no_mangle]
 fn main() -> i32 {

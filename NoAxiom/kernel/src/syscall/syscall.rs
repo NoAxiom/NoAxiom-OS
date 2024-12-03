@@ -2,7 +2,10 @@ use alloc::sync::Arc;
 use core::task::Waker;
 
 use crate::{
-    constant::syscall::*, cpu::current_cpu, print, task::{Task, TaskStatus}
+    constant::syscall::*,
+    cpu::current_cpu,
+    print,
+    task::{Task, TaskStatus},
 };
 
 /// system call tracer for a task
@@ -24,18 +27,24 @@ impl Syscall {
     pub fn waker(&self) -> Option<Waker> {
         self.waker.clone()
     }
-    pub async fn syscall(&self, id: usize, args: [usize; 6]) -> isize {
+    pub fn set_waker(&mut self, waker: Waker) {
+        self.waker = Some(waker);
+    }
+
+    pub async fn syscall(&mut self, id: usize, args: [usize; 6]) -> isize {
         info!("syscall id: {}, args: {:?}", id, args);
-        if id == SYS_EXIT {
-            let tmp = self.task.status_mut();
-            *tmp = TaskStatus::Zombie;
-            info!("task exited, tid: {}, args {:?}", self.task.tid(), args);
-        } else {
-            self.sys_write(args[0] as usize, args[1] as usize, args[2] as usize)
-                .await;
-            // println!("print! syscall id: {}", id);
+        match id {
+            SYS_EXIT => self.sys_exit(),
+            SYS_WRITE => self.sys_write(args[0], args[1], args[2]).await,
+            _ => panic!("unsupported syscall id: {}, args: {:?}", id, args),
         }
         -1
+    }
+
+    pub fn sys_exit(&mut self) {
+        let tmp = self.task.status_mut();
+        *tmp = TaskStatus::Zombie;
+        info!("task exited, tid: {}", self.task.tid());
     }
 
     pub async fn sys_write(&self, _fd: usize, buf: usize, len: usize) {

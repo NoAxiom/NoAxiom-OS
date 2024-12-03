@@ -1,9 +1,9 @@
 //! # Task
 
 use alloc::sync::Arc;
-use core::sync::atomic::{AtomicI8, AtomicUsize};
+use core::sync::atomic::AtomicI8;
 
-use super::taskid::TaskId;
+use super::taskid::TidTracer;
 use crate::{
     mm::MemorySet,
     sched::{spawn_task, task_count_dec},
@@ -21,9 +21,6 @@ pub enum TaskStatus {
 
 /// process resources info
 pub struct ProcessInfo {
-    /// process id
-    pub pid: AtomicUsize,
-
     /// memory set
     pub memory_set: MemorySet,
 }
@@ -39,7 +36,7 @@ pub struct ThreadInfo {
 /// a.k.a thread in current project structure
 pub struct Task {
     /// task identifier
-    tid: TaskId,
+    tid: TidTracer,
 
     /// process control block ptr,
     /// also belongs to other threads
@@ -159,7 +156,7 @@ pub async fn spawn_new_process(app_id: usize) {
     let task = Arc::new(Task {
         tid: tid_alloc(),
         process: Arc::new(SpinMutex::new(ProcessInfo {
-            pid: AtomicUsize::new(0), // TODO: pid_alloc()
+            // pid: pid_alloc(), // FIXME: pid_alloc()
             memory_set,
         })),
         thread: SyncUnsafeCell::new(ThreadInfo {

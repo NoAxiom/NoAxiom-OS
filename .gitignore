@@ -9,3 +9,4 @@ log/
 *-qemu
 *.img
 .vscode-ctags
+NoAxiom/user/bin/

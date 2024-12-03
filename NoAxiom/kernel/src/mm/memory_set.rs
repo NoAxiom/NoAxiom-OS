@@ -152,14 +152,14 @@ impl MemorySet {
     /// map user_heap_area lazily
     pub fn map_user_heap(&mut self, start: usize, end: usize) {
         self.user_heap_base = start;
-        let mut map_area = MapArea::new(
+        let map_area = MapArea::new(
             start.into(),
             end.into(),
             MapType::Framed,
             map_permission!(U, R, W),
             MapAreaType::UserHeap,
         );
-        map_area.map_each(&mut self.page_table); // todo ...
+        // map_area.map_each(&mut self.page_table);
         self.user_heap_area = Some(map_area);
     }
 

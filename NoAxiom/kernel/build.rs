@@ -9,11 +9,11 @@ fn main() {
     insert_app_data().unwrap();
 }
 
-static TARGET_PATH: &str = "./NoAxiom/user/elfs/";
+static TARGET_PATH: &str = "./NoAxiom/user/bin/";
 
 fn insert_app_data() -> Result<()> {
     let mut f = File::create("src/link_apps.S").unwrap();
-    let mut apps: Vec<String> = read_dir("../user/elfs")?
+    let mut apps: Vec<String> = read_dir("../user/bin")?
         .filter_map(|entry| entry.ok())
         .map(|entry| entry.file_name().into_string().unwrap())
         .collect();

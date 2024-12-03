@@ -37,8 +37,10 @@ pub(crate) fn init(_hart_id: usize, _dtb: usize) {
         println!("[entry] entry init hart_id: {}", hartid());
         println!("{}", crate::constant::banner::NOAXIOM_BANNER);
         // TODO: spawn init_proc
-        schedule_spawn_new_process(0);
-        schedule_spawn_new_process(1);
+        for i in 0..crate::task::load_app::app_nums() {
+            println!("[entry] spawn app_{}", i);
+            schedule_spawn_new_process(i);
+        }
         unsafe {
             INIT_FLAG.store(true, Ordering::SeqCst);
         }

@@ -38,7 +38,6 @@ impl PageTable {
     /// use satp[43:0] to generate a new pagetable,
     /// note that the frame won't be saved,
     /// so do assure that it's already wrapped in tcb
-    /// todo: should we clone the root frame?
     pub fn from_token(satp: usize) -> Self {
         Self {
             root_ppn: PhysPageNum::from(satp & ((1usize << 44) - 1)),

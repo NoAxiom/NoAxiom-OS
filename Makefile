@@ -48,7 +48,6 @@ build:
 
 MULTICORE_COUNT := 2
 
-# TODO: impl flags
 QFLAGS := 
 QFLAGS += -m 128
 QFLAGS += -machine virt
