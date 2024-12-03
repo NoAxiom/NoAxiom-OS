@@ -6,6 +6,7 @@ use alloc::sync::Arc;
 use core::{
     future::Future,
     pin::Pin,
+    sync::atomic::AtomicUsize,
     task::{Context, Poll},
 };
 
@@ -41,5 +42,8 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
 
 /// spawn a user task
 pub fn spawn_task(task: Arc<Task>) {
+    unsafe {
+        super::TASK_COUNTER.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
+    }
     executor::spawn_raw(UserTaskFuture::new(task.clone(), task_main(task)));
 }

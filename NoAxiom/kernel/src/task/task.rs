@@ -6,7 +6,7 @@ use core::sync::atomic::{AtomicI8, AtomicUsize};
 use super::taskid::TaskId;
 use crate::{
     mm::MemorySet,
-    sched::spawn_task,
+    sched::{spawn_task, TASK_COUNTER},
     sync::{cell::SyncUnsafeCell, mutex::SpinMutex},
     task::{load_app::get_app_data, taskid::tid_alloc},
     trap::{trap_restore, user_trap_handler, TrapContext},
@@ -142,6 +142,13 @@ pub async fn task_main(task: Arc<Task>) {
         // user -> kernel
         info!("[task_main] user_trap_handler");
         user_trap_handler(&task).await;
+    }
+    unsafe {
+        TASK_COUNTER.fetch_sub(1, core::sync::atomic::Ordering::Relaxed);
+    }
+    if unsafe { TASK_COUNTER.load(core::sync::atomic::Ordering::Relaxed) == 0 } {
+        info!("[kernel] all tasks are done, shutdown");
+        crate::driver::sbi::shutdown();
     }
 }
 
