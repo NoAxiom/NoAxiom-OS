@@ -1,3 +1,11 @@
+pub fn app_nums() -> usize {
+    extern "C" {
+        fn _num_app();
+    }
+    let num_app_ptr = _num_app as usize as *const usize;
+    unsafe { num_app_ptr.read_volatile() }
+}
+
 /// get applications data
 pub fn get_app_data(app_id: usize) -> &'static [u8] {
     extern "C" {
