@@ -3,14 +3,14 @@ use alloc::vec::Vec;
 use crate::sync::mutex::SpinMutex;
 
 /// Task ID allocator
-struct TidAllocator {
+struct IndexAllocator {
     current: usize,
     recycled: Vec<usize>,
 }
 
-impl TidAllocator {
+impl IndexAllocator {
     const fn new() -> Self {
-        TidAllocator {
+        IndexAllocator {
             current: 0,
             recycled: Vec::new(),
         }
@@ -36,7 +36,8 @@ impl TidAllocator {
     }
 }
 
-static TID_ALLOCATOR: SpinMutex<TidAllocator> = SpinMutex::new(TidAllocator::new());
+static TID_ALLOCATOR: SpinMutex<IndexAllocator> = SpinMutex::new(IndexAllocator::new());
+// static PID_ALLOCATOR: SpinMutex<IndexAllocator> = SpinMutex::new(IndexAllocator::new());
 
 /// task id with auto dealloc
 pub struct TaskId(pub usize);

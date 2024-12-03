@@ -17,7 +17,7 @@ SV39 := 1
 
 # platform
 VF2 :=
-QEMU_RISCV := 1
+RISCV_QEMU := 1
 
 UART := 
 PRELIMINARY :=
@@ -65,8 +65,8 @@ ifneq ($(VF2), )
 	FEATURES += vf2
 endif
 
-ifneq ($(QEMU_RISCV), )
-	FEATURES += qemu_riscv
+ifneq ($(RISCV_QEMU), )
+	FEATURES += riscv_qemu
 endif
 
 ifneq ($(BUSYBOX), )

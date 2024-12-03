@@ -6,7 +6,7 @@ use core::sync::atomic::{AtomicI8, AtomicUsize};
 use super::taskid::TaskId;
 use crate::{
     mm::MemorySet,
-    sched::{spawn_task, TASK_COUNTER},
+    sched::{spawn_task, task_count_dec},
     sync::{cell::SyncUnsafeCell, mutex::SpinMutex},
     task::{load_app::get_app_data, taskid::tid_alloc},
     trap::{trap_restore, user_trap_handler, TrapContext},
@@ -143,20 +143,14 @@ pub async fn task_main(task: Arc<Task>) {
         info!("[task_main] user_trap_handler");
         user_trap_handler(&task).await;
     }
-    unsafe {
-        TASK_COUNTER.fetch_sub(1, core::sync::atomic::Ordering::Relaxed);
-    }
-    if unsafe { TASK_COUNTER.load(core::sync::atomic::Ordering::Relaxed) == 0 } {
-        info!("[kernel] all tasks are done, shutdown");
-        crate::driver::sbi::shutdown();
-    }
+    task_count_dec();
 }
 
 /// create new process from elf
-pub fn spawn_new_process(app_id: usize) {
+pub async fn spawn_new_process(app_id: usize) {
     info!("[kernel] spawn new process from elf");
     let elf_data = get_app_data(app_id);
-    let elf_memory_info = MemorySet::load_from_elf(elf_data);
+    let elf_memory_info = MemorySet::load_from_elf(elf_data).await;
     let memory_set = elf_memory_info.memory_set;
     let elf_entry = elf_memory_info.elf_entry;
     let user_sp = elf_memory_info.user_sp;
@@ -175,6 +169,5 @@ pub fn spawn_new_process(app_id: usize) {
         exit_code: AtomicI8::new(0),
     });
     info!("create a new task, tid {}", task.tid.0);
-
     spawn_task(task);
 }

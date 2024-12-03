@@ -9,7 +9,8 @@ use async_task::{Builder, Runnable, ScheduleInfo, WithInfo};
 use lazy_static::lazy_static;
 
 use crate::{
-    config::sched::MLFQ_LEVELS, sync::{cell::SyncRefCell, mutex::SpinMutex}
+    config::sched::MLFQ_LEVELS,
+    sync::{cell::SyncRefCell, mutex::SpinMutex},
 };
 
 struct TaskScheduleInfoInner {
@@ -105,7 +106,6 @@ where
     F: Future<Output = R> + Send + 'static,
     R: Send + 'static,
 {
-    // let (task, handle) = async_task::spawn(future, WithInfo(schedule));
     let (task, handle) = Builder::new()
         .metadata(TaskScheduleInfo::new(0))
         .spawn(move |_: &TaskScheduleInfo| future, WithInfo(schedule));
@@ -123,8 +123,6 @@ pub fn run() {
             task.run();
             info!("[sched] task done");
             break;
-        } else {
-            // todo!()
         }
     }
 }

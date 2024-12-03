@@ -7,6 +7,7 @@
     "rust-analyzer.check.allTargets": false,
     "rust-analyzer.cargo.features": [
         "sv39",
-        "multicore"
+        "multicore",
+        "riscv_qemu"
     ],
 }

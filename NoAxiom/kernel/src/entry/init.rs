@@ -1,6 +1,9 @@
 use core::sync::atomic::{AtomicBool, Ordering};
 
-use crate::{arch::interrupt::enable_user_memory_access, cpu::hartid, println};
+use crate::{
+    arch::interrupt::enable_user_memory_access, cpu::hartid, println,
+    sched::schedule_spawn_new_process,
+};
 
 fn pre_init() {
     enable_user_memory_access();
@@ -34,9 +37,7 @@ pub(crate) fn init(_hart_id: usize, _dtb: usize) {
         println!("[entry] entry init hart_id: {}", hartid());
         println!("{}", crate::constant::banner::NOAXIOM_BANNER);
         // TODO: spawn init_proc
-        crate::task::spawn_new_process(0);
-        crate::task::spawn_new_process(1);
-        crate::task::spawn_new_process(2);
+        schedule_spawn_new_process(0);
         unsafe {
             INIT_FLAG.store(true, Ordering::SeqCst);
         }

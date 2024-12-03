@@ -6,14 +6,13 @@ use alloc::sync::Arc;
 use core::{
     future::Future,
     pin::Pin,
-    sync::atomic::AtomicUsize,
     task::{Context, Poll},
 };
 
-use super::executor;
+use super::{executor::{self, spawn_raw}, task_count_inc};
 use crate::{
     cpu::current_cpu,
-    task::{task_main, Task},
+    task::{spawn_new_process, task_main, Task},
 };
 
 pub struct UserTaskFuture<F: Future + Send + 'static> {
@@ -40,10 +39,13 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
     }
 }
 
-/// spawn a user task
+/// spawn a user task, should be wrapped in async fn
 pub fn spawn_task(task: Arc<Task>) {
-    unsafe {
-        super::TASK_COUNTER.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
-    }
     executor::spawn_raw(UserTaskFuture::new(task.clone(), task_main(task)));
+}
+
+/// schedule: will soon complete resouce alloc and spawn task
+pub fn schedule_spawn_new_process(path: usize) {
+    task_count_inc();
+    spawn_raw(spawn_new_process(path));
 }

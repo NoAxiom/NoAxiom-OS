@@ -166,7 +166,7 @@ impl MemorySet {
     /// load data from elf file
     /// TODO: use file to read elf
     /// TODO: map trampoline?
-    pub fn load_from_elf(elf_data: &[u8]) -> ElfMemoryInfo {
+    pub async fn load_from_elf(elf_data: &[u8]) -> ElfMemoryInfo {
         info!("[memory_set] load elf begins");
         let mut memory_set = Self::new_with_kernel();
         let elf = xmas_elf::ElfFile::new(elf_data).unwrap();

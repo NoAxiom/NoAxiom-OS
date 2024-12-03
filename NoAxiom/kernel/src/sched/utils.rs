@@ -2,6 +2,8 @@
 //! - use [`yield_now`] to yield current async task;
 //! - use [`take_waker`] to fetch current task's context
 
+#![allow(unused)]
+
 use core::{
     future::Future,
     pin::Pin,
