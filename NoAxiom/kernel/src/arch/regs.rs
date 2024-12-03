@@ -4,6 +4,7 @@ use core::arch::asm;
 
 use riscv::register::sstatus::SPP;
 
+/// virtual sstatus register, it's not a real register
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct Sstatus(pub usize);

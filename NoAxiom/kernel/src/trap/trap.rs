@@ -8,7 +8,7 @@ use riscv::register::{
 
 use super::context::TrapContext;
 use crate::{
-    arch::interrupt::{enable_stimer_interrupt, external_interrupt_enable},
+    arch::interrupt::{enable_stimer_interrupt, enable_external_interrupt},
     println,
     task::Task,
 };
@@ -33,7 +33,7 @@ pub fn set_user_trap_entry() {
 /// trap init of current hart
 pub fn trap_init() {
     set_kernel_trap_entry();
-    external_interrupt_enable();
+    enable_external_interrupt();
     enable_stimer_interrupt();
 }
 

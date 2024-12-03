@@ -1,24 +1,11 @@
-use core::{
-    arch::asm,
-    sync::atomic::{AtomicBool, Ordering},
-};
+use core::arch::asm;
 
 use crate::{
-    arch::interrupt::enable_visit_user_memory,
-    config::{
-        arch::CPU_NUM,
-        mm::{
-            BOOT_STACK_SIZE, BOOT_STACK_WIDTH, KERNEL_ADDR_OFFSET, KERNEL_PHYS_ENTRY, PTE_PER_PAGE,
-        },
-    },
-    cpu::hartid,
+    config::{arch::CPU_NUM, mm::*},
     driver::sbi::hart_start,
     mm::pte::PageTableEntry,
-    println, rust_main,
+    println,
 };
-
-static mut BOOT_FLAG: AtomicBool = AtomicBool::new(false);
-static mut INIT_FLAG: AtomicBool = AtomicBool::new(false);
 
 /// temp stack for kernel booting
 #[link_section = ".bss.stack"]
@@ -82,39 +69,9 @@ unsafe extern "C" fn _entry() -> ! {
         boot_stack = sym BOOT_STACK,
         kernel_addr_offset = const KERNEL_ADDR_OFFSET,
         kernel_stack_size = const BOOT_STACK_WIDTH,
-        entry = sym init,
+        entry = sym super::init::init,
         options(noreturn),
     )
-}
-
-// TODO: dtb
-/// init bss, mm, console, and other drivers,
-/// then jump to rust_main
-#[no_mangle]
-pub(crate) fn init(_hart_id: usize, _dtb: usize) {
-    if unsafe {
-        BOOT_FLAG
-            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
-            .is_ok()
-    } {
-        crate::mm::bss::bss_init();
-        crate::driver::log::log_init();
-        crate::mm::mm_init();
-        enable_visit_user_memory();
-        println!("[entry] entry init hart_id: {}", hartid());
-        println!("{}", crate::constant::banner::NOAXIOM_BANNER);
-        crate::task::spawn_new_process(0);
-        crate::task::spawn_new_process(1);
-        crate::task::spawn_new_process(2);
-        unsafe {
-            INIT_FLAG.store(true, Ordering::SeqCst);
-        }
-        // init_other_hart(hart_id);
-    } else {
-        enable_visit_user_memory();
-        while unsafe { !INIT_FLAG.load(Ordering::SeqCst) } {}
-    }
-    rust_main();
 }
 
 /// awake other core

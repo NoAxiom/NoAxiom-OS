@@ -5,7 +5,7 @@ use core::cell::{RefCell, RefMut};
 use kernel_sync::{ticket::TicketMutexGuard, LockAction};
 
 use crate::{
-    arch::interrupt::{interrupt_disable, interrupt_enable, is_interrupt_enable},
+    arch::interrupt::{disable_global_interrupt, enable_global_interrupt, is_interrupt_enabled},
     config::arch::CPU_NUM,
     cpu::hartid,
 };
@@ -68,8 +68,8 @@ impl LockAction for KernelLockAction {
 
 /// disable interrupt
 pub(crate) fn push_off() {
-    let old = is_interrupt_enable();
-    interrupt_disable();
+    let old = is_interrupt_enabled();
+    disable_global_interrupt();
     let mut cpu = current_cpu();
     if cpu.push_off_depth == 0 {
         cpu.interrupt_enable = old;
@@ -84,6 +84,6 @@ pub(crate) fn pop_off() {
     let should_enable = cpu.push_off_depth == 0 && cpu.interrupt_enable;
     drop(cpu); // drop before int_en
     if should_enable {
-        interrupt_enable();
+        enable_global_interrupt();
     }
 }
