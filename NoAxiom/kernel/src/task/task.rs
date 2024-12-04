@@ -5,6 +5,7 @@ use core::sync::atomic::AtomicI8;
 
 use super::taskid::TidTracer;
 use crate::{
+    fs::get_app_elf,
     mm::MemorySet,
     sched::{spawn_task, task_count_dec},
     sync::{cell::SyncUnsafeCell, mutex::SpinMutex},
@@ -146,8 +147,8 @@ pub async fn task_main(task: Arc<Task>) {
 /// create new process from elf
 pub async fn spawn_new_process(app_id: usize) {
     info!("[kernel] spawn new process from elf");
-    let elf_data = get_app_data(app_id);
-    let elf_memory_info = MemorySet::load_from_elf(elf_data).await;
+    let elf_file = Arc::new(get_app_elf(app_id)); // todo: now is read from static memory
+    let elf_memory_info = MemorySet::load_from_elf(elf_file).await;
     let memory_set = elf_memory_info.memory_set;
     let elf_entry = elf_memory_info.elf_entry;
     let user_sp = elf_memory_info.user_sp;

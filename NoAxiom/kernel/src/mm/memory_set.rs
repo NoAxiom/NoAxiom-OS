@@ -1,10 +1,11 @@
-use alloc::vec::Vec;
+use alloc::{sync::Arc, vec::Vec};
 
 use lazy_static::lazy_static;
 
 use super::{map_area::MapArea, page_table::PageTable};
 use crate::{
     config::mm::{PAGE_SIZE, PAGE_WIDTH, USER_HEAP_SIZE, USER_STACK_SIZE},
+    fs::{self, File},
     map_permission,
     mm::{
         address::{VirtAddr, VirtPageNum},
@@ -166,10 +167,12 @@ impl MemorySet {
     /// load data from elf file
     /// TODO: use file to read elf
     /// TODO: map trampoline?
-    pub async fn load_from_elf(elf_data: &[u8]) -> ElfMemoryInfo {
+    pub async fn load_from_elf(elf_file: Arc<dyn File>) -> ElfMemoryInfo {
         info!("[memory_set] load elf begins");
         let mut memory_set = Self::new_with_kernel();
-        let elf = xmas_elf::ElfFile::new(elf_data).unwrap();
+        let mut elf_data = [1u8; 0x100000]; // todo: use elf_header
+        let _ = elf_file.read(0, elf_data.len(), &mut elf_data).await;
+        let elf = xmas_elf::ElfFile::new(&elf_data).unwrap();
         info!("elf header: {:?}", elf.header);
 
         let elf_header = elf.header;
