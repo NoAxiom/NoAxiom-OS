@@ -134,7 +134,8 @@ impl MemorySet {
         memory_set
     }
 
-    /// map user_stack_area lazily
+    /// map user_stack_area
+    /// TODO: is lazy allocation necessary? currently we don't use lazy alloc
     pub fn map_user_stack(&mut self, start: usize, end: usize) {
         // FIXME: is using start correct?
         self.user_stack_base = start;

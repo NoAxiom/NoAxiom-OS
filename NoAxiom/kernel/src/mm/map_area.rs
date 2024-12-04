@@ -9,10 +9,7 @@ use super::{
     permission::{MapPermission, MapType},
     pte::PTEFlags,
 };
-use crate::{
-    config::mm::{PAGE_SIZE, PAGE_WIDTH},
-    mm::address::StepOne,
-};
+use crate::{config::mm::PAGE_SIZE, mm::address::StepOne};
 
 #[allow(unused)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

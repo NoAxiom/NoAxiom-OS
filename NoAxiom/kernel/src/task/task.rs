@@ -6,7 +6,7 @@ use core::sync::atomic::AtomicI8;
 use super::taskid::TidTracer;
 use crate::{
     mm::MemorySet,
-    sched::{spawn_task, task_count_dec},
+    sched::{spawn_task, task_counter::task_count_dec},
     sync::{cell::SyncUnsafeCell, mutex::SpinMutex},
     task::{load_app::get_app_data, taskid::tid_alloc},
     trap::{trap_restore, user_trap_handler, TrapContext},
@@ -156,7 +156,7 @@ pub async fn spawn_new_process(app_id: usize) {
     let task = Arc::new(Task {
         tid: tid_alloc(),
         process: Arc::new(SpinMutex::new(ProcessInfo {
-            // pid: pid_alloc(), // FIXME: pid_alloc()
+            // pid: pid_alloc(), // TODO: pid_alloc()
             memory_set,
         })),
         thread: SyncUnsafeCell::new(ThreadInfo {

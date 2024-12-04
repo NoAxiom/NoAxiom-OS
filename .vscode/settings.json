@@ -10,4 +10,5 @@
         "multicore",
         "riscv_qemu"
     ],
+    "commentTranslate.source": "Copilot",
 }
