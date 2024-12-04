@@ -170,7 +170,7 @@ impl MemorySet {
     pub async fn load_from_elf(elf_file: Arc<dyn File>) -> ElfMemoryInfo {
         info!("[memory_set] load elf begins");
         let mut memory_set = Self::new_with_kernel();
-        let mut elf_data = [1u8; 0x100000]; // todo: use elf_header
+        let mut elf_data = [1u8; 0x10000]; // todo: use elf_header
         let _ = elf_file.read(0, elf_data.len(), &mut elf_data).await;
         let elf = xmas_elf::ElfFile::new(&elf_data).unwrap();
         info!("elf header: {:?}", elf.header);

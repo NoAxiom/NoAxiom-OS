@@ -69,3 +69,7 @@ pub fn sys_exit(exit_code: isize) -> ! {
     syscall(SYS_EXIT, [exit_code as usize, 0, 0, 0, 0, 0]);
     loop {}
 }
+
+pub fn sys_read(fd: usize, buf_addr: usize, buf_len: usize) -> isize {
+    syscall(SYS_READ, [fd, buf_addr, buf_len, 0, 0, 0])
+}

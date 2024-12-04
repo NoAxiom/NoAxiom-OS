@@ -26,11 +26,9 @@ pub struct TmpFile {
 
 impl File for TmpFile {
     fn read<'a>(&'a self, addr: usize, len: usize, buf: &'a mut [u8]) -> FileReturn {
-        let _ = addr;
-        let _ = len;
         Box::pin(async move {
             let data = get_app_data(self.app_id);
-            buf[..data.len()].copy_from_slice(data);
+            buf[addr..len].copy_from_slice(&data[addr..len]);
             Ok(len as isize)
         })
     }
