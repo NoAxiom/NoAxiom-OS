@@ -51,7 +51,7 @@ impl Syscall {
 
     // todo: add fd
     pub async fn sys_write(&self, _fd: usize, buf: usize, len: usize) {
-        assert!(current_cpu().token() == self.task.token());
+        // assert!(current_cpu().token() == self.task.token());
         info!("sys_write: fd: {}, buf: {:#x}, len: {}", _fd, buf, len);
         let task = current_cpu().task.clone().unwrap();
         unsafe { task.memory_activate() };

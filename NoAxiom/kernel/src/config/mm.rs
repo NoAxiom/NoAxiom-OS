@@ -5,10 +5,12 @@ pub const PAGE_WIDTH: usize = 12;
 /// page size : 4KB, 4096 bytes
 pub const PAGE_SIZE: usize = 1 << PAGE_WIDTH;
 
-/// boot stack, only used when kernel initializes
-pub const BOOT_STACK_WIDTH: usize = 16;
-/// boot stack size: 16KB
-pub const BOOT_STACK_SIZE: usize = 1 << BOOT_STACK_WIDTH;
+/// kernel stack width
+pub const KERNEL_STACK_WIDTH: usize = 16;
+/// kernel stack size: 64KB (*CPU_NUM = 128KB)
+pub const KERNEL_STACK_SIZE: usize = 1 << KERNEL_STACK_WIDTH;
+/// kernel heap size: 32MB
+pub const KERNEL_HEAP_SIZE: usize = 0x200_0000;
 
 /// user app's stack size: 8KB
 pub const USER_STACK_SIZE: usize = 4096 * 2;
@@ -16,11 +18,6 @@ pub const USER_STACK_SIZE: usize = 4096 * 2;
 // pub const USER_HEAP_SIZE: usize = 4096 * 30000;
 /// user app's heap size: 8KB
 pub const USER_HEAP_SIZE: usize = 4096 * 2;
-
-/// kernel stack size: 8KB
-pub const KERNEL_STACK_SIZE: usize = 4096 * 2;
-/// kernel heap size: 32MB
-pub const KERNEL_HEAP_SIZE: usize = 0x200_0000;
 
 /// kernel address offset from phys to virt
 pub const KERNEL_ADDR_OFFSET: usize = 0xffff_ffc0_0000_0000;

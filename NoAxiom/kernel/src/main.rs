@@ -43,6 +43,7 @@ core::arch::global_asm!(include_str!("link_apps.S"));
 /// called by [`entry::init`]
 #[no_mangle]
 pub fn rust_main() {
+    trace!("token {:#x}", crate::mm::page_table::current_token());
     println!("[kernel] hart id {} has been booted", cpu::hartid());
     loop {
         sched::run();

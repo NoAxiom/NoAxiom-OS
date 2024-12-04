@@ -1,16 +1,14 @@
 //! memory management
 
-mod address;
+pub mod address;
 pub mod bss;
 mod frame;
 mod heap;
-mod map_area;
-mod memory_set;
-mod page_table;
+pub mod map_area;
+pub mod memory_set;
+pub mod page_table;
 pub mod permission;
 pub mod pte;
-
-pub use memory_set::MemorySet;
 
 pub fn mm_init() {
     frame::init();

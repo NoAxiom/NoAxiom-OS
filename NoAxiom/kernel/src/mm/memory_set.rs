@@ -1,18 +1,14 @@
-use alloc::{sync::Arc, vec::Vec};
+use alloc::{boxed::Box, sync::Arc, vec::Vec};
 
 use lazy_static::lazy_static;
 
 use super::{map_area::MapArea, page_table::PageTable};
 use crate::{
-    config::mm::{PAGE_SIZE, PAGE_WIDTH, USER_HEAP_SIZE, USER_STACK_SIZE},
-    fs::{self, File},
-    map_permission,
-    mm::{
+    config::mm::{KERNEL_VIRT_MEMORY_END, PAGE_SIZE, PAGE_WIDTH, USER_HEAP_SIZE, USER_STACK_SIZE}, cpu::hartid, fs::File, map_permission, mm::{
         address::{VirtAddr, VirtPageNum},
         map_area::MapAreaType,
         permission::MapType,
-    },
-    sync::mutex::SpinMutex,
+    }, sync::mutex::SpinMutex
 };
 
 lazy_static! {
@@ -99,6 +95,7 @@ impl MemorySet {
             fn edata();
             fn sbss();
             fn ebss();
+            fn ekernel();
         }
         let mut memory_set = MemorySet::new_bare();
         macro_rules! kernel_push_area {
@@ -122,6 +119,26 @@ impl MemorySet {
             srodata, erodata, map_permission!(R)
             sdata,   edata,   map_permission!(R, W)
             sbss,    ebss,    map_permission!(R, W)
+            ekernel, KERNEL_VIRT_MEMORY_END, map_permission!(R, W)
+        );
+        trace!("[memory_set] sp: {:#x}", crate::arch::regs::get_sp());
+        info!("[kernel] space initialized");
+        info!(
+            "[kernel].text [{:#x}, {:#x})",
+            stext as usize, etext as usize
+        );
+        info!(
+            "[kernel].rodata [{:#x}, {:#x})",
+            srodata as usize, erodata as usize
+        );
+        info!(
+            "[kernel].data [{:#x}, {:#x})",
+            sdata as usize, edata as usize
+        );
+        info!("[kernel].bss [{:#x}, {:#x})", sbss as usize, ebss as usize);
+        info!(
+            "[kernel]physical mem [{:#x}, {:#x})",
+            ekernel as usize, KERNEL_VIRT_MEMORY_END as usize
         );
         memory_set
     }
@@ -166,14 +183,19 @@ impl MemorySet {
     }
 
     /// load data from elf file
-    /// TODO: use file to read elf
     /// TODO: map trampoline?
     pub async fn load_from_elf(elf_file: Arc<dyn File>) -> ElfMemoryInfo {
         info!("[memory_set] load elf begins");
         let mut memory_set = Self::new_with_kernel();
-        let mut elf_data = [1u8; 0x10000]; // todo: use elf_header
-        let _ = elf_file.read(0, elf_data.len(), &mut elf_data).await;
-        let elf = xmas_elf::ElfFile::new(&elf_data).unwrap();
+        let mut elf_data = Box::new([0u8; 0x10000]); // todo: use elf_header
+        let elf_data = elf_data.as_mut();
+        trace!("[load_from_elf] hart: {}, sp: {:#x}", hartid(), crate::arch::regs::get_sp());
+        // let elf_data = &mut [0u8; 0x10000];
+        elf_file
+            .read(0, elf_data.len(), elf_data)
+            .await
+            .expect("[memory_set] read elf failed");
+        let elf = xmas_elf::ElfFile::new(elf_data).unwrap();
         info!("elf header: {:?}", elf.header);
 
         let elf_header = elf.header;

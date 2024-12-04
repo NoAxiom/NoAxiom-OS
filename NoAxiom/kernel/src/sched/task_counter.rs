@@ -6,15 +6,12 @@ pub static mut TASK_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 pub fn task_count_inc() {
     unsafe {
-        TASK_COUNTER.fetch_add(1, Ordering::SeqCst);
+        TASK_COUNTER.fetch_add(1, Ordering::AcqRel);
     }
 }
 
 pub fn task_count_dec() {
-    unsafe {
-        TASK_COUNTER.fetch_sub(1, Ordering::SeqCst);
-    }
-    if unsafe { TASK_COUNTER.load(Ordering::Acquire) == 0 } {
+    if unsafe { TASK_COUNTER.fetch_sub(1, Ordering::AcqRel) } == 1 {
         info!("[kernel] all tasks are done, shutdown");
         crate::driver::sbi::shutdown();
     }

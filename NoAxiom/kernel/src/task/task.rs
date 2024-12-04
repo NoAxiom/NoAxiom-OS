@@ -1,15 +1,15 @@
 //! # Task
 
 use alloc::sync::Arc;
-use core::sync::atomic::AtomicI8;
+use core::sync::atomic::{AtomicI8, AtomicIsize, Ordering};
 
 use super::taskid::TidTracer;
 use crate::{
     fs::get_app_elf,
-    mm::MemorySet,
+    mm::memory_set::MemorySet,
     sched::{spawn_task, task_counter::task_count_dec},
     sync::{cell::SyncUnsafeCell, mutex::SpinMutex},
-    task::{load_app::get_app_data, taskid::tid_alloc},
+    task::taskid::tid_alloc,
     trap::{trap_restore, user_trap_handler, TrapContext},
 };
 
@@ -49,6 +49,9 @@ pub struct Task {
     /// task status: ready / running / zombie
     status: SyncUnsafeCell<TaskStatus>,
 
+    /// priority for schedule
+    prio: AtomicIsize,
+
     /// task exit code
     exit_code: AtomicI8,
 }
@@ -63,8 +66,8 @@ impl Task {
     }
 
     /// status
-    pub fn status(&self) -> &TaskStatus {
-        unsafe { &(*self.status.get()) }
+    pub fn status(&self) -> TaskStatus {
+        unsafe { *self.status.get() }
     }
     pub fn status_mut(&self) -> &mut TaskStatus {
         unsafe { &mut (*self.status.get()) }
@@ -73,13 +76,13 @@ impl Task {
         *self.status_mut() = status;
     }
     pub fn is_zombie(&self) -> bool {
-        *self.status() == TaskStatus::Zombie
+        self.status() == TaskStatus::Zombie
     }
     pub fn is_running(&self) -> bool {
-        *self.status() == TaskStatus::Running
+        self.status() == TaskStatus::Running
     }
     pub fn is_ready(&self) -> bool {
-        *self.status() == TaskStatus::Ready
+        self.status() == TaskStatus::Ready
     }
 
     /// exit code
@@ -89,6 +92,18 @@ impl Task {
     pub fn set_exit_code(&self, exit_code: i8) {
         self.exit_code
             .store(exit_code, core::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// prio
+    pub fn prio(&self) -> isize {
+        self.prio.load(Ordering::Relaxed)
+    }
+    pub fn set_prio(&self, prio: isize) {
+        self.prio.store(prio, Ordering::Relaxed);
+    }
+    pub fn inc_prio(&self) {
+        debug!("tid: {}, inc prio, prio: {}", self.tid(), self.prio());
+        self.prio.fetch_add(1, Ordering::Relaxed);
     }
 
     /// thread info
@@ -165,7 +180,10 @@ pub async fn spawn_new_process(app_id: usize) {
         }),
         status: SyncUnsafeCell::new(TaskStatus::Ready),
         exit_code: AtomicI8::new(0),
+        prio: AtomicIsize::new(0),
     });
+    debug!("prio: {}", task.prio());
+    task.set_prio(0);
     info!("create a new task, tid {}", task.tid.0);
     spawn_task(task);
 }

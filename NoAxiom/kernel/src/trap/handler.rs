@@ -4,32 +4,24 @@ use alloc::sync::Arc;
 
 use riscv::register::{
     scause::{self, Exception, Interrupt, Trap},
-    stval,
+    sepc, stval,
 };
 
 use super::trap::set_kernel_trap_entry;
-use crate::{
-    constant::register::A0,
-    cpu::{current_cpu, hartid},
-    syscall::syscall,
-    task::Task,
-    time::timer::set_next_trigger,
-    yield_now,
-};
+use crate::{constant::register::A0, cpu::hartid, syscall::syscall, task::Task, yield_now};
 
 /// kernel trap handler
 #[no_mangle]
 pub fn kernel_trap_handler() {
-    let task = current_cpu().task.clone().unwrap();
-    let cx = task.trap_context_mut();
     let scause = scause::read();
     let stval = stval::read();
+    let sepc = sepc::read();
     panic!(
-            "a trap in kernel\nhart: {}, trap {:?} is unsupported, stval = {:#x}!, error address = {:#x}",
+            "a trap in kernel\nhart: {}, trap {:?} is unsupported, stval = {:#x}, error address = {:#x}",
             hartid(),
             scause.cause(),
             stval,
-            cx.sepc
+            sepc,
         );
 }
 
@@ -61,8 +53,7 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
         },
         Trap::Interrupt(interrupt) => match interrupt {
             Interrupt::SupervisorTimer => {
-                cx.sepc += 4;
-                set_next_trigger();
+                task.inc_prio();
                 yield_now!();
             }
             _ => panic!(

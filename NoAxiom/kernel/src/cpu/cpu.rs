@@ -10,31 +10,40 @@ pub fn hartid() -> usize {
 }
 
 pub struct Cpu {
+    /// pointer of current task on this hart
     pub task: Option<Arc<Task>>,
+
+    /// the time recorded at current task is lauched
+    pub time: usize,
 }
 
 impl Cpu {
     pub const fn new() -> Self {
-        Self { task: None }
+        Self {
+            task: None,
+            time: 0,
+        }
     }
-
     fn set_raw_task(&mut self, task: Arc<Task>) {
         unsafe {
             task.memory_activate();
         }
         self.task = Some(task);
     }
-    fn clear_raw_task(&mut self) {
-        self.task = None;
-    }
-
-    // TODO: mm
     pub fn set_task(&mut self, task: &mut Arc<Task>) {
         self.set_raw_task(task.clone());
+    }
+    pub fn set_time(&mut self, time: usize) {
+        self.time = time;
+    }
+
+    fn clear_raw_task(&mut self) {
+        self.task = None;
     }
     pub fn clear_task(&mut self) {
         self.clear_raw_task();
     }
+
     pub fn token(&self) -> usize {
         let task = self.task.clone();
         task.unwrap().token()

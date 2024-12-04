@@ -9,10 +9,7 @@ use core::{
     task::{Context, Poll},
 };
 
-use super::{
-    executor::{self, spawn_raw},
-    task_counter::task_count_inc,
-};
+use super::{executor::spawn_raw, task_counter::task_count_inc};
 use crate::{
     cpu::current_cpu,
     task::{spawn_new_process, task_main, Task},
@@ -44,11 +41,15 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
 
 /// spawn a user task, should be wrapped in async fn
 pub fn spawn_task(task: Arc<Task>) {
-    executor::spawn_raw(UserTaskFuture::new(task.clone(), task_main(task)));
+    spawn_raw(
+        UserTaskFuture::new(task.clone(), task_main(task.clone())),
+        None,
+        // Some(task),
+    );
 }
 
 /// schedule: will soon complete resouce alloc and spawn task
 pub fn schedule_spawn_new_process(path: usize) {
     task_count_inc();
-    spawn_raw(spawn_new_process(path));
+    spawn_raw(spawn_new_process(path), None);
 }

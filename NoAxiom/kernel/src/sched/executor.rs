@@ -2,47 +2,43 @@
 //! - [`spawn_raw`] to add a task
 //! - [`run`] to run next task
 
-use alloc::{collections::vec_deque::VecDeque, vec::Vec};
+use alloc::{collections::vec_deque::VecDeque, sync::Arc, vec::Vec};
 use core::future::Future;
 
 use async_task::{Builder, Runnable, ScheduleInfo, WithInfo};
 use lazy_static::lazy_static;
 
 use crate::{
-    config::sched::MLFQ_LEVELS,
-    sync::{cell::SyncRefCell, mutex::SpinMutex},
+    config::sched::MLFQ_LEVELS, sync::mutex::SpinMutex, task::Task,
+    time::timer::set_next_trigger,
 };
 
-struct TaskScheduleInfoInner {
-    prio: usize,
-}
-impl TaskScheduleInfoInner {
-    pub const fn new(prio: usize) -> Self {
-        Self { prio }
-    }
-    pub fn level(&self) -> usize {
-        self.prio
-    }
-    pub fn update(&mut self) {
-        info!("update task prio");
-        // self.prio = self.prio + 1;
-    }
-}
-
-struct TaskScheduleInfo {
-    inner: SyncRefCell<TaskScheduleInfoInner>,
+pub struct TaskScheduleInfo {
+    task: Option<Arc<Task>>,
 }
 impl TaskScheduleInfo {
-    pub const fn new(prio: usize) -> Self {
-        Self {
-            inner: SyncRefCell::new(TaskScheduleInfoInner::new(prio)),
+    pub const fn new(task: Option<Arc<Task>>) -> Self {
+        Self { task }
+    }
+    pub fn prio(&self) -> isize {
+        if let Some(task) = &self.task {
+            // todo: discard mlfq and use cfg
+            let level = task.prio();
+            if level < MLFQ_LEVELS as isize {
+                level as isize
+            } else {
+                MLFQ_LEVELS as isize - 1
+            }
+        } else {
+            0
         }
     }
-    pub fn level(&self) -> usize {
-        self.inner.borrow().level()
-    }
-    pub fn update(&self) {
-        self.inner.borrow_mut().update();
+    #[allow(unused)]
+    pub fn update(&mut self, prio: isize) {
+        info!("update task prio");
+        if let Some(task) = &self.task {
+            task.set_prio(prio);
+        }
     }
 }
 
@@ -58,14 +54,14 @@ impl Executor {
         Self { queue: vec }
     }
     fn push_back(&mut self, runnable: Runnable<TaskScheduleInfo>) {
-        let level = runnable.metadata().level();
+        let level = runnable.metadata().prio();
         info!("[sched] push task to back, prio: {}", level);
-        self.queue[level].push_back(runnable);
+        self.queue[level as usize].push_back(runnable);
     }
     fn push_front(&mut self, runnable: Runnable<TaskScheduleInfo>) {
-        let level = runnable.metadata().level();
+        let level = runnable.metadata().prio();
         info!("[sched] push task to front, prio: {}", level);
-        self.queue[level].push_front(runnable);
+        self.queue[level as usize].push_front(runnable);
     }
     fn pop_front(&mut self) -> Option<Runnable<TaskScheduleInfo>> {
         for q in self.queue.iter_mut() {
@@ -83,11 +79,10 @@ lazy_static! {
 
 /// insert task into EXECUTOR when [`core::task::Waker::wake`] get called
 fn schedule(task: Runnable<TaskScheduleInfo>, info: ScheduleInfo) {
-    info!("[sched] schedule task, prio: {}", task.metadata().level());
-    task.metadata().update();
+    info!("[sched] schedule task, prio: {}", task.metadata().prio());
     info!(
         "[sched] schedule task, new prio: {}",
-        task.metadata().level()
+        task.metadata().prio()
     );
     info!(
         "[sched] schedule task, woken_while_running: {}",
@@ -101,13 +96,13 @@ fn schedule(task: Runnable<TaskScheduleInfo>, info: ScheduleInfo) {
 }
 
 /// Add a raw task into task queue
-pub fn spawn_raw<F, R>(future: F)
+pub fn spawn_raw<F, R>(future: F, task: Option<Arc<Task>>)
 where
     F: Future<Output = R> + Send + 'static,
     R: Send + 'static,
 {
     let (task, handle) = Builder::new()
-        .metadata(TaskScheduleInfo::new(0))
+        .metadata(TaskScheduleInfo::new(task))
         .spawn(move |_: &TaskScheduleInfo| future, WithInfo(schedule));
     task.schedule();
     handle.detach();
@@ -119,7 +114,8 @@ pub fn run() {
     loop {
         let task = EXECUTOR.lock().pop_front();
         if let Some(task) = task {
-            info!("[sched] run task, prio: {}", task.metadata().level());
+            info!("[sched] run task, prio: {}", task.metadata().prio());
+            set_next_trigger();
             task.run();
             info!("[sched] task done");
             break;

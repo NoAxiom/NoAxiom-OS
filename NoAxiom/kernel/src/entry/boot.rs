@@ -8,8 +8,8 @@ use crate::{
 };
 
 /// temp stack for kernel booting
-#[link_section = ".bss.stack"]
-static BOOT_STACK: [u8; BOOT_STACK_SIZE * CPU_NUM] = [0; BOOT_STACK_SIZE * CPU_NUM];
+#[link_section = ".bss.kstack"]
+static BOOT_STACK: [u8; KERNEL_STACK_SIZE * CPU_NUM] = [0; KERNEL_STACK_SIZE * CPU_NUM];
 
 /// temp page table for kernel booting, hard linked
 #[link_section = ".data.prepage"]
@@ -41,7 +41,7 @@ unsafe extern "C" fn _entry() -> ! {
 
             mv      gp, a1
             add     t0, a0, 1
-            slli    t0, t0, {kernel_stack_size}
+            slli    t0, t0, {kernel_stack_shift}
             la      sp, {boot_stack}
             add     sp, sp, t0
 
@@ -68,7 +68,7 @@ unsafe extern "C" fn _entry() -> ! {
         page_table = sym PAGE_TABLE,
         boot_stack = sym BOOT_STACK,
         kernel_addr_offset = const KERNEL_ADDR_OFFSET,
-        kernel_stack_size = const BOOT_STACK_WIDTH,
+        kernel_stack_shift = const KERNEL_STACK_WIDTH,
         entry = sym super::init::init,
         options(noreturn),
     )
