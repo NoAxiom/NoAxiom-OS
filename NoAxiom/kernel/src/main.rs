@@ -33,6 +33,7 @@ mod sched;
 mod sync;
 mod syscall;
 mod task;
+mod time;
 mod trap;
 mod utils;
 

@@ -9,7 +9,10 @@ use core::{
     task::{Context, Poll},
 };
 
-use super::{executor::{self, spawn_raw}, task_count_inc};
+use super::{
+    executor::{self, spawn_raw},
+    task_counter::task_count_inc,
+};
 use crate::{
     cpu::current_cpu,
     task::{spawn_new_process, task_main, Task},
