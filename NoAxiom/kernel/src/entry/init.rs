@@ -24,7 +24,7 @@ static mut INIT_FLAG: AtomicBool = AtomicBool::new(false);
 
 // TODO: dtb
 /// init bss, mm, console, and other drivers, then jump to rust_main,
-/// called by [`super::boot`]
+/// called by `super::boot`
 #[no_mangle]
 pub(crate) fn init(_hart_id: usize, _dtb: usize) {
     pre_init();

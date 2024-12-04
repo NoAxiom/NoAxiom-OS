@@ -26,6 +26,7 @@ mod constant;
 mod cpu;
 mod driver;
 mod entry;
+mod fs;
 mod mm;
 mod panic;
 mod sched;
