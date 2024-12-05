@@ -14,10 +14,6 @@ Then you can run NoAxiom-OS in shell:
 make
 ```
 
-## File structure
-
-Temporarily using Pantheon's file structure.
-
 ## Toolchain
 
 View `./rust-toolchain.toml` for further infomation.

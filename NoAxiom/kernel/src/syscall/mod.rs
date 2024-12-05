@@ -7,14 +7,14 @@ mod syscall;
 pub async fn syscall(task: &Arc<Task>, cx: &mut TrapContext) -> isize {
     syscall::Syscall::new(task)
         .syscall(
-            cx.regs[A7],
+            cx.user_reg[A7],
             [
-                cx.regs[A0],
-                cx.regs[A1],
-                cx.regs[A2],
-                cx.regs[A3],
-                cx.regs[A4],
-                cx.regs[A5],
+                cx.user_reg[A0],
+                cx.user_reg[A1],
+                cx.user_reg[A2],
+                cx.user_reg[A3],
+                cx.user_reg[A4],
+                cx.user_reg[A5],
             ],
         )
         .await

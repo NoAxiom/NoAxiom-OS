@@ -1,10 +1,11 @@
 //! # Task
 
 use alloc::sync::Arc;
-use core::sync::atomic::{AtomicI8, AtomicIsize, Ordering};
+use core::sync::atomic::{AtomicIsize, Ordering};
 
 use super::taskid::TidTracer;
 use crate::{
+    cpu::hartid,
     fs::get_app_elf,
     mm::memory_set::MemorySet,
     sched::{spawn_task, task_counter::task_count_dec},
@@ -50,10 +51,14 @@ pub struct Task {
     status: SyncUnsafeCell<TaskStatus>,
 
     /// priority for schedule
-    prio: AtomicIsize,
+    pub prio: Arc<SyncUnsafeCell<isize>>,
+
+    tmp1: usize,
+    tmp2: usize,
+    tmp3: usize,
 
     /// task exit code
-    exit_code: AtomicI8,
+    exit_code: AtomicIsize,
 }
 
 /// user tasks
@@ -66,8 +71,8 @@ impl Task {
     }
 
     /// status
-    pub fn status(&self) -> TaskStatus {
-        unsafe { *self.status.get() }
+    pub fn status(&self) -> &TaskStatus {
+        unsafe { &(*self.status.get()) }
     }
     pub fn status_mut(&self) -> &mut TaskStatus {
         unsafe { &mut (*self.status.get()) }
@@ -76,34 +81,52 @@ impl Task {
         *self.status_mut() = status;
     }
     pub fn is_zombie(&self) -> bool {
-        self.status() == TaskStatus::Zombie
+        *self.status() == TaskStatus::Zombie
     }
     pub fn is_running(&self) -> bool {
-        self.status() == TaskStatus::Running
+        *self.status() == TaskStatus::Running
     }
     pub fn is_ready(&self) -> bool {
-        self.status() == TaskStatus::Ready
+        *self.status() == TaskStatus::Ready
     }
 
     /// exit code
-    pub fn exit_code(&self) -> i8 {
-        self.exit_code.load(core::sync::atomic::Ordering::Relaxed)
+    pub fn exit_code(&self) -> isize {
+        self.exit_code.load(Ordering::Relaxed)
     }
-    pub fn set_exit_code(&self, exit_code: i8) {
-        self.exit_code
-            .store(exit_code, core::sync::atomic::Ordering::Relaxed);
+    pub fn set_exit_code(&self, exit_code: isize) {
+        self.exit_code.store(exit_code, Ordering::Relaxed);
     }
 
     /// prio
-    pub fn prio(&self) -> isize {
-        self.prio.load(Ordering::Relaxed)
+    pub fn prio(&self) -> &isize {
+        unsafe { &(*self.prio.get()) }
     }
     pub fn set_prio(&self, prio: isize) {
-        self.prio.store(prio, Ordering::Relaxed);
+        unsafe { *self.prio.get() = prio };
     }
     pub fn inc_prio(&self) {
-        debug!("tid: {}, inc prio, prio: {}", self.tid(), self.prio());
-        self.prio.fetch_add(1, Ordering::Relaxed);
+        self._debug_prio("inc_prio");
+        unsafe { *self.prio.get() += 1 };
+    }
+    pub fn _debug_prio(&self, msg: &str) {
+        let mut ptr = self.exit_code() as *const usize;
+        let mut cnt = 0;
+        // while (unsafe { *ptr } != 0 && cnt < 10) {
+        //     ptr = unsafe { *ptr } as *const usize;
+        //     cnt += 1;
+        //     debug!("{:#x}", ptr as usize);
+        // }
+        debug!(
+            "hart: {}, tid: {}, prio: {:#x}, exit_code: {:#x}, *trap_cx: {:#x}, msg: {}",
+            hartid(),
+            self.tid(),
+            *self.prio(),
+            self.exit_code(), // 0xffffffc080299bc0
+            (self.trap_context() as *const TrapContext) as usize,
+            // unsafe { *(self.exit_code() as *const usize) },
+            msg,
+        );
     }
 
     /// thread info
@@ -144,18 +167,22 @@ impl Task {
 
 /// user task main
 pub async fn task_main(task: Arc<Task>) {
+    task._debug_prio("task_main begin");
     while !task.is_zombie() {
         // kernel -> user
+        task._debug_prio("task_main trap_restore begin1");
         info!("[task_main] trap_restore");
         trap_restore(&task);
+        task._debug_prio("task_main trap_restore end");
         if task.is_zombie() {
-            info!("task {} is zombie, break", task.tid());
+            warn!("task {} is zombie, break", task.tid());
             break;
         }
         // user -> kernel
         info!("[task_main] user_trap_handler");
         user_trap_handler(&task).await;
     }
+    task._debug_prio("task_main end");
     task_count_dec();
 }
 
@@ -179,11 +206,17 @@ pub async fn spawn_new_process(app_id: usize) {
             trap_context: TrapContext::app_init_cx(elf_entry, user_sp),
         }),
         status: SyncUnsafeCell::new(TaskStatus::Ready),
-        exit_code: AtomicI8::new(0),
-        prio: AtomicIsize::new(0),
+        exit_code: AtomicIsize::new(114514),
+        tmp1: 0,
+        tmp2: 0,
+        tmp3: 0,
+        prio: Arc::new(SyncUnsafeCell::new(0)),
     });
-    debug!("prio: {}", task.prio());
-    task.set_prio(0);
-    info!("create a new task, tid {}", task.tid.0);
+    debug!(
+        "[spawn] prio: {}, exit_code: {}",
+        task.prio(),
+        task.exit_code()
+    );
+    info!("[spawn] create a new task, tid {}", task.tid.0);
     spawn_task(task);
 }

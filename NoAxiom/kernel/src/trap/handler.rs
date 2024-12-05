@@ -41,7 +41,7 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
                 let result = syscall(task, cx).await;
                 trace!("[syscall] done! result {:#x}", result);
                 cx = task.trap_context_mut();
-                cx.regs[A0] = result as usize;
+                cx.user_reg[A0] = result as usize;
             }
             _ => panic!(
                 "hart: {}, exception {:?} is unsupported, stval = {:#x}, sepc = {:#x}",

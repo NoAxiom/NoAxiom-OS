@@ -77,8 +77,7 @@
     .set      offset, offset+1
     .endr
 
-    ld        fp, 48*8(sp)             # load kernel fp
-    ld        tp, 49*8(sp)
+    ld        tp, 48*8(sp)
     ld        sp, 34*8(sp)
 
     ret                                # return to kernel ra
@@ -100,8 +99,7 @@
     .set      offset, offset+1
     .endr
 
-    sd        fp, 48*8(a0)
-    sd        tp, 49*8(a0)
+    sd        tp, 48*8(a0)
 
     mv        sp, a0                   # to use macros
     LOAD_GENERAL_REG

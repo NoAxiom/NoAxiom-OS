@@ -9,36 +9,20 @@ use async_task::{Builder, Runnable, ScheduleInfo, WithInfo};
 use lazy_static::lazy_static;
 
 use crate::{
-    config::sched::MLFQ_LEVELS, sync::mutex::SpinMutex, task::Task,
+    config::sched::MLFQ_LEVELS,
+    sync::{cell::SyncUnsafeCell, mutex::SpinMutex},
     time::timer::set_next_trigger,
 };
 
 pub struct TaskScheduleInfo {
-    task: Option<Arc<Task>>,
+    prio: Arc<SyncUnsafeCell<isize>>,
 }
 impl TaskScheduleInfo {
-    pub const fn new(task: Option<Arc<Task>>) -> Self {
-        Self { task }
+    pub const fn new(prio: Arc<SyncUnsafeCell<isize>>) -> Self {
+        Self { prio }
     }
-    pub fn prio(&self) -> isize {
-        if let Some(task) = &self.task {
-            // todo: discard mlfq and use cfg
-            let level = task.prio();
-            if level < MLFQ_LEVELS as isize {
-                level as isize
-            } else {
-                MLFQ_LEVELS as isize - 1
-            }
-        } else {
-            0
-        }
-    }
-    #[allow(unused)]
-    pub fn update(&mut self, prio: isize) {
-        info!("update task prio");
-        if let Some(task) = &self.task {
-            task.set_prio(prio);
-        }
+    pub fn prio(&self) -> &isize {
+        unsafe { &(*self.prio.get()) }
     }
 }
 
@@ -56,12 +40,14 @@ impl Executor {
     fn push_back(&mut self, runnable: Runnable<TaskScheduleInfo>) {
         let level = runnable.metadata().prio();
         info!("[sched] push task to back, prio: {}", level);
-        self.queue[level as usize].push_back(runnable);
+        // self.queue[level as usize].push_back(runnable);
+        self.queue[0].push_back(runnable);
     }
     fn push_front(&mut self, runnable: Runnable<TaskScheduleInfo>) {
         let level = runnable.metadata().prio();
         info!("[sched] push task to front, prio: {}", level);
-        self.queue[level as usize].push_front(runnable);
+        // self.queue[level as usize].push_front(runnable);
+        self.queue[0].push_front(runnable);
     }
     fn pop_front(&mut self) -> Option<Runnable<TaskScheduleInfo>> {
         for q in self.queue.iter_mut() {
@@ -78,33 +64,36 @@ lazy_static! {
 }
 
 /// insert task into EXECUTOR when [`core::task::Waker::wake`] get called
-fn schedule(task: Runnable<TaskScheduleInfo>, info: ScheduleInfo) {
-    info!("[sched] schedule task, prio: {}", task.metadata().prio());
+fn schedule(runnable: Runnable<TaskScheduleInfo>, info: ScheduleInfo) {
+    info!(
+        "[sched] schedule task, prio: {}",
+        runnable.metadata().prio()
+    );
     info!(
         "[sched] schedule task, new prio: {}",
-        task.metadata().prio()
+        runnable.metadata().prio()
     );
     info!(
         "[sched] schedule task, woken_while_running: {}",
         info.woken_while_running
     );
     if info.woken_while_running {
-        EXECUTOR.lock().push_front(task);
+        EXECUTOR.lock().push_front(runnable);
     } else {
-        EXECUTOR.lock().push_back(task);
+        EXECUTOR.lock().push_back(runnable);
     }
 }
 
 /// Add a raw task into task queue
-pub fn spawn_raw<F, R>(future: F, task: Option<Arc<Task>>)
+pub fn spawn_raw<F, R>(future: F, prio: Arc<SyncUnsafeCell<isize>>)
 where
     F: Future<Output = R> + Send + 'static,
     R: Send + 'static,
 {
-    let (task, handle) = Builder::new()
-        .metadata(TaskScheduleInfo::new(task))
+    let (runnable, handle) = Builder::new()
+        .metadata(TaskScheduleInfo::new(prio))
         .spawn(move |_: &TaskScheduleInfo| future, WithInfo(schedule));
-    task.schedule();
+    runnable.schedule();
     handle.detach();
 }
 
@@ -112,12 +101,12 @@ where
 pub fn run() {
     // spin until find a valid task
     loop {
-        let task = EXECUTOR.lock().pop_front();
-        if let Some(task) = task {
-            info!("[sched] run task, prio: {}", task.metadata().prio());
+        let runnable = EXECUTOR.lock().pop_front();
+        if let Some(runnable) = runnable {
+            trace!("[sched] run task, prio: {}", runnable.metadata().prio());
             set_next_trigger();
-            task.run();
-            info!("[sched] task done");
+            runnable.run();
+            trace!("[sched] task done");
             break;
         }
     }

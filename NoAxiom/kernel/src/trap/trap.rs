@@ -8,7 +8,7 @@ use riscv::register::{
 
 use super::context::TrapContext;
 use crate::{
-    arch::interrupt::{disable_global_interrupt, enable_external_interrupt, enable_stimer_interrupt, is_interrupt_enabled},
+    arch::interrupt::{enable_external_interrupt, enable_stimer_interrupt, is_interrupt_enabled},
     println,
     task::Task,
 };
@@ -33,7 +33,10 @@ pub fn set_user_trap_entry() {
 /// trap init of current hart
 pub fn trap_init() {
     set_kernel_trap_entry();
-    assert!(!is_interrupt_enabled(), "kernel don't support global interrupt");
+    assert!(
+        !is_interrupt_enabled(),
+        "kernel don't support global interrupt"
+    );
     // disable_global_interrupt();
     enable_external_interrupt();
     enable_stimer_interrupt();
@@ -45,7 +48,9 @@ pub fn trap_restore(task: &Arc<Task>) {
     set_user_trap_entry();
     let cx = task.trap_context_mut();
     info!("trap_restore: sepc {:#x}", cx.sepc);
-    info!("trap_restore: sp {:#x}", cx.regs[2]);
+    info!("trap_restore: sp {:#x}", cx.user_reg[2]);
+    task._debug_prio("task_main trap_restore begin2");
+    warn!("trap_restore!!!");
     // kernel -> user
     unsafe {
         user_trapret(task.trap_context_mut());

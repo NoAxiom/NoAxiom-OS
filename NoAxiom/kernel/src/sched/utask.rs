@@ -12,6 +12,7 @@ use core::{
 use super::{executor::spawn_raw, task_counter::task_count_inc};
 use crate::{
     cpu::current_cpu,
+    sync::cell::SyncUnsafeCell,
     task::{spawn_new_process, task_main, Task},
 };
 
@@ -43,13 +44,12 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
 pub fn spawn_task(task: Arc<Task>) {
     spawn_raw(
         UserTaskFuture::new(task.clone(), task_main(task.clone())),
-        None,
-        // Some(task),
+        task.prio.clone(),
     );
 }
 
 /// schedule: will soon complete resouce alloc and spawn task
 pub fn schedule_spawn_new_process(path: usize) {
     task_count_inc();
-    spawn_raw(spawn_new_process(path), None);
+    spawn_raw(spawn_new_process(path), Arc::new(SyncUnsafeCell::new(0)));
 }
