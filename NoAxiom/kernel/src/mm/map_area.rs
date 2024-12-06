@@ -102,7 +102,7 @@ impl MapArea {
             // direct: kernel space
             MapType::Direct => {
                 for vpn in self.vpn_range.into_iter() {
-                    trace!("map_each: vpn = {:#x}", vpn.0);
+                    // trace!("map_each: vpn = {:#x}", vpn.0);
                     let ppn = vpn.kernel_translate_into_ppn();
                     let flags = PTEFlags::from_bits(self.map_permission.bits()).unwrap();
                     page_table.map(vpn, ppn, flags);

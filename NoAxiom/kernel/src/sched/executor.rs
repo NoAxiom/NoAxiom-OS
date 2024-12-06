@@ -39,13 +39,13 @@ impl Executor {
     }
     fn push_back(&mut self, runnable: Runnable<TaskScheduleInfo>) {
         let level = runnable.metadata().prio();
-        info!("[sched] push task to back, prio: {}", level);
+        trace!("[sched] push task to back, prio: {}", level);
         // self.queue[level as usize].push_back(runnable);
         self.queue[0].push_back(runnable);
     }
     fn push_front(&mut self, runnable: Runnable<TaskScheduleInfo>) {
         let level = runnable.metadata().prio();
-        info!("[sched] push task to front, prio: {}", level);
+        trace!("[sched] push task to front, prio: {}", level);
         // self.queue[level as usize].push_front(runnable);
         self.queue[0].push_front(runnable);
     }
@@ -65,16 +65,9 @@ lazy_static! {
 
 /// insert task into EXECUTOR when [`core::task::Waker::wake`] get called
 fn schedule(runnable: Runnable<TaskScheduleInfo>, info: ScheduleInfo) {
-    info!(
-        "[sched] schedule task, prio: {}",
-        runnable.metadata().prio()
-    );
-    info!(
-        "[sched] schedule task, new prio: {}",
-        runnable.metadata().prio()
-    );
-    info!(
-        "[sched] schedule task, woken_while_running: {}",
+    trace!(
+        "[sched] schedule task, prio: {}, woken_while_running: {}",
+        runnable.metadata().prio(),
         info.woken_while_running
     );
     if info.woken_while_running {
@@ -104,7 +97,6 @@ pub fn run() {
         let runnable = EXECUTOR.lock().pop_front();
         if let Some(runnable) = runnable {
             trace!("[sched] run task, prio: {}", runnable.metadata().prio());
-            set_next_trigger();
             runnable.run();
             trace!("[sched] task done");
             break;

@@ -1,12 +1,13 @@
 # kernel/trap/trap.S
 
 # TrapContext structure:
-#   0 - gpr
+#   0 - user_reg
 # 256 - sstatus
 # 264 - sepc
 # 272 - kernel_satp
 # 280 - kernel_ra
-# 288 - trap_handler
+# 288 - kernel_reg (callee_saved)
+# 384 - kernel_tp
 
     .altmacro
     .macro    STORE_X n
@@ -77,7 +78,8 @@
     .set      offset, offset+1
     .endr
 
-    ld        tp, 48*8(sp)
+    ld        fp, 48*8(sp)             # load kernel fp
+    ld        tp, 49*8(sp)
     ld        sp, 34*8(sp)
 
     ret                                # return to kernel ra
@@ -99,7 +101,8 @@
     .set      offset, offset+1
     .endr
 
-    sd        tp, 48*8(a0)
+    sd        fp, 48*8(a0)
+    sd        tp, 49*8(a0)
 
     mv        sp, a0                   # to use macros
     LOAD_GENERAL_REG

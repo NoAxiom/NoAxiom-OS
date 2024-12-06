@@ -21,6 +21,7 @@ use crate::{arch::regs::Sstatus, constant::register::*};
 /// save registers when trap occurs
 /// we don't expect this to derive Clone
 #[repr(C)]
+#[repr(align(64))]
 pub struct TrapContext {
     /// [0~31]/[0~255]: user registers, saved by caller
     pub user_reg: [usize; 32],
@@ -42,8 +43,11 @@ pub struct TrapContext {
     /// [36~47]/[288~383]: kernel registers (s0 ~ s11), saved by callee
     pub kernel_reg: [usize; 12],
 
-    /// [48]/[384~391]: hart id, aka tp
-    pub hart_tp: usize,
+    /// [48]/[384~391]: reserved
+    pub kernel_fp: usize,
+
+    /// [49]/[392~399]: tp, aka hartid
+    pub kernel_tp: usize,
 }
 
 impl TrapContext {
@@ -58,7 +62,8 @@ impl TrapContext {
             kernel_sp: 0,
             kernel_ra: 0,
             kernel_reg: [0; 12],
-            hart_tp: 0,
+            kernel_fp: 0,
+            kernel_tp: 0,
         };
         cx.user_reg[SP] = sp;
         cx

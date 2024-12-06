@@ -8,7 +8,7 @@ use riscv::register::{
 };
 
 use super::trap::set_kernel_trap_entry;
-use crate::{constant::register::A0, cpu::hartid, syscall::syscall, task::Task, yield_now};
+use crate::{constant::register::A0, cpu::get_hartid, syscall::syscall, task::Task, time::timer::set_next_trigger, yield_now};
 
 /// kernel trap handler
 #[no_mangle]
@@ -18,7 +18,7 @@ pub fn kernel_trap_handler() {
     let sepc = sepc::read();
     panic!(
             "a trap in kernel\nhart: {}, trap {:?} is unsupported, stval = {:#x}, error address = {:#x}",
-            hartid(),
+            get_hartid(),
             scause.cause(),
             stval,
             sepc,
@@ -28,7 +28,7 @@ pub fn kernel_trap_handler() {
 /// user trap handler
 #[no_mangle]
 pub async fn user_trap_handler(task: &Arc<Task>) {
-    info!("[user_trap_handler] call trap handler");
+    trace!("[user_trap_handler] call trap handler");
     set_kernel_trap_entry();
     let mut cx = task.trap_context_mut();
     let scause = scause::read();
@@ -45,7 +45,7 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
             }
             _ => panic!(
                 "hart: {}, exception {:?} is unsupported, stval = {:#x}, sepc = {:#x}",
-                hartid(),
+                get_hartid(),
                 scause.cause(),
                 stval,
                 cx.sepc
@@ -54,11 +54,13 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
         Trap::Interrupt(interrupt) => match interrupt {
             Interrupt::SupervisorTimer => {
                 task.inc_prio();
+                set_next_trigger();
+                debug!("trap: supervisor timer interrupt");
                 yield_now!();
             }
             _ => panic!(
                 "hart: {}, interrupt {:?} is unsupported, stval = {:#x}, sepc = {:#x}",
-                hartid(),
+                get_hartid(),
                 scause.cause(),
                 stval,
                 cx.sepc

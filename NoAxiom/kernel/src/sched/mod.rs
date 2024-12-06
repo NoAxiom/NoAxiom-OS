@@ -10,4 +10,4 @@ mod utask;
 pub mod utils;
 
 pub use executor::run;
-pub use utask::{schedule_spawn_new_process, spawn_task};
+pub use utask::schedule_spawn_new_process;

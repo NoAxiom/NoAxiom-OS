@@ -15,6 +15,8 @@
 // #![feature(custom_mir)]
 // #![feature(core_intrinsics)]
 
+use time::timer::set_next_trigger;
+
 #[macro_use]
 extern crate alloc;
 #[macro_use]
@@ -44,7 +46,8 @@ core::arch::global_asm!(include_str!("link_apps.S"));
 #[no_mangle]
 pub fn rust_main() {
     trace!("token {:#x}", crate::mm::page_table::current_token());
-    println!("[kernel] hart id {} has been booted", cpu::hartid());
+    info!("[kernel] hart id {} has been booted", cpu::get_hartid());
+    set_next_trigger();
     loop {
         sched::run();
     }

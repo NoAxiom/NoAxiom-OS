@@ -1,7 +1,7 @@
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use crate::{
-    arch::interrupt::enable_user_memory_access, constant::banner::NOAXIOM_BANNER, cpu::hartid,
+    arch::interrupt::enable_user_memory_access, constant::banner::NOAXIOM_BANNER, cpu::get_hartid,
     println, sched::schedule_spawn_new_process,
 };
 
@@ -34,11 +34,11 @@ pub(crate) fn init(_hart_id: usize, _dtb: usize) {
             .is_ok()
     } {
         global_resources_init();
-        println!("[entry] entry init hart_id: {}", hartid());
+        info!("[entry] entry init hart_id: {}", get_hartid());
         println!("{}", NOAXIOM_BANNER);
         // TODO: spawn init_proc
         for i in 0..crate::task::load_app::app_nums() {
-            println!("[entry] spawn app_{}", i);
+            info!("[entry] spawn app_{}", i);
             schedule_spawn_new_process(i);
         }
         unsafe {

@@ -158,4 +158,4 @@ count:
 # board:
 # 	@cp $(TARGET_DIR)/$(KERNEL).bin  $(TFTPBOOT)
 
-.PHONY: all build run debug clean debug-client sbi-qemu backup sdcard build-gui board vendor count
+.PHONY: all build run debug clean debug-client sbi-qemu backup sdcard build-gui board vendor count asm

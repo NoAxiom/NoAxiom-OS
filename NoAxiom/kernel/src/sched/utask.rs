@@ -13,7 +13,7 @@ use super::{executor::spawn_raw, task_counter::task_count_inc};
 use crate::{
     cpu::current_cpu,
     sync::cell::SyncUnsafeCell,
-    task::{spawn_new_process, task_main, Task},
+    task::{task_main, Task},
 };
 
 pub struct UserTaskFuture<F: Future + Send + 'static> {
@@ -40,16 +40,20 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
     }
 }
 
-/// spawn a user task, should be wrapped in async fn
-pub fn spawn_task(task: Arc<Task>) {
-    spawn_raw(
-        UserTaskFuture::new(task.clone(), task_main(task.clone())),
-        task.prio.clone(),
-    );
-}
-
-/// schedule: will soon complete resouce alloc and spawn task
+/// schedule: will soon allocate resouces and spawn task
 pub fn schedule_spawn_new_process(path: usize) {
     task_count_inc();
-    spawn_raw(spawn_new_process(path), Arc::new(SyncUnsafeCell::new(0)));
+    debug!("task_count_inc, counter: {}", unsafe {
+        crate::sched::task_counter::TASK_COUNTER.load(core::sync::atomic::Ordering::SeqCst)
+    });
+    spawn_raw(
+        async move {
+            let task = Task::new_process(path).await;
+            spawn_raw(
+                UserTaskFuture::new(task.clone(), task_main(task.clone())),
+                task.prio.clone(),
+            );
+        },
+        Arc::new(SyncUnsafeCell::new(0)),
+    );
 }

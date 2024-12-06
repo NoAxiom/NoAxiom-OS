@@ -7,7 +7,7 @@ use kernel_sync::{ticket::TicketMutexGuard, LockAction};
 use crate::{
     arch::interrupt::{disable_global_interrupt, enable_global_interrupt, is_interrupt_enabled},
     config::arch::CPU_NUM,
-    cpu::hartid,
+    cpu::get_hartid,
 };
 
 pub type SpinMutex<T> = kernel_sync::spin::SpinMutex<T, KernelLockAction>;
@@ -49,7 +49,7 @@ const DEFAULT_CPU: SafeRefCell<Cpu> = SafeRefCell::new(Cpu::new());
 static CPUS: [SafeRefCell<Cpu>; CPU_NUM] = [DEFAULT_CPU; CPU_NUM];
 
 fn current_cpu() -> RefMut<'static, Cpu> {
-    CPUS[hartid()].0.borrow_mut()
+    CPUS[get_hartid()].0.borrow_mut()
 }
 
 /// provides riscv arch interrupt behavior for lock action

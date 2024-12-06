@@ -4,7 +4,7 @@ use lazy_static::lazy_static;
 
 use super::{map_area::MapArea, page_table::PageTable};
 use crate::{
-    config::mm::{KERNEL_VIRT_MEMORY_END, PAGE_SIZE, PAGE_WIDTH, USER_HEAP_SIZE, USER_STACK_SIZE}, cpu::hartid, fs::File, map_permission, mm::{
+    config::mm::{KERNEL_VIRT_MEMORY_END, PAGE_SIZE, PAGE_WIDTH, USER_HEAP_SIZE, USER_STACK_SIZE}, cpu::get_hartid, fs::File, map_permission, mm::{
         address::{VirtAddr, VirtPageNum},
         map_area::MapAreaType,
         permission::MapType,
@@ -189,7 +189,7 @@ impl MemorySet {
         let mut memory_set = Self::new_with_kernel();
         let mut elf_data = Box::new([0u8; 0x10000]); // todo: use elf_header
         let elf_data = elf_data.as_mut();
-        trace!("[load_from_elf] hart: {}, sp: {:#x}", hartid(), crate::arch::regs::get_sp());
+        trace!("[load_from_elf] hart: {}, sp: {:#x}", get_hartid(), crate::arch::regs::get_sp());
         // let elf_data = &mut [0u8; 0x10000];
         elf_file
             .read(0, elf_data.len(), elf_data)

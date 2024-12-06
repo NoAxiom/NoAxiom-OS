@@ -3,7 +3,7 @@ use core::task::Waker;
 
 use crate::{
     constant::syscall::*,
-    cpu::current_cpu,
+    cpu::get_hartid,
     driver::sbi::shutdown,
     print,
     task::{Task, TaskStatus},
@@ -51,10 +51,13 @@ impl Syscall {
 
     // todo: add fd
     pub async fn sys_write(&self, _fd: usize, buf: usize, len: usize) {
-        // assert!(current_cpu().token() == self.task.token());
-        info!("sys_write: fd: {}, buf: {:#x}, len: {}", _fd, buf, len);
-        let task = current_cpu().task.clone().unwrap();
-        unsafe { task.memory_activate() };
+        info!(
+            "sys_write: fd: {}, buf: {:#x}, len: {}, hart: {}",
+            _fd,
+            buf,
+            len,
+            get_hartid()
+        );
         let buf = unsafe { core::slice::from_raw_parts_mut(buf as *mut u8, len) };
         let s = core::str::from_utf8(buf).unwrap();
         print!("{}", s);
@@ -62,6 +65,12 @@ impl Syscall {
 
     pub fn sys_exit(&mut self) {
         *self.task.status_mut() = TaskStatus::Zombie;
-        info!("task exited, tid: {}", self.task.tid());
+        debug!(
+            "task exited, tid: {}, counter: {}",
+            self.task.tid(),
+            unsafe {
+                crate::sched::task_counter::TASK_COUNTER.load(core::sync::atomic::Ordering::SeqCst)
+            }
+        );
     }
 }

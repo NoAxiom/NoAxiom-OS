@@ -3,7 +3,7 @@ use alloc::sync::Arc;
 use crate::{config::arch::CPU_NUM, sync::cell::SyncUnsafeCell, task::Task};
 
 #[inline(always)]
-pub fn hartid() -> usize {
+pub fn get_hartid() -> usize {
     let hartid: usize;
     unsafe { core::arch::asm!("mv {}, tp", out(reg) hartid) }
     hartid
@@ -12,16 +12,12 @@ pub fn hartid() -> usize {
 pub struct Cpu {
     /// pointer of current task on this hart
     pub task: Option<Arc<Task>>,
-
-    /// the time recorded at current task is lauched
-    pub time: usize,
 }
 
 impl Cpu {
     pub const fn new() -> Self {
         Self {
             task: None,
-            time: 0,
         }
     }
     fn set_raw_task(&mut self, task: Arc<Task>) {
@@ -33,9 +29,6 @@ impl Cpu {
     pub fn set_task(&mut self, task: &mut Arc<Task>) {
         self.set_raw_task(task.clone());
     }
-    pub fn set_time(&mut self, time: usize) {
-        self.time = time;
-    }
 
     fn clear_raw_task(&mut self) {
         self.task = None;
@@ -43,18 +36,13 @@ impl Cpu {
     pub fn clear_task(&mut self) {
         self.clear_raw_task();
     }
-
-    pub fn token(&self) -> usize {
-        let task = self.task.clone();
-        task.unwrap().token()
-    }
 }
 
 const DEFAULT_CPU: SyncUnsafeCell<Cpu> = SyncUnsafeCell::new(Cpu::new());
 pub static mut CPUS: [SyncUnsafeCell<Cpu>; CPU_NUM] = [DEFAULT_CPU; CPU_NUM];
 
 pub fn current_cpu() -> &'static mut Cpu {
-    unsafe { &mut CPUS[hartid()] }.get_mut()
+    unsafe { &mut CPUS[get_hartid()] }.get_mut()
 }
 
 // TODO: add mm
