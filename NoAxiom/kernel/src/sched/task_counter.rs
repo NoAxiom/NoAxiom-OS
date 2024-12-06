@@ -13,6 +13,11 @@ pub fn task_count_inc() {
 pub fn task_count_dec() {
     if unsafe { TASK_COUNTER.fetch_sub(1, Ordering::SeqCst) } == 1 {
         info!("[kernel] all tasks are done, shutdown");
+        // print_counter();
+        // let logger = unsafe { crate::sched::executor::INFO_LOGGER.lock() };
+        // for it in logger.iter() {
+        //     debug!("{}", it);
+        // }
         crate::driver::sbi::shutdown();
     }
 }

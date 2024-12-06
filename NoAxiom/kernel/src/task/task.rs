@@ -3,6 +3,8 @@
 use alloc::sync::Arc;
 use core::sync::atomic::{AtomicIsize, Ordering};
 
+use riscv::register::sstatus::{self, SPP};
+
 use super::taskid::TidTracer;
 use crate::{
     fs::get_app_elf,
@@ -173,6 +175,7 @@ pub async fn task_main(task: Arc<Task>) {
         // kernel -> user
         trace!("[task_main] trap_restore");
         trap_restore(&task);
+        // debug!("cx: {:?}", task.trap_context());
         // todo: is this necessary?
         if task.is_zombie() {
             warn!("task {} is zombie, break", task.tid());

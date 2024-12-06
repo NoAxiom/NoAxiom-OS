@@ -4,11 +4,20 @@ use alloc::sync::Arc;
 
 use riscv::register::{
     scause::{self, Exception, Interrupt, Trap},
-    sepc, stval,
+    sepc,
+    sstatus::{self, SPP},
+    stval,
 };
 
 use super::trap::set_kernel_trap_entry;
-use crate::{constant::register::A0, cpu::get_hartid, syscall::syscall, task::Task, time::timer::set_next_trigger, yield_now};
+use crate::{
+    constant::register::A0,
+    cpu::get_hartid,
+    sched::utils::yield_now,
+    syscall::syscall,
+    task::Task,
+    time::timer::{clear_trigger, set_next_trigger},
+};
 
 /// kernel trap handler
 #[no_mangle]
@@ -17,18 +26,18 @@ pub fn kernel_trap_handler() {
     let stval = stval::read();
     let sepc = sepc::read();
     panic!(
-            "a trap in kernel\nhart: {}, trap {:?} is unsupported, stval = {:#x}, error address = {:#x}",
-            get_hartid(),
-            scause.cause(),
-            stval,
-            sepc,
-        );
+        "kernel trap!!! hart: {}, trap {:?} is unsupported, stval = {:#x}, error pc = {:#x}",
+        get_hartid(),
+        scause.cause(),
+        stval,
+        sepc,
+    );
 }
 
 /// user trap handler
 #[no_mangle]
 pub async fn user_trap_handler(task: &Arc<Task>) {
-    trace!("[user_trap_handler] call trap handler");
+    trace!("[trap_handler] call trap handler");
     set_kernel_trap_entry();
     let mut cx = task.trap_context_mut();
     let scause = scause::read();
@@ -55,8 +64,14 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
             Interrupt::SupervisorTimer => {
                 task.inc_prio();
                 set_next_trigger();
-                debug!("trap: supervisor timer interrupt");
-                yield_now!();
+                debug!(
+                    "[trap_handler] SupervisorTimer, hart: {}, mode: {:?}, tid: {}, sie: {}",
+                    get_hartid(),
+                    riscv::register::sstatus::read().spp(),
+                    task.tid(),
+                    riscv::register::sstatus::read().sie(),
+                );
+                yield_now().await;
             }
             _ => panic!(
                 "hart: {}, interrupt {:?} is unsupported, stval = {:#x}, sepc = {:#x}",

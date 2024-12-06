@@ -47,7 +47,7 @@ pub fn trap_init() {
 pub fn trap_restore(task: &Arc<Task>) {
     set_user_trap_entry();
     let cx = task.trap_context_mut();
-    info!(
+    trace!(
         "trap_restore: tid {}, sepc {:#x}, sp {:#x}",
         task.tid(),
         cx.sepc,
@@ -56,7 +56,7 @@ pub fn trap_restore(task: &Arc<Task>) {
     // kernel -> user
     unsafe {
         user_trapret(task.trap_context_mut());
-    }  
+    }
 }
 
 /// debug: show sstatus

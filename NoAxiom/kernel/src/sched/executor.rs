@@ -2,14 +2,16 @@
 //! - [`spawn_raw`] to add a task
 //! - [`run`] to run next task
 
-use alloc::{collections::vec_deque::VecDeque, sync::Arc, vec::Vec};
+use alloc::{collections::vec_deque::VecDeque, string::String, sync::Arc, vec::Vec};
 use core::future::Future;
 
 use async_task::{Builder, Runnable, ScheduleInfo, WithInfo};
 use lazy_static::lazy_static;
 
 use crate::{
-    config::sched::MLFQ_LEVELS,
+    config::{arch::CPU_NUM, sched::MLFQ_LEVELS},
+    cpu::get_hartid,
+    print, println,
     sync::{cell::SyncUnsafeCell, mutex::SpinMutex},
     time::timer::set_next_trigger,
 };
@@ -90,16 +92,24 @@ where
     handle.detach();
 }
 
+// pub static mut INFO_LOGGER: SpinMutex<Vec<String>> =
+// SpinMutex::new(Vec::new());
+
 /// Pop a task and run it
 pub fn run() {
     // spin until find a valid task
     loop {
         let runnable = EXECUTOR.lock().pop_front();
         if let Some(runnable) = runnable {
-            trace!("[sched] run task, prio: {}", runnable.metadata().prio());
+            // let string = format!("[sched] run task, prio: {}",
+            // runnable.metadata().prio()); unsafe {
+            //     INFO_LOGGER.lock().push(string);
+            // }
+            // set_next_trigger();
             runnable.run();
-            trace!("[sched] task done");
             break;
+        } else {
+            // warn!("hart: {}, no task to run", get_hartid());
         }
     }
 }

@@ -22,6 +22,7 @@ use crate::{arch::regs::Sstatus, constant::register::*};
 /// we don't expect this to derive Clone
 #[repr(C)]
 #[repr(align(64))]
+#[derive(Debug)]
 pub struct TrapContext {
     /// [0~31]/[0~255]: user registers, saved by caller
     pub user_reg: [usize; 32],

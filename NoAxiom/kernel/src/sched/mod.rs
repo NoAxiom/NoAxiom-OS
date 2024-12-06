@@ -6,7 +6,7 @@
 
 mod executor;
 pub mod task_counter;
-mod utask;
+pub mod utask;
 pub mod utils;
 
 pub use executor::run;

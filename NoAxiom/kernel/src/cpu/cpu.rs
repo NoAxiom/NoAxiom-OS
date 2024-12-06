@@ -1,6 +1,8 @@
 use alloc::sync::Arc;
 
-use crate::{config::arch::CPU_NUM, sync::cell::SyncUnsafeCell, task::Task};
+use crate::{
+    config::arch::CPU_NUM, sync::cell::SyncUnsafeCell, task::Task, time::timer::set_next_trigger,
+};
 
 #[inline(always)]
 pub fn get_hartid() -> usize {
@@ -16,9 +18,7 @@ pub struct Cpu {
 
 impl Cpu {
     pub const fn new() -> Self {
-        Self {
-            task: None,
-        }
+        Self { task: None }
     }
     fn set_raw_task(&mut self, task: Arc<Task>) {
         unsafe {
@@ -28,6 +28,7 @@ impl Cpu {
     }
     pub fn set_task(&mut self, task: &mut Arc<Task>) {
         self.set_raw_task(task.clone());
+        set_next_trigger();
     }
 
     fn clear_raw_task(&mut self) {

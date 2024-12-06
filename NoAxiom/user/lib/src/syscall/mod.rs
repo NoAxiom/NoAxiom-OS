@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 macro_rules! syscall_id {
     ($name:ident, $val:expr) => {
         const $name: usize = $val;
