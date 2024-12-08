@@ -10,7 +10,6 @@ use riscv::register::{
 use super::trap::set_kernel_trap_entry;
 use crate::{
     constant::register::A0, cpu::get_hartid, sched::utils::yield_now, syscall::syscall, task::Task,
-    time::timer::set_next_trigger,
 };
 
 /// kernel trap handler
@@ -57,7 +56,6 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
         Trap::Interrupt(interrupt) => match interrupt {
             Interrupt::SupervisorTimer => {
                 task.inc_prio();
-                set_next_trigger();
                 debug!(
                     "[SupervisorTimer] hart: {}, tid: {}",
                     get_hartid(),

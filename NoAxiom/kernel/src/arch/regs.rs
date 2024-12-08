@@ -53,12 +53,3 @@ pub fn get_sp() -> usize {
     }
     sp
 }
-
-#[inline(always)]
-pub fn get_tp() -> usize {
-    let tp: usize;
-    unsafe {
-        core::arch::asm!("mv {}, sp", out(reg) tp);
-    }
-    tp
-}

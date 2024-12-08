@@ -11,7 +11,6 @@ use lazy_static::lazy_static;
 use crate::{
     config::sched::MLFQ_LEVELS,
     sync::{cell::SyncUnsafeCell, mutex::SpinMutex},
-    time::timer::set_next_trigger,
 };
 
 pub struct TaskScheduleInfo {
@@ -90,25 +89,14 @@ where
     handle.detach();
 }
 
-// pub static mut INFO_LOGGER: SpinMutex<Vec<String>> =
-// SpinMutex::new(Vec::new());
-
 /// Pop a task and run it
 pub fn run() {
     // spin until find a valid task
     loop {
         let runnable = EXECUTOR.lock().pop_front();
         if let Some(runnable) = runnable {
-            // let string = format!("[sched] run task, prio: {}",
-            // runnable.metadata().prio()); unsafe {
-            //     INFO_LOGGER.lock().push(string);
-            // }
-            // set_next_trigger();
             runnable.run();
             break;
-        } else {
-            set_next_trigger();
-            // warn!("hart: {}, no task to run", get_hartid());
         }
     }
 }
