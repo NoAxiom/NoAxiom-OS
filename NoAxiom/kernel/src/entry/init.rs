@@ -1,4 +1,4 @@
-use core::sync::atomic::{AtomicBool, Ordering};
+use core::arch::asm;
 
 use crate::{
     arch::interrupt::enable_user_memory_access,
@@ -20,25 +20,29 @@ fn hart_resources_init() {
     crate::trap::trap_init();
 }
 
-static mut BOOT_FLAG: AtomicBool = AtomicBool::new(false);
+/// BOOT_FLAG is used to ensure that the kernel is only initialized once
+/// and that the kernel is not re-entered after the first initialization
+/// SAFETY: I suppose not to use AtomicBool since it may damage the heap space
+static mut BOOT_FLAG: bool = false;
 
 // TODO: dtb
 /// init bss, mm, console, and other drivers, then jump to rust_main,
 /// called by `super::boot`
 #[no_mangle]
 pub(crate) fn boot_hart_init(_: usize, __: usize) {
-    if !unsafe { BOOT_FLAG.load(Ordering::SeqCst) } {
+    if unsafe { !BOOT_FLAG } {
         enable_user_memory_access();
         // WARNING: don't try to modify any global variable before this line
         // because it will be overwritten by clear_bss
         global_resources_init();
         unsafe {
-            BOOT_FLAG.store(true, Ordering::SeqCst);
+            BOOT_FLAG = true;
+            asm!("fence rw, rw");
         }
         info!(
-            "[entry] entry init hart_id: {}, boot_flag: {}",
+            "[init] entry init hart_id: {}, boot_flag: {}",
             get_hartid(),
-            unsafe { BOOT_FLAG.load(Ordering::SeqCst) }
+            unsafe { BOOT_FLAG }
         );
         println!("{}", NOAXIOM_BANNER);
         // TODO: spawn init_proc

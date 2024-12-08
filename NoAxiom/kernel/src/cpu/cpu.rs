@@ -20,11 +20,7 @@ impl Cpu {
     pub const fn new() -> Self {
         Self { task: None }
     }
-    // fn set_raw_task(&mut self, task: Arc<Task>) {
-        
-    // }
     pub fn set_task(&mut self, task: &mut Arc<Task>) {
-        // self.set_raw_task(task.clone());
         set_next_trigger();
         unsafe {
             task.memory_activate();
