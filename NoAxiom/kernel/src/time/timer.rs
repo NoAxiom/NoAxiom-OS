@@ -15,7 +15,7 @@ pub fn set_next_trigger() {
     set_timer((get_time() + TIME_SLICE_TICKS) as u64);
 }
 
-/// clear timer interrupt by setting an unreachable stime_value
-pub fn clear_trigger() {
-    set_timer(u64::MAX);
-}
+// /// clear timer interrupt by setting an unreachable stime_value
+// pub fn clear_trigger() {
+//     set_timer(u64::MAX);
+// }

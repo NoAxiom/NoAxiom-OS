@@ -46,13 +46,13 @@ build:
 	@cd $(PROJECT)/user && make build
 	@cd $(PROJECT)/kernel && make build
 
-MULTICORE_COUNT := 2
+MULTICORE_ARGS := 2,cores=1,threads=1,sockets=2
 
 QFLAGS := 
 QFLAGS += -m 128
 QFLAGS += -machine virt
 QFLAGS += -nographic
-QFLAGS += -smp $(MULTICORE_COUNT)
+QFLAGS += -smp $(MULTICORE_ARGS)
 QFLAGS += -kernel kernel-qemu
 QFLAGS += -device loader,file=$(KERNEL_BIN),addr=0x80200000
 # QFLAGS += -drive file=$(SDCARD_BAK),if=none,format=raw,id=x0 

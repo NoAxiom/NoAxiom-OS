@@ -2,16 +2,14 @@
 //! - [`spawn_raw`] to add a task
 //! - [`run`] to run next task
 
-use alloc::{collections::vec_deque::VecDeque, string::String, sync::Arc, vec::Vec};
+use alloc::{collections::vec_deque::VecDeque, sync::Arc, vec::Vec};
 use core::future::Future;
 
 use async_task::{Builder, Runnable, ScheduleInfo, WithInfo};
 use lazy_static::lazy_static;
 
 use crate::{
-    config::{arch::CPU_NUM, sched::MLFQ_LEVELS},
-    cpu::get_hartid,
-    print, println,
+    config::sched::MLFQ_LEVELS,
     sync::{cell::SyncUnsafeCell, mutex::SpinMutex},
     time::timer::set_next_trigger,
 };
@@ -109,6 +107,7 @@ pub fn run() {
             runnable.run();
             break;
         } else {
+            set_next_trigger();
             // warn!("hart: {}, no task to run", get_hartid());
         }
     }

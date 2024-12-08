@@ -4,19 +4,13 @@ use alloc::sync::Arc;
 
 use riscv::register::{
     scause::{self, Exception, Interrupt, Trap},
-    sepc,
-    sstatus::{self, SPP},
-    stval,
+    sepc, stval,
 };
 
 use super::trap::set_kernel_trap_entry;
 use crate::{
-    constant::register::A0,
-    cpu::get_hartid,
-    sched::utils::yield_now,
-    syscall::syscall,
-    task::Task,
-    time::timer::{clear_trigger, set_next_trigger},
+    constant::register::A0, cpu::get_hartid, sched::utils::yield_now, syscall::syscall, task::Task,
+    time::timer::set_next_trigger,
 };
 
 /// kernel trap handler
@@ -65,11 +59,9 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
                 task.inc_prio();
                 set_next_trigger();
                 debug!(
-                    "[trap_handler] SupervisorTimer, hart: {}, mode: {:?}, tid: {}, sie: {}",
+                    "[SupervisorTimer] hart: {}, tid: {}",
                     get_hartid(),
-                    riscv::register::sstatus::read().spp(),
                     task.tid(),
-                    riscv::register::sstatus::read().sie(),
                 );
                 yield_now().await;
             }

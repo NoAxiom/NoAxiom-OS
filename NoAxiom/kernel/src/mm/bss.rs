@@ -1,7 +1,14 @@
+//! clear bss section
+
+/// SAFETY: This function is called only once during booting
+/// and don't try to modify any global / unstacked variable before this function
+///
+/// NOTE THAT this function will not clear any data on the kernel stack
+/// since the beginning address is `ekstack`
 pub fn bss_init() {
     extern "C" {
-        fn skstack();
+        fn ekstack();
         fn ebss();
     }
-    (skstack as usize..ebss as usize).for_each(|x| unsafe { (x as *mut u8).write_volatile(0) });
+    (ekstack as usize..ebss as usize).for_each(|x| unsafe { (x as *mut u8).write_volatile(0) });
 }

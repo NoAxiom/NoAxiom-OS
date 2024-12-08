@@ -1,13 +1,14 @@
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use crate::{
-    arch::interrupt::enable_user_memory_access, constant::banner::NOAXIOM_BANNER, cpu::get_hartid,
-    println, sched::schedule_spawn_new_process,
+    arch::interrupt::enable_user_memory_access,
+    config::{arch::CPU_NUM, mm::KERNEL_PHYS_ENTRY},
+    constant::banner::NOAXIOM_BANNER,
+    cpu::get_hartid,
+    driver::sbi::hart_start,
+    println, rust_main,
+    sched::schedule_spawn_new_process,
 };
-
-fn pre_init() {
-    enable_user_memory_access();
-}
 
 fn global_resources_init() {
     crate::mm::bss::bss_init();
@@ -20,33 +21,57 @@ fn hart_resources_init() {
 }
 
 static mut BOOT_FLAG: AtomicBool = AtomicBool::new(false);
-static mut INIT_FLAG: AtomicBool = AtomicBool::new(false);
 
 // TODO: dtb
 /// init bss, mm, console, and other drivers, then jump to rust_main,
 /// called by `super::boot`
 #[no_mangle]
-pub(crate) fn init(_hart_id: usize, _dtb: usize) {
-    pre_init();
-    if unsafe {
-        BOOT_FLAG
-            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
-            .is_ok()
-    } {
+pub(crate) fn boot_hart_init(_: usize, __: usize) {
+    if !unsafe { BOOT_FLAG.load(Ordering::SeqCst) } {
+        enable_user_memory_access();
+        // WARNING: don't try to modify any global variable before this line
+        // because it will be overwritten by clear_bss
         global_resources_init();
-        info!("[entry] entry init hart_id: {}", get_hartid());
+        unsafe {
+            BOOT_FLAG.store(true, Ordering::SeqCst);
+        }
+        info!(
+            "[entry] entry init hart_id: {}, boot_flag: {}",
+            get_hartid(),
+            unsafe { BOOT_FLAG.load(Ordering::SeqCst) }
+        );
         println!("{}", NOAXIOM_BANNER);
         // TODO: spawn init_proc
         for i in 0..crate::task::load_app::app_nums() {
             info!("[entry] spawn app_{}", i);
             schedule_spawn_new_process(i);
         }
-        unsafe {
-            INIT_FLAG.store(true, Ordering::SeqCst);
-        }
+        awake_other_hart(get_hartid());
+        hart_resources_init();
+        rust_main();
     } else {
-        while unsafe { !INIT_FLAG.load(Ordering::SeqCst) } {}
+        enable_user_memory_access();
+        hart_resources_init();
+        rust_main();
     }
-    hart_resources_init();
-    crate::rust_main();
+}
+
+/// awake other core
+#[allow(unused)]
+pub fn awake_other_hart(forbid_hart_id: usize) {
+    info!("awake_other_hart, forbid hart: {}", forbid_hart_id);
+    for i in 0..CPU_NUM {
+        if i != forbid_hart_id {
+            let result = hart_start(i, KERNEL_PHYS_ENTRY, 0);
+            if result.error == 0 {
+                info!("[awake_other_hart] hart {:x} start successfully", i);
+            } else {
+                error!(
+                    "[awake_other_hart] error when waking {}, error code: {:?}",
+                    i,
+                    result.get_sbi_error()
+                );
+            }
+        }
+    }
 }

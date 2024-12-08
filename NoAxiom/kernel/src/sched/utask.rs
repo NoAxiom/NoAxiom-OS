@@ -12,10 +12,9 @@ use core::{
 
 use super::{executor::spawn_raw, task_counter::task_count_inc};
 use crate::{
-    cpu::{current_cpu, get_hartid},
+    cpu::current_cpu,
     sync::cell::SyncUnsafeCell,
     task::{task_main, Task},
-    time::timer::set_next_trigger,
 };
 
 pub struct UserTaskFuture<F: Future + Send + 'static> {
@@ -28,21 +27,29 @@ impl<F: Future + Send + 'static> UserTaskFuture<F> {
         Self { task, future }
     }
 }
-// static mut COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+static mut COUNTER_BEFORE: AtomicUsize = AtomicUsize::new(0);
+static mut COUNTER_AFTER: AtomicUsize = AtomicUsize::new(0);
 impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
     type Output = F::Output;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         // unsafe {
-        //     COUNTER.fetch_add(1, core::sync::atomic::Ordering::SeqCst);
+        //     COUNTER_BEFORE.fetch_add(1, core::sync::atomic::Ordering::SeqCst);
         // }
         let this = unsafe { self.get_unchecked_mut() };
         let p = current_cpu();
         p.set_task(&mut this.task);
-        // set_next_trigger();  
         let ret = unsafe { Pin::new_unchecked(&mut this.future).poll(cx) };
         p.clear_task();
-        // debug!("yield or exit, hart: {}, tid: {}", get_hartid(), this.task.tid());
+        // unsafe {
+        //     COUNTER_AFTER.fetch_add(1, core::sync::atomic::Ordering::SeqCst);
+        // }
+        // debug!(
+        //     "yield or exit, hart: {}, tid: {}",
+        //     get_hartid(),
+        //     this.task.tid()
+        // );
         ret
     }
 }
@@ -50,7 +57,7 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
 /// schedule: will soon allocate resouces and spawn task
 pub fn schedule_spawn_new_process(path: usize) {
     task_count_inc();
-    debug!("task_count_inc, counter: {}", unsafe {
+    trace!("task_count_inc, counter: {}", unsafe {
         crate::sched::task_counter::TASK_COUNTER.load(core::sync::atomic::Ordering::SeqCst)
     });
     spawn_raw(
@@ -65,12 +72,13 @@ pub fn schedule_spawn_new_process(path: usize) {
     );
 }
 
-// #[allow(unused)]
-// pub fn print_counter() {
-//     unsafe {
-//         debug!(
-//             "task future counter: {}",
-//             COUNTER.load(core::sync::atomic::Ordering::SeqCst)
-//         );
-//     }
-// }
+#[allow(unused)]
+pub fn print_counter() {
+    unsafe {
+        debug!(
+            "task future counter: before: {}, after: {}",
+            COUNTER_BEFORE.load(core::sync::atomic::Ordering::SeqCst),
+            COUNTER_AFTER.load(core::sync::atomic::Ordering::SeqCst)
+        );
+    }
+}

@@ -2,9 +2,7 @@ use core::arch::asm;
 
 use crate::{
     config::{arch::CPU_NUM, mm::*},
-    driver::sbi::hart_start,
     mm::pte::PageTableEntry,
-    println,
 };
 
 /// temp stack for kernel booting
@@ -69,35 +67,7 @@ unsafe extern "C" fn _entry() -> ! {
         boot_stack = sym BOOT_STACK,
         kernel_addr_offset = const KERNEL_ADDR_OFFSET,
         kernel_stack_shift = const KERNEL_STACK_WIDTH,
-        entry = sym super::init::init,
+        entry = sym super::init::boot_hart_init,
         options(noreturn),
     )
-}
-
-/// awake other core
-#[allow(unused)]
-pub fn init_other_hart(forbid_hart_id: usize) {
-    // let aux_core_func = (other_hart_entry as usize) & (!KERNEL_ADDR_OFFSET);
-    // println!("aux_core_func: {:#x}", aux_core_func);
-
-    let start_id = 0;
-    // there's no need to wake hart 0 on vf2 platform
-    #[cfg(feature = "vf2")]
-    let start_id = 1;
-
-    info!("init_other_hart, forbid hart: {}", forbid_hart_id);
-    for i in start_id..CPU_NUM {
-        if i != forbid_hart_id {
-            // info!("[init_other_hart] secondary addr: {:#x}", aux_core_func);
-            let result = hart_start(i, KERNEL_PHYS_ENTRY, 0);
-            if result.error != 0 {
-                println!(
-                    "[init_other_hart] error when waking {}, error code: {:?}",
-                    i,
-                    result.get_sbi_error()
-                );
-            }
-            info!("[init_other_hart] hart {:x} start successfully", i);
-        }
-    }
 }
