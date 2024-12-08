@@ -1,7 +1,6 @@
 //! memory management
 
 pub mod address;
-pub mod bss;
 mod frame;
 mod heap;
 pub mod map_area;

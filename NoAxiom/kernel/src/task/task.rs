@@ -167,6 +167,11 @@ impl Task {
         info!("[spawn] create a new task, tid {}", task.tid.0);
         task
     }
+
+    /// exit current task
+    pub fn exit(&self) {
+        self.set_status(TaskStatus::Zombie);
+    }
 }
 
 /// user task main

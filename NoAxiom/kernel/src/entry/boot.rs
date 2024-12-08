@@ -19,11 +19,10 @@ static PAGE_TABLE: [PageTableEntry; PTE_PER_PAGE] = {
             $(arr[$id] = PageTableEntry(($addr << 10) | 0xcf);)*
         };
     }
+    // va: 0x0000_0000_8000_0000 -> pa: 0x0000_0000_8000_0000
+    // va: 0xffff_fc00_8000_0000 -> pa: 0x0000_0000_8000_0000
     page_table_config! {
-        1, 0x40000
         2, 0x80000
-        0x100, 0x00000
-        0x101, 0x40000
         0x102, 0x80000
     };
     arr

@@ -2,7 +2,7 @@
 //! - [`spawn_raw`] to add a task
 //! - [`run`] to run next task
 
-use alloc::{collections::vec_deque::VecDeque, sync::Arc, vec::Vec};
+use alloc::{collections::vec_deque::VecDeque, sync::Arc};
 use core::future::Future;
 
 use async_task::{Builder, Runnable, ScheduleInfo, WithInfo};
@@ -26,15 +26,14 @@ impl TaskScheduleInfo {
 }
 
 struct Executor {
-    queue: Vec<VecDeque<Runnable<TaskScheduleInfo>>>,
+    queue: [VecDeque<Runnable<TaskScheduleInfo>>; MLFQ_LEVELS],
 }
 impl Executor {
     pub fn new() -> Self {
-        let mut vec = Vec::new();
-        for _ in 0..MLFQ_LEVELS {
-            vec.push(VecDeque::new());
+        const VEC_DEQUE: VecDeque<Runnable<TaskScheduleInfo>> = VecDeque::new();
+        Self {
+            queue: [VEC_DEQUE; MLFQ_LEVELS],
         }
-        Self { queue: vec }
     }
     fn push_back(&mut self, runnable: Runnable<TaskScheduleInfo>) {
         let level = runnable.metadata().prio();

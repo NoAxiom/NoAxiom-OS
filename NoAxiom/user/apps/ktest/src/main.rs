@@ -5,6 +5,6 @@ use userlib::println;
 
 #[no_mangle]
 fn main() -> i32 {
-    println!("[user] test for kernel ====================\n");
+    println!("[user] test for kernel\n");
     0
 }

@@ -1,11 +1,10 @@
 #![no_std]
 #![no_main]
 
-use userlib::{print, println};
+use userlib::println;
 
 #[no_mangle]
 fn main() -> i32 {
-    print!("initprocess\n");
-    println!("todo: initprocess");
+    println!("[user] initprocess has been booted!");
     0
 }
