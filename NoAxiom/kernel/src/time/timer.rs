@@ -1,5 +1,5 @@
 use super::gettime::get_time;
-use crate::{config::sched::TIME_SLICE_TICKS, cpu::get_hartid, driver::sbi::set_timer};
+use crate::{config::sched::TIME_SLICE_TICKS, driver::sbi::set_timer};
 
 /// set next timer interrupt by time_slice
 /// todo: add variable time slice

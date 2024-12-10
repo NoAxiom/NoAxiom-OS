@@ -2,15 +2,13 @@ use alloc::{sync::Arc, vec::Vec};
 
 use lazy_static::lazy_static;
 
-use super::{
-    address::PhysAddr, frame::frame_alloc, map_area::MapArea, page_table::PageTable, pte::PTEFlags,
-};
+use super::{address::PhysAddr, map_area::MapArea, page_table::PageTable};
 use crate::{
     config::mm::{KERNEL_VIRT_MEMORY_END, PAGE_SIZE, PAGE_WIDTH, USER_HEAP_SIZE, USER_STACK_SIZE},
     fs::File,
     map_permission,
     mm::{
-        address::{PhysPageNum, VirtAddr, VirtPageNum},
+        address::{VirtAddr, VirtPageNum},
         map_area::MapAreaType,
         permission::MapType,
     },

@@ -22,9 +22,7 @@ impl Cpu {
     }
     pub fn set_task(&mut self, task: &mut Arc<Task>) {
         set_next_trigger();
-        unsafe {
-            task.memory_activate();
-        }
+        unsafe { task.memory_activate() };
         self.task = Some(task.clone());
     }
 

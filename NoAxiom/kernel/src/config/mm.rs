@@ -81,5 +81,3 @@ mod sv48 {
 }
 #[cfg(feature = "sv48")]
 pub use sv48::*;
-
-use crate::utils::signed_extend;

@@ -7,6 +7,8 @@ use crate::{
 };
 
 /// addr type def
+/// note that the highter bits of pagenum isn't used and it can be any value
+/// but for address, it should be same as the highest bit of the valid address
 macro_rules! gen_new_type {
     ($name:ident) => {
         #[repr(C)]
@@ -31,7 +33,7 @@ macro_rules! impl_from_types {
 }
 impl_from_types!(PhysAddr, |x| x.0);
 impl_from_types!(PhysPageNum, |x| x.0);
-impl_from_types!(VirtPageNum, |x| signed_extend(x.0, VPN_WIDTH));
+impl_from_types!(VirtPageNum, |x| x.0);
 impl_from_types!(VirtAddr, |x| signed_extend(x.0, VA_WIDTH));
 
 /// usize -> addr
@@ -88,7 +90,6 @@ impl VirtPageNum {
     pub fn get_index(&self) -> [usize; INDEX_LEVELS] {
         let mut vpn = self.0;
         let mut idx = [0; INDEX_LEVELS];
-        // idx[0] = vpn[26, 18], idx[1] = vpn[17, 9], idx[2] = vpn[8, 0]
         for i in (0..INDEX_LEVELS).rev() {
             idx[i] = vpn & ((1 << PAGE_NUM_WIDTH) - 1);
             vpn >>= PAGE_NUM_WIDTH;
@@ -110,33 +111,49 @@ impl PhysAddr {
     pub fn is_aligned(&self) -> bool {
         self.offset() == 0
     }
-    pub fn as_ref<T>(&self) -> &'static T {
-        unsafe { (self.0 as *const T).as_ref().unwrap() }
+    /// SAFETY: only for kernel space
+    pub unsafe fn as_ref<T>(&self) -> &'static T {
+        unsafe {
+            ((self.0 | KERNEL_ADDR_OFFSET) as *const T)
+                .as_ref()
+                .unwrap()
+        }
     }
-    pub fn as_mut<T>(&self) -> &'static mut T {
-        unsafe { (self.0 as *mut T).as_mut().unwrap() }
+    /// SAFETY: only for kernel space
+    pub unsafe fn as_mut<T>(&self) -> &'static mut T {
+        unsafe { ((self.0 | KERNEL_ADDR_OFFSET) as *mut T).as_mut().unwrap() }
     }
 }
 
 /// physical page number
+/// SAFETY: be very careful if you want to convert pa into an ptr
+/// since the pa should be added KERNEL_ADDR_OFFSET to get the va
+/// all ptr conversion should only be used to fetch kernel address
+/// and in any conversion, the func should added KERNEL_ADDR_OFFSET to pa
 impl PhysPageNum {
     /// convert self into physical address
     pub fn into_pa(&self) -> PhysAddr {
         (*self).into()
     }
     /// get pte array from self pointing address
+    /// SAFETY: only for kernel space
     pub fn get_pte_array(&self) -> &'static mut [PageTableEntry] {
         unsafe {
-            core::slice::from_raw_parts_mut((self.into_pa().0 | KERNEL_ADDR_OFFSET) as *mut PageTableEntry, PTE_PER_PAGE)
+            core::slice::from_raw_parts_mut(
+                (self.into_pa().0 | KERNEL_ADDR_OFFSET) as *mut PageTableEntry,
+                PTE_PER_PAGE,
+            )
         }
     }
     /// get bytes array from self pointing address
+    /// SAFETY: only for kernel space
     pub fn get_bytes_array(&self) -> &'static mut [u8] {
-        unsafe { core::slice::from_raw_parts_mut((self.into_pa().0 | KERNEL_ADDR_OFFSET) as *mut u8, PAGE_SIZE) }
-    }
-    /// return self as a mut generic reference
-    pub fn as_mut<T>(&self) -> &'static mut T {
-        self.into_pa().as_mut()
+        unsafe {
+            core::slice::from_raw_parts_mut(
+                (self.into_pa().0 | KERNEL_ADDR_OFFSET) as *mut u8,
+                PAGE_SIZE,
+            )
+        }
     }
 }
 

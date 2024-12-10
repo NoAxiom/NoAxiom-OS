@@ -28,6 +28,7 @@ pub fn kernel_va_to_pa(virt: usize) -> usize {
 
 /// get current pc
 #[inline(always)]
+#[allow(unused)]
 pub fn current_pc() -> usize {
     let pc: usize;
     unsafe { core::arch::asm!("auipc {}, 0", out(reg) pc) }

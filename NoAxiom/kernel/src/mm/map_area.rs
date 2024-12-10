@@ -3,13 +3,13 @@
 use alloc::collections::btree_map::BTreeMap;
 
 use super::{
-    address::{PhysPageNum, VirtAddr, VirtPageNum, VpnRange},
+    address::{VirtAddr, VirtPageNum, VpnRange},
     frame::{frame_alloc, FrameTracker},
     page_table::PageTable,
     permission::{MapPermission, MapType},
     pte::PTEFlags,
 };
-use crate::{config::mm::{KERNEL_ADDR_OFFSET, PAGE_SIZE}, mm::address::StepOne};
+use crate::{config::mm::PAGE_SIZE, mm::address::StepOne};
 
 #[allow(unused)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
