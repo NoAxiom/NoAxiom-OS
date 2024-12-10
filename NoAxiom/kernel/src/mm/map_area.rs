@@ -3,13 +3,13 @@
 use alloc::collections::btree_map::BTreeMap;
 
 use super::{
-    address::{VirtAddr, VirtPageNum, VpnRange},
+    address::{PhysPageNum, VirtAddr, VirtPageNum, VpnRange},
     frame::{frame_alloc, FrameTracker},
     page_table::PageTable,
     permission::{MapPermission, MapType},
     pte::PTEFlags,
 };
-use crate::{config::mm::PAGE_SIZE, mm::address::StepOne};
+use crate::{config::mm::{KERNEL_ADDR_OFFSET, PAGE_SIZE}, mm::address::StepOne};
 
 #[allow(unused)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -104,6 +104,7 @@ impl MapArea {
                 for vpn in self.vpn_range.into_iter() {
                     // trace!("map_each: vpn = {:#x}", vpn.0);
                     let ppn = vpn.kernel_translate_into_ppn();
+                    // let ppn = PhysPageNum(vpn.0 - KERNEL_ADDR_OFFSET);
                     let flags = PTEFlags::from_bits(self.map_permission.bits()).unwrap();
                     page_table.map(vpn, ppn, flags);
                 }

@@ -19,7 +19,8 @@ export LOG ?= DEBUG
 
 
 # kernel config
-KERNEL_ELF := ./target/$(TARGET)/$(MODE)/$(KERNEL)
+KERNEL_O_PATH := ./target/$(TARGET)/$(MODE)
+KERNEL_ELF := $(KERNEL_O_PATH)/$(KERNEL)
 KERNEL_BIN := $(KERNEL_ELF).bin
 
 # TFTPBOOT := /work/tftpboot/
@@ -39,14 +40,22 @@ export WARN := "\e[33m"
 export NORMAL := "\e[32m"
 export RESET := "\e[0m"
 
-all: sbi-qemu run
+all: build_kernel run
 	@cp $(KERNEL_BIN) kernel-qemu
 
-build: 
-	@cd $(PROJECT)/user && make build
+build_kernel:
 	@cd $(PROJECT)/kernel && make build
 
-MULTICORE_ARGS := 2,cores=1,threads=1,sockets=2
+build:
+	@cd $(PROJECT)/kernel && make build
+	@cd $(PROJECT)/user && make build
+
+asm: # build_kernel
+	@echo -e "Building Kernel and Generating Assembly..."
+	@riscv64-unknown-elf-objdump -d $(KERNEL_ELF) > $(KERNEL_ELF).asm
+	@echo -e "Assembly saved to $(KERNEL_ELF).asm"
+
+MULTICORE_ARGS := 1 # ,cores=1,threads=1,sockets=2
 
 QFLAGS := 
 QFLAGS += -m 128
@@ -72,7 +81,7 @@ endif
 sbi-qemu:
 	@cp $(SBI) sbi-qemu
 
-run: sbi-qemu build # backup
+run: sbi-qemu
 	@cp $(KERNEL_BIN) kernel-qemu
 	qemu-system-riscv64 $(QFLAGS)
 # rm -f $(SDCARD_BAK)
@@ -92,12 +101,12 @@ run: sbi-qemu build # backup
 # gdb-server: build
 # 	qemu-system-riscv64 $(QEMU_ARGS) -s -S
 
-gdb-server: build
+gdb-server: build_kernel
 	qemu-system-riscv64 $(QFLAGS) -s -S
 
 
-# debug-client:
-# 	@riscv64-unknown-elf-gdb -ex 'file $(KERNEL_BIN)' -ex 'set arch riscv:rv64' -ex 'target remote localhost:1234'
+debug-client:
+	@riscv64-unknown-elf-gdb -ex 'file $(KERNEL_BIN)' -ex 'set arch riscv:rv64' -ex 'target remote localhost:1234'
 
 clean:
 	@rm -f kernel-qemu

@@ -3,15 +3,13 @@
 use alloc::sync::Arc;
 use core::sync::atomic::{AtomicIsize, Ordering};
 
-use riscv::register::sstatus::{self, SPP};
-
 use super::taskid::TidTracer;
 use crate::{
     fs::get_app_elf,
     mm::memory_set::MemorySet,
     sched::task_counter::task_count_dec,
     sync::{cell::SyncUnsafeCell, mutex::SpinMutex},
-    task::taskid::tid_alloc,
+    task::{load_app::get_app_len, taskid::tid_alloc},
     trap::{trap_restore, user_trap_handler, TrapContext},
 };
 
@@ -145,7 +143,7 @@ impl Task {
     pub async fn new_process(app_id: usize) -> Arc<Self> {
         trace!("[kernel] spawn new process from elf");
         let elf_file = Arc::new(get_app_elf(app_id)); // todo: now is read from static memory
-        let elf_memory_info = MemorySet::load_from_elf(elf_file).await;
+        let elf_memory_info = MemorySet::load_from_elf(elf_file, get_app_len(app_id)).await;
         let memory_set = elf_memory_info.memory_set;
         let elf_entry = elf_memory_info.elf_entry;
         let user_sp = elf_memory_info.user_sp;
@@ -183,7 +181,10 @@ pub async fn task_main(task: Arc<Task>) {
         // debug!("cx: {:?}", task.trap_context());
         // todo: is this necessary?
         if task.is_zombie() {
-            warn!("task {} is zombie, break", task.tid());
+            error!(
+                "task {} is set zombie before trap_handler, break",
+                task.tid()
+            );
             break;
         }
         // user -> kernel

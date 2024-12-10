@@ -31,7 +31,7 @@ macro_rules! impl_from_types {
 }
 impl_from_types!(PhysAddr, |x| x.0);
 impl_from_types!(PhysPageNum, |x| x.0);
-impl_from_types!(VirtPageNum, |x| x.0);
+impl_from_types!(VirtPageNum, |x| signed_extend(x.0, VPN_WIDTH));
 impl_from_types!(VirtAddr, |x| signed_extend(x.0, VA_WIDTH));
 
 /// usize -> addr
@@ -88,12 +88,14 @@ impl VirtPageNum {
     pub fn get_index(&self) -> [usize; INDEX_LEVELS] {
         let mut vpn = self.0;
         let mut idx = [0; INDEX_LEVELS];
+        // idx[0] = vpn[26, 18], idx[1] = vpn[17, 9], idx[2] = vpn[8, 0]
         for i in (0..INDEX_LEVELS).rev() {
             idx[i] = vpn & ((1 << PAGE_NUM_WIDTH) - 1);
             vpn >>= PAGE_NUM_WIDTH;
         }
         idx
     }
+    #[inline(always)]
     pub fn kernel_translate_into_ppn(&self) -> PhysPageNum {
         let pa = kernel_vpn_to_ppn(self.0);
         PhysPageNum::from(pa)
@@ -125,12 +127,12 @@ impl PhysPageNum {
     /// get pte array from self pointing address
     pub fn get_pte_array(&self) -> &'static mut [PageTableEntry] {
         unsafe {
-            core::slice::from_raw_parts_mut(self.into_pa().0 as *mut PageTableEntry, PTE_PER_PAGE)
+            core::slice::from_raw_parts_mut((self.into_pa().0 | KERNEL_ADDR_OFFSET) as *mut PageTableEntry, PTE_PER_PAGE)
         }
     }
     /// get bytes array from self pointing address
     pub fn get_bytes_array(&self) -> &'static mut [u8] {
-        unsafe { core::slice::from_raw_parts_mut(self.into_pa().0 as *mut u8, PAGE_SIZE) }
+        unsafe { core::slice::from_raw_parts_mut((self.into_pa().0 | KERNEL_ADDR_OFFSET) as *mut u8, PAGE_SIZE) }
     }
     /// return self as a mut generic reference
     pub fn as_mut<T>(&self) -> &'static mut T {
@@ -151,7 +153,7 @@ macro_rules! impl_mutual_convert {
         }
         impl From<$from> for $to {
             fn from(x: $from) -> Self {
-                assert!(x.is_aligned(), "addr {:?} is not an aligned page!", x);
+                assert!(x.is_aligned(), "addr {:#x} is not an aligned page!", x.0);
                 x.floor()
             }
         }
@@ -232,3 +234,46 @@ where
         }
     }
 }
+
+// #[allow(unused)]
+// pub fn kernel_address_test() {
+//     let va = VirtAddr(0x8000_0000);
+//     let pa = va.kernel_translate_into_pa();
+//     assert_eq!(pa.0, 0x0);
+
+//     let vpn = VirtPageNum(0x80000);
+//     let ppn = vpn.kernel_translate_into_ppn();
+//     assert_eq!(ppn.0, 0x0);
+
+//     let va = VirtAddr(0x8000_0000);
+//     let vpn: VirtPageNum = va.into();
+//     assert_eq!(vpn.0, 0x80000);
+
+//     let va = VirtAddr(0x8000_0000);
+//     let vpn = VirtPageNum::from(va);
+//     assert_eq!(vpn.0, 0x80000);
+
+//     let pa = PhysAddr(0x80000);
+//     let ppn: PhysPageNum = pa.into();
+//     assert_eq!(ppn.0, 0x80000);
+
+//     let pa = PhysAddr(0x80000);
+//     let ppn = PhysPageNum::from(pa);
+//     assert_eq!(ppn.0, 0x80000);
+
+//     let pa = PhysAddr(0x80000);
+//     let ppn = pa.floor();
+//     assert_eq!(ppn.0, 0x80000);
+
+//     let pa = PhysAddr(0x80000);
+//     let ppn: PhysPageNum = pa.into();
+//     assert_eq!(ppn.0, 0x8);
+
+//     let pa = PhysAddr(0x0);
+//     let ppn = PhysPageNum::from(pa);
+//     assert_eq!(ppn.0, 0x0);
+
+//     let vpn = VirtPageNum(0x8000_0000);
+//     let va = vpn.into_va();
+//     assert_eq!(va.0, 0x8000_0000);
+// }

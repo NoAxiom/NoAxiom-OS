@@ -1,5 +1,4 @@
 #![no_std]
-// #![no_main]
 #![feature(panic_info_message)]
 #![feature(alloc_error_handler)]
 #![feature(linkage)]
@@ -10,4 +9,4 @@ mod config;
 pub mod driver;
 mod entry;
 mod panic;
-mod syscall;
+pub mod syscall;

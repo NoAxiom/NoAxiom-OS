@@ -14,6 +14,10 @@ pub fn mm_init() {
     heap::init();
 }
 
+pub fn hart_mm_init() {
+    unsafe { memory_set::KERNEL_SPACE.lock().activate() };
+}
+
 /// returns pte flags with multiple flag bits
 #[macro_export]
 macro_rules! pte_flags {

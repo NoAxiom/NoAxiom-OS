@@ -1,8 +1,12 @@
 // ! log
 
+use core::sync::atomic::{AtomicBool, Ordering};
+
 use log::{self, Level, LevelFilter, Log, Metadata, Record};
 
-use crate::println;
+use crate::{cpu::get_hartid, println};
+
+pub static mut LOG_BOOTED : AtomicBool = AtomicBool::new(false);
 
 struct SimpleLogger;
 
@@ -11,6 +15,9 @@ impl Log for SimpleLogger {
         true
     }
     fn log(&self, record: &Record) {
+        if !unsafe { LOG_BOOTED.load(Ordering::SeqCst) } {
+            return;
+        }
         if !self.enabled(record.metadata()) {
             return;
         }
@@ -22,9 +29,10 @@ impl Log for SimpleLogger {
             Level::Trace => 90, // BrightBlack
         };
         println!(
-            "\u{1B}[{}m[{:>5}] {}\u{1B}[0m",
+            "\u{1B}[{}m[{:>5}, HART{}] {}\u{1B}[0m",
             color,
             record.level(),
+            get_hartid(),
             record.args(),
         );
     }
@@ -42,4 +50,5 @@ pub fn log_init() {
         Some("TRACE") => LevelFilter::Trace,
         _ => LevelFilter::Off,
     });
+    unsafe { LOG_BOOTED.store(true, Ordering::SeqCst) };
 }

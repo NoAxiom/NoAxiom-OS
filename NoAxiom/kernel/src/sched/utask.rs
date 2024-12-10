@@ -6,7 +6,6 @@ use alloc::sync::Arc;
 use core::{
     future::Future,
     pin::Pin,
-    sync::atomic::AtomicUsize,
     task::{Context, Poll},
 };
 
@@ -28,28 +27,19 @@ impl<F: Future + Send + 'static> UserTaskFuture<F> {
     }
 }
 
-static mut COUNTER_BEFORE: AtomicUsize = AtomicUsize::new(0);
-static mut COUNTER_AFTER: AtomicUsize = AtomicUsize::new(0);
 impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
     type Output = F::Output;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        // unsafe {
-        //     COUNTER_BEFORE.fetch_add(1, core::sync::atomic::Ordering::SeqCst);
-        // }
         let this = unsafe { self.get_unchecked_mut() };
         let p = current_cpu();
+        // let current_tid = this.task.tid();
+        // debug!("[UserTaskFuture::poll] push_task, tid: {}", current_tid);
         p.set_task(&mut this.task);
+        // debug!("[UserTaskFuture::poll] push_task done");
         let ret = unsafe { Pin::new_unchecked(&mut this.future).poll(cx) };
         p.clear_task();
-        // unsafe {
-        //     COUNTER_AFTER.fetch_add(1, core::sync::atomic::Ordering::SeqCst);
-        // }
-        // debug!(
-        //     "yield or exit, hart: {}, tid: {}",
-        //     get_hartid(),
-        //     this.task.tid()
-        // );
+        // debug!("pop_task, tid: {}", current_tid);
         ret
     }
 }
@@ -70,15 +60,4 @@ pub fn schedule_spawn_new_process(path: usize) {
         },
         Arc::new(SyncUnsafeCell::new(0)),
     );
-}
-
-#[allow(unused)]
-pub fn print_counter() {
-    unsafe {
-        debug!(
-            "task future counter: before: {}, after: {}",
-            COUNTER_BEFORE.load(core::sync::atomic::Ordering::SeqCst),
-            COUNTER_AFTER.load(core::sync::atomic::Ordering::SeqCst)
-        );
-    }
 }

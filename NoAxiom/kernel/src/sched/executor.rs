@@ -92,7 +92,9 @@ where
 pub fn run() {
     // spin until find a valid task
     loop {
-        let runnable = EXECUTOR.lock().pop_front();
+        let mut guard = EXECUTOR.lock();
+        let runnable = guard.pop_front();
+        drop(guard);
         if let Some(runnable) = runnable {
             runnable.run();
             break;

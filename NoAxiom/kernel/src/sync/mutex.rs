@@ -68,22 +68,25 @@ impl LockAction for KernelLockAction {
 
 /// disable interrupt
 pub(crate) fn push_off() {
-    let old = is_interrupt_enabled();
-    disable_global_interrupt();
-    let mut cpu = current_cpu();
-    if cpu.push_off_depth == 0 {
-        cpu.interrupt_enable = old;
-    }
-    cpu.push_off_depth += 1;
+    assert!(!is_interrupt_enabled());
+    // debug!("push_off");
+    // let old = is_interrupt_enabled();
+    // disable_global_interrupt();
+    // let mut cpu = current_cpu();
+    // if cpu.push_off_depth == 0 {
+    //     cpu.interrupt_enable = old;
+    // }
+    // cpu.push_off_depth += 1;
 }
 
 /// enable interrupt if depth decline to 0
 pub(crate) fn pop_off() {
-    let mut cpu = current_cpu();
-    cpu.push_off_depth -= 1;
-    let should_enable = cpu.push_off_depth == 0 && cpu.interrupt_enable;
-    drop(cpu); // drop before int_en
-    if should_enable {
-        enable_global_interrupt();
-    }
+    // debug!("pop_off");
+    // let mut cpu = current_cpu();
+    // cpu.push_off_depth -= 1;
+    // let should_enable = cpu.push_off_depth == 0 && cpu.interrupt_enable;
+    // drop(cpu); // drop before int_en
+    // if should_enable {
+    //     enable_global_interrupt();
+    // }
 }

@@ -3,12 +3,13 @@
     .section .data
     .global _num_app
 _num_app:
-    .quad 4
+    .quad 5
     .quad app_0_start
     .quad app_1_start
     .quad app_2_start
     .quad app_3_start
-    .quad app_3_end
+    .quad app_4_start
+    .quad app_4_end
 
     .global _app_names
 _app_names:
@@ -16,6 +17,7 @@ _app_names:
     .string "initprocess"
     .string "ktest"
     .string "long_loop"
+    .string "process_test"
 
     .section .data
     .global app_0_start
@@ -48,3 +50,11 @@ app_2_end:
 app_3_start:
     .incbin "./NoAxiom/user/bin/long_loop"
 app_3_end:
+
+    .section .data
+    .global app_4_start
+    .global app_4_end
+    .align 3
+app_4_start:
+    .incbin "./NoAxiom/user/bin/process_test"
+app_4_end:

@@ -2,6 +2,8 @@ use alloc::sync::Arc;
 
 use crate::{constant::register::*, task::Task, trap::TrapContext};
 
+mod fs;
+mod process;
 mod syscall;
 
 pub async fn syscall(task: &Arc<Task>, cx: &mut TrapContext) -> isize {

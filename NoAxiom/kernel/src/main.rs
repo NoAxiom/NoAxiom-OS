@@ -15,6 +15,9 @@
 // #![feature(custom_mir)]
 // #![feature(core_intrinsics)]
 
+use mm::{hart_mm_init, memory_set::remap_test};
+use trap::trap_init;
+
 #[macro_use]
 extern crate alloc;
 #[macro_use]
@@ -43,6 +46,8 @@ core::arch::global_asm!(include_str!("link_apps.S"));
 /// called by [`entry::init::boot_hart_init`]
 #[no_mangle]
 pub fn rust_main() {
+    trap_init();
+    hart_mm_init();
     trace!("token {:#x}", crate::mm::page_table::current_token());
     info!("[kernel] hart id {} has been booted", cpu::get_hartid());
     loop {

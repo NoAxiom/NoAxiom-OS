@@ -22,10 +22,10 @@ pub const USER_HEAP_SIZE: usize = 4096 * 2;
 /// kernel address offset from phys to virt
 pub const KERNEL_ADDR_OFFSET: usize = 0xffff_ffc0_0000_0000;
 /// kernle pagenum offset from phys to virt
-pub const KERNEL_PAGENUM_OFFSET: usize = KERNEL_ADDR_OFFSET >> PAGE_WIDTH;
+pub const KERNEL_PAGENUM_MASK: usize = 0xffff_ffff_fc00_0000;
 
-/// kernel phys memory start address
-pub const KERNEL_PHYS_ENTRY: usize = 0x8020_0000;
+// /// kernel phys memory start address
+// pub const KERNEL_PHYS_ENTRY: usize = 0x8020_0000;
 // /// kernel virt memory start address
 // pub const KERNEL_VIRT_ENTRY: usize = KERNEL_ADDR_OFFSET | KERNEL_PHYS_ENTRY;
 
@@ -81,3 +81,5 @@ mod sv48 {
 }
 #[cfg(feature = "sv48")]
 pub use sv48::*;
+
+use crate::utils::signed_extend;

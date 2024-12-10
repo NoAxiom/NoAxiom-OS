@@ -95,7 +95,7 @@ lazy_static! {
 }
 
 pub fn frame_alloc() -> Option<FrameTracker> {
-    FRAME_ALLOCATOR.lock().alloc().map(FrameTracker::new)
+    FRAME_ALLOCATOR.lock().alloc().map(|x| FrameTracker::new(x))
 }
 
 pub fn frame_dealloc(ppn: PhysPageNum) {

@@ -6,11 +6,11 @@ use crate::{config::sched::TIME_SLICE_TICKS, cpu::get_hartid, driver::sbi::set_t
 pub fn set_next_trigger() {
     // let current_time = get_time();
     // current_cpu().set_time(current_time);
-    trace!(
-        "[set_next_trigger] hart: {}, cur: {}, to: {}",
-        get_hartid(),
-        get_time(),
-        (get_time() + TIME_SLICE_TICKS) as u64
-    );
+    // debug!(
+    //     "[set_next_trigger] hart: {}, cur: {}, to: {}",
+    //     get_hartid(),
+    //     get_time(),
+    //     (get_time() + TIME_SLICE_TICKS) as u64
+    // );
     set_timer((get_time() + TIME_SLICE_TICKS) as u64);
 }
