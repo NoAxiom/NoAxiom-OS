@@ -8,7 +8,7 @@ use riscv::register::{
 
 use super::context::TrapContext;
 use crate::{
-    arch::interrupt::{enable_external_interrupt, enable_stimer_interrupt, is_interrupt_enabled}, mm::memory_set::KERNEL_SPACE, println, task::Task, utils::current_pc
+    arch::interrupt::{enable_external_interrupt, enable_stimer_interrupt, is_interrupt_enabled}, println, task::Task, utils::current_pc
 };
 
 global_asm!(include_str!("./trap.S"));

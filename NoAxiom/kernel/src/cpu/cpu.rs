@@ -1,11 +1,8 @@
 use alloc::sync::Arc;
 
 use crate::{
-    config::arch::CPU_NUM,
-    mm::memory_set::{kernel_space_activate, KERNEL_SPACE},
-    sync::cell::SyncUnsafeCell,
-    task::Task,
-    time::timer::set_next_trigger,
+    config::arch::CPU_NUM, mm::memory_set::kernel_space_activate, sync::cell::SyncUnsafeCell,
+    task::Task, time::timer::set_next_trigger,
 };
 
 #[inline(always)]

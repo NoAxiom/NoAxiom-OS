@@ -7,10 +7,9 @@ use super::taskid::TidTracer;
 use crate::{
     fs::get_app_elf,
     mm::memory_set::MemorySet,
-    sched::task_counter::task_count_dec,
     sync::{cell::SyncUnsafeCell, mutex::SpinMutex},
     task::{load_app::get_app_len, taskid::tid_alloc},
-    trap::{trap_restore, user_trap_handler, TrapContext},
+    trap::TrapContext,
 };
 
 #[derive(Debug, PartialEq, Clone, Copy)]

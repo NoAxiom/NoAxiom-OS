@@ -23,7 +23,7 @@ pub fn kernel_va_to_pa(virt: usize) -> usize {
         (virt & KERNEL_ADDR_OFFSET) == KERNEL_ADDR_OFFSET,
         "invalid kernel virt address"
     );
-    virt - KERNEL_ADDR_OFFSET // FIXME: use &
+    virt & !KERNEL_ADDR_OFFSET
 }
 
 /// get current pc
