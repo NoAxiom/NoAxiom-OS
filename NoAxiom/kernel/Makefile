@@ -12,7 +12,7 @@ FEATURES :=
 # feature flags
 
 # arch, multicore config is passed from ../makefile
-MULTICORE :=
+MULTICORE := 1
 SV39 := 1
 
 # platform

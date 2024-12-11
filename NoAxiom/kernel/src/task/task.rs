@@ -171,25 +171,3 @@ impl Task {
         self.set_status(TaskStatus::Zombie);
     }
 }
-
-/// user task main
-pub async fn task_main(task: Arc<Task>) {
-    while !task.is_zombie() {
-        // kernel -> user
-        trace!("[task_main] trap_restore");
-        trap_restore(&task);
-        // debug!("cx: {:?}", task.trap_context());
-        // todo: is this necessary?
-        if task.is_zombie() {
-            error!(
-                "task {} is set zombie before trap_handler, break",
-                task.tid()
-            );
-            break;
-        }
-        // user -> kernel
-        trace!("[task_main] user_trap_handler");
-        user_trap_handler(&task).await;
-    }
-    task_count_dec();
-}

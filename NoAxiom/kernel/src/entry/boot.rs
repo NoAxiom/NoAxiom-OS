@@ -25,11 +25,11 @@ static PAGE_TABLE: [PageTableEntry; PTE_PER_PAGE] = {
         // 0, 0x00000
         // 1, 0x40000
         2, 0x80000
-        3, 0xc0000
+        // 3, 0xc0000
         // 0x100, 0x00000
         // 0x101, 0x40000
         0x102, 0x80000
-        0x103, 0xc0000
+        // 0x103, 0xc0000
     };
     arr
 };

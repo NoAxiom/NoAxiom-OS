@@ -9,11 +9,15 @@ use core::{
     task::{Context, Poll},
 };
 
-use super::{executor::spawn_raw, task_counter::task_count_inc};
+use super::{
+    executor::spawn_raw,
+    task_counter::{task_count_dec, task_count_inc},
+};
 use crate::{
     cpu::current_cpu,
     sync::cell::SyncUnsafeCell,
-    task::{task_main, Task},
+    task::Task,
+    trap::{trap_restore, user_trap_handler},
 };
 
 pub struct UserTaskFuture<F: Future + Send + 'static> {
@@ -33,13 +37,13 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = unsafe { self.get_unchecked_mut() };
         let p = current_cpu();
-        // let current_tid = this.task.tid();
-        // debug!("[UserTaskFuture::poll] push_task, tid: {}", current_tid);
+        let current_tid = this.task.tid();
+        trace!("[UserTaskFuture::poll] push_task, tid: {}", current_tid);
         p.set_task(&mut this.task);
         // debug!("[UserTaskFuture::poll] push_task done");
         let ret = unsafe { Pin::new_unchecked(&mut this.future).poll(cx) };
         p.clear_task();
-        // debug!("pop_task, tid: {}", current_tid);
+        trace!("[UserTaskFuture::poll] pop_task, tid: {}", current_tid);
         ret
     }
 }
@@ -60,4 +64,26 @@ pub fn schedule_spawn_new_process(path: usize) {
         },
         Arc::new(SyncUnsafeCell::new(0)),
     );
+}
+
+/// user task main
+pub async fn task_main(task: Arc<Task>) {
+    while !task.is_zombie() {
+        // kernel -> user
+        trace!("[task_main] trap_restore");
+        trap_restore(&task);
+        // debug!("cx: {:?}", task.trap_context());
+        // todo: is this necessary?
+        if task.is_zombie() {
+            error!(
+                "task {} is set zombie before trap_handler, break",
+                task.tid()
+            );
+            break;
+        }
+        // user -> kernel
+        trace!("[task_main] user_trap_handler");
+        user_trap_handler(&task).await;
+    }
+    task_count_dec();
 }

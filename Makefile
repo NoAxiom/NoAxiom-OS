@@ -55,7 +55,7 @@ asm: # build_kernel
 	@riscv64-unknown-elf-objdump -d $(KERNEL_ELF) > $(KERNEL_ELF).asm
 	@echo -e "Assembly saved to $(KERNEL_ELF).asm"
 
-MULTICORE_ARGS := 1 # ,cores=1,threads=1,sockets=2
+MULTICORE_ARGS := 2 # ,cores=1,threads=1,sockets=2
 
 QFLAGS := 
 QFLAGS += -m 128

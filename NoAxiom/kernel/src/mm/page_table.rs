@@ -241,7 +241,6 @@ impl PageTable {
     pub unsafe fn activate(&self) {
         let satp: usize = self.token();
         unsafe {
-            // asm!("sfence.vma");
             satp::write(satp);
             asm!("sfence.vma");
         }

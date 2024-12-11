@@ -8,9 +8,7 @@ use riscv::register::{
 
 use super::context::TrapContext;
 use crate::{
-    arch::interrupt::{enable_external_interrupt, enable_stimer_interrupt, is_interrupt_enabled},
-    println,
-    task::Task,
+    arch::interrupt::{enable_external_interrupt, enable_stimer_interrupt, is_interrupt_enabled}, mm::memory_set::KERNEL_SPACE, println, task::Task, utils::current_pc
 };
 
 global_asm!(include_str!("./trap.S"));
@@ -48,7 +46,7 @@ pub fn trap_restore(task: &Arc<Task>) {
     set_user_trap_entry();
     let cx = task.trap_context_mut();
     trace!(
-        "trap_restore: tid {}, sepc {:#x}, sp {:#x}",
+        "[trap_restore] tid {}, sepc {:#x}, sp {:#x}",
         task.tid(),
         cx.sepc,
         cx.user_reg[2]
@@ -57,6 +55,11 @@ pub fn trap_restore(task: &Arc<Task>) {
     unsafe {
         user_trapret(task.trap_context_mut());
     }
+    trace!(
+        "[trap_restore] back to kernel, current_pc: {:#x}, inst: {:#x}",
+        current_pc(),
+        unsafe { *(current_pc() as *const u32) },
+    );
 }
 
 /// debug: show sstatus

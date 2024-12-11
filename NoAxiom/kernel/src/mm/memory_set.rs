@@ -1,6 +1,11 @@
 use alloc::{sync::Arc, vec::Vec};
+use core::{
+    arch::asm,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
 use lazy_static::lazy_static;
+use riscv::register::satp;
 
 use super::{address::PhysAddr, map_area::MapArea, page_table::PageTable};
 use crate::{
@@ -30,6 +35,17 @@ extern "C" {
 lazy_static! {
     pub static ref KERNEL_SPACE: SpinMutex<MemorySet> =
         SpinMutex::new(MemorySet::init_kernel_space());
+}
+
+/// lazily initialized kernel space token
+/// please assure it's initialized before any user space token
+pub static KERNEL_SPACE_TOKEN: AtomicUsize = AtomicUsize::new(0);
+
+pub unsafe fn kernel_space_activate() {
+    unsafe {
+        satp::write(KERNEL_SPACE_TOKEN.load(Ordering::Relaxed));
+        asm!("sfence.vma");
+    }
 }
 
 /// elf load result
@@ -150,19 +166,21 @@ impl MemorySet {
             "[kernel]physical mem [{:#x}, {:#x})",
             ekernel as usize, KERNEL_VIRT_MEMORY_END as usize
         );
+        KERNEL_SPACE_TOKEN.store(memory_set.token(), Ordering::Relaxed);
         memory_set
     }
 
     /// create a new memory set with kernel space mapped,
     pub fn new_with_kernel() -> Self {
         let mut memory_set = Self::new_bare();
-        let kernel_space = KERNEL_SPACE.lock();
-        memory_set.page_table = PageTable::clone_from_other(&kernel_space.page_table);
+        memory_set.page_table = PageTable::clone_from_other(&KERNEL_SPACE.lock().page_table);
+        // let kernel_space = KERNEL_SPACE.lock();
         // let mut new_page_table = PageTable::new();
         // for area in kernel_space.areas.iter() {
-        //     let pte_flags = PTEFlags::from_bits(area.map_permission.bits()).unwrap();
+        //     let pte_flags =
+        // super::pte::PTEFlags::from_bits(area.map_permission.bits()).unwrap();
         //     for vpn in area.vpn_range {
-        //         let ppn: PhysPageNum =
+        //         let ppn: super::address::PhysPageNum =
         // kernel_space.translate_va(vpn.into()).unwrap().into();
         //         new_page_table.map(vpn, ppn, pte_flags);
         //     }

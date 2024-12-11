@@ -19,8 +19,7 @@ pub fn kernel_trap_handler() {
     let stval = stval::read();
     let sepc = sepc::read();
     panic!(
-        "kernel trap!!! hart: {}, trap {:?} is unsupported, stval = {:#x}, error pc = {:#x}",
-        get_hartid(),
+        "kernel trap!!! trap {:?} is unsupported, stval = {:#x}, error pc = {:#x}",
         scause.cause(),
         stval,
         sepc,
@@ -35,11 +34,13 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
     let mut cx = task.trap_context_mut();
     let scause = scause::read();
     let stval = stval::read();
+    trace!("[trap_handler] handle begin, scause: {:?}, stval: {:#x}", scause.cause(), stval);
     match scause.cause() {
         // syscall
         Trap::Exception(exception) => match exception {
             Exception::UserEnvCall => {
                 cx.sepc += 4;
+                trace!("[syscall] doing syscall");
                 let result = syscall(task, cx).await;
                 trace!("[syscall] done! result {:#x}", result);
                 cx = task.trap_context_mut();
