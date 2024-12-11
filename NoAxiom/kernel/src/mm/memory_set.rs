@@ -173,20 +173,20 @@ impl MemorySet {
     /// create a new memory set with kernel space mapped,
     pub fn new_with_kernel() -> Self {
         let mut memory_set = Self::new_bare();
-        memory_set.page_table = PageTable::clone_from_other(&KERNEL_SPACE.lock().page_table);
-        // let kernel_space = KERNEL_SPACE.lock();
-        // let mut new_page_table = PageTable::new();
-        // for area in kernel_space.areas.iter() {
-        //     let pte_flags =
-        // super::pte::PTEFlags::from_bits(area.map_permission.bits()).unwrap();
-        //     for vpn in area.vpn_range {
-        //         let ppn: super::address::PhysPageNum =
-        // kernel_space.translate_va(vpn.into()).unwrap().into();
-        //         new_page_table.map(vpn, ppn, pte_flags);
-        //     }
-        // }
-        // memory_set.page_table = new_page_table;
-        // drop(kernel_space);
+        // memory_set.page_table =
+        // PageTable::clone_from_other(&KERNEL_SPACE.lock().page_table);
+        let kernel_space = KERNEL_SPACE.lock();
+        let mut new_page_table = PageTable::new();
+        for area in kernel_space.areas.iter() {
+            let pte_flags = super::pte::PTEFlags::from_bits(area.map_permission.bits()).unwrap();
+            for vpn in area.vpn_range {
+                let ppn: super::address::PhysPageNum =
+                    kernel_space.translate_va(vpn.into()).unwrap().into();
+                new_page_table.map(vpn, ppn, pte_flags);
+            }
+        }
+        memory_set.page_table = new_page_table;
+        drop(kernel_space);
         memory_set
     }
 
