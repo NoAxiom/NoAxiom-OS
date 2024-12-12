@@ -39,11 +39,14 @@ mod utils;
 
 core::arch::global_asm!(include_str!("link_apps.S"));
 
-/// boot a hardware thread
-/// called by [`entry::init`]
+/// rust_main: only act as a task runner
+/// called by [`entry::init::boot_hart_init`]
 #[no_mangle]
 pub fn rust_main() {
-    println!("[kernel] hart id {} has been booted", cpu::hartid());
+    trap::trap_init();
+    mm::hart_mm_init();
+    trace!("token {:#x}", crate::mm::page_table::current_token());
+    info!("[kernel] hart id {} has been booted", cpu::get_hartid());
     loop {
         sched::run();
     }

@@ -7,6 +7,8 @@ use crate::{
 };
 
 /// addr type def
+/// note that the highter bits of pagenum isn't used and it can be any value
+/// but for address, it should be same as the highest bit of the valid address
 macro_rules! gen_new_type {
     ($name:ident) => {
         #[repr(C)]
@@ -94,6 +96,7 @@ impl VirtPageNum {
         }
         idx
     }
+    #[inline(always)]
     pub fn kernel_translate_into_ppn(&self) -> PhysPageNum {
         let pa = kernel_vpn_to_ppn(self.0);
         PhysPageNum::from(pa)
@@ -108,33 +111,49 @@ impl PhysAddr {
     pub fn is_aligned(&self) -> bool {
         self.offset() == 0
     }
-    pub fn as_ref<T>(&self) -> &'static T {
-        unsafe { (self.0 as *const T).as_ref().unwrap() }
+    /// SAFETY: only for kernel space
+    pub unsafe fn as_ref<T>(&self) -> &'static T {
+        unsafe {
+            ((self.0 | KERNEL_ADDR_OFFSET) as *const T)
+                .as_ref()
+                .unwrap()
+        }
     }
-    pub fn as_mut<T>(&self) -> &'static mut T {
-        unsafe { (self.0 as *mut T).as_mut().unwrap() }
+    /// SAFETY: only for kernel space
+    pub unsafe fn as_mut<T>(&self) -> &'static mut T {
+        unsafe { ((self.0 | KERNEL_ADDR_OFFSET) as *mut T).as_mut().unwrap() }
     }
 }
 
 /// physical page number
+/// SAFETY: be very careful if you want to convert pa into an ptr
+/// since the pa should be added KERNEL_ADDR_OFFSET to get the va
+/// all ptr conversion should only be used to fetch kernel address
+/// and in any conversion, the func should added KERNEL_ADDR_OFFSET to pa
 impl PhysPageNum {
     /// convert self into physical address
     pub fn into_pa(&self) -> PhysAddr {
         (*self).into()
     }
     /// get pte array from self pointing address
+    /// SAFETY: only for kernel space
     pub fn get_pte_array(&self) -> &'static mut [PageTableEntry] {
         unsafe {
-            core::slice::from_raw_parts_mut(self.into_pa().0 as *mut PageTableEntry, PTE_PER_PAGE)
+            core::slice::from_raw_parts_mut(
+                (self.into_pa().0 | KERNEL_ADDR_OFFSET) as *mut PageTableEntry,
+                PTE_PER_PAGE,
+            )
         }
     }
     /// get bytes array from self pointing address
+    /// SAFETY: only for kernel space
     pub fn get_bytes_array(&self) -> &'static mut [u8] {
-        unsafe { core::slice::from_raw_parts_mut(self.into_pa().0 as *mut u8, PAGE_SIZE) }
-    }
-    /// return self as a mut generic reference
-    pub fn as_mut<T>(&self) -> &'static mut T {
-        self.into_pa().as_mut()
+        unsafe {
+            core::slice::from_raw_parts_mut(
+                (self.into_pa().0 | KERNEL_ADDR_OFFSET) as *mut u8,
+                PAGE_SIZE,
+            )
+        }
     }
 }
 
@@ -151,7 +170,7 @@ macro_rules! impl_mutual_convert {
         }
         impl From<$from> for $to {
             fn from(x: $from) -> Self {
-                assert!(x.is_aligned(), "addr {:?} is not an aligned page!", x);
+                assert!(x.is_aligned(), "addr {:#x} is not an aligned page!", x.0);
                 x.floor()
             }
         }
@@ -232,3 +251,46 @@ where
         }
     }
 }
+
+// #[allow(unused)]
+// pub fn kernel_address_test() {
+//     let va = VirtAddr(0x8000_0000);
+//     let pa = va.kernel_translate_into_pa();
+//     assert_eq!(pa.0, 0x0);
+
+//     let vpn = VirtPageNum(0x80000);
+//     let ppn = vpn.kernel_translate_into_ppn();
+//     assert_eq!(ppn.0, 0x0);
+
+//     let va = VirtAddr(0x8000_0000);
+//     let vpn: VirtPageNum = va.into();
+//     assert_eq!(vpn.0, 0x80000);
+
+//     let va = VirtAddr(0x8000_0000);
+//     let vpn = VirtPageNum::from(va);
+//     assert_eq!(vpn.0, 0x80000);
+
+//     let pa = PhysAddr(0x80000);
+//     let ppn: PhysPageNum = pa.into();
+//     assert_eq!(ppn.0, 0x80000);
+
+//     let pa = PhysAddr(0x80000);
+//     let ppn = PhysPageNum::from(pa);
+//     assert_eq!(ppn.0, 0x80000);
+
+//     let pa = PhysAddr(0x80000);
+//     let ppn = pa.floor();
+//     assert_eq!(ppn.0, 0x80000);
+
+//     let pa = PhysAddr(0x80000);
+//     let ppn: PhysPageNum = pa.into();
+//     assert_eq!(ppn.0, 0x8);
+
+//     let pa = PhysAddr(0x0);
+//     let ppn = PhysPageNum::from(pa);
+//     assert_eq!(ppn.0, 0x0);
+
+//     let vpn = VirtPageNum(0x8000_0000);
+//     let va = vpn.into_va();
+//     assert_eq!(va.0, 0x8000_0000);
+// }

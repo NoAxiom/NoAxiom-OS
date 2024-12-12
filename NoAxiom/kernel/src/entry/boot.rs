@@ -2,14 +2,12 @@ use core::arch::asm;
 
 use crate::{
     config::{arch::CPU_NUM, mm::*},
-    driver::sbi::hart_start,
     mm::pte::PageTableEntry,
-    println,
 };
 
 /// temp stack for kernel booting
-#[link_section = ".bss.stack"]
-static BOOT_STACK: [u8; BOOT_STACK_SIZE * CPU_NUM] = [0; BOOT_STACK_SIZE * CPU_NUM];
+#[link_section = ".bss.kstack"]
+static BOOT_STACK: [u8; KERNEL_STACK_SIZE * CPU_NUM] = [0; KERNEL_STACK_SIZE * CPU_NUM];
 
 /// temp page table for kernel booting, hard linked
 #[link_section = ".data.prepage"]
@@ -21,12 +19,17 @@ static PAGE_TABLE: [PageTableEntry; PTE_PER_PAGE] = {
             $(arr[$id] = PageTableEntry(($addr << 10) | 0xcf);)*
         };
     }
+    // va: 0x0000_0000_8000_0000 -> pa: 0x0000_0000_8000_0000
+    // va: 0xffff_fc00_8000_0000 -> pa: 0x0000_0000_8000_0000
     page_table_config! {
-        1, 0x40000
+        // 0, 0x00000
+        // 1, 0x40000
         2, 0x80000
-        0x100, 0x00000
-        0x101, 0x40000
+        // 3, 0xc0000
+        // 0x100, 0x00000
+        // 0x101, 0x40000
         0x102, 0x80000
+        // 0x103, 0xc0000
     };
     arr
 };
@@ -35,13 +38,13 @@ static PAGE_TABLE: [PageTableEntry; PTE_PER_PAGE] = {
 #[naked]
 #[no_mangle]
 #[link_section = ".text.entry"]
-unsafe extern "C" fn _entry() -> ! {
+pub unsafe extern "C" fn _entry() -> ! {
     asm!("
             mv      tp, a0
 
             mv      gp, a1
             add     t0, a0, 1
-            slli    t0, t0, {kernel_stack_size}
+            slli    t0, t0, {kernel_stack_shift}
             la      sp, {boot_stack}
             add     sp, sp, t0
 
@@ -68,36 +71,49 @@ unsafe extern "C" fn _entry() -> ! {
         page_table = sym PAGE_TABLE,
         boot_stack = sym BOOT_STACK,
         kernel_addr_offset = const KERNEL_ADDR_OFFSET,
-        kernel_stack_size = const BOOT_STACK_WIDTH,
-        entry = sym super::init::init,
+        kernel_stack_shift = const KERNEL_STACK_WIDTH,
+        entry = sym super::init::boot_hart_init,
         options(noreturn),
     )
 }
 
-/// awake other core
-#[allow(unused)]
-pub fn init_other_hart(forbid_hart_id: usize) {
-    // let aux_core_func = (other_hart_entry as usize) & (!KERNEL_ADDR_OFFSET);
-    // println!("aux_core_func: {:#x}", aux_core_func);
+#[naked]
+#[no_mangle]
+pub unsafe extern "C" fn _entry_other_hart() -> ! {
+    asm!("
+            mv      tp, a0
 
-    let start_id = 0;
-    // there's no need to wake hart 0 on vf2 platform
-    #[cfg(feature = "vf2")]
-    let start_id = 1;
+            mv      gp, a1
+            add     t0, a0, 1
+            slli    t0, t0, {kernel_stack_shift}
+            la      sp, {boot_stack}
+            add     sp, sp, t0
 
-    info!("init_other_hart, forbid hart: {}", forbid_hart_id);
-    for i in start_id..CPU_NUM {
-        if i != forbid_hart_id {
-            // info!("[init_other_hart] secondary addr: {:#x}", aux_core_func);
-            let result = hart_start(i, KERNEL_PHYS_ENTRY, 0);
-            if result.error != 0 {
-                println!(
-                    "[init_other_hart] error when waking {}, error code: {:?}",
-                    i,
-                    result.get_sbi_error()
-                );
-            }
-            info!("[init_other_hart] hart {:x} start successfully", i);
-        }
-    }
+            li      s0, {kernel_addr_offset}
+            or      sp, sp, s0
+
+            // activate page table
+            la      t0, {page_table}
+            srli    t0, t0, 12
+            li      t1, 8 << 60
+            or      t0, t0, t1
+            csrw    satp, t0
+            sfence.vma
+
+            li      t1, {kernel_addr_offset}
+            or      gp, gp, t1
+
+            mv      a1, gp
+            la      t0, {entry}
+            or      t0, t0, t1
+            mv      a0, tp
+            jalr    t0
+        ",
+        page_table = sym PAGE_TABLE,
+        boot_stack = sym BOOT_STACK,
+        kernel_addr_offset = const KERNEL_ADDR_OFFSET,
+        kernel_stack_shift = const KERNEL_STACK_WIDTH,
+        entry = sym super::init::other_hart_init,
+        options(noreturn),
+    )
 }

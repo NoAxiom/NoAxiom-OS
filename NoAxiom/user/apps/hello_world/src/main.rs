@@ -1,10 +1,10 @@
 #![no_std]
 #![no_main]
 
-use userlib::{print, println};
+use userlib::println;
 
 #[no_mangle]
 fn main() -> i32 {
-    println!("[user] hello, world!\n");
+    println!("[user] hello, world!");
     0
 }

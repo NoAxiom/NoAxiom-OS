@@ -51,14 +51,14 @@ pub fn enable_stimer_interrupt() {
     }
 }
 
-/// Permit Supervisor User Memory access
+/// permit supervisor user memory access
 pub fn enable_user_memory_access() {
     unsafe {
         riscv::register::sstatus::set_sum();
     }
 }
 
-/// Permit Supervisor User Memory access
+/// clear supervisor user memory access
 pub fn disable_user_memory_access() {
     unsafe {
         riscv::register::sstatus::clear_sum();

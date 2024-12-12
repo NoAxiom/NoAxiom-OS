@@ -37,11 +37,14 @@ impl Future for YieldFuture {
 /// yield current task by awaiting this future,
 /// note that this should be wrapped in an async function,
 /// and will create an await point for the current task flow
-#[macro_export]
-macro_rules! yield_now {
-    () => {
-        crate::sched::utils::YieldFuture::new().await;
-    };
+// #[macro_export]
+// macro_rules! yield_now {
+//     () => {
+//         crate::sched::utils::YieldFuture::new().await;
+//     };
+// }
+pub async fn yield_now() {
+    YieldFuture::new().await;
 }
 
 // struct TakeWakerFuture;

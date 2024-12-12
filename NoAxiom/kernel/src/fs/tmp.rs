@@ -29,6 +29,8 @@ impl File for TmpFile {
         Box::pin(async move {
             let data = get_app_data(self.app_id);
             buf[0..len].copy_from_slice(&data[addr..addr + len]);
+            info!("addr: {}, len: {}, total_len: {}", addr, len, data.len());
+            assert!(addr == 0 && len <= data.len());
             Ok(len as isize)
         })
     }

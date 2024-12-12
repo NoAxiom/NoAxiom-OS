@@ -11,7 +11,7 @@ export ROOT := $(shell pwd)
 export TARGET_DIR := $(ROOT)/target/$(TARGET)/$(MODE)
 export SBI ?= $(ROOT)/$(PROJECT)/bootloader/rustsbi-qemu.bin
 
-export LOG ?= INFO
+export LOG ?= DEBUG
 
 # partition config
 # export ROOTFS  ?= $(ROOT)/part/img/sdcard-riscv.img
@@ -19,7 +19,8 @@ export LOG ?= INFO
 
 
 # kernel config
-KERNEL_ELF := ./target/$(TARGET)/$(MODE)/$(KERNEL)
+KERNEL_O_PATH := ./target/$(TARGET)/$(MODE)
+KERNEL_ELF := $(KERNEL_O_PATH)/$(KERNEL)
 KERNEL_BIN := $(KERNEL_ELF).bin
 
 # TFTPBOOT := /work/tftpboot/
@@ -39,20 +40,28 @@ export WARN := "\e[33m"
 export NORMAL := "\e[32m"
 export RESET := "\e[0m"
 
-all: sbi-qemu run
+all: build_kernel run
 	@cp $(KERNEL_BIN) kernel-qemu
 
-build: 
-	@cd $(PROJECT)/user && make build
+build_kernel:
 	@cd $(PROJECT)/kernel && make build
 
-MULTICORE_COUNT := 2
+build:
+	@cd $(PROJECT)/kernel && make build
+	@cd $(PROJECT)/user && make build
+
+asm: # build_kernel
+	@echo -e "Building Kernel and Generating Assembly..."
+	@riscv64-unknown-elf-objdump -d $(KERNEL_ELF) > $(KERNEL_ELF).asm
+	@echo -e "Assembly saved to $(KERNEL_ELF).asm"
+
+MULTICORE_ARGS := 2 # ,cores=1,threads=1,sockets=2
 
 QFLAGS := 
 QFLAGS += -m 128
 QFLAGS += -machine virt
 QFLAGS += -nographic
-QFLAGS += -smp $(MULTICORE_COUNT)
+QFLAGS += -smp $(MULTICORE_ARGS)
 QFLAGS += -kernel kernel-qemu
 QFLAGS += -device loader,file=$(KERNEL_BIN),addr=0x80200000
 # QFLAGS += -drive file=$(SDCARD_BAK),if=none,format=raw,id=x0 
@@ -72,7 +81,7 @@ endif
 sbi-qemu:
 	@cp $(SBI) sbi-qemu
 
-run: sbi-qemu build # backup
+run: sbi-qemu
 	@cp $(KERNEL_BIN) kernel-qemu
 	qemu-system-riscv64 $(QFLAGS)
 # rm -f $(SDCARD_BAK)
@@ -92,12 +101,12 @@ run: sbi-qemu build # backup
 # gdb-server: build
 # 	qemu-system-riscv64 $(QEMU_ARGS) -s -S
 
-gdb-server: build
+gdb-server: build_kernel
 	qemu-system-riscv64 $(QFLAGS) -s -S
 
 
-# debug-client:
-# 	@riscv64-unknown-elf-gdb -ex 'file $(KERNEL_BIN)' -ex 'set arch riscv:rv64' -ex 'target remote localhost:1234'
+debug-client:
+	@riscv64-unknown-elf-gdb -ex 'file $(KERNEL_BIN)' -ex 'set arch riscv:rv64' -ex 'target remote localhost:1234'
 
 clean:
 	@rm -f kernel-qemu
@@ -158,4 +167,4 @@ count:
 # board:
 # 	@cp $(TARGET_DIR)/$(KERNEL).bin  $(TFTPBOOT)
 
-.PHONY: all build run debug clean debug-client sbi-qemu backup sdcard build-gui board vendor count
+.PHONY: all build run debug clean debug-client sbi-qemu backup sdcard build-gui board vendor count asm

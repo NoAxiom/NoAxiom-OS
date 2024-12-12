@@ -22,13 +22,17 @@ pub struct PageTable {
     frames: Vec<FrameTracker>,
 }
 
-#[allow(unused)]
+// #[allow(unused)]
 impl PageTable {
     /// create a new page table,
     /// with allocating a frame for root node
     /// used in raw memory_set initialization
     pub fn new() -> Self {
         let frame = frame_alloc().unwrap();
+        info!(
+            "[page_table] root_ppn = {:#x}",
+            frame.ppn.0
+        );
         PageTable {
             root_ppn: frame.ppn,
             frames: vec![frame],
@@ -59,7 +63,8 @@ impl PageTable {
     }
 
     /// insert new pte into the page table trie
-    fn insert(&mut self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
+    fn create_pte(&mut self, vpn: VirtPageNum) -> &mut PageTableEntry {
+        // debug!("insert: vpn = {:#x}", vpn.0);
         let index = vpn.get_index();
         let mut ppn = self.root_ppn;
         let mut result: Option<&mut PageTableEntry> = None;
@@ -76,7 +81,7 @@ impl PageTable {
             }
             ppn = pte.ppn();
         }
-        result
+        result.unwrap()
     }
 
     /// try to find pte, returns None at failure
@@ -98,15 +103,64 @@ impl PageTable {
         result
     }
 
+    // #[allow(unused)]
+    pub fn debug_find_pte(&self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
+        trace!(
+            "find_pte: vpn = {:#x}, root_ppn: {:#x}",
+            vpn.0,
+            self.root_ppn.0
+        );
+        let index = vpn.get_index();
+        let mut ppn = self.root_ppn;
+        let mut result: Option<&mut PageTableEntry> = None;
+        for (i, idx) in index.iter().enumerate() {
+            let pte = &mut ppn.get_pte_array()[*idx];
+            trace!(
+                "find_pte: i = {}, idx = {:#x}, ppn = {:#x}, pte_addr = {:#x}",
+                i,
+                idx,
+                ppn.0,
+                pte as *mut PageTableEntry as usize
+            );
+            trace!(
+                "find_pte: cur_pte: pa: {:#x}, flags: {:#x}",
+                pte.ppn().into_pa().0,
+                pte.flags()
+            );
+            if !pte.flags().is_valid() {
+                return None;
+            }
+            if i == 2 {
+                trace!(
+                    "find successfully (va -> pa) = ({:#x} -> {:#x})",
+                    VirtAddr::from(vpn).0,
+                    pte.ppn().into_pa().0
+                );
+                result = Some(pte);
+                break;
+            }
+            ppn = pte.ppn();
+        }
+        result
+    }
+
     /// map vpn -> ppn
     pub fn map(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: PTEFlags) {
-        let pte = self.insert(vpn).unwrap();
+        let pte = self.create_pte(vpn);
         assert!(
             !pte.flags().is_valid(),
             "{:?} is mapped before mapping",
             vpn
         );
         *pte = PageTableEntry::new(ppn, flags | pte_flags!(V, D, A));
+
+        let find_res = self.find_pte(vpn).unwrap();
+        assert!(
+            find_res.flags().is_valid(),
+            "error vpn: {:#x}, flags: {:?}",
+            vpn.0,
+            find_res.flags()
+        );
     }
 
     /// unmap a vpn
@@ -129,10 +183,26 @@ impl PageTable {
     /// translate va into pa
     /// returns None if nothing is mapped
     pub fn translate_va(&self, va: VirtAddr) -> Option<PhysAddr> {
+        let vpn = va.clone().floor();
+        let res = self.find_pte(vpn);
+        res.map(|pte| {
+            let aligned_pa: PhysAddr = pte.ppn().into();
+            let offset = va.offset();
+            let aligned_pa_usize: usize = aligned_pa.into();
+            (aligned_pa_usize + offset).into()
+        })
+    }
+
+    #[allow(unused)]
+    pub fn translate_va_debug(&self, va: VirtAddr) -> Option<PhysAddr> {
         self.find_pte(va.clone().floor()).map(|pte| {
             let aligned_pa: PhysAddr = pte.ppn().into();
             let offset = va.offset();
             let aligned_pa_usize: usize = aligned_pa.into();
+            info!(
+                "translate_va_debug: va: {:#x}, pa: {:#x}, offset: {:#x}, pte: {:#x?}",
+                va.0, aligned_pa_usize, offset, pte
+            );
             (aligned_pa_usize + offset).into()
         })
     }
@@ -145,23 +215,23 @@ impl PageTable {
 
     /// set copy-on-write for a vpn
     pub fn set_cow(&mut self, vpn: VirtPageNum) {
-        self.insert(vpn).unwrap().set_cow();
+        self.create_pte(vpn).set_cow();
     }
 
     /// reset copy-on-write for a vpn
     pub fn reset_cow(&mut self, vpn: VirtPageNum) {
-        self.insert(vpn).unwrap().reset_cow();
+        self.create_pte(vpn).reset_cow();
     }
 
     /// set flags for a vpn
     pub fn set_flags(&mut self, vpn: VirtPageNum, flags: PTEFlags) {
-        self.insert(vpn).unwrap().set_flags(flags);
+        self.create_pte(vpn).set_flags(flags);
     }
 
     /// remap a vpn with new ppn
     pub fn remap_cow(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, former_ppn: PhysPageNum) {
-        let pte = self.insert(vpn).unwrap();
-        *pte = PageTableEntry::new(ppn, pte.flags() | pte_flags!(W));
+        let pte = self.create_pte(vpn);
+        *pte = PageTableEntry::new(ppn, pte.flags() | pte_flags!(COW));
         ppn.get_bytes_array()
             .copy_from_slice(former_ppn.get_bytes_array());
     }
@@ -175,4 +245,10 @@ impl PageTable {
             asm!("sfence.vma");
         }
     }
+}
+
+pub fn current_token() -> usize {
+    let satp: usize;
+    unsafe { asm!("csrr {}, satp", out(reg) satp) }
+    satp
 }

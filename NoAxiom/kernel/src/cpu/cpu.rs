@@ -1,15 +1,19 @@
 use alloc::sync::Arc;
 
-use crate::{config::arch::CPU_NUM, sync::cell::SyncUnsafeCell, task::Task};
+use crate::{
+    config::arch::CPU_NUM, mm::memory_set::kernel_space_activate, sync::cell::SyncUnsafeCell,
+    task::Task, time::timer::set_next_trigger,
+};
 
 #[inline(always)]
-pub fn hartid() -> usize {
+pub fn get_hartid() -> usize {
     let hartid: usize;
     unsafe { core::arch::asm!("mv {}, tp", out(reg) hartid) }
     hartid
 }
 
 pub struct Cpu {
+    /// pointer of current task on this hart
     pub task: Option<Arc<Task>>,
 }
 
@@ -17,27 +21,14 @@ impl Cpu {
     pub const fn new() -> Self {
         Self { task: None }
     }
-
-    fn set_raw_task(&mut self, task: Arc<Task>) {
-        unsafe {
-            task.memory_activate();
-        }
-        self.task = Some(task);
-    }
-    fn clear_raw_task(&mut self) {
-        self.task = None;
-    }
-
-    // TODO: mm
     pub fn set_task(&mut self, task: &mut Arc<Task>) {
-        self.set_raw_task(task.clone());
+        set_next_trigger();
+        self.task = Some(task.clone());
+        unsafe { task.memory_activate() };
     }
     pub fn clear_task(&mut self) {
-        self.clear_raw_task();
-    }
-    pub fn token(&self) -> usize {
-        let task = self.task.clone();
-        task.unwrap().token()
+        self.task = None;
+        unsafe { kernel_space_activate() };
     }
 }
 
@@ -45,7 +36,7 @@ const DEFAULT_CPU: SyncUnsafeCell<Cpu> = SyncUnsafeCell::new(Cpu::new());
 pub static mut CPUS: [SyncUnsafeCell<Cpu>; CPU_NUM] = [DEFAULT_CPU; CPU_NUM];
 
 pub fn current_cpu() -> &'static mut Cpu {
-    unsafe { &mut CPUS[hartid()] }.get_mut()
+    unsafe { &mut CPUS[get_hartid()] }.get_mut()
 }
 
 // TODO: add mm

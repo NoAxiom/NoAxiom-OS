@@ -2,7 +2,7 @@
 //! - [`spawn_raw`] to add a task
 //! - [`run`] to run next task
 
-use alloc::{collections::vec_deque::VecDeque, vec::Vec};
+use alloc::{collections::vec_deque::VecDeque, sync::Arc};
 use core::future::Future;
 
 use async_task::{Builder, Runnable, ScheduleInfo, WithInfo};
@@ -10,62 +10,42 @@ use lazy_static::lazy_static;
 
 use crate::{
     config::sched::MLFQ_LEVELS,
-    sync::{cell::SyncRefCell, mutex::SpinMutex},
+    sync::{cell::SyncUnsafeCell, mutex::SpinMutex},
 };
 
-struct TaskScheduleInfoInner {
-    prio: usize,
-}
-impl TaskScheduleInfoInner {
-    pub const fn new(prio: usize) -> Self {
-        Self { prio }
-    }
-    pub fn level(&self) -> usize {
-        self.prio
-    }
-    pub fn update(&mut self) {
-        info!("update task prio");
-        // self.prio = self.prio + 1;
-    }
-}
-
-struct TaskScheduleInfo {
-    inner: SyncRefCell<TaskScheduleInfoInner>,
+pub struct TaskScheduleInfo {
+    prio: Arc<SyncUnsafeCell<isize>>,
 }
 impl TaskScheduleInfo {
-    pub const fn new(prio: usize) -> Self {
-        Self {
-            inner: SyncRefCell::new(TaskScheduleInfoInner::new(prio)),
-        }
+    pub const fn new(prio: Arc<SyncUnsafeCell<isize>>) -> Self {
+        Self { prio }
     }
-    pub fn level(&self) -> usize {
-        self.inner.borrow().level()
-    }
-    pub fn update(&self) {
-        self.inner.borrow_mut().update();
+    pub fn prio(&self) -> &isize {
+        unsafe { &(*self.prio.get()) }
     }
 }
 
 struct Executor {
-    queue: Vec<VecDeque<Runnable<TaskScheduleInfo>>>,
+    queue: [VecDeque<Runnable<TaskScheduleInfo>>; MLFQ_LEVELS],
 }
 impl Executor {
     pub fn new() -> Self {
-        let mut vec = Vec::new();
-        for _ in 0..MLFQ_LEVELS {
-            vec.push(VecDeque::new());
+        const VEC_DEQUE: VecDeque<Runnable<TaskScheduleInfo>> = VecDeque::new();
+        Self {
+            queue: [VEC_DEQUE; MLFQ_LEVELS],
         }
-        Self { queue: vec }
     }
     fn push_back(&mut self, runnable: Runnable<TaskScheduleInfo>) {
-        let level = runnable.metadata().level();
-        info!("[sched] push task to back, prio: {}", level);
-        self.queue[level].push_back(runnable);
+        let level = runnable.metadata().prio();
+        trace!("[sched] push task to back, prio: {}", level);
+        // self.queue[level as usize].push_back(runnable);
+        self.queue[0].push_back(runnable);
     }
     fn push_front(&mut self, runnable: Runnable<TaskScheduleInfo>) {
-        let level = runnable.metadata().level();
-        info!("[sched] push task to front, prio: {}", level);
-        self.queue[level].push_front(runnable);
+        let level = runnable.metadata().prio();
+        trace!("[sched] push task to front, prio: {}", level);
+        // self.queue[level as usize].push_front(runnable);
+        self.queue[0].push_front(runnable);
     }
     fn pop_front(&mut self) -> Option<Runnable<TaskScheduleInfo>> {
         for q in self.queue.iter_mut() {
@@ -82,34 +62,29 @@ lazy_static! {
 }
 
 /// insert task into EXECUTOR when [`core::task::Waker::wake`] get called
-fn schedule(task: Runnable<TaskScheduleInfo>, info: ScheduleInfo) {
-    info!("[sched] schedule task, prio: {}", task.metadata().level());
-    task.metadata().update();
-    info!(
-        "[sched] schedule task, new prio: {}",
-        task.metadata().level()
-    );
-    info!(
-        "[sched] schedule task, woken_while_running: {}",
+fn schedule(runnable: Runnable<TaskScheduleInfo>, info: ScheduleInfo) {
+    trace!(
+        "[sched] schedule task, prio: {}, woken_while_running: {}",
+        runnable.metadata().prio(),
         info.woken_while_running
     );
     if info.woken_while_running {
-        EXECUTOR.lock().push_front(task);
+        EXECUTOR.lock().push_front(runnable);
     } else {
-        EXECUTOR.lock().push_back(task);
+        EXECUTOR.lock().push_back(runnable);
     }
 }
 
 /// Add a raw task into task queue
-pub fn spawn_raw<F, R>(future: F)
+pub fn spawn_raw<F, R>(future: F, prio: Arc<SyncUnsafeCell<isize>>)
 where
     F: Future<Output = R> + Send + 'static,
     R: Send + 'static,
 {
-    let (task, handle) = Builder::new()
-        .metadata(TaskScheduleInfo::new(0))
+    let (runnable, handle) = Builder::new()
+        .metadata(TaskScheduleInfo::new(prio))
         .spawn(move |_: &TaskScheduleInfo| future, WithInfo(schedule));
-    task.schedule();
+    runnable.schedule();
     handle.detach();
 }
 
@@ -117,11 +92,11 @@ where
 pub fn run() {
     // spin until find a valid task
     loop {
-        let task = EXECUTOR.lock().pop_front();
-        if let Some(task) = task {
-            info!("[sched] run task, prio: {}", task.metadata().level());
-            task.run();
-            info!("[sched] task done");
+        let mut guard = EXECUTOR.lock();
+        let runnable = guard.pop_front();
+        drop(guard);
+        if let Some(runnable) = runnable {
+            runnable.run();
             break;
         }
     }

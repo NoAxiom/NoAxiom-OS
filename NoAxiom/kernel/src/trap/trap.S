@@ -1,27 +1,27 @@
-# kernel/trap/trap.S
-
 # TrapContext structure:
-#   0 - gpr
+#   0 - user_reg
 # 256 - sstatus
 # 264 - sepc
 # 272 - kernel_satp
 # 280 - kernel_ra
-# 288 - trap_handler
+# 288 - kernel_reg (callee_saved)
+# 384 - kernel_tp
+
 
     .altmacro
-    .macro    STORE_X n
+    .macro    STORE_X n                # store user regs
     sd        x\n, \n*8(sp)
     .endm
 
-    .macro    LOAD_X n
+    .macro    LOAD_X n                 # load user regs
     ld        x\n, \n*8(sp)
     .endm
 
-    .macro    STORE_S n, offset
+    .macro    STORE_S n, offset        # store kernel callee-saved regs
     sd        s\n, \offset*8(a0)
     .endm
 
-    .macro    LOAD_S n, offset
+    .macro    LOAD_S n, offset         # load kernel callee-saved regs
     ld        s\n, \offset*8(sp)
     .endm
 
@@ -32,7 +32,6 @@
     STORE_X   %n
     .set      n, n+1
     .endr
-
     csrr      t0, sstatus
     csrr      t1, sepc
     csrr      t2, sscratch
@@ -60,14 +59,11 @@
     .globl    trap_from_kernel
     .align    2
 
-
 # user -> kernel
     user_trapvec:
     csrrw     sp, sscratch, sp
-
     STORE_GENERAL_REG
     sd        t2, 2*8(sp)
-
     ld        ra, 35*8(sp)             # move to kernel_sp
     .set      n, 0                     # load callee-saved regs
     .set      offset, 36
@@ -76,22 +72,16 @@
     .set      n, n+1
     .set      offset, offset+1
     .endr
-
     ld        fp, 48*8(sp)             # load kernel fp
     ld        tp, 49*8(sp)
     ld        sp, 34*8(sp)
-
     ret                                # return to kernel ra
-
 
 # kernel -> user
     user_trapret:
-
     csrw      sscratch, a0
-
     sd        sp, 34*8(a0)             # save kernel callee-saved regs
     sd        ra, 35*8(a0)
-
     .set      n, 0
     .set      offset, 36
     .rept     12
@@ -99,13 +89,10 @@
     .set      n, n+1
     .set      offset, offset+1
     .endr
-
     sd        fp, 48*8(a0)
     sd        tp, 49*8(a0)
-
-    mv        sp, a0                   # to use macros
+    mv        sp, a0
     LOAD_GENERAL_REG
-
     sret
 
 # kernel -> kernel

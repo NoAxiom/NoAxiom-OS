@@ -1,11 +1,16 @@
 use alloc::{sync::Arc, vec::Vec};
+use core::{
+    arch::asm,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
 use lazy_static::lazy_static;
+use riscv::register::satp;
 
-use super::{map_area::MapArea, page_table::PageTable};
+use super::{address::PhysAddr, map_area::MapArea, page_table::PageTable};
 use crate::{
-    config::mm::{PAGE_SIZE, PAGE_WIDTH, USER_HEAP_SIZE, USER_STACK_SIZE},
-    fs::{self, File},
+    config::mm::{KERNEL_VIRT_MEMORY_END, PAGE_SIZE, PAGE_WIDTH, USER_HEAP_SIZE, USER_STACK_SIZE},
+    fs::File,
     map_permission,
     mm::{
         address::{VirtAddr, VirtPageNum},
@@ -15,9 +20,32 @@ use crate::{
     sync::mutex::SpinMutex,
 };
 
+extern "C" {
+    fn stext();
+    fn etext();
+    fn srodata();
+    fn erodata();
+    fn sdata();
+    fn edata();
+    fn sbss();
+    fn ebss();
+    fn ekernel();
+}
+
 lazy_static! {
     pub static ref KERNEL_SPACE: SpinMutex<MemorySet> =
         SpinMutex::new(MemorySet::init_kernel_space());
+}
+
+/// lazily initialized kernel space token
+/// please assure it's initialized before any user space token
+pub static KERNEL_SPACE_TOKEN: AtomicUsize = AtomicUsize::new(0);
+
+pub unsafe fn kernel_space_activate() {
+    unsafe {
+        satp::write(KERNEL_SPACE_TOKEN.load(Ordering::Relaxed));
+        asm!("sfence.vma");
+    }
 }
 
 /// elf load result
@@ -73,6 +101,11 @@ impl MemorySet {
         }
     }
 
+    /// translate va into pa
+    pub fn translate_va(&self, va: VirtAddr) -> Option<PhysAddr> {
+        self.page_table.translate_va(va)
+    }
+
     /// push a map area into current memory set
     /// load data if provided
     pub fn push_area(&mut self, mut map_area: MapArea, data: Option<&[u8]>) {
@@ -90,16 +123,6 @@ impl MemorySet {
 
     /// create kernel space, used in [`KERNEL_SPACE`] initialization
     pub fn init_kernel_space() -> Self {
-        extern "C" {
-            fn stext();
-            fn etext();
-            fn srodata();
-            fn erodata();
-            fn sdata();
-            fn edata();
-            fn sbss();
-            fn ebss();
-        }
         let mut memory_set = MemorySet::new_bare();
         macro_rules! kernel_push_area {
             ($($start:expr, $end:expr, $permission:expr)*) => {
@@ -122,16 +145,48 @@ impl MemorySet {
             srodata, erodata, map_permission!(R)
             sdata,   edata,   map_permission!(R, W)
             sbss,    ebss,    map_permission!(R, W)
+            ekernel, KERNEL_VIRT_MEMORY_END, map_permission!(R, W)
         );
+        trace!("[memory_set] sp: {:#x}", crate::arch::regs::get_sp());
+        info!("[kernel] space initialized");
+        info!(
+            "[kernel].text [{:#x}, {:#x})",
+            stext as usize, etext as usize
+        );
+        info!(
+            "[kernel].rodata [{:#x}, {:#x})",
+            srodata as usize, erodata as usize
+        );
+        info!(
+            "[kernel].data [{:#x}, {:#x})",
+            sdata as usize, edata as usize
+        );
+        info!("[kernel].bss [{:#x}, {:#x})", sbss as usize, ebss as usize);
+        info!(
+            "[kernel]physical mem [{:#x}, {:#x})",
+            ekernel as usize, KERNEL_VIRT_MEMORY_END as usize
+        );
+        KERNEL_SPACE_TOKEN.store(memory_set.token(), Ordering::Relaxed);
         memory_set
     }
 
     /// create a new memory set with kernel space mapped,
     pub fn new_with_kernel() -> Self {
         let mut memory_set = Self::new_bare();
-        let kernel_space = KERNEL_SPACE.lock();
-        memory_set.page_table = PageTable::clone_from_other(&kernel_space.page_table);
-        drop(kernel_space);
+        memory_set.page_table = PageTable::clone_from_other(&KERNEL_SPACE.lock().page_table);
+        // let kernel_space = KERNEL_SPACE.lock();
+        // let mut new_page_table = PageTable::new();
+        // for area in kernel_space.areas.iter() {
+        //     let pte_flags =
+        // super::pte::PTEFlags::from_bits(area.map_permission.bits()).unwrap();
+        //     for vpn in area.vpn_range {
+        //         let ppn: super::address::PhysPageNum =
+        // kernel_space.translate_va(vpn.into()).unwrap().into();
+        //         new_page_table.map(vpn, ppn, pte_flags);
+        //     }
+        // }
+        // memory_set.page_table = new_page_table;
+        // drop(kernel_space);
         memory_set
     }
 
@@ -166,22 +221,45 @@ impl MemorySet {
     }
 
     /// load data from elf file
-    /// TODO: use file to read elf
     /// TODO: map trampoline?
-    pub async fn load_from_elf(elf_file: Arc<dyn File>) -> ElfMemoryInfo {
+    pub async fn load_from_elf(elf_file: Arc<dyn File>, elf_len: usize) -> ElfMemoryInfo {
         info!("[memory_set] load elf begins");
         let mut memory_set = Self::new_with_kernel();
-        let mut elf_data = [1u8; 0x10000]; // todo: use elf_header
-        let _ = elf_file.read(0, elf_data.len(), &mut elf_data).await;
-        let elf = xmas_elf::ElfFile::new(&elf_data).unwrap();
-        info!("elf header: {:?}", elf.header);
 
-        let elf_header = elf.header;
-        let magic = elf_header.pt1.magic;
+        // // read elf header
+        // const ELF_HEADER_SIZE: usize = 64;
+        // let mut elf_buf = [0u8; ELF_HEADER_SIZE];
+        // elf_file
+        //     .read(0, ELF_HEADER_SIZE, &mut elf_buf)
+        //     .await
+        //     .unwrap();
+        // let elf_ph = xmas_elf::ElfFile::new(elf_buf.as_slice()).unwrap().header;
+        // debug!("elf_header: {:?}, length = {}", elf_ph, elf_len);
+
+        // // read all program header
+        // let ph_entry_size = elf_header.pt2.ph_entry_size() as usize;
+        // let ph_offset: usize = elf_header.pt2.ph_offset() as usize;
+        // let ph_count = elf_header.pt2.ph_count() as usize;
+        // let mut elf_buf = vec![0u8; ph_offset + ph_count * ph_entry_size];
+        // elf_file
+        //     .read(0, ph_offset + ph_count * ph_entry_size, &mut elf_buf)
+        //     .await
+        //     .unwrap();
+        // let elf_ph = xmas_elf::ElfFile::new(elf_buf.as_slice()).unwrap();
+        // debug!("elf_ph: {:?}", elf_ph);
+
+        // read all data
+        let mut elf_buf = vec![0u8; elf_len];
+        elf_file.read(0, elf_buf.len(), &mut elf_buf).await.unwrap();
+        let elf = xmas_elf::ElfFile::new(elf_buf.as_slice()).unwrap();
+
+        // check: magic
+        let magic = elf.header.pt1.magic;
         assert_eq!(magic, [0x7f, 0x45, 0x4c, 0x46], "invalid elf!");
-        let ph_count = elf_header.pt2.ph_count();
+        let ph_count = elf.header.pt2.ph_count();
         let mut end_vpn = VirtPageNum(0);
 
+        // map pages by loaded program header
         info!("[memory_set] data loaded! start to map data pages");
         for i in 0..ph_count {
             let ph = elf.program_header(i).unwrap();
@@ -204,6 +282,7 @@ impl MemorySet {
         info!("[memory_set] elf data load complete! start to map user stack");
         let end_va: VirtAddr = end_vpn.into();
         let elf_entry = elf.header.pt2.entry_point() as usize;
+        info!("[memory_set] entry: {:#x}", elf_entry);
 
         let user_stack_base: usize = usize::from(end_va) + PAGE_SIZE; // stack bottom
         let user_stack_end = user_stack_base + USER_STACK_SIZE; // stack top
@@ -221,4 +300,45 @@ impl MemorySet {
             user_sp: user_stack_end, // stack grows downward
         }
     }
+}
+
+#[allow(unused)]
+pub fn remap_test() {
+    debug!("remap_test");
+
+    let mut kernel_space = KERNEL_SPACE.lock();
+
+    let mid_text: VirtAddr = (stext as usize / 2 + etext as usize / 2).into();
+    let mid_rodata: VirtAddr = (srodata as usize / 2 + erodata as usize / 2).into();
+    let mid_data: VirtAddr = (sdata as usize / 2 + edata as usize / 2).into();
+    let mid_bss: VirtAddr = (sbss as usize / 2 + ebss as usize / 2).into();
+    let mid_frame: VirtAddr = (ekernel as usize / 2 + KERNEL_VIRT_MEMORY_END as usize / 2).into();
+
+    debug!(
+        "mid_text: {:#x} => {:#x}",
+        mid_text.0,
+        kernel_space.translate_va(mid_text).unwrap().0
+    );
+    debug!(
+        "mid_rodata: {:#x} => {:#x}",
+        mid_rodata.0,
+        kernel_space.translate_va(mid_rodata).unwrap().0
+    );
+    debug!(
+        "mid_data: {:#x} => {:#x}",
+        mid_data.0,
+        kernel_space.translate_va(mid_data).unwrap().0
+    );
+    debug!(
+        "mid_bss: {:#x} => {:#x}",
+        mid_bss.0,
+        kernel_space.translate_va(mid_bss).unwrap().0
+    );
+    debug!(
+        "mid_frame: {:#x} => {:#x}",
+        mid_frame.0,
+        kernel_space.translate_va(mid_frame).unwrap().0
+    );
+
+    debug!("remap_test end");
 }

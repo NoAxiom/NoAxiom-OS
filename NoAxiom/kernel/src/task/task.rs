@@ -1,16 +1,15 @@
 //! # Task
 
 use alloc::sync::Arc;
-use core::sync::atomic::AtomicI8;
+use core::sync::atomic::{AtomicIsize, Ordering};
 
 use super::taskid::TidTracer;
 use crate::{
     fs::get_app_elf,
-    mm::MemorySet,
-    sched::{spawn_task, task_counter::task_count_dec},
+    mm::memory_set::MemorySet,
     sync::{cell::SyncUnsafeCell, mutex::SpinMutex},
-    task::{load_app::get_app_data, taskid::tid_alloc},
-    trap::{trap_restore, user_trap_handler, TrapContext},
+    task::{load_app::get_app_len, taskid::tid_alloc},
+    trap::TrapContext,
 };
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -49,8 +48,11 @@ pub struct Task {
     /// task status: ready / running / zombie
     status: SyncUnsafeCell<TaskStatus>,
 
+    /// priority for schedule
+    pub prio: Arc<SyncUnsafeCell<isize>>,
+
     /// task exit code
-    exit_code: AtomicI8,
+    exit_code: AtomicIsize,
 }
 
 /// user tasks
@@ -83,12 +85,22 @@ impl Task {
     }
 
     /// exit code
-    pub fn exit_code(&self) -> i8 {
-        self.exit_code.load(core::sync::atomic::Ordering::Relaxed)
+    pub fn exit_code(&self) -> isize {
+        self.exit_code.load(Ordering::Relaxed)
     }
-    pub fn set_exit_code(&self, exit_code: i8) {
-        self.exit_code
-            .store(exit_code, core::sync::atomic::Ordering::Relaxed);
+    pub fn set_exit_code(&self, exit_code: isize) {
+        self.exit_code.store(exit_code, Ordering::Relaxed);
+    }
+
+    /// prio
+    pub fn prio(&self) -> &isize {
+        unsafe { &(*self.prio.get()) }
+    }
+    pub fn set_prio(&self, prio: isize) {
+        unsafe { *self.prio.get() = prio };
+    }
+    pub fn inc_prio(&self) {
+        unsafe { *self.prio.get() += 1 };
     }
 
     /// thread info
@@ -125,47 +137,36 @@ impl Task {
     pub fn set_trap_context(&self, trap_context: TrapContext) {
         self.thread_mut().trap_context = trap_context;
     }
-}
 
-/// user task main
-pub async fn task_main(task: Arc<Task>) {
-    while !task.is_zombie() {
-        // kernel -> user
-        info!("[task_main] trap_restore");
-        trap_restore(&task);
-        if task.is_zombie() {
-            info!("task {} is zombie, break", task.tid());
-            break;
-        }
-        // user -> kernel
-        info!("[task_main] user_trap_handler");
-        user_trap_handler(&task).await;
+    /// create new process from elf
+    pub async fn new_process(app_id: usize) -> Arc<Self> {
+        trace!("[kernel] spawn new process from elf");
+        let elf_file = Arc::new(get_app_elf(app_id)); // todo: now is read from static memory
+        let elf_memory_info = MemorySet::load_from_elf(elf_file, get_app_len(app_id)).await;
+        let memory_set = elf_memory_info.memory_set;
+        let elf_entry = elf_memory_info.elf_entry;
+        let user_sp = elf_memory_info.user_sp;
+        trace!("[kernel] succeed to load elf data");
+
+        let task = Arc::new(Self {
+            tid: tid_alloc(),
+            process: Arc::new(SpinMutex::new(ProcessInfo {
+                // pid: pid_alloc(), // TODO: pid_alloc()
+                memory_set,
+            })),
+            thread: SyncUnsafeCell::new(ThreadInfo {
+                trap_context: TrapContext::app_init_cx(elf_entry, user_sp),
+            }),
+            status: SyncUnsafeCell::new(TaskStatus::Ready),
+            exit_code: AtomicIsize::new(0),
+            prio: Arc::new(SyncUnsafeCell::new(0)),
+        });
+        info!("[spawn] create a new task, tid {}", task.tid.0);
+        task
     }
-    task_count_dec();
-}
 
-/// create new process from elf
-pub async fn spawn_new_process(app_id: usize) {
-    info!("[kernel] spawn new process from elf");
-    let elf_file = Arc::new(get_app_elf(app_id)); // todo: now is read from static memory
-    let elf_memory_info = MemorySet::load_from_elf(elf_file).await;
-    let memory_set = elf_memory_info.memory_set;
-    let elf_entry = elf_memory_info.elf_entry;
-    let user_sp = elf_memory_info.user_sp;
-    info!("[kernel] succeed to load elf data");
-
-    let task = Arc::new(Task {
-        tid: tid_alloc(),
-        process: Arc::new(SpinMutex::new(ProcessInfo {
-            // pid: pid_alloc(), // TODO: pid_alloc()
-            memory_set,
-        })),
-        thread: SyncUnsafeCell::new(ThreadInfo {
-            trap_context: TrapContext::app_init_cx(elf_entry, user_sp),
-        }),
-        status: SyncUnsafeCell::new(TaskStatus::Ready),
-        exit_code: AtomicI8::new(0),
-    });
-    info!("create a new task, tid {}", task.tid.0);
-    spawn_task(task);
+    /// exit current task
+    pub fn exit(&self) {
+        self.set_status(TaskStatus::Zombie);
+    }
 }

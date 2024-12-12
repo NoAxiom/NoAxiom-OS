@@ -44,10 +44,10 @@ SECTIONS
  
     sbss = .;
     .bss : {
-        skstack0 = .;
-        *(.bss.stack)
+        skstack = .;
+        *(.bss.kstack)
         . = ALIGN(4K);
-        ekstack0 = .;
+        ekstack = .;
         *(.bss .bss.*)
         *(.sbss .sbss.*)
     }

@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 macro_rules! syscall_id {
     ($name:ident, $val:expr) => {
         const $name: usize = $val;
@@ -72,4 +74,8 @@ pub fn sys_exit(exit_code: isize) -> ! {
 
 pub fn sys_read(fd: usize, buf_addr: usize, buf_len: usize) -> isize {
     syscall(SYS_READ, [fd, buf_addr, buf_len, 0, 0, 0])
+}
+
+pub fn sys_yield() -> isize {
+    syscall(SYS_SCHED_YIELD, [0, 0, 0, 0, 0, 0])
 }

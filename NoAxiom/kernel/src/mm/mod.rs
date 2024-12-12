@@ -1,20 +1,21 @@
 //! memory management
 
-mod address;
-pub mod bss;
+pub mod address;
 mod frame;
 mod heap;
-mod map_area;
-mod memory_set;
-mod page_table;
+pub mod map_area;
+pub mod memory_set;
+pub mod page_table;
 pub mod permission;
 pub mod pte;
-
-pub use memory_set::MemorySet;
 
 pub fn mm_init() {
     frame::init();
     heap::init();
+}
+
+pub fn hart_mm_init() {
+    unsafe { memory_set::KERNEL_SPACE.lock().activate() };
 }
 
 /// returns pte flags with multiple flag bits
