@@ -28,12 +28,13 @@ impl File for TmpFile {
     fn read<'a>(&'a self, addr: usize, len: usize, buf: &'a mut [u8]) -> FileReturn {
         Box::pin(async move {
             let data = get_app_data(self.app_id);
-            buf[addr..len].copy_from_slice(&data[addr..len]);
+            buf[0..len].copy_from_slice(&data[addr..addr + len]);
             Ok(len as isize)
         })
     }
 
-    fn write<'a>(&'a self, buf: &'a [u8]) -> FileReturn {
+    fn write<'a>(&'a self, addr: usize, buf: &'a [u8]) -> FileReturn {
+        let _ = addr;
         let _ = buf;
         Box::pin(async { Ok(buf.len() as isize) })
     }

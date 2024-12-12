@@ -17,6 +17,7 @@ runtests = []
 uitest = []
 ramdisk = []
 uart = []
+board_qemu = []
 
 [dependencies]
 log = "0.4"
@@ -57,3 +58,8 @@ thiserror = { version = "1.0", package = "thiserror-core", default-features = fa
 kernel-sync = { git = "https://github.com/os-module/kernel-sync.git" }
 paste = "1"
 spin = "0.9"
+lru = "0.12.5"
+bit_field = "0.10.1"
+async-trait = "0.1.50"
+nb = "1.0.0"
+volatile = "0.2"

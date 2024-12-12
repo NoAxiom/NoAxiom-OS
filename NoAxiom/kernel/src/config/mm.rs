@@ -84,3 +84,6 @@ mod sv48 {
 }
 #[cfg(feature = "sv48")]
 pub use sv48::*;
+
+/// qemu virtio disk mmio
+pub const VIRTIO0: usize = 0x10001000 + KERNEL_ADDR_OFFSET;

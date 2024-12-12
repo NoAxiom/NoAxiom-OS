@@ -5,5 +5,7 @@
 //! [`sched`] contains configs for task / coroutine schedule
 
 pub mod arch;
+pub mod errno;
+pub mod fs;
 pub mod mm;
 pub mod sched;
