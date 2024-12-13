@@ -86,10 +86,10 @@ impl Task {
 
     /// exit code
     pub fn exit_code(&self) -> isize {
-        self.exit_code.load(Ordering::Relaxed)
+        self.exit_code.load(Ordering::SeqCst)
     }
     pub fn set_exit_code(&self, exit_code: isize) {
-        self.exit_code.store(exit_code, Ordering::Relaxed);
+        self.exit_code.store(exit_code, Ordering::SeqCst);
     }
 
     /// prio

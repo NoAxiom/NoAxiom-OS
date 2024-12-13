@@ -15,6 +15,8 @@
 // #![feature(custom_mir)]
 // #![feature(core_intrinsics)]
 
+use mm::{frame::frame_allocator_test, heap::heap_test, pte::PageTableEntry};
+
 #[macro_use]
 extern crate alloc;
 #[macro_use]
@@ -45,6 +47,10 @@ core::arch::global_asm!(include_str!("link_apps.S"));
 pub fn rust_main() {
     trap::trap_init();
     mm::hart_mm_init();
+    heap_test();
+    // frame_allocator_test();
+    // let pte = PageTableEntry(0x5F73_7365_636F_7270);
+    // warn!("flag: {:?}, ppn: {:#x}", pte.flags(), pte.ppn().0);
     trace!("token {:#x}", crate::mm::page_table::current_token());
     info!("[kernel] hart id {} has been booted", cpu::get_hartid());
     loop {

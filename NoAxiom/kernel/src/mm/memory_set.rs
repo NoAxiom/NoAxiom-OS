@@ -1,6 +1,7 @@
 use alloc::{sync::Arc, vec::Vec};
 use core::{
     arch::asm,
+    ops::Deref,
     sync::atomic::{AtomicUsize, Ordering},
 };
 
@@ -13,7 +14,7 @@ use crate::{
     fs::File,
     map_permission,
     mm::{
-        address::{VirtAddr, VirtPageNum},
+        address::{PhysPageNum, VirtAddr, VirtPageNum},
         map_area::MapAreaType,
         permission::MapType,
     },
@@ -167,6 +168,7 @@ impl MemorySet {
             ekernel as usize, KERNEL_VIRT_MEMORY_END as usize
         );
         KERNEL_SPACE_TOKEN.store(memory_set.token(), Ordering::Relaxed);
+        // memory_set.debug("kernel_space");
         memory_set
     }
 
@@ -175,18 +177,19 @@ impl MemorySet {
         let mut memory_set = Self::new_bare();
         // memory_set.page_table =
         // PageTable::clone_from_other(&KERNEL_SPACE.lock().page_table);
-        let kernel_space = KERNEL_SPACE.lock();
+        let guard = KERNEL_SPACE.lock();
         let mut new_page_table = PageTable::new();
+        let kernel_space = guard.deref();
         for area in kernel_space.areas.iter() {
             let pte_flags = super::pte::PTEFlags::from_bits(area.map_permission.bits()).unwrap();
             for vpn in area.vpn_range {
                 let ppn: super::address::PhysPageNum =
                     kernel_space.translate_va(vpn.into()).unwrap().into();
                 new_page_table.map(vpn, ppn, pte_flags);
+                // memory_set.page_table.map(vpn, ppn, pte_flags);
             }
         }
         memory_set.page_table = new_page_table;
-        drop(kernel_space);
         memory_set
     }
 
@@ -279,7 +282,10 @@ impl MemorySet {
             }
         }
 
-        info!("[memory_set] elf data load complete! start to map user stack");
+        info!(
+            "[memory_set] elf data load complete! end_vpn: {:#x}",
+            end_vpn.0
+        );
         let end_va: VirtAddr = end_vpn.into();
         let elf_entry = elf.header.pt2.entry_point() as usize;
         info!("[memory_set] entry: {:#x}", elf_entry);
@@ -288,16 +294,36 @@ impl MemorySet {
         let user_stack_end = user_stack_base + USER_STACK_SIZE; // stack top
         memory_set.map_user_stack(user_stack_base.into(), user_stack_end.into());
 
-        info!("[memory_set] user stack mapped! start to map user heap");
+        info!(
+            "[memory_set] user stack mapped: [{:#x}, {:#x})",
+            user_stack_base, user_stack_end
+        );
         let user_heap_base: usize = user_stack_end + PAGE_SIZE;
         let user_heap_end: usize = user_heap_base + USER_HEAP_SIZE;
         memory_set.map_user_heap(user_heap_base, user_heap_end);
 
-        info!("[memory_set] user heap mapped! elf load complete!");
+        info!(
+            "[memory_set] user heap mapped: [{:#x}, {:#x})",
+            user_heap_base, user_heap_end
+        );
+
+        // memory_set.debug("load_elf");
         ElfMemoryInfo {
             memory_set,
             elf_entry,
             user_sp: user_stack_end, // stack grows downward
+        }
+    }
+
+    fn debug(&self, msg: &str) {
+        error!("memory_set {} info:", msg);
+        let one_level = self.page_table.root_ppn.get_pte_array()[0x102];
+        warn!(
+            "root_ppn: {:#x}, kernel_one_level: {:?}",
+            self.page_table.root_ppn.0, one_level
+        );
+        for (i, pte) in one_level.ppn().get_pte_array()[0..512].iter().enumerate() {
+            warn!("[memory_set] {:#x}: 2-level pte: {:?}", i, pte);
         }
     }
 }

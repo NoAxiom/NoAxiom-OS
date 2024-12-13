@@ -15,7 +15,7 @@ use crate::pte_flags;
 #[derive(Debug)]
 pub struct PageTable {
     /// root ppn, serves as an identifier of this page table
-    root_ppn: PhysPageNum,
+    pub root_ppn: PhysPageNum,
 
     /// page table frame tracker holder,
     /// doesn't track data pages
@@ -79,6 +79,7 @@ impl PageTable {
                 *pte = PageTableEntry::new(frame.ppn, pte_flags!(V));
                 self.frames.push(frame);
             }
+            // debug!("set pte: {:#x}", pte.0);
             ppn = pte.ppn();
         }
         result.unwrap()

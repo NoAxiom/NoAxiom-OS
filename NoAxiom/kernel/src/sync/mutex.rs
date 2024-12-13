@@ -8,6 +8,7 @@ use crate::{
     arch::interrupt::{disable_global_interrupt, enable_global_interrupt, is_interrupt_enabled},
     config::arch::CPU_NUM,
     cpu::get_hartid,
+    utils::fence_all,
 };
 
 pub type SpinMutex<T> = kernel_sync::spin::SpinMutex<T, KernelLockAction>;
@@ -69,7 +70,6 @@ impl LockAction for KernelLockAction {
 /// disable interrupt
 pub(crate) fn push_off() {
     assert!(!is_interrupt_enabled());
-    // debug!("push_off");
     // let old = is_interrupt_enabled();
     // disable_global_interrupt();
     // let mut cpu = current_cpu();
@@ -81,7 +81,7 @@ pub(crate) fn push_off() {
 
 /// enable interrupt if depth decline to 0
 pub(crate) fn pop_off() {
-    // debug!("pop_off");
+    assert!(!is_interrupt_enabled());
     // let mut cpu = current_cpu();
     // cpu.push_off_depth -= 1;
     // let should_enable = cpu.push_off_depth == 0 && cpu.interrupt_enable;

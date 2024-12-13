@@ -1,5 +1,7 @@
 //! Page Table Entry
 
+use core::fmt::{self, Debug, Formatter};
+
 use bitflags::bitflags;
 
 use super::address::PhysPageNum;
@@ -64,7 +66,7 @@ impl PTEFlags {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub struct PageTableEntry(pub usize);
 
 impl PageTableEntry {
@@ -95,5 +97,15 @@ impl PageTableEntry {
     /// clear all data
     pub fn reset(&mut self) {
         self.0 = 0;
+    }
+}
+
+impl Debug for PageTableEntry {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_fmt(format_args!(
+            "ppn: {:#x} flags: {:?}",
+            self.ppn().0,
+            self.flags()
+        ))
     }
 }

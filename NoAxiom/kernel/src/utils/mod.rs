@@ -1,6 +1,11 @@
 //! utility functions
 
-use crate::config::mm::{KERNEL_ADDR_OFFSET, KERNEL_PAGENUM_MASK};
+use core::arch::asm;
+
+use crate::{
+    config::mm::{KERNEL_ADDR_OFFSET, KERNEL_PAGENUM_MASK, PAGE_WIDTH},
+    mm::address::{PhysAddr, PhysPageNum},
+};
 
 /// signed extend for number without 64/32 bits width
 pub fn signed_extend(num: usize, width: usize) -> usize {
@@ -12,13 +17,14 @@ pub fn signed_extend(num: usize, width: usize) -> usize {
 }
 
 /// translate a raw usize type kernel virt address into phys address
+#[inline(always)]
 pub fn kernel_va_to_pa(virt: usize) -> usize {
-    info!(
-        "kernel_va_to_pa: {:#x}, {:#x}, {:#x}",
-        virt,
-        virt & KERNEL_ADDR_OFFSET,
-        KERNEL_ADDR_OFFSET
-    );
+    // info!(
+    //     "kernel_va_to_pa: {:#x}, {:#x}, {:#x}",
+    //     virt,
+    //     virt & KERNEL_ADDR_OFFSET,
+    //     KERNEL_ADDR_OFFSET
+    // );
     assert!(
         (virt & KERNEL_ADDR_OFFSET) == KERNEL_ADDR_OFFSET,
         "invalid kernel virt address"
@@ -35,6 +41,13 @@ pub fn current_pc() -> usize {
     pc
 }
 
+#[inline(always)]
 pub fn kernel_vpn_to_ppn(vpn: usize) -> usize {
     vpn & !KERNEL_PAGENUM_MASK
+}
+
+#[no_mangle]
+#[inline(always)]
+pub unsafe fn fence_all() {
+    asm!("fence iorw, iorw");
 }

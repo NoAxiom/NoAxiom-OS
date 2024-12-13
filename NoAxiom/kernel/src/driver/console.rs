@@ -17,6 +17,7 @@ impl Write for Stdout {
 pub fn print(args: fmt::Arguments<'_>) {
     let _lock = PRINT_MUTEX.lock();
     Stdout.write_fmt(args).unwrap();
+    drop(_lock);
 }
 
 #[macro_export]

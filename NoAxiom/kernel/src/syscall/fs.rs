@@ -1,5 +1,5 @@
 use super::syscall::Syscall;
-use crate::{cpu::get_hartid, print};
+use crate::{config::mm::KERNEL_ADDR_OFFSET, cpu::get_hartid, print};
 
 impl Syscall<'_> {
     // todo: complete this
@@ -16,6 +16,7 @@ impl Syscall<'_> {
             len,
             get_hartid()
         );
+        assert!(buf < KERNEL_ADDR_OFFSET);
         let buf = unsafe { core::slice::from_raw_parts_mut(buf as *mut u8, len) };
         let s = core::str::from_utf8(buf).unwrap();
         print!("{}", s);

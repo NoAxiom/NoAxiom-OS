@@ -1,4 +1,4 @@
-use alloc::vec::Vec;
+use alloc::{boxed::Box, collections::{btree_map::BTreeMap, vec_deque::VecDeque}, string::String, vec::Vec};
 use core::fmt::{self, Debug, Formatter};
 
 use lazy_static::lazy_static;
@@ -20,6 +20,7 @@ impl FrameTracker {
         for i in bytes_array {
             *i = 0;
         }
+        // debug!("FrameTracker: new ppn={:#x}", ppn.0);
         Self { ppn }
     }
 }
@@ -45,7 +46,8 @@ trait FrameAllocator {
 pub struct StackFrameAllocator {
     current: usize,
     end: usize,
-    recycled: Vec<usize>,
+    recycled: VecDeque<usize>,
+    // mapped: BTreeMap<usize, bool>, // ppn -> is_mapped
 }
 
 impl StackFrameAllocator {
@@ -61,12 +63,32 @@ impl FrameAllocator for StackFrameAllocator {
         Self {
             current: 0,
             end: 0,
-            recycled: Vec::new(),
+            recycled: VecDeque::new(),
+            // mapped: BTreeMap::new(),
         }
     }
     fn alloc(&mut self) -> Option<PhysPageNum> {
-        if let Some(ppn) = self.recycled.pop() {
-            trace!("[frame] recycled use: frame ppn={:#x}", self.current);
+        if !self.recycled.is_empty() {
+            trace!(
+                "before: {:?}",
+                self.recycled
+                    .iter()
+                    .map(|x| format!("{:#x}", x))
+                    .collect::<Vec<String>>()
+            );
+        }
+        let res: Option<PhysPageNum> = if let Some(ppn) = self.recycled.pop_front() {
+            debug!(
+                "[frame] recycled use: frame ppn = {:#x}, current_total_allocation: {:#x}",
+                ppn, self.current
+            );
+            trace!(
+                "after: {:?}",
+                self.recycled
+                    .iter()
+                    .map(|x| format!("{:#x}", x))
+                    .collect::<Vec<String>>()
+            );
             Some(ppn.into())
         } else if self.current == self.end {
             None
@@ -74,16 +96,26 @@ impl FrameAllocator for StackFrameAllocator {
             trace!("[frame] alloc frame ppn={:#x}", self.current);
             self.current += 1;
             Some((self.current - 1).into())
-        }
+        };
+        // let value = res.unwrap().0;
+        // assert!(self.mapped.get(&value).is_none());
+        // self.mapped.insert(value, true);
+        res
     }
     fn dealloc(&mut self, ppn: PhysPageNum) {
         let ppn = ppn.0;
+        debug!("dealloc: {:#x}", ppn);
+        // let data = Box::new(0);
+        // warn!("qwqwq: {}", data);
+        // assert!(self.mapped.get(&ppn).is_some());
+        // self.mapped.remove(&ppn);
+        // debug!("qwq");
         // validity check
         if ppn >= self.current || self.recycled.iter().any(|&v| v == ppn) {
             panic!("Frame ppn={:#x} has not been allocated!", ppn);
         }
         // recycle
-        self.recycled.push(ppn);
+        self.recycled.push_back(ppn);
     }
 }
 
@@ -99,18 +131,22 @@ pub fn frame_alloc() -> Option<FrameTracker> {
 }
 
 pub fn frame_dealloc(ppn: PhysPageNum) {
+    trace!("frame_dealloc in");
     FRAME_ALLOCATOR.lock().dealloc(ppn);
+    trace!("frame_dealloc done");
 }
 
 /// init frame allocator
-pub fn init() {
+pub fn frame_init() {
     extern "C" {
         fn ekernel(); // virt address
     }
-    FRAME_ALLOCATOR.lock().init(
+    let mut guard = FRAME_ALLOCATOR.lock();
+    guard.init(
         PhysAddr::from(kernel_va_to_pa(ekernel as usize)).ceil(),
         PhysAddr::from(KERNEL_PHYS_MEMORY_END).floor(),
     );
+    info!("FRAME_ALLOCATOR: {:#x}, {:#x}", guard.current, guard.end);
 }
 
 #[allow(unused)]
@@ -118,15 +154,15 @@ pub fn frame_allocator_test() {
     let mut v: Vec<FrameTracker> = Vec::new();
     for i in 0..5 {
         let frame = frame_alloc().unwrap();
-        println!("{:?}", frame);
+        trace!("{:?}", frame);
         v.push(frame);
     }
     v.clear();
     for i in 0..5 {
         let frame = frame_alloc().unwrap();
-        println!("{:?}", frame);
+        trace!("{:?}", frame);
         v.push(frame);
     }
     drop(v);
-    println!("frame_allocator_test passed!");
+    trace!("frame_allocator_test passed!");
 }

@@ -1,6 +1,6 @@
 //! map area
 
-use alloc::collections::btree_map::BTreeMap;
+use alloc::{collections::btree_map::BTreeMap, sync::Arc};
 
 use super::{
     address::{VirtAddr, VirtPageNum, VpnRange},
@@ -30,7 +30,7 @@ pub struct MapArea {
     /// program data frame tracker holder,
     /// mapping from vpn to ppn
     /// TODO: should it be Arc<FrameTracker>?
-    pub frame_map: BTreeMap<VirtPageNum, FrameTracker>,
+    pub frame_map: BTreeMap<VirtPageNum, Arc<FrameTracker>>,
 
     /// address mapping type
     pub map_type: MapType,
@@ -93,7 +93,7 @@ impl MapArea {
                     if self.frame_map.contains_key(&vpn) {
                         panic!("vm area overlap");
                     }
-                    self.frame_map.insert(vpn, frame);
+                    self.frame_map.insert(vpn, Arc::from(frame));
                     let flags = PTEFlags::from_bits(self.map_permission.bits()).unwrap();
                     page_table.map(vpn, ppn, flags);
                     assert!(page_table.find_pte(vpn).is_some());

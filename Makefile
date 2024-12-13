@@ -47,8 +47,8 @@ build_kernel:
 	@cd $(PROJECT)/kernel && make build
 
 build:
-	@cd $(PROJECT)/kernel && make build
 	@cd $(PROJECT)/user && make build
+	@cd $(PROJECT)/kernel && make build
 
 asm: # build_kernel
 	@echo -e "Building Kernel and Generating Assembly..."

@@ -51,4 +51,5 @@ pub fn log_init() {
         _ => LevelFilter::Off,
     });
     unsafe { LOG_BOOTED.store(true, Ordering::SeqCst) };
+    info!("log init complete!!!");
 }
