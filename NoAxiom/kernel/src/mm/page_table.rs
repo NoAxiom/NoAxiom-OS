@@ -22,17 +22,23 @@ pub struct PageTable {
     frames: Vec<FrameTracker>,
 }
 
-// #[allow(unused)]
 impl PageTable {
+    /// create a new page table without any allocation
+    /// SAFETY: this function is only act as a placeholder,
+    /// don't really use this to construct a page table
+    pub fn new_bare() -> Self {
+        PageTable {
+            root_ppn: PhysPageNum(0),
+            frames: Vec::new(),
+        }
+    }
+
     /// create a new page table,
     /// with allocating a frame for root node
     /// used in raw memory_set initialization
-    pub fn new() -> Self {
+    pub fn new_allocated() -> Self {
         let frame = frame_alloc().unwrap();
-        info!(
-            "[page_table] root_ppn = {:#x}",
-            frame.ppn.0
-        );
+        info!("[page_table] root_ppn = {:#x}", frame.ppn.0);
         PageTable {
             root_ppn: frame.ppn,
             frames: vec![frame],
@@ -95,47 +101,6 @@ impl PageTable {
                 return None;
             }
             if i == 2 {
-                result = Some(pte);
-                break;
-            }
-            ppn = pte.ppn();
-        }
-        result
-    }
-
-    // #[allow(unused)]
-    pub fn debug_find_pte(&self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
-        trace!(
-            "find_pte: vpn = {:#x}, root_ppn: {:#x}",
-            vpn.0,
-            self.root_ppn.0
-        );
-        let index = vpn.get_index();
-        let mut ppn = self.root_ppn;
-        let mut result: Option<&mut PageTableEntry> = None;
-        for (i, idx) in index.iter().enumerate() {
-            let pte = &mut ppn.get_pte_array()[*idx];
-            trace!(
-                "find_pte: i = {}, idx = {:#x}, ppn = {:#x}, pte_addr = {:#x}",
-                i,
-                idx,
-                ppn.0,
-                pte as *mut PageTableEntry as usize
-            );
-            trace!(
-                "find_pte: cur_pte: pa: {:#x}, flags: {:#x}",
-                pte.ppn().into_pa().0,
-                pte.flags()
-            );
-            if !pte.flags().is_valid() {
-                return None;
-            }
-            if i == 2 {
-                trace!(
-                    "find successfully (va -> pa) = ({:#x} -> {:#x})",
-                    VirtAddr::from(vpn).0,
-                    pte.ppn().into_pa().0
-                );
                 result = Some(pte);
                 break;
             }
@@ -209,7 +174,8 @@ impl PageTable {
 
     /// get the token of this page table (WARNING: sv39 only)
     /// which will be written into satp
-    pub fn token(&self) -> usize {
+    #[inline(always)]
+    pub const fn token(&self) -> usize {
         8usize << 60 | self.root_ppn.0
     }
 
@@ -238,6 +204,7 @@ impl PageTable {
 
     /// switch into this page table,
     /// PLEASE make sure context around is mapped into both page tables
+    #[inline(always)]
     pub unsafe fn activate(&self) {
         let satp: usize = self.token();
         unsafe {

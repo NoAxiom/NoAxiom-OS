@@ -13,12 +13,6 @@ pub fn signed_extend(num: usize, width: usize) -> usize {
 
 /// translate a raw usize type kernel virt address into phys address
 pub fn kernel_va_to_pa(virt: usize) -> usize {
-    info!(
-        "kernel_va_to_pa: {:#x}, {:#x}, {:#x}",
-        virt,
-        virt & KERNEL_ADDR_OFFSET,
-        KERNEL_ADDR_OFFSET
-    );
     assert!(
         (virt & KERNEL_ADDR_OFFSET) == KERNEL_ADDR_OFFSET,
         "invalid kernel virt address"

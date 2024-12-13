@@ -161,7 +161,7 @@ impl Task {
             exit_code: AtomicIsize::new(0),
             prio: Arc::new(SyncUnsafeCell::new(0)),
         });
-        info!("[spawn] create a new task, tid {}", task.tid.0);
+        info!("[spawn] new task spawn complete, tid {}", task.tid.0);
         task
     }
 

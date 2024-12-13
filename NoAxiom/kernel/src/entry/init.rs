@@ -5,7 +5,7 @@ use crate::{
     cpu::get_hartid,
     driver::{log::log_init, sbi::hart_start},
     entry::boot::_entry_other_hart,
-    mm::mm_init,
+    mm::{frame::frame_init, heap::heap_init},
     println, rust_main,
     sched::schedule_spawn_new_process,
     task::load_app::app_nums,
@@ -71,8 +71,9 @@ pub fn boot_hart_init(_: usize, dtb: usize) {
     // WARNING: don't try to modify any global variable before this line
     // because it will be overwritten by clear_bss
     bss_init();
+    heap_init();
     log_init();
-    mm_init();
+    frame_init();
     enable_user_memory_access();
     schedule_spawn_all_apps();
     // WARNING: all global variables should be initialized before this line

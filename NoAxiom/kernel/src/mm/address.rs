@@ -1,5 +1,7 @@
 //! Physical and virtual address types.
 
+use core::fmt::Debug;
+
 use super::pte::PageTableEntry;
 use crate::{
     config::mm::*,
@@ -186,7 +188,7 @@ impl_mutual_convert!(PhysAddr, PhysPageNum);
 
 /// virtual page number range,
 /// which is used to iterate over vpn ranges
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub struct VpnRange {
     start: VirtPageNum,
     end: VirtPageNum,
@@ -207,6 +209,12 @@ impl VpnRange {
     #[inline(always)]
     pub const fn end(&self) -> VirtPageNum {
         self.end
+    }
+}
+
+impl Debug for VpnRange {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "[{:#x}, {:#x})", self.start.0, self.end.0)
     }
 }
 
@@ -251,46 +259,3 @@ where
         }
     }
 }
-
-// #[allow(unused)]
-// pub fn kernel_address_test() {
-//     let va = VirtAddr(0x8000_0000);
-//     let pa = va.kernel_translate_into_pa();
-//     assert_eq!(pa.0, 0x0);
-
-//     let vpn = VirtPageNum(0x80000);
-//     let ppn = vpn.kernel_translate_into_ppn();
-//     assert_eq!(ppn.0, 0x0);
-
-//     let va = VirtAddr(0x8000_0000);
-//     let vpn: VirtPageNum = va.into();
-//     assert_eq!(vpn.0, 0x80000);
-
-//     let va = VirtAddr(0x8000_0000);
-//     let vpn = VirtPageNum::from(va);
-//     assert_eq!(vpn.0, 0x80000);
-
-//     let pa = PhysAddr(0x80000);
-//     let ppn: PhysPageNum = pa.into();
-//     assert_eq!(ppn.0, 0x80000);
-
-//     let pa = PhysAddr(0x80000);
-//     let ppn = PhysPageNum::from(pa);
-//     assert_eq!(ppn.0, 0x80000);
-
-//     let pa = PhysAddr(0x80000);
-//     let ppn = pa.floor();
-//     assert_eq!(ppn.0, 0x80000);
-
-//     let pa = PhysAddr(0x80000);
-//     let ppn: PhysPageNum = pa.into();
-//     assert_eq!(ppn.0, 0x8);
-
-//     let pa = PhysAddr(0x0);
-//     let ppn = PhysPageNum::from(pa);
-//     assert_eq!(ppn.0, 0x0);
-
-//     let vpn = VirtPageNum(0x8000_0000);
-//     let va = vpn.into_va();
-//     assert_eq!(va.0, 0x8000_0000);
-// }

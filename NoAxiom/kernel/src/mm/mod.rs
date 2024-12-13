@@ -1,19 +1,15 @@
 //! memory management
 
 pub mod address;
-mod frame;
-mod heap;
+pub mod frame;
+pub mod heap;
 pub mod map_area;
 pub mod memory_set;
 pub mod page_table;
 pub mod permission;
 pub mod pte;
 
-pub fn mm_init() {
-    frame::init();
-    heap::init();
-}
-
+#[inline(always)]
 pub fn hart_mm_init() {
     unsafe { memory_set::KERNEL_SPACE.lock().activate() };
 }

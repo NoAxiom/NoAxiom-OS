@@ -27,8 +27,8 @@ impl Cpu {
         unsafe { task.memory_activate() };
     }
     pub fn clear_task(&mut self) {
-        self.task = None;
         unsafe { kernel_space_activate() };
+        self.task = None;
     }
 }
 

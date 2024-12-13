@@ -15,7 +15,11 @@ fn panic(info: &PanicInfo) -> ! {
         );
         println!("[kernel panic] hart: {}", get_hartid());
     } else {
-        println!("[kernel panic (no_detail)] hart {} panicked: {}", 0, info.message().unwrap());
+        println!(
+            "[kernel panic (no_detail)] hart {} panicked: {}",
+            get_hartid(),
+            info.message().unwrap()
+        );
     }
     shutdown()
 }

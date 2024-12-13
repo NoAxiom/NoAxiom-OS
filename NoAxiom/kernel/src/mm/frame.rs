@@ -76,6 +76,12 @@ impl FrameAllocator for StackFrameAllocator {
             Some((self.current - 1).into())
         }
     }
+    /// dealloc frame
+    /// SAFETY: check if the satp is correctly switched to other before dealloc
+    /// NOTE THAT the deallocation won't clear the data in
+    /// corrisponding frame, so the processor can run on a deallocated
+    /// page, which can possibly cause pagefault after the page being
+    /// allocated again.
     fn dealloc(&mut self, ppn: PhysPageNum) {
         let ppn = ppn.0;
         // validity check
@@ -103,7 +109,7 @@ pub fn frame_dealloc(ppn: PhysPageNum) {
 }
 
 /// init frame allocator
-pub fn init() {
+pub fn frame_init() {
     extern "C" {
         fn ekernel(); // virt address
     }

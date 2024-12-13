@@ -81,6 +81,7 @@ impl MapArea {
     /// pte will be saved into page_table
     /// and data frame will be saved by self
     pub fn map_each(&mut self, page_table: &mut PageTable) {
+        trace!("map_each: vpn_range = {:?}", self.vpn_range);
         match self.map_type {
             MapType::Identical => {
                 panic!("kernel don't support identical memory mapping");

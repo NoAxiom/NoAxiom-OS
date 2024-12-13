@@ -78,9 +78,12 @@ pub struct MemorySet {
 impl MemorySet {
     /// create an new empty memory set without any allocation
     /// do not use this function directly, use [`new_with_kernel`] instead
-    pub fn new_bare() -> Self {
+    ///
+    /// use [`PageTable::new_bare`] to create a completly empty page table,
+    /// or use [`PageTable::new_allocated`] to create one with root allocated
+    pub fn new_bare(page_table: PageTable) -> Self {
         Self {
-            page_table: PageTable::new(),
+            page_table,
             areas: Vec::new(),
             user_stack_area: None,
             user_heap_area: None,
@@ -95,6 +98,7 @@ impl MemorySet {
     }
 
     /// switch into this memory set
+    #[inline(always)]
     pub unsafe fn activate(&mut self) {
         unsafe {
             self.page_table.activate();
@@ -123,7 +127,7 @@ impl MemorySet {
 
     /// create kernel space, used in [`KERNEL_SPACE`] initialization
     pub fn init_kernel_space() -> Self {
-        let mut memory_set = MemorySet::new_bare();
+        let mut memory_set = MemorySet::new_bare(PageTable::new_allocated());
         macro_rules! kernel_push_area {
             ($($start:expr, $end:expr, $permission:expr)*) => {
                 $(
@@ -163,7 +167,7 @@ impl MemorySet {
         );
         info!("[kernel].bss [{:#x}, {:#x})", sbss as usize, ebss as usize);
         info!(
-            "[kernel]physical mem [{:#x}, {:#x})",
+            "[kernel] frame [{:#x}, {:#x})",
             ekernel as usize, KERNEL_VIRT_MEMORY_END as usize
         );
         KERNEL_SPACE_TOKEN.store(memory_set.token(), Ordering::Relaxed);
@@ -172,21 +176,8 @@ impl MemorySet {
 
     /// create a new memory set with kernel space mapped,
     pub fn new_with_kernel() -> Self {
-        let mut memory_set = Self::new_bare();
+        let mut memory_set = Self::new_bare(PageTable::new_bare());
         memory_set.page_table = PageTable::clone_from_other(&KERNEL_SPACE.lock().page_table);
-        // let kernel_space = KERNEL_SPACE.lock();
-        // let mut new_page_table = PageTable::new();
-        // for area in kernel_space.areas.iter() {
-        //     let pte_flags =
-        // super::pte::PTEFlags::from_bits(area.map_permission.bits()).unwrap();
-        //     for vpn in area.vpn_range {
-        //         let ppn: super::address::PhysPageNum =
-        // kernel_space.translate_va(vpn.into()).unwrap().into();
-        //         new_page_table.map(vpn, ppn, pte_flags);
-        //     }
-        // }
-        // memory_set.page_table = new_page_table;
-        // drop(kernel_space);
         memory_set
     }
 
