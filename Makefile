@@ -29,7 +29,8 @@ KERNEL_BIN := $(KERNEL_ELF).bin
 # FS_BAK = $(TESTFS).bak
 
 # TEST_DIR := ./tests/final
-# FS_IMG := ./sdcard.img
+FS_IMG := fs.img
+MKFS_SH := mk_fat32img.sh
 
 export OBJCOPY := rust-objcopy --binary-architecture=riscv64
 
@@ -40,8 +41,11 @@ export WARN := "\e[33m"
 export NORMAL := "\e[32m"
 export RESET := "\e[0m"
 
-all: build_kernel run
+all: $(FS_IMG) build_kernel run 
 	@cp $(KERNEL_BIN) kernel-qemu
+
+$(FS_IMG):
+	@./$(MKFS_SH)
 
 build_kernel:
 	@cd $(PROJECT)/kernel && make build
@@ -64,8 +68,8 @@ QFLAGS += -nographic
 QFLAGS += -smp $(MULTICORE_ARGS)
 QFLAGS += -kernel kernel-qemu
 QFLAGS += -device loader,file=$(KERNEL_BIN),addr=0x80200000
-# QFLAGS += -drive file=$(SDCARD_BAK),if=none,format=raw,id=x0 
-# QFLAGS += -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 
+QFLAGS += -drive file=$(FS_IMG),if=none,format=raw,id=x0
+QFLAGS += -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 
 # QFLAGS += -device virtio-net-device,netdev=net -netdev user,id=net
 ifeq ($(BOARD), qemu-virt)
 	QFLAGS += -bios sbi-qemu
@@ -111,6 +115,7 @@ debug-client:
 clean:
 	@rm -f kernel-qemu
 	@rm -f sbi-qemu
+	@rm -f $(FS_IMG)
 	# @rm -f sdcard.img
 	cargo clean
 

@@ -8,7 +8,6 @@ pub mod tmp;
 use alloc::sync::Arc;
 use core::mem::MaybeUninit;
 
-use blockdevice::BlockDevice;
 use fat32::FAT32FIleSystem;
 pub use file::*;
 use spin::Mutex;
@@ -17,10 +16,9 @@ pub use tmp::*;
 use crate::{
     config::mm::VIRTIO0,
     driver::async_virtio_driver::{block::VirtIOBlock, mmio::VirtIOHeader},
-    println,
 };
 
-// #[cfg(feature = "board_qemu")]
+#[cfg(feature = "riscv_qemu")]
 type BlockDeviceImpl = VirtIOBlock<1>;
 
 #[cfg(feature = "board_k210")]
@@ -39,11 +37,18 @@ lazy_static::lazy_static! {
 }
 
 pub async fn fs_init() {
-    let initialed_fs = FAT32FIleSystem::init(VIRTIO_BLOCK.clone() as Arc<dyn BlockDevice>).await;
-    let mut gaurd = FS.lock();
-    let ptr = gaurd.as_mut_ptr();
+    // todo: do not use cast
+    info!("fs_init");
+    let device = Arc::clone(&VIRTIO_BLOCK);
+    let initialed_fs = FAT32FIleSystem::init(device).await;
+    info!("initialed_fs done");
+
+    initialed_fs.list().await;
+
+    let mut guard = FS.lock();
+    let ptr = guard.as_mut_ptr();
     unsafe {
         ptr.write(initialed_fs);
     }
-    println!("[kernel] fs initialed");
+    info!("[kernel] fs initialed");
 }

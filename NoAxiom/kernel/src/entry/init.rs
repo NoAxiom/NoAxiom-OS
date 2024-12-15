@@ -5,9 +5,10 @@ use crate::{
     cpu::get_hartid,
     driver::{log::log_init, sbi::hart_start},
     entry::boot::_entry_other_hart,
+    fs::fs_init,
     mm::{frame::frame_init, heap::heap_init},
     println, rust_main,
-    sched::schedule_spawn_new_process,
+    sched::{schedule_spawn_new_ktask, schedule_spawn_new_process},
     task::load_app::app_nums,
 };
 
@@ -50,6 +51,7 @@ fn awake_other_hart(forbid_hart_id: usize) {
 /// spawn all apps, only used in debug
 #[allow(unused)]
 fn schedule_spawn_all_apps() {
+    // schedule_spawn_new_ktask(fs_init(), 0);
     for i in 0..app_nums() {
         info!("[init] spawn app_{}", i);
         schedule_spawn_new_process(i);

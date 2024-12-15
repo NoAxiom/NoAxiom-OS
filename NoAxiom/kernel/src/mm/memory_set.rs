@@ -9,7 +9,10 @@ use riscv::register::satp;
 
 use super::{address::PhysAddr, map_area::MapArea, page_table::PageTable};
 use crate::{
-    config::mm::{KERNEL_VIRT_MEMORY_END, PAGE_SIZE, PAGE_WIDTH, USER_HEAP_SIZE, USER_STACK_SIZE},
+    config::mm::{
+        KERNEL_ADDR_OFFSET, KERNEL_VIRT_MEMORY_END, MMIO, PAGE_SIZE, PAGE_WIDTH, USER_HEAP_SIZE,
+        USER_STACK_SIZE,
+    },
     fs::File,
     map_permission,
     mm::{
@@ -125,6 +128,27 @@ impl MemorySet {
         self.areas.push(map_area); // bind life cycle
     }
 
+    #[cfg(feature = "qemu")]
+    fn map_mmio(mapping: &mut Mapping) {
+        // 映射 PLIC
+        let plic_va_start = VirtualAddress(PLIC_BASE);
+        let plic_va_end = VirtualAddress(PLIC_BASE + 0x400000);
+        mapping.map_defined(
+            &(plic_va_start..plic_va_end),
+            &(plic_va_start.physical_address_linear()..plic_va_end.physical_address_linear()),
+            Flags::READABLE | Flags::WRITABLE,
+        );
+
+        // 映射 virtio disk mmio
+        let virtio_va = VirtualAddress(VIRTIO0);
+        let virtio_pa = VirtualAddress(VIRTIO0).physical_address_linear();
+        mapping.map_one(
+            VirtualPageNumber::floor(virtio_va),
+            Some(PhysicalPageNumber::floor(virtio_pa)),
+            Flags::WRITABLE | Flags::READABLE,
+        );
+    }
+
     /// create kernel space, used in [`KERNEL_SPACE`] initialization
     pub fn init_kernel_space() -> Self {
         let mut memory_set = MemorySet::new_bare(PageTable::new_allocated());
@@ -151,6 +175,14 @@ impl MemorySet {
             sbss,    ebss,    map_permission!(R, W)
             ekernel, KERNEL_VIRT_MEMORY_END, map_permission!(R, W)
         );
+        info!("mapping memory-mapped registers");
+        for (start, len) in MMIO {
+            kernel_push_area!(
+                *start + KERNEL_ADDR_OFFSET,
+                *start + *len + KERNEL_ADDR_OFFSET,
+                map_permission!(R, W)
+            );
+        }
         trace!("[memory_set] sp: {:#x}", crate::arch::regs::get_sp());
         info!("[kernel] space initialized");
         info!(

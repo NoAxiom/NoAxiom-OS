@@ -20,6 +20,11 @@ pub fn kernel_va_to_pa(virt: usize) -> usize {
     virt & !KERNEL_ADDR_OFFSET
 }
 
+/// translate a raw usize type kernel phys address into virt address
+pub fn kernel_pa_to_va(phys: usize) -> usize {
+    phys | KERNEL_ADDR_OFFSET
+}
+
 /// get current pc
 #[inline(always)]
 #[allow(unused)]

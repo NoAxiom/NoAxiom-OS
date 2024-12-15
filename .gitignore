@@ -10,3 +10,4 @@ log/
 *.img
 .vscode-ctags
 NoAxiom/user/bin/
+fs/

@@ -32,6 +32,7 @@ use core::{
 
 use bitflags::bitflags;
 use spin::Mutex;
+use virtio_mm::{virtio_phys_to_virt, VIRTIO_BLOCK};
 use volatile::Volatile;
 
 use super::{config::*, mmio::VirtIOHeader, queue::VirtQueue, util::AsBuf, *};
@@ -397,6 +398,7 @@ impl<const N: usize> VirtIOBlock<N> {
     /// todo!()
     /// ```
     pub async fn async_read_block(&self, block_id: usize, buf: &mut [u8]) -> Result<()> {
+        info!("async_read_block!");
         // 块大小 = 一个块中的扇区数 * 扇区大小
         let block_size = self.sector_size as usize * N;
         if buf.len() != block_size {
@@ -406,7 +408,7 @@ impl<const N: usize> VirtIOBlock<N> {
             );
         }
         for (idx, b) in buf.chunks_mut(self.sector_size as usize).enumerate() {
-            self.async_read_sector(block_id + idx, b).await?;
+            self.read_sector_event(block_id + idx, b).await?;
         }
         Ok(())
     }
@@ -473,7 +475,11 @@ impl<const N: usize> VirtIOBlock<N> {
 
         h.notify(0);
 
+        info!("read sector event");
+
         listener.await;
+
+        info!("read sector event");
 
         q.pop_used()?;
 
@@ -834,13 +840,9 @@ pub enum InterruptRet {
     Other,
 }
 
-extern "C" {
-    /// 内核提供的物理地址到虚拟地址的转换函数
-    fn virtio_phys_to_virt(paddr: usize) -> usize;
-}
-
 impl<const N: usize> BlockDevice for VirtIOBlock<N> {
     fn read<'a>(&'a self, id: usize, buf: &'a mut [u8]) -> crate::fs::blockdevice::BlockReturn {
+        info!("read!");
         Box::pin(async move {
             self.async_read_block(id, buf)
                 .await

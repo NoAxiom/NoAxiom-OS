@@ -70,7 +70,7 @@ impl RootDirectory {
     }
 
     /// get content
-    async fn content(&self) -> Vec<u8> {
+    pub async fn content(&self) -> Vec<u8> {
         let mut ret = Vec::new();
         for cluster in &self.clusters {
             let cluster = cluster_offset_sectors(&*self.bpb, *cluster);

@@ -2,10 +2,11 @@
 
 pub mod block;
 mod config;
-mod dma;
+pub mod dma;
 pub mod mmio;
 pub mod queue;
 mod util;
+mod virtio_mm;
 
 extern crate alloc;
 

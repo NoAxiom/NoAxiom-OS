@@ -414,6 +414,11 @@ impl Future for EventListener {
             }
         }
 
+        info!(
+            "EventListener::poll: {:?}",
+            self.inner.notified.load(Ordering::Acquire)
+        );
+
         Poll::Pending
     }
 }

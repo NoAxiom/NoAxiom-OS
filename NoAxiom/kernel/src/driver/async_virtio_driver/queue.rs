@@ -6,6 +6,7 @@ use core::{
 };
 
 use bitflags::bitflags;
+use virtio_mm::virtio_virt_to_phys;
 /// 虚拟队列相关实现
 /// ref: https://github.com/rcore-os/virtio-drivers/blob/master/src/queue.rs
 /// thanks!
@@ -413,7 +414,7 @@ impl Clone for Descriptor {
 impl Descriptor {
     /// 把特定 buffer 的信息写入到描述符
     fn set_buf(&mut self, buf: &[u8]) {
-        let buf_paddr = unsafe { virtio_virt_to_phys(buf.as_ptr() as usize) as u64 };
+        let buf_paddr = virtio_virt_to_phys(buf.as_ptr() as usize) as u64;
         self.paddr.write(buf_paddr);
         self.len.write(buf.len() as u32);
     }
@@ -449,8 +450,4 @@ pub struct Ring<Entry: Sized> {
 pub struct UsedElement {
     id: Volatile<u32>,
     len: Volatile<u32>,
-}
-
-extern "C" {
-    fn virtio_virt_to_phys(vaddr: usize) -> usize;
 }

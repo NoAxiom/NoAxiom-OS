@@ -47,4 +47,8 @@ impl FAT32FIleSystem {
             root,
         }
     }
+
+    pub async fn list(&self) {
+        info!("root content: {:?}", self.root.content().await);
+    }
 }

@@ -1,16 +1,16 @@
 //! Linux error number: https://man7.org/linux/man-pages/man3/errno.3.html
 
-use alloc::boxed::Box;
-use core::{future::Future, pin::Pin};
+// use alloc::boxed::Box;
+// use core::{future::Future, pin::Pin};
 
 use thiserror::Error;
 
 // 用于syscall返回值
-pub type Result = core::result::Result<isize, Errno>;
-pub type GeneralRes<T> = core::result::Result<T, Errno>;
+// pub type Result = core::result::Result<isize, Errno>;
+// pub type GeneralRes<T> = core::result::Result<T, Errno>;
 // 异步的syscall返回值
-pub type SysFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
-pub type AsyscallRet<'a> = SysFuture<'a, Result>;
+// pub type SysFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
+// pub type AsyscallRet<'a> = SysFuture<'a, Result>;
 
 #[repr(i32)]
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
