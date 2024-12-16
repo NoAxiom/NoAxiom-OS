@@ -6,7 +6,7 @@ use log::{self, Level, LevelFilter, Log, Metadata, Record};
 
 use crate::{cpu::get_hartid, println};
 
-pub static mut LOG_BOOTED : AtomicBool = AtomicBool::new(false);
+pub static mut LOG_BOOTED: AtomicBool = AtomicBool::new(false);
 
 struct SimpleLogger;
 
@@ -51,4 +51,5 @@ pub fn log_init() {
         _ => LevelFilter::Off,
     });
     unsafe { LOG_BOOTED.store(true, Ordering::SeqCst) };
+    info!("[init] log init success");
 }

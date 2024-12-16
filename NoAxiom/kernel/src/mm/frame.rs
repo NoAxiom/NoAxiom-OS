@@ -117,6 +117,7 @@ pub fn frame_init() {
         PhysAddr::from(kernel_va_to_pa(ekernel as usize)).ceil(),
         PhysAddr::from(KERNEL_PHYS_MEMORY_END).floor(),
     );
+    info!("[init] frame allocator init success.");
 }
 
 #[allow(unused)]

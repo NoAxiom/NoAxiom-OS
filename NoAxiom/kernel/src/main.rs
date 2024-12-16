@@ -29,6 +29,7 @@ mod entry;
 mod fs;
 mod mm;
 mod panic;
+mod platform;
 mod sched;
 mod sync;
 mod syscall;

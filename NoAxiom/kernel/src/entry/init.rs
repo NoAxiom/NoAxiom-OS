@@ -5,10 +5,9 @@ use crate::{
     cpu::get_hartid,
     driver::{log::log_init, sbi::hart_start},
     entry::boot::_entry_other_hart,
-    fs::fs_init,
     mm::{frame::frame_init, heap::heap_init},
     println, rust_main,
-    sched::{schedule_spawn_new_ktask, schedule_spawn_new_process},
+    sched::schedule_spawn_new_process,
     task::load_app::app_nums,
 };
 

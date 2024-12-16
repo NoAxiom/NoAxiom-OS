@@ -1,5 +1,6 @@
 mod context;
 mod handler;
+mod interrupt;
 mod trap;
 
 pub use context::TrapContext;

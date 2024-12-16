@@ -97,11 +97,20 @@ pub const MMIO: &[(usize, usize)] = &[
                             * (0x3000_0000, 0x1000_0000), */
 ];
 
-// / VF2 MMIO
-#[cfg(feature = "vf2")]
-pub const MMIO: &[(usize, usize)] = &[
-    (0x17040000, 0x10000),  // RTC
-    (0xc000000, 0x4000000), // PLIC
-    (0x1000_0000, 0x10000), // UART
-    (0x16020000, 0x10000),  // sdio1
-];
+// pub const MMIO: &[(usize, usize)] = &[
+// (0x0010_0000, 0x00_2000), // VIRT_TEST/RTC  in virt machine
+// (0x2000000, 0x10000),
+// (0xc00_0000, 0x21_0000), // VIRT_PLIC in virt machine
+// (0x1000_0000, 0x9000),   // VIRT_UART0 with GPU  in virt machine
+// (0x3000_0000, 0x1000_0000),
+// ];
+//
+// VF2 MMIO
+// #[cfg(feature = "vf2")]
+// pub const MMIO: &[(usize, usize)] = &[
+// (0x17040000, 0x10000),  // RTC
+// (0xc000000, 0x4000000), // PLIC
+// (0x1000_0000, 0x10000), // UART
+// (0x16020000, 0x10000),  // sdio1
+// ];
+//

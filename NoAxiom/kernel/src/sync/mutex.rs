@@ -4,6 +4,7 @@ use core::cell::{RefCell, RefMut};
 
 use kernel_sync::{ticket::TicketMutexGuard, LockAction};
 
+use super::cell::SyncRefCell;
 use crate::{
     arch::interrupt::{disable_global_interrupt, enable_global_interrupt, is_interrupt_enabled},
     config::arch::CPU_NUM,
@@ -18,74 +19,51 @@ pub type MutexGuard<'a, T> = TicketMutexGuard<'a, T, KernelLockAction>;
 
 #[derive(Debug, Default, Clone, Copy)]
 #[repr(align(64))]
-struct Cpu {
-    pub push_off_depth: i32,    // Depth of push_off() nesting.
-    pub interrupt_enable: bool, // Were interrupts enabled before push_off()?
+struct MutexTracer {
+    pub depth: i32,       // Depth of push_off() nesting.
+    pub int_record: bool, // Were interrupts enabled before push_off()?
 }
 
-impl Cpu {
+impl MutexTracer {
     const fn new() -> Self {
         Self {
-            push_off_depth: 0,
-            interrupt_enable: false,
+            depth: 0,
+            int_record: false,
         }
     }
 }
 
-pub struct SafeRefCell<T>(RefCell<T>);
-
-/// # Safety: Only the corresponding cpu will access it.
-unsafe impl<Cpu> Sync for SafeRefCell<Cpu> {}
-
-impl<T> SafeRefCell<T> {
-    const fn new(t: T) -> Self {
-        Self(RefCell::new(t))
-    }
-}
-
 #[allow(clippy::declare_interior_mutable_const)]
-const DEFAULT_CPU: SafeRefCell<Cpu> = SafeRefCell::new(Cpu::new());
+const DEFAULT_CPU: SyncRefCell<MutexTracer> = SyncRefCell::new(MutexTracer::new());
 
-static CPUS: [SafeRefCell<Cpu>; CPU_NUM] = [DEFAULT_CPU; CPU_NUM];
+static CPUS: [SyncRefCell<MutexTracer>; CPU_NUM] = [DEFAULT_CPU; CPU_NUM];
 
-fn current_cpu() -> RefMut<'static, Cpu> {
-    CPUS[get_hartid()].0.borrow_mut()
+fn current_mutex_tracer() -> RefMut<'static, MutexTracer> {
+    CPUS[get_hartid()].borrow_mut()
 }
 
 /// provides riscv arch interrupt behavior for lock action
 pub struct KernelLockAction;
 
 impl LockAction for KernelLockAction {
-    #[inline(always)]
     fn before_lock() {
-        push_off();
+        // assert!(!is_interrupt_enabled());
+        let old = is_interrupt_enabled();
+        disable_global_interrupt();
+        let mut cpu = current_mutex_tracer();
+        if cpu.depth == 0 {
+            cpu.int_record = old;
+        }
+        cpu.depth += 1;
     }
-    #[inline(always)]
     fn after_lock() {
-        pop_off();
+        // assert!(!is_interrupt_enabled());
+        let mut cpu = current_mutex_tracer();
+        cpu.depth -= 1;
+        let should_enable = cpu.depth == 0 && cpu.int_record;
+        drop(cpu); // drop before int_en
+        if should_enable {
+            enable_global_interrupt();
+        }
     }
-}
-
-/// disable interrupt
-pub(crate) fn push_off() {
-    assert!(!is_interrupt_enabled());
-    // let old = is_interrupt_enabled();
-    // disable_global_interrupt();
-    // let mut cpu = current_cpu();
-    // if cpu.push_off_depth == 0 {
-    //     cpu.interrupt_enable = old;
-    // }
-    // cpu.push_off_depth += 1;
-}
-
-/// enable interrupt if depth decline to 0
-pub(crate) fn pop_off() {
-    assert!(!is_interrupt_enabled());
-    // let mut cpu = current_cpu();
-    // cpu.push_off_depth -= 1;
-    // let should_enable = cpu.push_off_depth == 0 && cpu.interrupt_enable;
-    // drop(cpu); // drop before int_en
-    // if should_enable {
-    //     enable_global_interrupt();
-    // }
 }

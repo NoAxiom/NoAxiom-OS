@@ -15,7 +15,7 @@ impl Syscall<'_> {
     }
 
     pub async fn sys_yield(&mut self) {
-        debug!("sys_yield");
+        trace!("sys_yield");
         yield_now().await;
     }
 }
