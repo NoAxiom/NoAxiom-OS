@@ -11,7 +11,7 @@ use riscv::{
     },
 };
 
-use super::trap::set_kernel_trap_entry;
+use super::{interrupt::ext_int_handler, trap::set_kernel_trap_entry};
 use crate::{
     config::fs::WAKE_NUM, constant::register::A0, cpu::get_hartid, fs::VIRTIO_BLOCK,
     platform::plic::PLIC, sched::utils::yield_now, syscall::syscall, task::Task,
@@ -100,12 +100,20 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
         Trap::Interrupt(interrupt) => match interrupt {
             Interrupt::SupervisorTimer => {
                 task.inc_prio();
-                debug!(
+                trace!(
                     "[SupervisorTimer] hart: {}, tid: {}",
                     get_hartid(),
                     task.tid(),
                 );
                 yield_now().await;
+            }
+            Interrupt::SupervisorExternal => {
+                trace!(
+                    "[SupervisorExternal] interrupted at hart: {}, tid: {}",
+                    get_hartid(),
+                    task.tid(),
+                );
+                ext_int_handler();
             }
             _ => panic!(
                 "hart: {}, interrupt {:?} is unsupported, stval = {:#x}, sepc = {:#x}",

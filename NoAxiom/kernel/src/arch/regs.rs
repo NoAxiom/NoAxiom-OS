@@ -28,11 +28,7 @@ impl Sstatus {
     }
     pub fn spp(&self) -> SPP {
         let v = (self.0 >> 8) & 1;
-        if v == 1 {
-            SPP::Supervisor
-        } else {
-            SPP::User
-        }
+        if v == 1 { SPP::Supervisor } else { SPP::User }
     }
     pub fn set_spie(&mut self) {
         self.0 |= 1 << 5;
