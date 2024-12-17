@@ -16,27 +16,31 @@ pub static PLIC: Once<PLIC<CPU_NUM>> = Once::new();
 // Mutex::new(BTreeMap::new()); pub static DEVICE_TABLE: Mutex<BTreeMap<usize,
 // Arc<dyn Device>>> = Mutex::new(BTreeMap::new());
 
+pub fn register_to_hart() {
+    let plic = PLIC.get().unwrap();
+    let hart = get_hartid();
+    let irq = 1;
+    plic.set_threshold(hart as u32, Mode::Machine, 1);
+    plic.set_threshold(hart as u32, Mode::Supervisor, 0);
+    plic.enable(hart as u32, Mode::Supervisor, irq);
+    plic.complete(hart as u32, Mode::Supervisor, irq);
+    println!("hart: {}, register to {}", hart, irq);
+}
+
 pub fn init_plic(plic_addr: usize) {
     #[cfg(feature = "riscv_qemu")]
     {
+        // privilege level for each hart, hart can run
+        // when its mode threshold <= privilege
         let privileges = [2; CPU_NUM];
         let plic = PLIC::new(plic_addr, privileges);
         PLIC.call_once(|| plic);
-        // todo: register more devices
-        let hart = get_hartid();
+
+        let irq = 1;
         let plic = PLIC.get().unwrap();
-        plic.set_threshold(hart as u32, Mode::Machine, 1);
-        plic.set_threshold(hart as u32, Mode::Supervisor, 0);
-        // todo: alloc irq number, now is equal to hart id
-        let irq = hart as u32 + 1;
-        plic.complete(hart as u32, Mode::Supervisor, irq);
-        plic.set_priority(irq, 1);
-        // bind irq to current hart
-        plic.enable(hart as u32, Mode::Supervisor, irq);
-        println!(
-            "hart: {}, Init qemu plic success, plic address: {:#x}, irq: {}",
-            hart, plic_addr, irq
-        );
+        plic.set_priority(irq, 3);
+
+        // todo: register more devices
     }
     #[cfg(any(feature = "vf2"))]
     {
