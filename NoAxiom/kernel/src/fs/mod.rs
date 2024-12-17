@@ -15,8 +15,7 @@ pub use tmp::*;
 
 use crate::{
     arch::interrupt::{
-        disable_external_interrupt, disable_global_interrupt, enable_external_interrupt,
-        enable_global_interrupt,
+        disable_global_interrupt, enable_external_interrupt, enable_global_interrupt,
     },
     driver::async_virtio_driver::virtio_mm::async_blk::VirtIOAsyncBlock,
 };

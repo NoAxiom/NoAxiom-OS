@@ -13,7 +13,7 @@ pub static DTB: Once<usize> = Once::new();
 static MACHINE_INFO: Once<PlatformInfo> = Once::new();
 
 #[no_mangle]
-pub fn init(_hart_id: usize, dtb: usize) {
+pub fn platform_init(_hart_id: usize, dtb: usize) {
     #[cfg(feature = "riscv_qemu")]
     {
         let riscv = qemu_riscv::QemuRISCV::new().unwrap();
