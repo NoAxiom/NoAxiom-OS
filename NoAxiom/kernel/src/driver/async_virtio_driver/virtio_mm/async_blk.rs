@@ -1,11 +1,14 @@
 //! virtio异步块设备驱动
 
+use alloc::boxed::Box;
+
 use crate::{
     config::mm::VIRTIO0,
     driver::async_virtio_driver::{
         block::{InterruptRet, VirtIOBlock},
         mmio::VirtIOHeader,
     },
+    fs::blockdevice::BlockDevice,
 };
 /// 异步虚拟块设备接口
 ///
@@ -100,5 +103,30 @@ impl VirtIOAsyncBlock {
                 return None;
             }
         }
+    }
+}
+
+impl BlockDevice for VirtIOAsyncBlock {
+    fn read<'a>(&'a self, id: usize, buf: &'a mut [u8]) -> crate::fs::blockdevice::BlockReturn {
+        info!("read!");
+        Box::pin(async move {
+            self.read_block(id, buf).await;
+            Ok(buf.len() as isize)
+        })
+    }
+
+    fn write<'a>(&'a self, id: usize, buf: &'a [u8]) -> crate::fs::blockdevice::BlockReturn {
+        Box::pin(async move {
+            self.write_block(id, buf).await;
+            Ok(buf.len() as isize)
+        })
+    }
+
+    fn close(&self) -> core::result::Result<(), ()> {
+        todo!()
+    }
+
+    fn flush(&self) -> core::result::Result<(), ()> {
+        todo!()
     }
 }

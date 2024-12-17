@@ -21,7 +21,7 @@
 //! 说明系统里面可能会有这样的情况）
 //!
 //! todo: 弄清楚哪些操作需要同步，哪些部分需要加锁
-use alloc::{boxed::Box, sync::Arc};
+use alloc::sync::Arc;
 use core::{
     cell::RefCell,
     future::Future,
@@ -32,11 +32,11 @@ use core::{
 
 use bitflags::bitflags;
 use spin::Mutex;
-use virtio_mm::{virtio_phys_to_virt, VIRTIO_BLOCK};
+use virtio_mm::virtio_phys_to_virt;
 use volatile::Volatile;
 
 use super::{config::*, mmio::VirtIOHeader, queue::VirtQueue, util::AsBuf, *};
-use crate::{config::errno::Errno, driver::event::Event, fs::blockdevice::BlockDevice, println};
+use crate::{driver::event::Event, println};
 
 /// 块设备读写返回的`Future`
 ///
@@ -838,33 +838,4 @@ pub enum InterruptRet {
     Write(u64),
     /// 其他
     Other,
-}
-
-impl<const N: usize> BlockDevice for VirtIOBlock<N> {
-    fn read<'a>(&'a self, id: usize, buf: &'a mut [u8]) -> crate::fs::blockdevice::BlockReturn {
-        info!("read!");
-        Box::pin(async move {
-            self.async_read_block(id, buf)
-                .await
-                .map_err(|_| Errno::EIO)?;
-            Ok(buf.len() as isize)
-        })
-    }
-
-    fn write<'a>(&'a self, id: usize, buf: &'a [u8]) -> crate::fs::blockdevice::BlockReturn {
-        Box::pin(async move {
-            self.async_write_block(id, buf)
-                .await
-                .map_err(|_| Errno::EIO)?;
-            Ok(buf.len() as isize)
-        })
-    }
-
-    fn close(&self) -> core::result::Result<(), ()> {
-        todo!()
-    }
-
-    fn flush(&self) -> core::result::Result<(), ()> {
-        todo!()
-    }
 }

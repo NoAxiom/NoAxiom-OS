@@ -2,14 +2,19 @@
 
 use alloc::sync::Arc;
 
-use riscv::register::{
-    scause::{self, Exception, Interrupt, Trap},
-    sepc, stval,
+use plic::Mode;
+use riscv::{
+    interrupt,
+    register::{
+        scause::{self, Exception, Interrupt, Trap},
+        sepc, stval,
+    },
 };
 
 use super::trap::set_kernel_trap_entry;
 use crate::{
-    constant::register::A0, cpu::get_hartid, sched::utils::yield_now, syscall::syscall, task::Task,
+    config::fs::WAKE_NUM, constant::register::A0, cpu::get_hartid, fs::VIRTIO_BLOCK,
+    platform::plic::PLIC, sched::utils::yield_now, syscall::syscall, task::Task,
 };
 
 /// kernel trap handler
@@ -18,12 +23,46 @@ pub fn kernel_trap_handler() {
     let scause = scause::read();
     let stval = stval::read();
     let sepc = sepc::read();
-    panic!(
-        "kernel trap!!! trap {:?} is unsupported, stval = {:#x}, error pc = {:#x}",
-        scause.cause(),
-        stval,
-        sepc,
-    );
+    match scause.cause() {
+        Trap::Exception(exception) => match exception {
+            _ => panic!(
+                "hart: {}, kernel exception {:?} is unsupported, stval = {:#x}, sepc = {:#x}",
+                get_hartid(),
+                scause.cause(),
+                stval,
+                sepc
+            ),
+        },
+        Trap::Interrupt(interrupt) => match interrupt {
+            Interrupt::SupervisorExternal => {
+                let plic = PLIC.get().unwrap();
+                let irq = plic.claim(get_hartid() as u32, Mode::Supervisor);
+                debug!("[SupervisorExternal] hart: {}, irq: {}", get_hartid(), irq);
+                unsafe {
+                    VIRTIO_BLOCK
+                        .0
+                        .handle_interrupt()
+                        .expect("virtio handle interrupt error!")
+                };
+                VIRTIO_BLOCK.0.wake_ops.notify(WAKE_NUM);
+                plic.complete(get_hartid() as u32, Mode::Supervisor, irq);
+                debug!("[SupervisorExternal] plic complete done!");
+            }
+            _ => panic!(
+                "hart: {}, kernel interrupt {:?} is unsupported, stval = {:#x}, sepc = {:#x}",
+                get_hartid(),
+                scause.cause(),
+                stval,
+                sepc
+            ),
+        },
+    }
+    // panic!(
+    //     "kernel trap!!! trap {:?} is unsupported, stval = {:#x}, error pc =
+    // {:#x}",     scause.cause(),
+    //     stval,
+    //     sepc,
+    // );
 }
 
 /// user trap handler
@@ -34,7 +73,11 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
     let mut cx = task.trap_context_mut();
     let scause = scause::read();
     let stval = stval::read();
-    trace!("[trap_handler] handle begin, scause: {:?}, stval: {:#x}", scause.cause(), stval);
+    trace!(
+        "[trap_handler] handle begin, scause: {:?}, stval: {:#x}",
+        scause.cause(),
+        stval
+    );
     match scause.cause() {
         // syscall
         Trap::Exception(exception) => match exception {

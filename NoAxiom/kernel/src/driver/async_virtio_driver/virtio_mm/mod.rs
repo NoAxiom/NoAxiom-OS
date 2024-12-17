@@ -15,7 +15,7 @@ use crate::{
     println,
     utils::{kernel_pa_to_va, kernel_va_to_pa},
 };
-mod async_blk;
+pub mod async_blk;
 
 lazy_static! {
     static ref QUEUE_FRAMES: Mutex<Vec<FrameTracker>> = Mutex::new(Vec::new());

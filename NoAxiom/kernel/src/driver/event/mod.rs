@@ -6,8 +6,6 @@
 //! ```
 //! ```
 
-mod rvlock;
-
 extern crate alloc;
 use alloc::{boxed::Box, sync::Arc};
 use core::{
@@ -27,6 +25,8 @@ use core::{
 use rv_lock::{Lock, LockGuard};
 #[cfg(any(not(feature = "kernel")))]
 use spin::{Mutex, MutexGuard};
+
+use crate::arch::interrupt::is_external_interrupt_enabled;
 
 /// [`Event`] 的内部数据
 struct Inner {
@@ -396,16 +396,21 @@ impl Future for EventListener {
         let state = unsafe { &entry.as_ref().state };
 
         match state.replace(State::Notified(false)) {
+            // 被通知过了，返回ready
             State::Notified(_) => {
                 list.remove(entry, self.inner.cache_ptr());
                 drop(list);
                 self.entry = None;
                 return Poll::Ready(());
             }
+            // 刚被创建，被poll了，就保存住waker，返回pending
             State::Created => {
+                info!("created");
                 state.set(State::Polling(cx.waker().clone()));
             }
+            // 可以被poll的状态，重设waker，返回pending
             State::Polling(w) => {
+                info!("polling");
                 if w.will_wake(cx.waker()) {
                     state.set(State::Polling(w));
                 } else {
@@ -414,9 +419,11 @@ impl Future for EventListener {
             }
         }
 
+        info!("EventListener is pending!");
         info!(
-            "EventListener::poll: {:?}",
-            self.inner.notified.load(Ordering::Acquire)
+            "[kernel] hart id {} interrupt status: {}",
+            crate::get_hartid(),
+            is_external_interrupt_enabled()
         );
 
         Poll::Pending

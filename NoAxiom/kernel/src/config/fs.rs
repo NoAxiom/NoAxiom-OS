@@ -15,3 +15,6 @@ pub const MAX_LRU_CACHE_SIZE: usize = 128;
 pub const IS_DELETED: u8 = 0xe5;
 pub const SPACE: u8 = 0x20;
 pub const FIRST_CLUSTER: u32 = 2;
+
+/// The number of wake ops when external interrupt comes
+pub const WAKE_NUM: usize = 1;

@@ -30,6 +30,11 @@ pub fn enable_external_interrupt() {
     }
 }
 
+/// check if external interrupt is enabled
+pub fn is_external_interrupt_enabled() -> bool {
+    riscv::register::sie::read().sext() && is_interrupt_enabled()
+}
+
 /// set external int disabled
 pub fn disable_external_interrupt() {
     unsafe {

@@ -15,6 +15,15 @@
 // #![feature(custom_mir)]
 // #![feature(core_intrinsics)]
 
+use arch::interrupt::{
+    enable_external_interrupt, enable_global_interrupt, is_external_interrupt_enabled,
+    is_interrupt_enabled,
+};
+use config::mm::KERNEL_ADDR_OFFSET;
+use cpu::get_hartid;
+use device::device_init;
+use platform::{base_riscv::platforminfo::platform_info_from_dtb, plic::init_plic};
+
 #[macro_use]
 extern crate alloc;
 #[macro_use]
@@ -24,11 +33,13 @@ mod arch;
 mod config;
 mod constant;
 mod cpu;
+mod device;
 mod driver;
 mod entry;
 mod fs;
 mod mm;
 mod panic;
+mod platform;
 mod sched;
 mod sync;
 mod syscall;
@@ -44,9 +55,12 @@ core::arch::global_asm!(include_str!("link_apps.S"));
 #[no_mangle]
 pub fn rust_main() {
     trap::trap_init();
-    mm::hart_mm_init();
     trace!("token {:#x}", crate::mm::page_table::current_token());
     info!("[kernel] hart id {} has been booted", cpu::get_hartid());
+    info!(
+        "[kernel] interrupt status: {}",
+        is_external_interrupt_enabled()
+    );
     loop {
         sched::run();
     }

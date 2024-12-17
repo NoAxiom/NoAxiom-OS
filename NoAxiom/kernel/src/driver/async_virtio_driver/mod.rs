@@ -6,7 +6,7 @@ pub mod dma;
 pub mod mmio;
 pub mod queue;
 mod util;
-mod virtio_mm;
+pub mod virtio_mm;
 
 extern crate alloc;
 

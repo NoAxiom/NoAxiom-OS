@@ -128,27 +128,6 @@ impl MemorySet {
         self.areas.push(map_area); // bind life cycle
     }
 
-    #[cfg(feature = "qemu")]
-    fn map_mmio(mapping: &mut Mapping) {
-        // 映射 PLIC
-        let plic_va_start = VirtualAddress(PLIC_BASE);
-        let plic_va_end = VirtualAddress(PLIC_BASE + 0x400000);
-        mapping.map_defined(
-            &(plic_va_start..plic_va_end),
-            &(plic_va_start.physical_address_linear()..plic_va_end.physical_address_linear()),
-            Flags::READABLE | Flags::WRITABLE,
-        );
-
-        // 映射 virtio disk mmio
-        let virtio_va = VirtualAddress(VIRTIO0);
-        let virtio_pa = VirtualAddress(VIRTIO0).physical_address_linear();
-        mapping.map_one(
-            VirtualPageNumber::floor(virtio_va),
-            Some(PhysicalPageNumber::floor(virtio_pa)),
-            Flags::WRITABLE | Flags::READABLE,
-        );
-    }
-
     /// create kernel space, used in [`KERNEL_SPACE`] initialization
     pub fn init_kernel_space() -> Self {
         let mut memory_set = MemorySet::new_bare(PageTable::new_allocated());
