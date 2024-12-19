@@ -53,6 +53,9 @@ pub struct Task {
 
     /// task exit code
     exit_code: AtomicIsize,
+
+    // /// file descriptor
+    // fd: Arc<SpinMutex<FdTable>>,
 }
 
 /// user tasks
@@ -163,6 +166,14 @@ impl Task {
         });
         info!("[spawn] new task spawn complete, tid {}", task.tid.0);
         task
+    }
+
+    pub fn fork_thread(&self) -> Arc<Self> {
+        todo!()
+    }
+
+    pub fn fork_process(&self) -> Arc<Self> {
+        todo!()
     }
 
     /// exit current task

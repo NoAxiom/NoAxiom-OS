@@ -1,6 +1,6 @@
 //! map area
 
-use alloc::collections::btree_map::BTreeMap;
+use alloc::{collections::btree_map::BTreeMap, sync::Arc};
 
 use super::{
     address::{VirtAddr, VirtPageNum, VpnRange},
@@ -9,7 +9,7 @@ use super::{
     permission::{MapPermission, MapType},
     pte::PTEFlags,
 };
-use crate::{config::mm::PAGE_SIZE, mm::address::StepOne};
+use crate::{config::mm::PAGE_SIZE, fs::File, mm::address::StepOne};
 
 #[allow(unused)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -21,7 +21,6 @@ pub enum MapAreaType {
     KernelSpace,
 }
 
-// TODO: file & file offset
 /// map area, saves program data mapping information
 pub struct MapArea {
     /// The range of the virtual page number
@@ -29,8 +28,8 @@ pub struct MapArea {
 
     /// program data frame tracker holder,
     /// mapping from vpn to ppn
-    /// TODO: should it be Arc<FrameTracker>?
-    pub frame_map: BTreeMap<VirtPageNum, FrameTracker>,
+    /// use Arc because we share it in copy-on-write fork
+    pub frame_map: BTreeMap<VirtPageNum, Arc<FrameTracker>>,
 
     /// address mapping type
     pub map_type: MapType,
@@ -39,7 +38,15 @@ pub struct MapArea {
     pub map_permission: MapPermission,
 
     /// area type
+    #[allow(unused)]
     pub area_type: MapAreaType,
+
+    /// mapped file
+    /// we use MapArea to trace area in a file
+    pub file: Option<Arc<dyn File>>,
+
+    /// offset in file
+    pub file_offset: usize,
 }
 
 impl MapArea {
@@ -57,6 +64,8 @@ impl MapArea {
             map_permission,
             map_type,
             area_type: map_area_type,
+            file: None,
+            file_offset: 0,
         }
     }
 
@@ -68,6 +77,8 @@ impl MapArea {
             map_permission: other.map_permission.clone(),
             map_type: other.map_type.clone(),
             area_type: other.area_type.clone(),
+            file: other.file.clone(),
+            file_offset: other.file_offset,
         }
     }
 
@@ -94,7 +105,7 @@ impl MapArea {
                     if self.frame_map.contains_key(&vpn) {
                         panic!("vm area overlap");
                     }
-                    self.frame_map.insert(vpn, frame);
+                    self.frame_map.insert(vpn, Arc::from(frame));
                     let flags = PTEFlags::from_bits(self.map_permission.bits()).unwrap();
                     page_table.map(vpn, ppn, flags);
                     assert!(page_table.find_pte(vpn).is_some());

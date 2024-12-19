@@ -42,21 +42,21 @@ pub async fn yield_now() {
     YieldFuture::new().await;
 }
 
-// struct TakeWakerFuture;
+/// future to take the waker of the current task,
+/// it won't change any schedule status,
+/// since it returns Ready immediately
+struct TakeWakerFuture;
 
-// impl Future for TakeWakerFuture {
-//     type Output = Waker;
-//     #[inline(always)]
-//     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output>
-// {         // immediately returns ready
-//         // so it won't change any scedule order
-//         Poll::Ready(cx.waker().clone())
-//     }
-// }
+impl Future for TakeWakerFuture {
+    type Output = Waker;
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        Poll::Ready(cx.waker().clone())
+    }
+}
 
-// /// Take the waker of the current future
-// #[inline(always)]
-// #[allow(unused)]
-// pub async fn take_waker() -> Waker {
-//     TakeWakerFuture.await
-// }
+/// Take the waker of the current future
+#[inline(always)]
+#[allow(unused)]
+pub async fn take_waker() -> Waker {
+    TakeWakerFuture.await
+}

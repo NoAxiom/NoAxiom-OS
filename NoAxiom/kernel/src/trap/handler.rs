@@ -3,19 +3,31 @@
 use alloc::sync::Arc;
 
 use plic::Mode;
-use riscv::{
-    interrupt,
-    register::{
-        scause::{self, Exception, Interrupt, Trap},
-        sepc, stval,
-    },
+use riscv::register::{
+    scause::{self, Exception, Interrupt, Trap},
+    sepc, stval,
 };
 
-use super::{interrupt::ext_int_handler, trap::set_kernel_trap_entry};
+use super::trap::set_kernel_trap_entry;
 use crate::{
     config::fs::WAKE_NUM, constant::register::A0, cpu::get_hartid, fs::VIRTIO_BLOCK,
     platform::plic::PLIC, sched::utils::yield_now, syscall::syscall, task::Task,
 };
+
+fn ext_int_handler() {
+    let plic = PLIC.get().unwrap();
+    let irq = plic.claim(get_hartid() as u32, Mode::Supervisor);
+    debug!("[SupervisorExternal] hart: {}, irq: {}", get_hartid(), irq);
+    unsafe {
+        VIRTIO_BLOCK
+            .0
+            .handle_interrupt()
+            .expect("virtio handle interrupt error!")
+    };
+    VIRTIO_BLOCK.0.wake_ops.notify(WAKE_NUM);
+    plic.complete(get_hartid() as u32, Mode::Supervisor, irq);
+    debug!("[SupervisorExternal] plic complete done!");
+}
 
 /// kernel trap handler
 #[no_mangle]
@@ -35,18 +47,7 @@ pub fn kernel_trap_handler() {
         },
         Trap::Interrupt(interrupt) => match interrupt {
             Interrupt::SupervisorExternal => {
-                let plic = PLIC.get().unwrap();
-                let irq = plic.claim(get_hartid() as u32, Mode::Supervisor);
-                debug!("[SupervisorExternal] hart: {}, irq: {}", get_hartid(), irq);
-                unsafe {
-                    VIRTIO_BLOCK
-                        .0
-                        .handle_interrupt()
-                        .expect("virtio handle interrupt error!")
-                };
-                VIRTIO_BLOCK.0.wake_ops.notify(WAKE_NUM);
-                plic.complete(get_hartid() as u32, Mode::Supervisor, irq);
-                debug!("[SupervisorExternal] plic complete done!");
+                ext_int_handler();
             }
             _ => panic!(
                 "hart: {}, kernel interrupt {:?} is unsupported, stval = {:#x}, sepc = {:#x}",

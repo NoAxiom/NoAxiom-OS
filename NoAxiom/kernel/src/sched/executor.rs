@@ -10,7 +10,7 @@ use lazy_static::lazy_static;
 
 use crate::{
     config::sched::MLFQ_LEVELS,
-    sync::{cell::SyncUnsafeCell, mutex::SpinMutex},
+    sync::{cell::SyncUnsafeCell, mutex::TicketMutex},
 };
 
 pub struct TaskScheduleInfo {
@@ -57,8 +57,10 @@ impl Executor {
         None
     }
 }
+
+// TODO: add muticore support
 lazy_static! {
-    static ref EXECUTOR: SpinMutex<Executor> = SpinMutex::new(Executor::new());
+    static ref EXECUTOR: TicketMutex<Executor> = TicketMutex::new(Executor::new());
 }
 
 /// insert task into EXECUTOR when [`core::task::Waker::wake`] get called

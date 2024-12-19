@@ -20,6 +20,7 @@ use crate::{
         map_area::MapAreaType,
         permission::MapType,
     },
+    pte_flags,
     sync::mutex::SpinMutex,
 };
 
@@ -228,27 +229,30 @@ impl MemorySet {
         info!("[memory_set] load elf begins");
         let mut memory_set = Self::new_with_kernel();
 
-        // // read elf header
-        // const ELF_HEADER_SIZE: usize = 64;
-        // let mut elf_buf = [0u8; ELF_HEADER_SIZE];
-        // elf_file
-        //     .read(0, ELF_HEADER_SIZE, &mut elf_buf)
-        //     .await
-        //     .unwrap();
-        // let elf_ph = xmas_elf::ElfFile::new(elf_buf.as_slice()).unwrap().header;
-        // debug!("elf_header: {:?}, length = {}", elf_ph, elf_len);
+        {
+            // // read elf header
+            // const ELF_HEADER_SIZE: usize = 64;
+            // let mut elf_buf = [0u8; ELF_HEADER_SIZE];
+            // elf_file
+            //     .read(0, ELF_HEADER_SIZE, &mut elf_buf)
+            //     .await
+            //     .unwrap();
+            // let elf_ph =
+            // xmas_elf::ElfFile::new(elf_buf.as_slice()).unwrap().header;
+            // debug!("elf_header: {:?}, length = {}", elf_ph, elf_len);
 
-        // // read all program header
-        // let ph_entry_size = elf_header.pt2.ph_entry_size() as usize;
-        // let ph_offset: usize = elf_header.pt2.ph_offset() as usize;
-        // let ph_count = elf_header.pt2.ph_count() as usize;
-        // let mut elf_buf = vec![0u8; ph_offset + ph_count * ph_entry_size];
-        // elf_file
-        //     .read(0, ph_offset + ph_count * ph_entry_size, &mut elf_buf)
-        //     .await
-        //     .unwrap();
-        // let elf_ph = xmas_elf::ElfFile::new(elf_buf.as_slice()).unwrap();
-        // debug!("elf_ph: {:?}", elf_ph);
+            // // read all program header
+            // let ph_entry_size = elf_header.pt2.ph_entry_size() as usize;
+            // let ph_offset: usize = elf_header.pt2.ph_offset() as usize;
+            // let ph_count = elf_header.pt2.ph_count() as usize;
+            // let mut elf_buf = vec![0u8; ph_offset + ph_count *
+            // ph_entry_size]; elf_file
+            //     .read(0, ph_offset + ph_count * ph_entry_size, &mut elf_buf)
+            //     .await
+            //     .unwrap();
+            // let elf_ph = xmas_elf::ElfFile::new(elf_buf.as_slice()).unwrap();
+            // debug!("elf_ph: {:?}", elf_ph);
+        }
 
         // read all data
         let mut elf_buf = vec![0u8; elf_len];
@@ -301,6 +305,29 @@ impl MemorySet {
             elf_entry,
             user_sp: user_stack_end, // stack grows downward
         }
+    }
+
+    /// clone current memory set,
+    /// and mark the new memory set as copy-on-write
+    /// used in sys_fork
+    pub fn clone_cow(&mut self) -> Self {
+        let mut new_set = Self::new_with_kernel();
+        new_set.map_user_stack(self.user_stack_base, self.user_stack_base + USER_STACK_SIZE);
+        for area in self.areas.iter_mut() {
+            assert!(area.area_type == MapAreaType::ElfBinary);
+            let mut new_area = MapArea::from_another(area);
+            for vpn in area.vpn_range {
+                let old_pte = self.page_table.translate_vpn(vpn).unwrap();
+                let new_flags = old_pte.flags().switch_to_cow();
+                self.page_table.set_flags(vpn, new_flags);
+                new_set.page_table.map(vpn, old_pte.ppn(), new_flags);
+                new_area
+                    .frame_map
+                    .insert(vpn, area.frame_map.get(&vpn).unwrap().clone());
+            }
+            new_set.areas.push(new_area);
+        }
+        new_set
     }
 }
 

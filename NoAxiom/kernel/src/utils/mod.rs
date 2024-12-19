@@ -3,6 +3,7 @@
 use crate::config::mm::{KERNEL_ADDR_OFFSET, KERNEL_PAGENUM_MASK};
 
 /// signed extend for number without 64/32 bits width
+#[inline(always)]
 pub fn signed_extend(num: usize, width: usize) -> usize {
     if num & (1 << (width - 1)) != 0 {
         num | (!((1 << width) - 1))
@@ -12,6 +13,7 @@ pub fn signed_extend(num: usize, width: usize) -> usize {
 }
 
 /// translate a raw usize type kernel virt address into phys address
+#[inline(always)]
 pub fn kernel_va_to_pa(virt: usize) -> usize {
     assert!(
         (virt & KERNEL_ADDR_OFFSET) == KERNEL_ADDR_OFFSET,
@@ -21,6 +23,7 @@ pub fn kernel_va_to_pa(virt: usize) -> usize {
 }
 
 /// translate a raw usize type kernel phys address into virt address
+#[inline(always)]
 pub fn kernel_pa_to_va(phys: usize) -> usize {
     phys | KERNEL_ADDR_OFFSET
 }
@@ -34,6 +37,17 @@ pub fn current_pc() -> usize {
     pc
 }
 
+#[inline(always)]
 pub fn kernel_vpn_to_ppn(vpn: usize) -> usize {
     vpn & !KERNEL_PAGENUM_MASK
+}
+
+#[inline(always)]
+pub fn div_ceil(dividend: usize, divisor: usize) -> usize {
+    (dividend + divisor - 1) / divisor
+}
+
+#[inline(always)]
+pub fn align_up(addr: usize, align: usize) -> usize {
+    (addr + align - 1) & !(align - 1)
 }
