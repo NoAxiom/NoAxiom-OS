@@ -5,7 +5,7 @@ use core::fmt::{self, Debug, Formatter};
 use bitflags::bitflags;
 
 use super::address::PhysPageNum;
-use crate::config::mm::PPN_WIDTH;
+use crate::{config::mm::PPN_WIDTH, pte_flags};
 
 type FlagInnerType = u16;
 const PTE_WIDTH: usize = 10;
@@ -36,32 +36,45 @@ bitflags! {
 }
 
 impl PTEFlags {
+    #[inline(always)]
     pub fn is_valid(&self) -> bool {
         self.contains(Self::V)
     }
+    #[inline(always)]
     pub fn is_readable(&self) -> bool {
         self.contains(Self::R)
     }
+    #[inline(always)]
     pub fn is_writable(&self) -> bool {
         self.contains(Self::W)
     }
+    #[inline(always)]
     pub fn is_executable(&self) -> bool {
         self.contains(Self::X)
     }
+    #[inline(always)]
     pub fn is_user(&self) -> bool {
         self.contains(Self::U)
     }
+    #[inline(always)]
     pub fn is_global(&self) -> bool {
         self.contains(Self::G)
     }
+    #[inline(always)]
     pub fn is_accessed(&self) -> bool {
         self.contains(Self::A)
     }
+    #[inline(always)]
     pub fn is_dirty(&self) -> bool {
         self.contains(Self::D)
     }
+    #[inline(always)]
     pub fn is_cow(&self) -> bool {
         self.contains(Self::COW)
+    }
+    #[inline(always)]
+    pub fn switch_to_cow(&self) -> Self {
+        *self & !pte_flags!(W) | pte_flags!(COW)
     }
 }
 
@@ -93,6 +106,10 @@ impl PageTableEntry {
     /// reset copy-on-write flag
     pub fn reset_cow(&mut self) {
         self.0 &= !(PTEFlags::COW.bits() as usize);
+    }
+    /// reset write flag
+    pub fn reset_write(&mut self) {
+        self.0 &= !(PTEFlags::W.bits() as usize);
     }
     /// clear all data
     pub fn reset(&mut self) {

@@ -16,6 +16,21 @@ use crate::{
     sched::utils::yield_now, syscall::syscall, task::Task,
 };
 
+fn ext_int_handler() {
+    let plic = PLIC.get().unwrap();
+    let irq = plic.claim(get_hartid() as u32, Mode::Supervisor);
+    debug!("[SupervisorExternal] hart: {}, irq: {}", get_hartid(), irq);
+    unsafe {
+        VIRTIO_BLOCK
+            .0
+            .handle_interrupt()
+            .expect("virtio handle interrupt error!")
+    };
+    VIRTIO_BLOCK.0.wake_ops.notify(WAKE_NUM);
+    plic.complete(get_hartid() as u32, Mode::Supervisor, irq);
+    debug!("[SupervisorExternal] plic complete done!");
+}
+
 /// kernel trap handler
 #[no_mangle]
 pub fn kernel_trap_handler() {

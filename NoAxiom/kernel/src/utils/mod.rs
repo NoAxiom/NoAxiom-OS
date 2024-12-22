@@ -5,6 +5,7 @@ use alloc::vec::Vec;
 use crate::config::mm::{KERNEL_ADDR_OFFSET, KERNEL_PAGENUM_MASK};
 
 /// signed extend for number without 64/32 bits width
+#[inline(always)]
 pub fn signed_extend(num: usize, width: usize) -> usize {
     if num & (1 << (width - 1)) != 0 {
         num | (!((1 << width) - 1))
@@ -38,6 +39,7 @@ pub fn current_pc() -> usize {
     pc
 }
 
+#[inline(always)]
 pub fn kernel_vpn_to_ppn(vpn: usize) -> usize {
     vpn & !KERNEL_PAGENUM_MASK
 }
@@ -46,4 +48,14 @@ pub fn reverse<T: Clone>(vec: &Vec<T>) -> Vec<T> {
     let mut res = vec.clone();
     res.reverse();
     res
+}
+
+#[inline(always)]
+pub fn div_ceil(dividend: usize, divisor: usize) -> usize {
+    (dividend + divisor - 1) / divisor
+}
+
+#[inline(always)]
+pub fn align_up(addr: usize, align: usize) -> usize {
+    (addr + align - 1) & !(align - 1)
 }

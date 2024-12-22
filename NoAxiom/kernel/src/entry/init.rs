@@ -64,12 +64,9 @@ pub fn other_hart_init(hart_id: usize, dtb: usize) {
 
 // TODO: dtb, init_proc
 /// init bss, mm, console, and other drivers, then jump to rust_main,
-/// called by `super::boot`
+/// called by [`super::boot`]
 #[no_mangle]
-pub fn boot_hart_init(hart_id: usize, dtb: usize) {
-    // WARNING: don't try to modify any global variable before this line
-    // because it will be overwritten by clear_bss
-
+pub fn boot_hart_init(_: usize, dtb: usize) {
     // global resources init
     bss_init();
     heap_init();
@@ -80,9 +77,10 @@ pub fn boot_hart_init(hart_id: usize, dtb: usize) {
     // hart resources init
     hart_mm_init();
     trap_init();
+
     // global resources: platform & device init
     let platfrom_info = platform_info_from_dtb(dtb);
-    platform_init(hart_id, dtb);
+    platform_init(get_hartid(), dtb);
     init_plic(platfrom_info.plic.start + KERNEL_ADDR_OFFSET);
     device_init();
     register_to_hart();
@@ -92,7 +90,8 @@ pub fn boot_hart_init(hart_id: usize, dtb: usize) {
     println!("{}", NOAXIOM_BANNER);
     info!(
         "[first_init] entry init hart_id: {}, dtb_addr: {:#x}",
-        hart_id, dtb as usize,
+        get_hartid(),
+        dtb as usize,
     );
     rust_main();
 }
