@@ -127,7 +127,6 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
         },
         Trap::Interrupt(interrupt) => match interrupt {
             Interrupt::SupervisorTimer => {
-                task.inc_prio();
                 trace!(
                     "[SupervisorTimer] hart: {}, tid: {}",
                     get_hartid(),

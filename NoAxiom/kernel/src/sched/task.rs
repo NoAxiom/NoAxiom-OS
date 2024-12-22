@@ -11,10 +11,15 @@ use core::{
 
 use super::{
     executor::spawn_raw,
+    sched_entity::SchedEntity,
     task_counter::{task_count_dec, task_count_inc},
 };
 use crate::{
-    config::fs::INIT_PROC_NAME, cpu::current_cpu, sync::cell::SyncUnsafeCell, task::Task, trap::{trap_restore, user_trap_handler}
+    config::fs::INIT_PROC_NAME,
+    cpu::current_cpu,
+    task::Task,
+    time::gettime::get_time_us,
+    trap::{trap_restore, user_trap_handler},
 };
 
 pub struct UserTaskFuture<F: Future + Send + 'static> {
@@ -34,13 +39,19 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = unsafe { self.get_unchecked_mut() };
         let p = current_cpu();
-        let current_tid = this.task.tid();
-        trace!("[UserTaskFuture::poll] push_task, tid: {}", current_tid);
+        let time_in = get_time_us();
         p.set_task(&mut this.task);
-        // debug!("[UserTaskFuture::poll] push_task done");
+        warn!("polling task {}", this.task.tid());
         let ret = unsafe { Pin::new_unchecked(&mut this.future).poll(cx) };
         p.clear_task();
-        trace!("[UserTaskFuture::poll] pop_task, tid: {}", current_tid);
+        let time_out = get_time_us();
+        this.task.sched_entity.update_vruntime(time_out - time_in);
+        debug!(
+            "task {} yield, poll time: {} us, vruntime: {}",
+            this.task.tid(),
+            time_out - time_in,
+            this.task.sched_entity.inner().vruntime.0
+        );
         ret
     }
 }
@@ -53,10 +64,10 @@ pub fn schedule_spawn_new_process() {
             let task = Task::new_process(INIT_PROC_NAME).await;
             spawn_raw(
                 UserTaskFuture::new(task.clone(), task_main(task.clone())),
-                task.prio.clone(),
+                task.sched_entity.ref_clone(),
             );
         },
-        Arc::new(SyncUnsafeCell::new(0)),
+        SchedEntity::new_bare(),
     );
 }
 
@@ -64,7 +75,7 @@ pub fn spawn_utask(task: Arc<Task>) {
     task_count_inc();
     spawn_raw(
         UserTaskFuture::new(task.clone(), task_main(task.clone())),
-        task.prio.clone(),
+        task.sched_entity.ref_clone(),
     );
 }
 
@@ -73,7 +84,7 @@ where
     F: Future<Output = R> + Send + 'static,
     R: Send + 'static,
 {
-    spawn_raw(future, Arc::new(SyncUnsafeCell::new(0)));
+    spawn_raw(future, SchedEntity::new_bare());
 }
 
 /// user task main

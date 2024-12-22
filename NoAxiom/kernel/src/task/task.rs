@@ -12,6 +12,7 @@ use crate::{
     fs::inode::Inode,
     mm::memory_set::MemorySet,
     nix::clone_flags::CloneFlags,
+    sched::sched_entity::SchedEntity,
     sync::{cell::SyncUnsafeCell, mutex::SpinMutex},
     task::taskid::tid_alloc,
     trap::TrapContext,
@@ -63,8 +64,8 @@ pub struct Task {
     /// task status: ready / running / zombie
     status: SyncUnsafeCell<TaskStatus>,
 
-    /// priority for schedule
-    pub prio: Arc<SyncUnsafeCell<isize>>,
+    /// schedule entity for schedule
+    pub sched_entity: SchedEntity,
 
     /// task exit code
     exit_code: AtomicIsize,
@@ -124,20 +125,6 @@ impl Task {
     #[inline(always)]
     pub fn set_exit_code(&self, exit_code: isize) {
         self.exit_code.store(exit_code, Ordering::Relaxed);
-    }
-
-    /// prio
-    #[inline(always)]
-    pub fn prio(&self) -> &isize {
-        unsafe { &(*self.prio.get()) }
-    }
-    #[inline(always)]
-    pub fn set_prio(&self, prio: isize) {
-        unsafe { *self.prio.get() = prio };
-    }
-    #[inline(always)]
-    pub fn inc_prio(&self) {
-        unsafe { *self.prio.get() += 1 };
     }
 
     /// thread info
@@ -200,7 +187,7 @@ impl Task {
             }),
             status: SyncUnsafeCell::new(TaskStatus::Ready),
             exit_code: AtomicIsize::new(0),
-            prio: Arc::new(SyncUnsafeCell::new(0)),
+            sched_entity: SchedEntity::new_bare(),
         });
         info!("[spawn] new task spawn complete, tid {}", task.tid.0);
         task
@@ -234,7 +221,7 @@ impl Task {
                 }),
                 status: SyncUnsafeCell::new(TaskStatus::Ready),
                 exit_code: AtomicIsize::new(0),
-                prio: self.prio.clone(),
+                sched_entity: self.sched_entity.data_clone(),
             });
             task
         } else {

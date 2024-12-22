@@ -1,17 +1,23 @@
 //! CFS(completly fair schedule) scheduler entity
 
+use alloc::sync::Arc;
 use core::cmp::Ordering;
 
-use crate::constant::sched::{NICE_0_LOAD, SCHED_PRIO_TO_WEIGHT, SCHED_PRIO_TO_WMULT};
+use crate::{
+    constant::sched::{NICE_0_LOAD, SCHED_PRIO_TO_WEIGHT, SCHED_PRIO_TO_WMULT},
+    sync::cell::SyncUnsafeCell,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Ord)]
-pub struct SchedVruntime(u64);
+pub struct SchedVruntime(pub usize);
 
 impl SchedVruntime {
-    pub fn new(vruntime: u64) -> Self {
+    pub fn new(vruntime: usize) -> Self {
         Self(vruntime)
     }
-    pub fn update(&mut self, delta: u64) {
+    #[inline(always)]
+    pub fn update(&mut self, delta: usize) {
+        debug!("delta: {}", delta);
         self.0 += delta;
     }
 }
@@ -25,28 +31,23 @@ impl PartialOrd for SchedVruntime {
 }
 
 /// priority, range: -20 ~ 19
-pub struct SchedPrio(isize);
+#[derive(Debug)]
+pub struct SchedPrio(pub isize);
 
 impl SchedPrio {
-    pub fn new(prio: isize) -> Self {
-        Self(prio)
-    }
-    #[inline(always)]
-    pub fn inner_mut(&mut self) -> &mut isize {
-        &mut self.0
-    }
     #[inline(always)]
     #[allow(unused)]
-    pub fn to_weight(&self) -> u64 {
+    pub fn to_weight(&self) -> usize {
         SCHED_PRIO_TO_WEIGHT[(self.0 + 20) as usize]
     }
     #[inline(always)]
-    pub fn to_inv_weight(&self) -> u64 {
+    pub fn to_inv_weight(&self) -> usize {
         SCHED_PRIO_TO_WMULT[(self.0 + 20) as usize]
     }
 }
 
-pub struct SchedEntity {
+#[derive(Debug)]
+pub struct SchedEntityInner {
     /// virtual runtime. scheduler uses this to compare
     pub vruntime: SchedVruntime,
 
@@ -54,7 +55,7 @@ pub struct SchedEntity {
     pub prio: SchedPrio,
 }
 
-impl SchedEntity {
+impl SchedEntityInner {
     pub fn new(vruntime: SchedVruntime) -> Self {
         Self {
             vruntime,
@@ -62,8 +63,49 @@ impl SchedEntity {
         }
     }
     /// update vruntime by delta(ms)
-    pub fn update_vruntime(&mut self, wall_time: u64) {
+    pub fn update_vruntime(&mut self, wall_time: usize) {
+        debug!("wall_time: {}, to_inv: {}", wall_time, self.prio.to_inv_weight());
         self.vruntime
             .update((wall_time * NICE_0_LOAD * self.prio.to_inv_weight()) >> 32);
+    }
+}
+
+pub struct SchedEntity {
+    inner: Arc<SyncUnsafeCell<SchedEntityInner>>,
+}
+
+impl SchedEntity {
+    pub fn new_bare() -> Self {
+        Self {
+            inner: Arc::new(SyncUnsafeCell::new(SchedEntityInner::new(
+                SchedVruntime::new(0),
+            ))),
+        }
+    }
+    #[inline(always)]
+    pub fn inner(&self) -> &SchedEntityInner {
+        unsafe { &*self.inner.get() }
+    }
+    #[inline(always)]
+    pub fn inner_mut(&self) -> &mut SchedEntityInner {
+        unsafe { &mut *self.inner.get() }
+    }
+    #[inline(always)]
+    pub fn update_vruntime(&self, wall_time: usize) {
+        self.inner_mut().update_vruntime(wall_time);
+    }
+
+    pub fn data_clone(&self) -> Self {
+        Self {
+            inner: Arc::new(SyncUnsafeCell::new(SchedEntityInner {
+                vruntime: SchedVruntime::new(self.inner().vruntime.0),
+                prio: SchedPrio(self.inner().prio.0),
+            })),
+        }
+    }
+    pub fn ref_clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+        }
     }
 }

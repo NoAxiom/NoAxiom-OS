@@ -2,59 +2,54 @@
 //! - [`spawn_raw`] to add a task
 //! - [`run`] to run next task
 
-use alloc::{collections::vec_deque::VecDeque, sync::Arc};
+use alloc::collections::{btree_map::BTreeMap, vec_deque::VecDeque};
 use core::future::Future;
 
 use async_task::{Builder, Runnable, ScheduleInfo, WithInfo};
 use lazy_static::lazy_static;
 
-use crate::{
-    config::sched::MLFQ_LEVELS,
-    sync::{cell::SyncUnsafeCell, mutex::TicketMutex},
-};
+use super::sched_entity::SchedEntity;
+use crate::sync::mutex::TicketMutex;
 
 pub struct TaskScheduleInfo {
-    prio: Arc<SyncUnsafeCell<isize>>,
+    sched_entity: SchedEntity,
 }
 impl TaskScheduleInfo {
-    pub const fn new(prio: Arc<SyncUnsafeCell<isize>>) -> Self {
-        Self { prio }
-    }
-    pub fn prio(&self) -> &isize {
-        unsafe { &(*self.prio.get()) }
+    pub const fn new(sched_entity: SchedEntity) -> Self {
+        Self { sched_entity }
     }
 }
 
 struct Executor {
-    queue: [VecDeque<Runnable<TaskScheduleInfo>>; MLFQ_LEVELS],
+    /// cfs tree: (prio, task)
+    normal: BTreeMap<usize, Runnable<TaskScheduleInfo>>,
+    /// realtime / just-woken runnable queue
+    urgent: VecDeque<Runnable<TaskScheduleInfo>>,
 }
 impl Executor {
     pub fn new() -> Self {
-        const VEC_DEQUE: VecDeque<Runnable<TaskScheduleInfo>> = VecDeque::new();
         Self {
-            queue: [VEC_DEQUE; MLFQ_LEVELS],
+            normal: BTreeMap::new(),
+            urgent: VecDeque::new(),
         }
     }
-    fn push_back(&mut self, runnable: Runnable<TaskScheduleInfo>) {
-        let level = runnable.metadata().prio();
-        trace!("[sched] push task to back, prio: {}", level);
-        // self.queue[level as usize].push_back(runnable);
-        self.queue[0].push_back(runnable);
+    fn push_normal(&mut self, runnable: Runnable<TaskScheduleInfo>) {
+        self.normal.insert(
+            runnable.metadata().sched_entity.inner().vruntime.0,
+            runnable,
+        );
     }
-    fn push_front(&mut self, runnable: Runnable<TaskScheduleInfo>) {
-        let level = runnable.metadata().prio();
-        trace!("[sched] push task to front, prio: {}", level);
-        // self.queue[level as usize].push_front(runnable);
-        self.queue[0].push_front(runnable);
+    fn push_urgent(&mut self, runnable: Runnable<TaskScheduleInfo>) {
+        self.urgent.push_back(runnable);
     }
-    fn pop_front(&mut self) -> Option<Runnable<TaskScheduleInfo>> {
-        for q in self.queue.iter_mut() {
-            let info = q.pop_front();
-            if info.is_some() {
-                return info;
-            }
+    fn pop(&mut self) -> Option<Runnable<TaskScheduleInfo>> {
+        if let Some(runnable) = self.urgent.pop_front() {
+            Some(runnable)
+        } else if let Some((_, runnable)) = self.normal.pop_first() {
+            Some(runnable)
+        } else {
+            None
         }
-        None
     }
 }
 
@@ -66,25 +61,25 @@ lazy_static! {
 /// insert task into EXECUTOR when [`core::task::Waker::wake`] get called
 fn schedule(runnable: Runnable<TaskScheduleInfo>, info: ScheduleInfo) {
     trace!(
-        "[sched] schedule task, prio: {}, woken_while_running: {}",
-        runnable.metadata().prio(),
+        "[sched] schedule task, sched_entity: {:?}, woken_while_running: {}",
+        runnable.metadata().sched_entity.inner(),
         info.woken_while_running
     );
     if info.woken_while_running {
-        EXECUTOR.lock().push_front(runnable);
+        EXECUTOR.lock().push_normal(runnable);
     } else {
-        EXECUTOR.lock().push_back(runnable);
+        EXECUTOR.lock().push_urgent(runnable);
     }
 }
 
 /// Add a raw task into task queue
-pub fn spawn_raw<F, R>(future: F, prio: Arc<SyncUnsafeCell<isize>>)
+pub fn spawn_raw<F, R>(future: F, sched_entity: SchedEntity)
 where
     F: Future<Output = R> + Send + 'static,
     R: Send + 'static,
 {
     let (runnable, handle) = Builder::new()
-        .metadata(TaskScheduleInfo::new(prio))
+        .metadata(TaskScheduleInfo::new(sched_entity))
         .spawn(move |_: &TaskScheduleInfo| future, WithInfo(schedule));
     runnable.schedule();
     handle.detach();
@@ -95,7 +90,7 @@ pub fn run() {
     // spin until find a valid task
     loop {
         let mut guard = EXECUTOR.lock();
-        let runnable = guard.pop_front();
+        let runnable = guard.pop();
         drop(guard);
         if let Some(runnable) = runnable {
             runnable.run();
