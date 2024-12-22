@@ -4,8 +4,6 @@ use core::{ops::{Add, Sub}, time::Duration};
 
 use crate::constant::time::{CLOCK_FREQ, USEC_PER_SEC};
 
-/// linux-typed time struct,
-/// sec + usec = real time
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct TimeVal {
     pub sec: usize,

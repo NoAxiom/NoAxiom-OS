@@ -7,7 +7,6 @@ pub mod fs;
 pub mod mm;
 pub mod others;
 pub mod process;
-pub mod nix;
 
 use crate::constant::syscall::*;
 

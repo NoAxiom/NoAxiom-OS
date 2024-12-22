@@ -7,7 +7,7 @@ use core::{
 use lazy_static::lazy_static;
 use riscv::register::satp;
 
-use super::{address::PhysAddr, map_area::MapArea, page_table::PageTable};
+use super::{address::PhysAddr, frame::FrameTracker, map_area::MapArea, page_table::PageTable};
 use crate::{
     config::mm::{
         KERNEL_ADDR_OFFSET, KERNEL_VIRT_MEMORY_END, MMIO, PAGE_SIZE, PAGE_WIDTH, USER_HEAP_SIZE,
@@ -182,7 +182,7 @@ impl MemorySet {
             "[kernel] frame [{:#x}, {:#x})",
             ekernel as usize, KERNEL_VIRT_MEMORY_END as usize
         );
-        KERNEL_SPACE_TOKEN.store(memory_set.token(), Ordering::Relaxed);
+        KERNEL_SPACE_TOKEN.store(memory_set.token(), Ordering::SeqCst);
         memory_set
     }
 
@@ -292,7 +292,7 @@ impl MemorySet {
 
         let user_stack_base: usize = usize::from(end_va) + PAGE_SIZE; // stack bottom
         let user_stack_end = user_stack_base + USER_STACK_SIZE; // stack top
-        memory_set.map_user_stack(user_stack_base.into(), user_stack_end.into());
+        memory_set.map_user_stack(user_stack_base, user_stack_end);
 
         info!("[memory_set] user stack mapped! start to map user heap");
         let user_heap_base: usize = user_stack_end + PAGE_SIZE;
@@ -313,17 +313,27 @@ impl MemorySet {
     pub fn clone_cow(&mut self) -> Self {
         let mut new_set = Self::new_with_kernel();
         new_set.map_user_stack(self.user_stack_base, self.user_stack_base + USER_STACK_SIZE);
-        for area in self.areas.iter_mut() {
+        let mut remap_cow = |vpn: VirtPageNum,
+                             new_set: &mut MemorySet,
+                             new_area: &mut MapArea,
+                             frame_tracker: &Arc<FrameTracker>| {
+            let old_pte = self.page_table.translate_vpn(vpn).unwrap();
+            let old_flags = old_pte.flags();
+            if !old_flags.is_writable() {
+                new_set.page_table.map(vpn, old_pte.ppn(), old_flags);
+                return;
+            }
+            let new_flags = old_flags.switch_to_cow();
+            self.page_table.set_flags(vpn, new_flags);
+            new_set.page_table.map(vpn, old_pte.ppn(), new_flags);
+            new_area.frame_map.insert(vpn, frame_tracker.clone());
+        };
+        for area in self.areas.iter() {
             assert!(area.area_type == MapAreaType::ElfBinary);
             let mut new_area = MapArea::from_another(area);
             for vpn in area.vpn_range {
-                let old_pte = self.page_table.translate_vpn(vpn).unwrap();
-                let new_flags = old_pte.flags().switch_to_cow();
-                self.page_table.set_flags(vpn, new_flags);
-                new_set.page_table.map(vpn, old_pte.ppn(), new_flags);
-                new_area
-                    .frame_map
-                    .insert(vpn, area.frame_map.get(&vpn).unwrap().clone());
+                let frame_tracker = area.frame_map.get(&vpn).unwrap();
+                remap_cow(vpn, &mut new_set, &mut new_area, frame_tracker);
             }
             new_set.areas.push(new_area);
         }

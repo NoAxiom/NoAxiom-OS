@@ -51,9 +51,6 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
 /// schedule: will soon allocate resouces and spawn task
 pub fn schedule_spawn_new_process(path: usize) {
     task_count_inc();
-    trace!("task_count_inc, counter: {}", unsafe {
-        crate::sched::task_counter::TASK_COUNTER.load(core::sync::atomic::Ordering::SeqCst)
-    });
     spawn_raw(
         async move {
             let task = Task::new_process(path).await;
@@ -64,6 +61,22 @@ pub fn schedule_spawn_new_process(path: usize) {
         },
         Arc::new(SyncUnsafeCell::new(0)),
     );
+}
+
+pub fn spawn_utask(task: Arc<Task>) {
+    task_count_inc();
+    spawn_raw(
+        UserTaskFuture::new(task.clone(), task_main(task.clone())),
+        task.prio.clone(),
+    );
+}
+
+pub fn spawn_ktask<F, R>(future: F)
+where
+    F: Future<Output = R> + Send + 'static,
+    R: Send + 'static,
+{
+    spawn_raw(future, Arc::new(SyncUnsafeCell::new(0)));
 }
 
 /// user task main

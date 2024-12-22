@@ -1,7 +1,6 @@
 //! memory management system calls
-use crate::syscall::nix::clone_flags::CloneFlags;
-
 use super::Syscall;
+use crate::{nix::clone_flags::CloneFlags, sched::task::spawn_utask};
 
 impl Syscall<'_> {
     /// exit current task by marking it as zombie
@@ -14,9 +13,9 @@ impl Syscall<'_> {
         &self,
         flags: usize, // 创建的标志，如SIGCHLD
         stack: usize, // 指定新进程的栈，可为0
-        ptid: usize,  // 父线程ID
+        ptid: usize,  // 父线程ID, addr
         tls: usize,   // TLS线程本地存储描述符
-        ctid: usize,  // 子线程ID
+        ctid: usize,  // 子线程ID, addr
     ) -> isize {
         trace!(
             "[sys_fork] flags: {:x} stack: {:?} ptid: {:?} tls: {:?} ctid: {:?}",
@@ -26,12 +25,13 @@ impl Syscall<'_> {
             tls,
             ctid
         );
-        let flag = CloneFlags::from_bits_truncate(flags);
-        if flag.contains(CloneFlags::THREAD) {
-            self.task.fork_thread();
-        } else {
-            self.task.fork_process();
+        let flags = CloneFlags::from_bits_truncate(flags);
+        let task = self.task.fork(flags);
+        let trap_cx = task.trap_context_mut();
+        if stack != 0 {
+            trap_cx.set_sp(stack);
         }
+        spawn_utask(task);
         0
     }
 

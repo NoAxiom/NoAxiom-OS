@@ -1,5 +1,5 @@
-use super::{nix::tms::TMS, Syscall};
-use crate::sched::utils::yield_now;
+use super::Syscall;
+use crate::{nix::tms::TMS, sched::utils::yield_now};
 
 impl Syscall<'_> {
     /// yield current task
