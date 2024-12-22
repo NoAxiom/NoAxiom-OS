@@ -1,14 +1,14 @@
 //! # Task
 
-use alloc::sync::Arc;
+use alloc::{string::ToString, sync::Arc};
 use core::sync::atomic::{AtomicIsize, Ordering};
 
 use super::taskid::TidTracer;
 use crate::{
-    fs::get_app_elf,
+    fs::inode::Inode,
     mm::memory_set::MemorySet,
     sync::{cell::SyncUnsafeCell, mutex::SpinMutex},
-    task::{load_app::get_app_len, taskid::tid_alloc},
+    task::taskid::tid_alloc,
     trap::TrapContext,
 };
 
@@ -53,7 +53,6 @@ pub struct Task {
 
     /// task exit code
     exit_code: AtomicIsize,
-
     // /// file descriptor
     // fd: Arc<SpinMutex<FdTable>>,
 }
@@ -142,10 +141,10 @@ impl Task {
     }
 
     /// create new process from elf
-    pub async fn new_process(app_id: usize) -> Arc<Self> {
+    pub async fn new_process() -> Arc<Self> {
         trace!("[kernel] spawn new process from elf");
-        let elf_file = Arc::new(get_app_elf(app_id)); // todo: now is read from static memory
-        let elf_memory_info = MemorySet::load_from_elf(elf_file, get_app_len(app_id)).await;
+        let elf_file = Arc::new(Inode::from("initprocess".to_string())); // todo: now is read from static memory
+        let elf_memory_info = MemorySet::load_from_elf(elf_file).await;
         let memory_set = elf_memory_info.memory_set;
         let elf_entry = elf_memory_info.elf_entry;
         let user_sp = elf_memory_info.user_sp;

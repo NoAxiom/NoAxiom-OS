@@ -225,7 +225,7 @@ impl MemorySet {
 
     /// load data from elf file
     /// TODO: map trampoline?
-    pub async fn load_from_elf(elf_file: Arc<dyn File>, elf_len: usize) -> ElfMemoryInfo {
+    pub async fn load_from_elf(elf_file: Arc<dyn File>) -> ElfMemoryInfo {
         info!("[memory_set] load elf begins");
         let mut memory_set = Self::new_with_kernel();
 
@@ -255,9 +255,9 @@ impl MemorySet {
         }
 
         // read all data
-        let mut elf_buf = vec![0u8; elf_len];
-        elf_file.read(0, elf_buf.len(), &mut elf_buf).await.unwrap();
-        let elf = xmas_elf::ElfFile::new(elf_buf.as_slice()).unwrap();
+        // let mut elf_buf = vec![0u8; elf_len];
+        let file_data = elf_file.read().await.unwrap();
+        let elf = xmas_elf::ElfFile::new(file_data.as_slice()).unwrap();
 
         // check: magic
         let magic = elf.header.pt1.magic;

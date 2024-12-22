@@ -49,14 +49,14 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
 }
 
 /// schedule: will soon allocate resouces and spawn task
-pub fn schedule_spawn_new_process(path: usize) {
+pub fn schedule_spawn_new_process() {
     task_count_inc();
     trace!("task_count_inc, counter: {}", unsafe {
         crate::sched::task_counter::TASK_COUNTER.load(core::sync::atomic::Ordering::SeqCst)
     });
     spawn_raw(
         async move {
-            let task = Task::new_process(path).await;
+            let task = Task::new_process().await;
             spawn_raw(
                 UserTaskFuture::new(task.clone(), task_main(task.clone())),
                 task.prio.clone(),

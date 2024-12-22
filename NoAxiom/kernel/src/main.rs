@@ -16,7 +16,6 @@
 // #![feature(core_intrinsics)]
 
 use arch::interrupt::is_external_interrupt_enabled;
-use cpu::get_hartid;
 
 #[macro_use]
 extern crate alloc;

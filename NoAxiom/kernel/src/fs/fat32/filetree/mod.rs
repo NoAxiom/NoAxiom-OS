@@ -4,13 +4,17 @@ pub mod file;
 pub mod fs_node;
 
 use alloc::{boxed::Box, vec::Vec};
-use core::borrow::{Borrow, BorrowMut};
+use core::{
+    borrow::{Borrow, BorrowMut},
+    future::Future,
+    pin::Pin,
+};
 
 use directory::ShortDirectory;
 use entry::ShortDirectoryEntry;
 use fs_node::FSNode;
 
-use crate::config::fs::FileError;
+use crate::{config::fs::FileError, fs::FileReturn};
 
 /// the node of the file tree with identifier `T`
 pub struct FileNode<T, V> {
@@ -30,8 +34,14 @@ where
         }
     }
 
+    /// get the identifier of the node
     pub fn ident(&self) -> T {
         self.inner.ident()
+    }
+
+    /// get the content of the node
+    pub async fn content<'a>(&'a self) -> Pin<Box<dyn Future<Output = V> + Send + 'a>> {
+        self.inner.content()
     }
 
     /// identity the node with the given identifier
@@ -125,6 +135,15 @@ where
         let node = self.root.find(ident);
         if let Some(node) = node {
             Ok(node.children_ref())
+        } else {
+            Err(FileError::FileNotFound)
+        }
+    }
+    /// find the node with the given identifier
+    pub fn find(&self, ident: &T) -> Result<&FileNode<T, V>, FileError> {
+        let node = self.root.find(ident);
+        if let Some(node) = node {
+            Ok(node)
         } else {
             Err(FileError::FileNotFound)
         }
