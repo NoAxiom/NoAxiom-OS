@@ -69,6 +69,21 @@ pub fn schedule_spawn_new_process() {
         },
         SchedEntity::new_bare(),
     );
+    // !fixme: delete me!!
+    const paths: [&str; 4] = ["hello_world", "ktest", "long_loop", "process_test"];
+    for path in paths.iter() {
+        task_count_inc();
+        spawn_raw(
+            async move {
+                let task = Task::new_process(path).await;
+                spawn_raw(
+                    UserTaskFuture::new(task.clone(), task_main(task.clone())),
+                    task.sched_entity.ref_clone(),
+                );
+            },
+            SchedEntity::new_bare(),
+        );
+    }
 }
 
 pub fn spawn_utask(task: Arc<Task>) {

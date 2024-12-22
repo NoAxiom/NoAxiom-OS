@@ -224,18 +224,4 @@ impl FAT32FIleSystem {
             }
         }
     }
-
-    pub async fn load_init_process(&self) -> Vec<u8> {
-        let node = self.file_tree.find(&"initprocess".to_string());
-        match node {
-            Ok(node) => {
-                let content = node.content().await;
-                content.await
-            }
-            Err(e) => {
-                error!("Error loading init process: {:?}", e);
-                Vec::new()
-            }
-        }
-    }
 }

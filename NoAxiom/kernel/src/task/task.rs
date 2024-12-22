@@ -164,7 +164,7 @@ impl Task {
     /// create new process from elf
     pub async fn new_process(path: &str) -> Arc<Self> {
         trace!("[kernel] spawn new process from elf");
-        let elf_file = Arc::new(Inode::from("initprocess".to_string())); // todo: now is read from static memory
+        let elf_file = Arc::new(Inode::from(path.to_string())); // todo: now is read from static memory
         let elf_memory_info = MemorySet::load_from_elf(elf_file).await;
         let memory_set = elf_memory_info.memory_set;
         let elf_entry = elf_memory_info.elf_entry;
