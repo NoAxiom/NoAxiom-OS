@@ -34,3 +34,4 @@ pub const ROOT_FAKE_ENTRY: [u8; 32] = {
 pub enum FileError {
     FileNotFound,
 }
+pub const INIT_PROC_NAME: &str = "initprocess";

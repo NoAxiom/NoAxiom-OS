@@ -14,7 +14,7 @@ use crate::{
         plic::{init_plic, register_to_hart},
     },
     println, rust_main,
-    sched::schedule_spawn_new_ktask,
+    sched::task::spawn_ktask,
     trap::trap_init,
 };
 
@@ -86,7 +86,7 @@ pub fn boot_hart_init(_: usize, dtb: usize) {
     register_to_hart();
 
     // main
-    schedule_spawn_new_ktask(async_init(), 0);
+    spawn_ktask(async_init());
     println!("{}", NOAXIOM_BANNER);
     info!(
         "[first_init] entry init hart_id: {}, dtb_addr: {:#x}",

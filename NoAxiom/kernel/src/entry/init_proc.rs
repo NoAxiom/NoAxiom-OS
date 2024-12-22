@@ -1,8 +1,9 @@
-use crate::sched::schedule_spawn_new_process;
+use crate::sched::task::schedule_spawn_new_process;
 
 /// spawn all apps, only used in debug
 #[allow(unused)]
 pub fn schedule_spawn_all_apps() {
+    unimplemented!()
     // for i in 0..app_nums() {
     //     info!("[init] spawn app_{}", i);
     //     schedule_spawn_new_process(i);

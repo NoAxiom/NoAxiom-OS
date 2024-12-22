@@ -31,6 +31,7 @@ mod driver;
 mod entry;
 mod fs;
 mod mm;
+mod nix;
 mod panic;
 mod platform;
 mod sched;

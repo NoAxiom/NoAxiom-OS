@@ -14,10 +14,7 @@ use super::{
     task_counter::{task_count_dec, task_count_inc},
 };
 use crate::{
-    cpu::current_cpu,
-    sync::cell::SyncUnsafeCell,
-    task::Task,
-    trap::{trap_restore, user_trap_handler},
+    config::fs::INIT_PROC_NAME, cpu::current_cpu, sync::cell::SyncUnsafeCell, task::Task, trap::{trap_restore, user_trap_handler}
 };
 
 pub struct UserTaskFuture<F: Future + Send + 'static> {
@@ -53,7 +50,7 @@ pub fn schedule_spawn_new_process() {
     task_count_inc();
     spawn_raw(
         async move {
-            let task = Task::new_process().await;
+            let task = Task::new_process(INIT_PROC_NAME).await;
             spawn_raw(
                 UserTaskFuture::new(task.clone(), task_main(task.clone())),
                 task.prio.clone(),

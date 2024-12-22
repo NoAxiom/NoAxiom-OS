@@ -1,9 +1,10 @@
 //! # Task
 
 use alloc::{
-    {string::ToString, sync::{Arc, Weak},
+    string::ToString,
+    sync::{Arc, Weak},
     vec::Vec,
-}};
+};
 use core::sync::atomic::{AtomicIsize, Ordering};
 
 use super::taskid::TidTracer;
@@ -67,7 +68,6 @@ pub struct Task {
 
     /// task exit code
     exit_code: AtomicIsize,
-
     // /// file descriptor
     // fd: Arc<SpinMutex<FdTable>>,
 }
@@ -175,7 +175,7 @@ impl Task {
     }
 
     /// create new process from elf
-    pub async fn new_process(app_id: usize) -> Arc<Self> {
+    pub async fn new_process(path: &str) -> Arc<Self> {
         trace!("[kernel] spawn new process from elf");
         let elf_file = Arc::new(Inode::from("initprocess".to_string())); // todo: now is read from static memory
         let elf_memory_info = MemorySet::load_from_elf(elf_file).await;
