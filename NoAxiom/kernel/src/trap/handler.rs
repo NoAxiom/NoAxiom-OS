@@ -8,7 +8,7 @@ use riscv::register::{
     sepc, stval,
 };
 
-use super::{interrupt::ext_int_handler, trap::set_kernel_trap_entry};
+use super::trap::set_kernel_trap_entry;
 #[cfg(feature = "async_fs")]
 use crate::driver::async_virtio_driver::virtio_mm::VIRTIO_BLOCK;
 use crate::{
@@ -17,18 +17,21 @@ use crate::{
 };
 
 fn ext_int_handler() {
-    let plic = PLIC.get().unwrap();
-    let irq = plic.claim(get_hartid() as u32, Mode::Supervisor);
-    debug!("[SupervisorExternal] hart: {}, irq: {}", get_hartid(), irq);
-    unsafe {
-        VIRTIO_BLOCK
-            .0
-            .handle_interrupt()
-            .expect("virtio handle interrupt error!")
-    };
-    VIRTIO_BLOCK.0.wake_ops.notify(WAKE_NUM);
-    plic.complete(get_hartid() as u32, Mode::Supervisor, irq);
-    debug!("[SupervisorExternal] plic complete done!");
+    #[cfg(feature = "async_fs")]
+    {
+        let plic = PLIC.get().unwrap();
+        let irq = plic.claim(get_hartid() as u32, Mode::Supervisor);
+        debug!("[SupervisorExternal] hart: {}, irq: {}", get_hartid(), irq);
+        unsafe {
+            VIRTIO_BLOCK
+                .0
+                .handle_interrupt()
+                .expect("virtio handle interrupt error!")
+        };
+        VIRTIO_BLOCK.0.wake_ops.notify(WAKE_NUM);
+        plic.complete(get_hartid() as u32, Mode::Supervisor, irq);
+        debug!("[SupervisorExternal] plic complete done!");
+    }
 }
 
 /// kernel trap handler
