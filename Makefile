@@ -41,7 +41,7 @@ export WARN := "\e[33m"
 export NORMAL := "\e[32m"
 export RESET := "\e[0m"
 
-all: build_kernel run 
+all: build_kernel run
 	@cp $(KERNEL_BIN) kernel-qemu
 
 build_user:
@@ -50,7 +50,7 @@ build_user:
 $(FS_IMG): build_user
 	@./$(MKFS_SH)
 
-build_kernel: $(FS_IMG)
+build_kernel:
 	@cd $(PROJECT)/kernel && make build
 
 asm: # build_kernel

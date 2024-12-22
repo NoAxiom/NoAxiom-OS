@@ -24,12 +24,7 @@ pub fn get_time_ms() -> usize {
 }
 
 pub fn get_time_us() -> usize {
-    let time = get_time();
-    const DIVISOR: usize = CLOCK_FREQ / USEC_PER_SEC;
-    const REMAINDER: usize = CLOCK_FREQ % USEC_PER_SEC;
-    let integral_part = time / DIVISOR;
-    let fraction_part = time * REMAINDER / CLOCK_FREQ;
-    integral_part + fraction_part
+    get_time() * USEC_PER_SEC / CLOCK_FREQ
 }
 
 pub fn get_time_ns() -> usize {
