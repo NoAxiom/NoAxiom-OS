@@ -13,22 +13,13 @@ pub use file::*;
 use kernel_sync::SpinMutex;
 pub use tmp::*;
 
-use crate::{
-    arch::interrupt::{
-        disable_global_interrupt, enable_external_interrupt, enable_global_interrupt,
-    },
-    driver::async_virtio_driver::virtio_mm::async_blk::VirtIOAsyncBlock,
+use crate::arch::interrupt::{
+    disable_global_interrupt, enable_external_interrupt, enable_global_interrupt,
 };
-
-#[cfg(feature = "riscv_qemu")]
-type BlockDeviceImpl = VirtIOAsyncBlock;
-
-#[cfg(feature = "board_k210")]
-type BlockDeviceImpl = sdcard::SDCardWrapper;
-
-lazy_static::lazy_static! {
-    pub static ref VIRTIO_BLOCK: Arc<BlockDeviceImpl> = Arc::new(VirtIOAsyncBlock::new());
-}
+#[cfg(not(feature = "async_fs"))]
+use crate::device::block::BLOCK_DEVICE as SYNC_BLOCK_DEVICE;
+#[cfg(feature = "async_fs")]
+use crate::driver::async_virtio_driver::virtio_mm::VIRTIO_BLOCK;
 
 lazy_static::lazy_static! {
     // todo: async mutex?
@@ -36,10 +27,19 @@ lazy_static::lazy_static! {
 }
 
 pub async fn fs_init() {
-    info!("fs_init");
-    enable_global_interrupt();
-    enable_external_interrupt();
-    let device = Arc::clone(&VIRTIO_BLOCK);
+    let device;
+    #[cfg(feature = "async_fs")]
+    {
+        info!("async_fs init");
+        enable_global_interrupt();
+        enable_external_interrupt();
+        device = Arc::clone(&VIRTIO_BLOCK);
+    }
+    #[cfg(not(feature = "async_fs"))]
+    {
+        info!("sync_fs init");
+        device = Arc::clone(SYNC_BLOCK_DEVICE.get().unwrap());
+    }
     let initialed_fs = FAT32FIleSystem::init(device).await;
     info!("initialed_fs done");
     initialed_fs.list().await;

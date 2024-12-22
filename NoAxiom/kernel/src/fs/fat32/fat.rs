@@ -69,7 +69,7 @@ impl FAT {
         blk.write_sector(sector_id as usize, &sector.read().data)
             .await;
     }
-    /// get `FAT` links
+    /// get `FAT` links by `first_cluster`
     pub async fn get_link(&self, blk: &ABC, first_cluster: u32) -> Vec<u32> {
         let mut res = Vec::new();
         let mut sector_id = self.sector_id(first_cluster) as usize;
@@ -85,7 +85,7 @@ impl FAT {
             );
             match value {
                 0x0 => {
-                    panic!("FAT Content must not be zero in one link!");
+                    panic!("FAT content can not equal to zero!");
                 }
                 0xffffff8..=0xfffffff => {
                     break;

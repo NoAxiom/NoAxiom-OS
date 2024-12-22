@@ -82,7 +82,7 @@ impl Probe<'_> {
                 ));
             }
         }
-        println!("prob virtio ok");
+        debug!("Prob virtio success");
         Some(virtio_devices)
     }
     pub fn probe_common(&self, device_name: &str) -> Option<ProbeInfo> {

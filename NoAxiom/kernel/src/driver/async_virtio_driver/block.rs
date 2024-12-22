@@ -475,11 +475,7 @@ impl<const N: usize> VirtIOBlock<N> {
 
         h.notify(0);
 
-        info!("read sector event");
-
         listener.await;
-
-        info!("read sector event");
 
         q.pop_used()?;
 

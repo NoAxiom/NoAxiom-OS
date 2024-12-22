@@ -9,8 +9,10 @@ use super::dma::VirtualAddress;
 use crate::{
     driver::async_virtio_driver::dma::PhysicalAddress,
     mm::{
-        address::{PhysAddr, PhysPageNum},
+        address::{PhysAddr, PhysPageNum, VirtAddr},
         frame::{frame_alloc, FrameTracker},
+        memory_set::KERNEL_SPACE,
+        page_table::PageTable,
     },
     println,
     utils::{kernel_pa_to_va, kernel_va_to_pa},
@@ -77,7 +79,13 @@ pub fn virtio_virt_to_phys(vaddr: VirtualAddress) -> PhysicalAddress {
     //     .translate(vpn)
     //     .expect("virtio virtual address not map!");
     // ppn.start_address().add(offset)
-    PhysicalAddress::from(kernel_va_to_pa(vaddr))
+    let pa = PhysicalAddress::from(kernel_va_to_pa(vaddr));
+    let translated_pa = PageTable::from_token(KERNEL_SPACE.lock().token())
+        .translate_va(VirtAddr::from(vaddr))
+        .unwrap()
+        .into();
+    assert_eq!(pa, translated_pa, "virtio_virt_to_phys translation failed");
+    pa
 }
 
 /// 异步virtio块设备驱动测试

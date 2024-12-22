@@ -2,8 +2,6 @@ use core::{cmp::min, fmt::Debug, ops::Range};
 
 use fdt::Fdt;
 
-use crate::println;
-
 const MEMORY: &str = "memory";
 const PLIC: &str = "plic";
 const CLINT: &str = "clint";
@@ -64,8 +62,6 @@ impl Debug for PlatformInfo {
 }
 /// Get platform information from a device-tree
 pub fn platform_info_from_dtb(ptr: usize) -> PlatformInfo {
-    println!("dtb ptr: {:x}", ptr);
-
     #[cfg(feature = "vf2")]
     let ptr = FDT.as_ptr() as usize;
 

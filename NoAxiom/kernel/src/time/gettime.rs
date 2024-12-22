@@ -2,6 +2,8 @@
 
 #![allow(unused)]
 
+use core::time::Duration;
+
 use riscv::register::time;
 
 use super::timeval::TimeVal;
@@ -39,4 +41,8 @@ pub fn get_timeval() -> TimeVal {
     let sec = ticks / CLOCK_FREQ;
     let usec = (ticks % CLOCK_FREQ) * USEC_PER_SEC / CLOCK_FREQ;
     TimeVal { sec, usec }
+}
+
+pub fn get_time_duration() -> Duration {
+    Duration::from_micros(get_time_us() as u64)
 }

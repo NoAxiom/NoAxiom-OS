@@ -8,6 +8,7 @@
     "rust-analyzer.cargo.features": [
         "sv39",
         "multicore",
-        "riscv_qemu"
+        "riscv_qemu",
+        // "async_fs"
     ],
 }

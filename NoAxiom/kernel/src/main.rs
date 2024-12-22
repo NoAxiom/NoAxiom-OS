@@ -15,14 +15,8 @@
 // #![feature(custom_mir)]
 // #![feature(core_intrinsics)]
 
-use arch::interrupt::{
-    enable_external_interrupt, enable_global_interrupt, is_external_interrupt_enabled,
-    is_interrupt_enabled,
-};
-use config::mm::KERNEL_ADDR_OFFSET;
+use arch::interrupt::is_external_interrupt_enabled;
 use cpu::get_hartid;
-use device::device_init;
-use platform::{base_riscv::platforminfo::platform_info_from_dtb, plic::init_plic};
 
 #[macro_use]
 extern crate alloc;

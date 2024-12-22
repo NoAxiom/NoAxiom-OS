@@ -1,4 +1,3 @@
-use alloc::{boxed::Box, collections::VecDeque, sync::Arc};
 pub mod sifive;
 pub mod uart8250;
 

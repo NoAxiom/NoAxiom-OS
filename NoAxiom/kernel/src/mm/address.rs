@@ -230,6 +230,13 @@ impl StepOne for VirtPageNum {
         tmp
     }
 }
+impl StepOne for PhysPageNum {
+    fn step(&mut self) -> Self {
+        let tmp = self.clone();
+        self.0 += 1;
+        tmp
+    }
+}
 
 /// iterator for vpn range
 impl IntoIterator for VpnRange {

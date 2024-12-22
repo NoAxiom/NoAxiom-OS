@@ -1,17 +1,12 @@
 use bitflags::*;
 use volatile::{ReadOnly, Volatile, WriteOnly};
 
-/// virtio MMIO 寄存器接口
-/// ref: https://github.com/rcore-os/virtio-drivers/blob/master/src/header.rs
-/// thanks!
-/// 虚拟设备直接挂在系统总线上
-use super::config::PAGE_SIZE;
+use super::PAGE_SIZE;
 
 /// MMIO Device Legacy Register Interface.
 ///
 /// Ref: 4.2.4 Legacy interface
 #[repr(C)]
-#[derive(Debug)]
 pub struct VirtIOHeader {
     /// Magic value
     magic: ReadOnly<u32>,
@@ -19,34 +14,28 @@ pub struct VirtIOHeader {
     /// Device version number
     ///
     /// Legacy device returns value 0x1.
-    /// 设备版本号
     version: ReadOnly<u32>,
 
     /// Virtio Subsystem Device ID
-    /// 子系统设备 ID
     device_id: ReadOnly<u32>,
 
     /// Virtio Subsystem Vendor ID
-    /// 子设备供应商 ID
     vendor_id: ReadOnly<u32>,
 
     /// Flags representing features the device supports
-    /// 设备支持的功能
     device_features: ReadOnly<u32>,
 
     /// Device (host) features word selection
-    /// 设备选择的功能
     device_features_sel: WriteOnly<u32>,
 
     /// Reserved
     __r1: [ReadOnly<u32>; 2],
 
     /// Flags representing device features understood and activated by the
-    /// driver 驱动程序理解的功能
+    /// driver
     driver_features: WriteOnly<u32>,
 
     /// Activated (guest) features word selection
-    /// 驱动程序选择的设备功能
     driver_features_sel: WriteOnly<u32>,
 
     /// Guest page size
@@ -55,7 +44,6 @@ pub struct VirtIOHeader {
     /// initialization, before any queues are used. This value should be a
     /// power of 2 and is used by the device to calculate the Guest address
     /// of the first queue page (see QueuePFN).
-    /// 操作系统内核中提供的页大小
     guest_page_size: WriteOnly<u32>,
 
     /// Reserved
@@ -66,7 +54,6 @@ pub struct VirtIOHeader {
     /// Writing to this register selects the virtual queue that the following
     /// operations on the QueueNumMax, QueueNum, QueueAlign and QueuePFN
     /// registers apply to. The index number of the first queue is zero (0x0).
-    /// 虚拟队列索引号
     queue_sel: WriteOnly<u32>,
 
     /// Maximum virtual queue size
@@ -76,7 +63,6 @@ pub struct VirtIOHeader {
     /// This applies to the queue selected by writing to QueueSel and is
     /// allowed only when QueuePFN is set to zero (0x0), so when the queue is
     /// not actively used.
-    /// 虚拟队列最大容量值，指虚拟队列的最大个数
     queue_num_max: ReadOnly<u32>,
 
     /// Virtual queue size
@@ -84,7 +70,6 @@ pub struct VirtIOHeader {
     /// Queue size is the number of elements in the queue. Writing to this
     /// register notifies the device what size of the queue the driver will use.
     /// This applies to the queue selected by writing to QueueSel.
-    /// 虚拟队列当前容量值，指虚拟队列当前的个数
     queue_num: WriteOnly<u32>,
 
     /// Used Ring alignment in the virtual queue
@@ -92,7 +77,6 @@ pub struct VirtIOHeader {
     /// Writing to this register notifies the device about alignment boundary
     /// of the Used Ring in bytes. This value should be a power of 2 and
     /// applies to the queue selected by writing to QueueSel.
-    /// 虚拟队列对齐边界，单位为字节
     queue_align: WriteOnly<u32>,
 
     /// Guest physical page number of the virtual queue
@@ -106,7 +90,6 @@ pub struct VirtIOHeader {
     /// used page number of the queue, therefore a value other than zero
     /// (0x0) means that the queue is in use. Both read and write accesses
     /// apply to the queue selected by writing to QueueSel.
-    /// 虚拟队列所在物理页号
     queue_pfn: Volatile<u32>,
 
     /// new interface only
@@ -116,18 +99,15 @@ pub struct VirtIOHeader {
     __r3: [ReadOnly<u32>; 2],
 
     /// Queue notifier
-    /// 队列通知
     queue_notify: WriteOnly<u32>,
 
     /// Reserved
     __r4: [ReadOnly<u32>; 3],
 
     /// Interrupt status
-    /// 中断状态
     interrupt_status: ReadOnly<u32>,
 
     /// Interrupt acknowledge
-    /// 中断确认
     interrupt_ack: WriteOnly<u32>,
 
     /// Reserved
@@ -140,7 +120,6 @@ pub struct VirtIOHeader {
     /// indicating the OS/driver progress. Writing zero (0x0) to this register
     /// triggers a device reset. The device sets QueuePFN to zero (0x0) for
     /// all queues in the device. Also see 3.1 Device Initialization.
-    /// 设备状态
     status: Volatile<DeviceStatus>,
 
     /// Reserved
@@ -165,7 +144,6 @@ pub struct VirtIOHeader {
     /// Reserved
     __r9: [ReadOnly<u32>; 21],
 
-    // 配置空间
     config_generation: ReadOnly<u32>,
 }
 
@@ -176,27 +154,25 @@ impl VirtIOHeader {
     }
 
     /// Get the device type.
-    // pub fn device_type(&self) -> DeviceType {
-    //     match self.device_id.read() {
-    //         x @ 1..=13 | x @ 16..=24 => unsafe { core::mem::transmute(x as u8) },
-    //         _ => DeviceType::Invalid,
-    //     }
-    // }
+    pub fn device_type(&self) -> DeviceType {
+        match self.device_id.read() {
+            x @ 1..=13 | x @ 16..=24 => unsafe { core::mem::transmute(x as u8) },
+            _ => DeviceType::Invalid,
+        }
+    }
 
     /// Get the vendor ID.
-    // pub fn vendor_id(&self) -> u32 {
-    //     self.vendor_id.read()
-    // }
+    pub fn vendor_id(&self) -> u32 {
+        self.vendor_id.read()
+    }
 
     /// Begin initializing the device.
     ///
     /// Ref: virtio 3.1.1 Device Initialization
     pub fn begin_init(&mut self, negotiate_features: impl FnOnce(u64) -> u64) {
-        // 设置设备状态位
         self.status.write(DeviceStatus::ACKNOWLEDGE);
         self.status.write(DeviceStatus::DRIVER);
 
-        // 对 features 进行谈判
         let features = self.read_device_features();
         self.write_driver_features(negotiate_features(features));
         self.status.write(DeviceStatus::FEATURES_OK);
@@ -251,7 +227,6 @@ impl VirtIOHeader {
     }
 
     /// Notify device.
-    /// 参数 queue 表示通知的队列编号
     pub fn notify(&mut self, queue: u32) {
         self.queue_notify.write(queue);
     }
@@ -267,11 +242,6 @@ impl VirtIOHeader {
         }
     }
 
-    /// 返回中断状态
-    // pub fn interrupt_status(&self) -> u32 {
-    //     self.interrupt_status.read()
-    // }
-
     /// Get the pointer to config space (at offset 0x100)
     pub fn config_space(&self) -> *mut u64 {
         (self as *const _ as usize + CONFIG_SPACE_OFFSET) as _
@@ -280,7 +250,7 @@ impl VirtIOHeader {
 
 bitflags! {
     /// The device status field.
-    #[derive(Copy, Clone, Debug)]
+    #[derive(Copy, Clone)]
     struct DeviceStatus: u32 {
         /// Indicates that the guest OS has found the device and recognized it
         /// as a valid virtio device.
@@ -314,7 +284,6 @@ const CONFIG_SPACE_OFFSET: usize = 0x100;
 #[repr(u8)]
 #[derive(Debug, Eq, PartialEq)]
 #[allow(missing_docs)]
-#[allow(unused)]
 pub enum DeviceType {
     Invalid = 0,
     Network = 1,

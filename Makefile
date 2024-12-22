@@ -41,18 +41,17 @@ export WARN := "\e[33m"
 export NORMAL := "\e[32m"
 export RESET := "\e[0m"
 
-all: $(FS_IMG) build_kernel run 
+all: build_kernel run 
 	@cp $(KERNEL_BIN) kernel-qemu
 
-$(FS_IMG):
+build_user:
+	@cd $(PROJECT)/user && make build
+
+$(FS_IMG): build_user
 	@./$(MKFS_SH)
 
-build_kernel:
+build_kernel: $(FS_IMG)
 	@cd $(PROJECT)/kernel && make build
-
-build:
-	@cd $(PROJECT)/kernel && make build
-	@cd $(PROJECT)/user && make build
 
 asm: # build_kernel
 	@echo -e "Building Kernel and Generating Assembly..."

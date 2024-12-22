@@ -1,194 +1,197 @@
-use alloc::vec::Vec;
-use core::ptr::NonNull;
+pub mod block;
+pub mod char;
+mod config;
+pub mod init;
+pub mod random;
 
-use fdt::Fdt;
-use virtio_drivers::transport::{
-    mmio::{MmioTransport, VirtIOHeader},
-    DeviceType, Transport,
+use alloc::{
+    boxed::Box,
+    string::String,
+    sync::{Arc, Weak},
 };
+use core::{future::Future, pin::Pin};
+
+use char::CharDevice;
 
 use crate::{
-    config::mm::KERNEL_ADDR_OFFSET,
-    driver::probe::{Probe, ProbeInfo, PROBE},
-    platform, println,
+    alloc::string::ToString,
+    config::errno::Errno,
+    device::{block::BlockDevice, config::DeviceNumber},
+    driver::Driver,
 };
 
-pub fn device_init() {
-    let dtb_ptr = platform::platform_dtb_ptr();
-
-    //? dtb is unused
-    let dtb = unsafe { Fdt::from_ptr(dtb_ptr as *const u8).unwrap() };
-    Probe::init(dtb_ptr);
-
-    #[cfg(not(all(feature = "vf2", feature = "hifive")))]
-    {
-        match PROBE.get().unwrap().probe_virtio() {
-            Some(virtio_mmio_devices) => {
-                init_virtio_mmio(virtio_mmio_devices);
-            }
-            None => {
-                println!("There is no virtio-mmio device");
-            }
-        }
-    }
-
-    #[cfg(feature = "vf2")]
-    match PROBE.get().unwrap().probe_sdio() {
-        Some(sdio) => {
-            println!("vf2 into probe");
-            init_block_device(sdio, None)
-        }
-        None => {
-            panic!("There is no sdio device");
-        }
-    }
-    #[cfg(feature = "uart")]
-    match PROBE.get().unwrap().probe_uart() {
-        Some(uart) => {
-            println!("vf2 into probe");
-
-            init_uart(uart);
-            interrupt::register_device_to_plic(
-                uart.property("interrupts").unwrap().as_usize().unwrap(),
-                UART_DEVICE.get().unwrap().clone() as Arc<dyn Device>,
-            )
-        }
-        None => {
-            panic!("There is no sdio device");
-        }
-    }
-    // #[cfg(any(feature = "hifive", feature = "vf2"))]
-    // init_net(None);
+#[allow(dead_code)]
+#[derive(Debug, Copy, Clone)]
+pub enum DeviceError {
+    DriverExists,         // 设备已存在
+    DeviceExists,         // 驱动已存在
+    InitializeFailed,     // 初始化错误
+    NotInitialized,       // 未初始化的设备
+    NoDeviceForDriver,    // 没有合适的设备匹配驱动
+    NoDriverForDevice,    // 没有合适的驱动匹配设备
+    RegisterError,        // 注册失败
+    UnsupportedOperation, // 不支持的操作
 }
 
-pub fn init_virtio_mmio(devices: Vec<ProbeInfo>) {
-    for device in devices {
-        // println!("name : {}", device.name);
-        let paddr = device.base_addr + KERNEL_ADDR_OFFSET;
-        // println!("device.base_addr:{:x}", paddr);
-        const VIRTIO0: usize = 0x10001000 + KERNEL_ADDR_OFFSET;
-        if paddr != VIRTIO0 {
-            // println!("paddr : {:x}", paddr);
-            continue;
+impl From<DeviceError> for Errno {
+    fn from(value: DeviceError) -> Self {
+        match value {
+            DeviceError::DriverExists => Errno::EEXIST,
+            DeviceError::DeviceExists => Errno::EEXIST,
+            DeviceError::InitializeFailed => Errno::EIO,
+            DeviceError::NotInitialized => Errno::ENODEV,
+            DeviceError::NoDeviceForDriver => Errno::ENODEV,
+            DeviceError::NoDriverForDevice => Errno::ENODEV,
+            DeviceError::RegisterError => Errno::EIO,
+            DeviceError::UnsupportedOperation => Errno::EIO,
         }
+    }
+}
+pub type DevResult<T = ()> = Result<T, Errno>;
+type Async<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
+pub type ADevResult<'a, T = ()> = Async<'a, DevResult<T>>;
 
-        let header = NonNull::new(paddr as *mut VirtIOHeader).unwrap();
-        println!("header:{:?}", header);
+#[allow(dead_code)]
+#[derive(Debug, Eq, PartialEq)]
+pub enum DeviceType {
+    Bus,
+    Net,
+    Gpu,
+    Input,
+    Block,
+    Rtc,
+    Serial,
+    Intc,
+    PlatformDev,
+    Char,
+    Pci,
+}
 
-        match unsafe { MmioTransport::new(header) } {
-            Err(_) => {
-                println!("header err");
-            }
-            Ok(mut transport) => {
-                println!(
-                    "Detected virtio MMIO device with vendor id {:#X}, device type {:?}, version {:?}, features:{:?}",
-                    transport.vendor_id(),
-                    transport.device_type(),
-                    transport.version(),
-                    transport.read_device_features(),
-                );
-                println!("Probe virtio device: {:?}", transport.device_type());
-                match transport.device_type() {
-                    // DeviceType::Input => {
-                    //     if paddr == VIRTIO5 {
-                    //         init_input_device(device, "keyboard", Some(transport));
-                    //     } else if paddr == VIRTIO6 {
-                    //         init_input_device(device, "mouse", Some(transport));
-                    //     }
-                    // }
-                    DeviceType::Block => {
-                        init_block_device(device, Some(transport));
-                    }
-
-                    // DeviceType::GPU => init_gpu(device, Some(transport)),
-                    // DeviceType::Network => init_net(Some(device)),
-                    ty => {
-                        println!("Don't support virtio device type: {:?}", ty);
-                    }
-                }
-            }
-            _ => {
-                unreachable!()
-            }
+pub trait Device: Send + Sync {
+    fn name(&self) -> &str;
+    fn dev_type(&self) -> DeviceType;
+    /// Register base address
+    fn mmio_base(&self) -> usize;
+    fn mmio_size(&self) -> usize;
+    fn interrupt_number(&self) -> Option<usize>;
+    fn interrupt_handler(&self);
+    fn init(&self);
+    fn driver(&self) -> Option<Arc<dyn Driver>>;
+    fn set_driver(&self, driver: Option<Weak<dyn Driver>>);
+    fn is_dead(&self) -> bool;
+    fn as_blk(self: Arc<Self>) -> Option<Arc<dyn BlockDevice>>;
+    fn as_char(self: Arc<Self>) -> Option<Arc<dyn CharDevice>>;
+}
+pub struct DeviceData {
+    pub common: DeviceCommonData,
+    pub private: Option<DevicePrivateData>,
+}
+impl Default for DeviceData {
+    fn default() -> Self {
+        Self {
+            common: DeviceCommonData::default(),
+            private: None,
         }
     }
 }
 
-fn init_block_device(blk: ProbeInfo, mmio_transport: Option<MmioTransport>) {
-    println!("start init block device");
-    let (base_addr, irq) = (blk.base_addr, blk.irq);
-    match blk.compatible.as_str() {
-        "virtio,mmio" => {
-            // qemu
-            // let mut block_device = VirtIOBlkWrapper::new(blk.base_addr);
-            // let block_driver = VirtIOBlockDriver::from_mmio(mmio_transport.unwrap());
-            println!("Init block device, base_addr:{:#x},irq:{}", base_addr, irq);
-            // let size = block_driver.size();
-            // println!("Block device size is {}MB", size * 512 / 1024 / 1024);
-            // let driver: Arc<dyn Driver> = Arc::new(block_driver);
-            // DRIVER_MANAGER.lock().push_driver(driver.clone());
-            // let driver = Some(Arc::downgrade(&driver));
-
-            // let block_device = Arc::new(super::Block::virtio::virtio::new(driver,
-            // base_addr, size));
-
-            // super::Block::init_block_device(block_device);
-            // register_device_to_plic(irq, block_device);
-            // println!("Init block device success");
-            println!("Block device will be init in the fs_init");
-        }
-        "starfive,jh7110-sdio" => {
-            // starfive2
-            #[cfg(not(feature = "ramdisk"))]
-            {
-                // let sd = SdIoImpl;
-                // let sleep = SleepOpsImpl;
-
-                // todo: implement sdio driver
-                // let sd = Vf2SdDriver::<_, SleepOpsImpl>::new(SdIoImpl);
-                // let driver = VF2SDDriver::new(sd);
-                // println!("Init block device, base_addr:{:#x},irq:{}",
-                // base_addr, irq); let size = driver.size();
-                // println!("Block device size is {}MB", size);
-                // let driver: Arc<dyn Driver> = Arc::new(driver);
-                // DRIVER_MANAGER.lock().push_driver(driver.clone());
-                // let driver = Some(Arc::downgrade(&driver));
-                // let block_device =
-                //     Arc::new(super::Block::vf2sd::vfs2d::new(driver,
-                // base_addr, size));
-                // super::Block::init_block_device(block_device);
-                // // register_device_to_plic(irq, block_device);
-                // println!("Init SDIO block device success");
-            }
-            #[cfg(feature = "ramdisk")]
-            {
-                init_ramdisk();
-            }
-        }
-        name => {
-            println!("Don't support block device: {}", name);
-            #[cfg(feature = "ramdisk")]
-            {
-                init_ramdisk();
-            }
-            #[cfg(not(feature = "ramdisk"))]
-            panic!("System need block device, but there is no block device");
+pub struct DeviceCommonData {
+    pub driver: Option<Weak<dyn Driver>>,
+    pub dead: bool,
+}
+impl Default for DeviceCommonData {
+    fn default() -> Self {
+        Self {
+            driver: None,
+            dead: false,
         }
     }
 }
 
-// pub trait Device: Send + Sync {
-//     fn name(&self) -> &str;
-//     fn dev_type(&self) -> DeviceType;
-//     /// Register base address
-//     fn mmio_base(&self) -> usize;
-//     fn mmio_size(&self) -> usize;
-//     fn interrupt_number(&self) -> Option<usize>;
-//     fn interrupt_handler(&self);
-//     fn init(&self);
-// fn driver(&self) -> Option<Arc<dyn Driver>>;
-// fn set_driver(&self, driver: Option<Weak<dyn Driver>>);
-// fn is_dead(&self) -> bool;
-// fn as_blk(self: Arc<Self>) -> Option<Arc<dyn BlockDevice>>;
-// fn as_char(self: Arc<Self>) -> Option<Arc<dyn CharDevice>>;
-// }
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub struct DevicePrivateData {
+    id_table: IdTable,
+    state: DeviceState,
+}
+#[allow(dead_code)]
+impl DevicePrivateData {
+    pub fn new(id_table: IdTable, state: DeviceState) -> Self {
+        Self { id_table, state }
+    }
+
+    pub fn id_table(&self) -> &IdTable {
+        &self.id_table
+    }
+
+    pub fn state(&self) -> DeviceState {
+        self.state
+    }
+
+    pub fn set_state(&mut self, state: DeviceState) {
+        self.state = state;
+    }
+}
+/// @brief: 设备标识符类型
+#[derive(Debug, Clone, Hash, PartialOrd, PartialEq, Ord, Eq)]
+pub struct IdTable {
+    basename: String,
+    id: Option<DeviceNumber>,
+}
+
+/// @brief: 设备标识符操作方法集
+impl IdTable {
+    /// @brief: 创建一个新的设备标识符
+    /// @parameter name: 设备名
+    /// @parameter id: 设备id
+    /// @return: 设备标识符
+    pub fn new(basename: String, id: Option<DeviceNumber>) -> IdTable {
+        return IdTable { basename, id };
+    }
+
+    /// @brief: 将设备标识符转换成name
+    /// @parameter None
+    /// @return: 设备名
+    pub fn name(&self) -> String {
+        if self.id.is_none() {
+            return self.basename.clone();
+        } else {
+            let id = self.id.unwrap();
+            return format!("{}:{}", id.major().data(), id.minor());
+        }
+    }
+
+    pub fn device_number(&self) -> DeviceNumber {
+        return self.id.unwrap_or_default();
+    }
+}
+impl Default for IdTable {
+    fn default() -> Self {
+        IdTable::new("unknown".to_string(), None)
+    }
+}
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum DeviceState {
+    NotInitialized = 0,
+    Initialized = 1,
+    UnDefined = 2,
+}
+impl From<u32> for DeviceState {
+    fn from(state: u32) -> Self {
+        match state {
+            0 => DeviceState::NotInitialized,
+            1 => DeviceState::Initialized,
+            _ => todo!(),
+        }
+    }
+}
+/// @brief: 将设备状态转换为u32类型
+impl From<DeviceState> for u32 {
+    fn from(state: DeviceState) -> Self {
+        match state {
+            DeviceState::NotInitialized => 0,
+            DeviceState::Initialized => 1,
+            DeviceState::UnDefined => 2,
+        }
+    }
+}

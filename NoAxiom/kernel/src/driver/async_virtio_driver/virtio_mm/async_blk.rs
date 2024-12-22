@@ -108,7 +108,6 @@ impl VirtIOAsyncBlock {
 
 impl BlockDevice for VirtIOAsyncBlock {
     fn read<'a>(&'a self, id: usize, buf: &'a mut [u8]) -> crate::fs::blockdevice::BlockReturn {
-        info!("read!");
         Box::pin(async move {
             self.read_block(id, buf).await;
             Ok(buf.len() as isize)

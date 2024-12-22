@@ -159,7 +159,6 @@ impl Event {
         full_fence();
         if let Some(inner) = self.try_inner() {
             if inner.notified.load(Ordering::Acquire) < n {
-                debug!("[event] goto notify...");
                 inner.lock().notify(n);
             }
         }
@@ -406,7 +405,6 @@ impl Future for EventListener {
             }
             // 刚被创建，被poll了，就保存住waker，返回pending
             State::Created => {
-                info!("created");
                 state.set(State::Polling(cx.waker().clone()));
             }
             // 可以被poll的状态，重设waker，返回pending
@@ -419,13 +417,6 @@ impl Future for EventListener {
                 }
             }
         }
-
-        info!("EventListener is pending!");
-        info!(
-            "[kernel] hart id {} interrupt status: {}",
-            crate::get_hartid(),
-            is_external_interrupt_enabled()
-        );
 
         Poll::Pending
     }
@@ -605,7 +596,6 @@ impl List {
     /// 通知一定数量的条目
     // #[cold]
     fn notify(&mut self, mut n: usize) {
-        debug!("notify: n: {}, self.notifiled: {}", n, self.notified);
         if n <= self.notified {
             return;
         }

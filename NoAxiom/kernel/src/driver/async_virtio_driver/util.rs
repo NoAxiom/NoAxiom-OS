@@ -1,9 +1,9 @@
 use super::config::*;
 
 /// 向上对齐页大小
-pub const fn align_up_page(size: usize) -> usize {
-    (size + PAGE_SIZE) & !(PAGE_SIZE - 1)
-}
+// pub const fn align_up_page(size: usize) -> usize {
+//     (size + PAGE_SIZE) & !(PAGE_SIZE - 1)
+// }
 
 /// todo
 #[allow(unused)]

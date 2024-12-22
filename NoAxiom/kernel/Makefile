@@ -18,7 +18,7 @@ SV39 := 1
 # platform
 VF2 :=
 RISCV_QEMU := 1
-
+ASYNC_FS := 
 UART := 
 PRELIMINARY :=
 BUSYBOX :=
@@ -79,6 +79,10 @@ endif
 
 ifneq ($(RUNTESTS), )
 	FEATURES += runtests
+endif
+
+ifneq ($(ASYNC_FS), )
+	FEATURES += async_fs
 endif
 
 ifneq ($(FEATURES), )

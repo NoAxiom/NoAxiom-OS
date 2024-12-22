@@ -1,4 +1,4 @@
-use crate::{config, cpu::get_hartid, println};
+use crate::{config, cpu::get_hartid};
 
 extern crate alloc;
 
@@ -19,12 +19,13 @@ pub static PLIC: Once<PLIC<CPU_NUM>> = Once::new();
 pub fn register_to_hart() {
     let plic = PLIC.get().unwrap();
     let hart = get_hartid();
+    // todo: support multiple devices
     let irq = 1;
     plic.set_threshold(hart as u32, Mode::Machine, 1);
     plic.set_threshold(hart as u32, Mode::Supervisor, 0);
     plic.enable(hart as u32, Mode::Supervisor, irq);
     plic.complete(hart as u32, Mode::Supervisor, irq);
-    println!("hart: {}, register to {}", hart, irq);
+    debug!("Register irq {} to hart {}", irq, hart);
 }
 
 pub fn init_plic(plic_addr: usize) {
@@ -36,11 +37,22 @@ pub fn init_plic(plic_addr: usize) {
         let plic = PLIC::new(plic_addr, privileges);
         PLIC.call_once(|| plic);
 
+        let priority;
+        #[cfg(feature = "async_fs")]
+        {
+            priority = 2;
+        }
+        #[cfg(not(feature = "async_fs"))]
+        {
+            priority = 0;
+        }
+        // ! fixme: now is turn OFF the interrupt
         let irq = 1;
         let plic = PLIC.get().unwrap();
-        plic.set_priority(irq, 3);
+        plic.set_priority(irq, priority);
 
         // todo: register more devices
+        debug!("Init qemu plic success");
     }
     #[cfg(any(feature = "vf2"))]
     {

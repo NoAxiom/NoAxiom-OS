@@ -18,3 +18,19 @@ pub const FIRST_CLUSTER: u32 = 2;
 
 /// The number of wake ops when external interrupt comes
 pub const WAKE_NUM: usize = 1;
+
+/// The fake virtual root entry, it's just a placeholder that define the name
+/// and first cluster mannually
+/// todo: use a real root entry that read from the disk
+pub const ROOT_FAKE_ENTRY: [u8; 32] = {
+    let mut entry = [0; 32];
+    // entry[0] = 0x2f; // '/'
+    entry[11] = 0x10; // directory
+    entry[26] = 0x02; // first cluster
+    entry
+};
+
+#[derive(Debug)]
+pub enum FileError {
+    FileNotFound,
+}
