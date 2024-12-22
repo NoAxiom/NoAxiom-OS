@@ -193,6 +193,7 @@ impl FAT32FIleSystem {
         }
     }
 
+    /// list the files in the root directory
     pub async fn list(&self) {
         let result = self.file_tree.list(&self.root);
         match result {
@@ -205,6 +206,35 @@ impl FAT32FIleSystem {
             }
             Err(e) => {
                 error!("Error listing files: {:?}", e);
+            }
+        }
+    }
+
+    /// load the file content
+    pub async fn load_file(&self, name: String) -> Vec<u8> {
+        let node = self.file_tree.find(&name);
+        match node {
+            Ok(node) => {
+                let content = node.content().await;
+                content.await
+            }
+            Err(e) => {
+                error!("Error loading file: {:?}", e);
+                Vec::new()
+            }
+        }
+    }
+
+    pub async fn load_init_process(&self) -> Vec<u8> {
+        let node = self.file_tree.find(&"initprocess".to_string());
+        match node {
+            Ok(node) => {
+                let content = node.content().await;
+                content.await
+            }
+            Err(e) => {
+                error!("Error loading init process: {:?}", e);
+                Vec::new()
             }
         }
     }

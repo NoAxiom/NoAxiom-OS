@@ -2,8 +2,7 @@ mod blockcache;
 pub mod blockdevice;
 pub mod fat32;
 mod file;
-mod inode;
-pub mod tmp;
+pub mod inode;
 
 use alloc::sync::Arc;
 use core::mem::MaybeUninit;
@@ -11,8 +10,8 @@ use core::mem::MaybeUninit;
 use fat32::FAT32FIleSystem;
 pub use file::*;
 use kernel_sync::SpinMutex;
-pub use tmp::*;
 
+// pub use tmp::*;
 use crate::arch::interrupt::{
     disable_global_interrupt, enable_external_interrupt, enable_global_interrupt,
 };

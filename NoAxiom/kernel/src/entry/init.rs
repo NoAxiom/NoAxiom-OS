@@ -5,7 +5,7 @@ use crate::{
     cpu::get_hartid,
     device::init::device_init,
     driver::{log::log_init, sbi::hart_start},
-    entry::{boot::_entry_other_hart, init_proc::schedule_spawn_all_apps},
+    entry::{boot::_entry_other_hart, init_proc::spawn_initproc},
     fs::fs_init,
     mm::{bss::bss_init, frame::frame_init, hart_mm_init, heap::heap_init},
     platform::{
@@ -44,7 +44,7 @@ pub fn wake_other_hart(forbid_hart_id: usize) {
 
 pub async fn async_init() {
     fs_init().await;
-    schedule_spawn_all_apps();
+    // schedule_spawn_all_apps();
     wake_other_hart(get_hartid());
     info!("[kernel] async init done");
 }
@@ -93,5 +93,6 @@ pub fn boot_hart_init(_: usize, dtb: usize) {
         get_hartid(),
         dtb as usize,
     );
+    spawn_initproc();
     rust_main();
 }
