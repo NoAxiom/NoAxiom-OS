@@ -8,7 +8,7 @@ use crate::{
     sync::cell::SyncUnsafeCell,
 };
 
-#[derive(Debug, Clone, PartialEq, Eq, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Ord)]
 pub struct SchedVruntime(pub usize);
 
 impl SchedVruntime {

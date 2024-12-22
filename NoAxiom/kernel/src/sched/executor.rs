@@ -8,7 +8,7 @@ use core::future::Future;
 use async_task::{Builder, Runnable, ScheduleInfo, WithInfo};
 use lazy_static::lazy_static;
 
-use super::sched_entity::SchedEntity;
+use super::sched_entity::{SchedEntity, SchedVruntime};
 use crate::sync::mutex::TicketMutex;
 
 pub struct TaskScheduleInfo {
@@ -22,7 +22,7 @@ impl TaskScheduleInfo {
 
 struct Executor {
     /// cfs tree: (prio, task)
-    normal: BTreeMap<usize, Runnable<TaskScheduleInfo>>,
+    normal: BTreeMap<SchedVruntime, Runnable<TaskScheduleInfo>>,
     /// realtime / just-woken runnable queue
     urgent: VecDeque<Runnable<TaskScheduleInfo>>,
 }
@@ -34,10 +34,8 @@ impl Executor {
         }
     }
     fn push_normal(&mut self, runnable: Runnable<TaskScheduleInfo>) {
-        self.normal.insert(
-            runnable.metadata().sched_entity.inner().vruntime.0,
-            runnable,
-        );
+        self.normal
+            .insert(runnable.metadata().sched_entity.inner().vruntime, runnable);
     }
     fn push_urgent(&mut self, runnable: Runnable<TaskScheduleInfo>) {
         self.urgent.push_back(runnable);
@@ -46,6 +44,13 @@ impl Executor {
         if let Some(runnable) = self.urgent.pop_front() {
             Some(runnable)
         } else if let Some((_, runnable)) = self.normal.pop_first() {
+            debug!(
+                "poped from normal queue, vruntime: {}",
+                runnable.metadata().sched_entity.inner().vruntime.0
+            );
+            for it in self.normal.iter() {
+                debug!("normal queue: {:?}", it.1.metadata().sched_entity.inner());
+            }
             Some(runnable)
         } else {
             None
