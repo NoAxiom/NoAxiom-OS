@@ -13,7 +13,7 @@ use crate::{
         KERNEL_ADDR_OFFSET, KERNEL_VIRT_MEMORY_END, MMIO, PAGE_SIZE, PAGE_WIDTH, USER_HEAP_SIZE,
         USER_STACK_SIZE,
     },
-    fs::File,
+    fs::{inode::Inode, path::Path, File},
     map_permission,
     mm::{
         address::{VirtAddr, VirtPageNum},
@@ -229,30 +229,27 @@ impl MemorySet {
         info!("[memory_set] load elf begins");
         let mut memory_set = Self::new_with_kernel();
 
-        {
-            // // read elf header
-            // const ELF_HEADER_SIZE: usize = 64;
-            // let mut elf_buf = [0u8; ELF_HEADER_SIZE];
-            // elf_file
-            //     .read(0, ELF_HEADER_SIZE, &mut elf_buf)
-            //     .await
-            //     .unwrap();
-            // let elf_ph =
-            // xmas_elf::ElfFile::new(elf_buf.as_slice()).unwrap().header;
-            // debug!("elf_header: {:?}, length = {}", elf_ph, elf_len);
-
-            // // read all program header
-            // let ph_entry_size = elf_header.pt2.ph_entry_size() as usize;
-            // let ph_offset: usize = elf_header.pt2.ph_offset() as usize;
-            // let ph_count = elf_header.pt2.ph_count() as usize;
-            // let mut elf_buf = vec![0u8; ph_offset + ph_count *
-            // ph_entry_size]; elf_file
-            //     .read(0, ph_offset + ph_count * ph_entry_size, &mut elf_buf)
-            //     .await
-            //     .unwrap();
-            // let elf_ph = xmas_elf::ElfFile::new(elf_buf.as_slice()).unwrap();
-            // debug!("elf_ph: {:?}", elf_ph);
-        }
+        // // read elf header
+        // const ELF_HEADER_SIZE: usize = 64;
+        // let mut elf_buf = [0u8; ELF_HEADER_SIZE];
+        // elf_file
+        //     .read(0, ELF_HEADER_SIZE, &mut elf_buf)
+        //     .await
+        //     .unwrap();
+        // let elf_ph =
+        // xmas_elf::ElfFile::new(elf_buf.as_slice()).unwrap().header;
+        // debug!("elf_header: {:?}, length = {}", elf_ph, elf_len);
+        // // read all program header
+        // let ph_entry_size = elf_header.pt2.ph_entry_size() as usize;
+        // let ph_offset: usize = elf_header.pt2.ph_offset() as usize;
+        // let ph_count = elf_header.pt2.ph_count() as usize;
+        // let mut elf_buf = vec![0u8; ph_offset + ph_count *
+        // ph_entry_size]; elf_file
+        //     .read(0, ph_offset + ph_count * ph_entry_size, &mut elf_buf)
+        //     .await
+        //     .unwrap();
+        // let elf_ph = xmas_elf::ElfFile::new(elf_buf.as_slice()).unwrap();
+        // debug!("elf_ph: {:?}", elf_ph);
 
         // read all data
         // let mut elf_buf = vec![0u8; elf_len];
@@ -305,6 +302,11 @@ impl MemorySet {
             elf_entry,
             user_sp: user_stack_end, // stack grows downward
         }
+    }
+
+    pub async fn load_from_path(path: Path) -> ElfMemoryInfo {
+        let elf_file = Arc::new(Inode::from(path));
+        MemorySet::load_from_elf(elf_file).await
     }
 
     /// clone current memory set,

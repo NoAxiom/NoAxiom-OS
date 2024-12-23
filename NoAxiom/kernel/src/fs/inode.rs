@@ -3,8 +3,8 @@
 
 use alloc::{boxed::Box, string::String};
 
-use super::{File, FileReturn};
-use crate::{config::errno::Errno, fs::FS};
+use super::{path::Path, File, FileReturn};
+use crate::fs::FS;
 
 pub struct Inode<T> {
     pub readable: bool,
@@ -13,11 +13,11 @@ pub struct Inode<T> {
 }
 
 impl Inode<String> {
-    pub fn from(identifier: String) -> Self {
+    pub fn from(identifier: Path) -> Self {
         Self {
             readable: true,
             writable: false,
-            identifier,
+            identifier: identifier.as_string(),
         }
     }
 }

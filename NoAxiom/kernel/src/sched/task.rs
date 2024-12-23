@@ -16,6 +16,7 @@ use super::{
 };
 use crate::{
     cpu::current_cpu,
+    fs::path::Path,
     task::Task,
     time::gettime::get_time_us,
     trap::{trap_restore, user_trap_handler},
@@ -56,7 +57,7 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
 }
 
 /// schedule to allocate resouces and spawn task
-pub fn schedule_spawn_new_process(path: &'static str) {
+pub fn schedule_spawn_new_process(path: Path) {
     task_count_inc();
     spawn_raw(
         async move {

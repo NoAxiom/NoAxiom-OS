@@ -1,15 +1,14 @@
 //! # Task
 
 use alloc::{
-    string::ToString,
     sync::{Arc, Weak},
     vec::Vec,
 };
-use core::sync::atomic::{AtomicIsize, Ordering};
+use core::sync::atomic::{AtomicIsize, AtomicUsize, Ordering};
 
 use super::taskid::TidTracer;
 use crate::{
-    fs::inode::Inode,
+    fs::path::Path,
     mm::memory_set::MemorySet,
     nix::clone_flags::CloneFlags,
     sched::sched_entity::SchedEntity,
@@ -44,15 +43,15 @@ pub struct ThreadInfo {
 /// task control block for a coroutine,
 /// a.k.a thread in current project structure
 pub struct Task {
-    /// task identifier, contains thread_id and process_id
-    tid: TidTracer,
+    /// task group id, aka process_id
+    tgid: Arc<AtomicUsize>,
 
-    /// task group identifier
-    tgid: Arc<usize>,
+    /// task id, aka thread_id
+    tid: TidTracer,
 
     /// process control block ptr,
     /// also belongs to other threads
-    process: Arc<SpinMutex<ProcessInfo>>,
+    pcb: Arc<SpinMutex<ProcessInfo>>,
 
     /// memory set for task
     /// it's a process resource as well
@@ -82,13 +81,12 @@ impl Task {
     pub fn tid(&self) -> usize {
         self.tid.0
     }
-    #[inline(always)]
     pub fn tgid(&self) -> usize {
-        *self.tgid
+        self.tgid.load(Ordering::SeqCst)
     }
     #[inline(always)]
     pub fn is_leader(&self) -> bool {
-        self.tid.0 == *self.tgid
+        self.tid() == self.tgid()
     }
 
     /// status
@@ -162,22 +160,21 @@ impl Task {
     }
 
     /// create new process from elf
-    pub async fn new_process(path: &str) -> Arc<Self> {
+    pub async fn new_process(path: Path) -> Arc<Self> {
         trace!("[kernel] spawn new process from elf");
-        let elf_file = Arc::new(Inode::from(path.to_string())); // todo: now is read from static memory
-        let elf_memory_info = MemorySet::load_from_elf(elf_file).await;
+        let elf_memory_info = MemorySet::load_from_path(path).await;
         let memory_set = elf_memory_info.memory_set;
         let elf_entry = elf_memory_info.elf_entry;
         let user_sp = elf_memory_info.user_sp;
         trace!("[kernel] succeed to load elf data");
         // identifier
         let tid = tid_alloc();
-        let tgid = Arc::new(tid.0);
+        let tgid = Arc::new(AtomicUsize::new(tid.0));
         // create task
         let task = Arc::new(Self {
             tid,
             tgid,
-            process: Arc::new(SpinMutex::new(ProcessInfo {
+            pcb: Arc::new(SpinMutex::new(ProcessInfo {
                 children: Vec::new(),
                 parent: None,
             })),
@@ -194,15 +191,17 @@ impl Task {
     }
 
     /// fork
-    pub fn fork(&self, flags: CloneFlags) -> Arc<Self> {
+    pub fn fork(self: &Arc<Task>, flags: CloneFlags) -> Arc<Self> {
         // memory set clone
         let memory_set = if flags.contains(CloneFlags::VM) {
             self.memory_set.clone()
         } else {
             Arc::new(SpinMutex::new(self.memory_set.lock().clone_cow()))
+            // todo: vfence all?
         };
 
-        // TODO: fd table
+        // TODO: CloneFlags::SIGHAND
+        // TODO: fd table (CloneFlags::FILES)
         // let fd = if flags.contains(CloneFlags::FILES) {
         // self.fd_table.clone()
         // } else {
@@ -212,9 +211,9 @@ impl Task {
         if flags.contains(CloneFlags::THREAD) {
             // fork as a new thread
             let task = Arc::new(Self {
-                tid: tid_alloc(),
                 tgid: self.tgid.clone(),
-                process: self.process.clone(),
+                tid: tid_alloc(),
+                pcb: self.pcb.clone(),
                 memory_set,
                 thread: SyncUnsafeCell::new(ThreadInfo {
                     trap_context: self.trap_context().clone(),
@@ -226,7 +225,23 @@ impl Task {
             task
         } else {
             // fork as a new process
-            todo!()
+            let new_tid = tid_alloc();
+            let task = Arc::new(Self {
+                tgid: Arc::new(AtomicUsize::new(new_tid.0)),
+                tid: new_tid,
+                pcb: Arc::new(SpinMutex::new(ProcessInfo {
+                    children: Vec::new(),
+                    parent: Some(Arc::downgrade(self)),
+                })),
+                memory_set,
+                thread: SyncUnsafeCell::new(ThreadInfo {
+                    trap_context: self.trap_context().clone(),
+                }),
+                status: SyncUnsafeCell::new(TaskStatus::Ready),
+                exit_code: AtomicIsize::new(0),
+                sched_entity: self.sched_entity.data_clone(),
+            });
+            task
         }
     }
 

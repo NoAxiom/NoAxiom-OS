@@ -3,6 +3,7 @@ pub mod blockdevice;
 pub mod fat32;
 mod file;
 pub mod inode;
+pub mod path;
 
 use alloc::sync::Arc;
 use core::mem::MaybeUninit;
@@ -12,9 +13,7 @@ pub use file::*;
 use kernel_sync::SpinMutex;
 
 // pub use tmp::*;
-use crate::arch::interrupt::{
-    disable_global_interrupt, enable_external_interrupt, enable_global_interrupt,
-};
+use crate::arch::interrupt::disable_global_interrupt;
 #[cfg(not(feature = "async_fs"))]
 use crate::device::block::BLOCK_DEVICE as SYNC_BLOCK_DEVICE;
 #[cfg(feature = "async_fs")]
