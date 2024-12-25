@@ -1,7 +1,7 @@
 use alloc::{boxed::Box, vec::Vec};
 use core::{future::Future, pin::Pin};
 
-use crate::utils::result::Errno;
+use crate::nix::result::Errno;
 
 /// file's data
 pub struct FileData<T> {
@@ -15,6 +15,11 @@ impl<T> FileData<T> {
 }
 
 pub type FileReturn<'a> = Pin<Box<dyn Future<Output = Result<Vec<u8>, Errno>> + Send + 'a>>;
+
+#[derive(Debug)]
+pub enum FileError {
+    FileNotFound,
+}
 
 pub trait File: Send + Sync {
     fn read<'a>(&'a self) -> FileReturn;

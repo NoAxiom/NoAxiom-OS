@@ -13,7 +13,7 @@ use crate::{
         DL_INTERP_OFFSET, KERNEL_ADDR_OFFSET, KERNEL_VIRT_MEMORY_END, MMIO, PAGE_SIZE, PAGE_WIDTH,
         USER_HEAP_SIZE, USER_STACK_SIZE,
     },
-    constant::{auxv::*, time::CLOCK_FREQ},
+    constant::time::CLOCK_FREQ,
     fs::{inode::Inode, path::Path, File},
     map_permission,
     mm::{
@@ -21,7 +21,7 @@ use crate::{
         map_area::MapAreaType,
         permission::MapType,
     },
-    nix::auxv::AuxEntry,
+    nix::auxv::*,
     sync::mutex::SpinMutex,
 };
 

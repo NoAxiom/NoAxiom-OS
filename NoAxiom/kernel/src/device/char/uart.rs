@@ -15,7 +15,7 @@ use super::{CharDevice, Device};
 use crate::{
     device::{ADevResult, DeviceType},
     driver::uart::UartDriver,
-    sync::mutex::SpinMutex, utils::result::Errno,
+    sync::mutex::SpinMutex, nix::result::Errno,
 };
 
 pub static UART_DEVICE: Once<Arc<Serial>> = Once::new();

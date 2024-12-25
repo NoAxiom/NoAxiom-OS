@@ -17,7 +17,7 @@ use crate::{
         Driver,
     },
     sync::mutex::SpinMutex,
-    utils::result::Errno,
+    nix::result::Errno,
 };
 
 pub struct VirtIOBlockDriver {

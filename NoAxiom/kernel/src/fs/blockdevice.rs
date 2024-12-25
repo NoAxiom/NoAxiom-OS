@@ -1,7 +1,7 @@
 use alloc::boxed::Box;
 use core::{future::Future, pin::Pin};
 
-use crate::utils::result::Errno;
+use crate::nix::result::Errno;
 
 pub type BlockReturn<'a> = Pin<Box<dyn Future<Output = Result<isize, Errno>> + Send + 'a>>;
 

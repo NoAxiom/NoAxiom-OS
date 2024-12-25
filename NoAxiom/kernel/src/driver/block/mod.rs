@@ -2,7 +2,7 @@
 pub mod virtio;
 
 use super::Driver;
-use crate::utils::result::Errno;
+use crate::nix::result::Errno;
 
 pub trait BlockDriver: Driver
 where

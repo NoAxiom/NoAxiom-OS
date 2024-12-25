@@ -14,7 +14,7 @@ use directory::ShortDirectory;
 use entry::ShortDirectoryEntry;
 use fs_node::FSNode;
 
-use crate::{config::fs::FileError, fs::FileReturn};
+use crate::fs::{FileError, FileReturn};
 
 /// the node of the file tree with identifier `T`
 pub struct FileNode<T, V> {

@@ -6,7 +6,7 @@ use alloc::sync::Arc;
 use spin::Once;
 
 use super::Device;
-use crate::{utils::result::Errno, device::block::virtio::virtio as Virtio, println};
+use crate::{nix::result::Errno, device::block::virtio::virtio as Virtio, println};
 
 /// ! fixme: Virtio to dyn BlockDevice
 pub static BLOCK_DEVICE: Once<Arc<Virtio>> = Once::new();

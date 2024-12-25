@@ -14,7 +14,7 @@ use alloc::{fmt::Debug, sync::Arc, vec::Vec};
 use block::BlockDriver;
 use spin::{Lazy, Mutex};
 
-use crate::{utils::result::Errno, device::IdTable};
+use crate::{nix::result::Errno, device::IdTable};
 /// @brief: Driver error
 #[allow(dead_code)]
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]

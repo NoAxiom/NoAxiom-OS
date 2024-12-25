@@ -1,7 +1,7 @@
 use alloc::sync::Arc;
 use core::result::Result;
 
-use crate::{constant::register::*, task::Task, trap::TrapContext, utils::result::Errno};
+use crate::{constant::register::*, task::Task, trap::TrapContext, nix::result::Errno};
 
 pub mod fs;
 pub mod mm;

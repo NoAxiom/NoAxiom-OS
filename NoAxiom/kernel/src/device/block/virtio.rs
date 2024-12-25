@@ -7,7 +7,7 @@ use spin::{Mutex, MutexGuard};
 
 use super::BlockDevice;
 use crate::{
-    utils::result::Errno,
+    nix::result::Errno,
     device::{Device, DeviceData, DeviceType},
     driver::Driver,
 };

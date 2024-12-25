@@ -1,6 +1,6 @@
 use core::{fmt::Debug, pin::Pin};
 
-use crate::utils::result::Errno;
+use crate::nix::result::Errno;
 
 use super::{ADevResult, Device};
 

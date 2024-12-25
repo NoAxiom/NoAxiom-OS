@@ -4,8 +4,6 @@ use alloc::{string::String, vec::Vec};
 
 use crate::config::mm::{KERNEL_ADDR_OFFSET, KERNEL_PAGENUM_MASK};
 
-pub mod result;
-
 /// signed extend for number without 64/32 bits width
 #[inline(always)]
 pub fn signed_extend(num: usize, width: usize) -> usize {
