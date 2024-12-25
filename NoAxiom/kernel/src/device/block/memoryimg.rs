@@ -4,7 +4,7 @@ use spin::Mutex;
 
 use super::BlockDevice;
 use crate::{
-    config::errno::Errno,
+    utils::result::Errno,
     device::{Device, DeviceType},
     driver::Driver,
     println,

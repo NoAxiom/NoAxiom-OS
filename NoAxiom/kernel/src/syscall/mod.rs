@@ -1,7 +1,7 @@
 use alloc::sync::Arc;
-use core::task::Waker;
+use core::result::Result;
 
-use crate::{constant::register::*, task::Task, trap::TrapContext};
+use crate::{constant::register::*, task::Task, trap::TrapContext, utils::result::Errno};
 
 pub mod fs;
 pub mod mm;
@@ -10,38 +10,48 @@ pub mod process;
 
 use crate::constant::syscall::*;
 
+pub type SyscallResult = Result<isize, Errno>;
+
 /// system call tracer for a task
 pub struct Syscall<'a> {
     pub task: &'a Arc<Task>,
-    #[allow(unused)]
-    pub waker: Option<Waker>, // TODO: maybe we can remove this
 }
 
 impl<'a> Syscall<'a> {
     pub fn new(task: &'a Arc<Task>) -> Self {
-        Self { task, waker: None }
+        Self { task }
     }
-    pub async fn syscall(&mut self, id: usize, args: [usize; 6]) -> isize {
+    pub async fn syscall(&mut self, id: usize, args: [usize; 6]) -> SyscallResult {
         trace!("syscall id: {}, args: {:?}", id, args);
         match id {
-            SYS_EXIT => self.sys_exit(),
+            // fs
             SYS_READ => self.sys_read().await,
             SYS_WRITE => self.sys_write(args[0], args[1], args[2]).await,
-            SYS_SCHED_YIELD => Self::sys_yield().await,
+
+            // process
+            SYS_EXIT => self.sys_exit(),
             SYS_CLONE => self.sys_fork(args[0], args[1], args[2], args[3], args[4]),
-            SYS_EXECVE => self.sys_exec().await,
-            // SYS_TIMES => self.sys_times(args[0]),
+            SYS_EXECVE => self.sys_exec(args[0], args[1], args[2]).await,
+
+            // mm
+            SYS_BRK => todo!(),
+            SYS_MMAP => todo!(),
+            SYS_MUNMAP => todo!(),
+
+            // others
+            SYS_TIMES => Self::sys_times(args[0]),
+            SYS_SCHED_YIELD => Self::sys_yield().await,
+
+            // unsupported: return -1
             _ => {
-                error!("unsupported syscall id: {}, args: {:?}", id, args);
-                self.task.exit();
-                -1
+                panic!("unsupported syscall id: {}, args: {:?}", id, args);
             }
         }
     }
 }
 
 pub async fn syscall(task: &Arc<Task>, cx: &mut TrapContext) -> isize {
-    Syscall::new(task)
+    let res = Syscall::new(task)
         .syscall(
             cx.user_reg[A7],
             [
@@ -53,5 +63,16 @@ pub async fn syscall(task: &Arc<Task>, cx: &mut TrapContext) -> isize {
                 cx.user_reg[A5],
             ],
         )
-        .await
+        .await;
+    match res {
+        Ok(res) => res,
+        Err(errno) => {
+            let errno = errno as isize;
+            if errno > 0 {
+                -errno
+            } else {
+                errno
+            }
+        }
+    }
 }

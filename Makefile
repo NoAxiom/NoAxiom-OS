@@ -124,7 +124,7 @@ vendor:
 
 count:
 	@echo "kernel code statistic:"
-	@cd $(PROJECT) && cloc $(KERNEL)
+	@cd $(PROJECT) && cloc $(KERNEL) --exclude-dir=.trashbin --exclude-ext=md,toml
 
 # sdcard:
 # 	@echo "\e[49;34m\e[1m----------Making sdcard-----------\e[0m"

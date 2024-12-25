@@ -1,6 +1,7 @@
 //! # Task
 
 use alloc::{
+    string::String,
     sync::{Arc, Weak},
     vec::Vec,
 };
@@ -9,7 +10,7 @@ use core::sync::atomic::{AtomicIsize, AtomicUsize, Ordering};
 use super::taskid::TidTracer;
 use crate::{
     fs::path::Path,
-    mm::memory_set::MemorySet,
+    mm::memory_set::{ElfMemoryInfo, MemorySet},
     nix::clone_flags::CloneFlags,
     sched::sched_entity::SchedEntity,
     sync::{cell::SyncUnsafeCell, mutex::SpinMutex},
@@ -140,9 +141,14 @@ impl Task {
     pub unsafe fn memory_activate(&self) {
         unsafe { self.memory_set.lock().activate() };
     }
+    /// get token from memory set
     #[inline(always)]
     pub fn token(&self) -> usize {
         self.memory_set.lock().token()
+    }
+    /// change current memory set
+    pub fn change_memory_set(&self, memory_set: MemorySet) {
+        *self.memory_set.lock() = memory_set;
     }
 
     /// trap context
@@ -162,10 +168,11 @@ impl Task {
     /// create new process from elf
     pub async fn new_process(path: Path) -> Arc<Self> {
         trace!("[kernel] spawn new process from elf");
-        let elf_memory_info = MemorySet::load_from_path(path).await;
-        let memory_set = elf_memory_info.memory_set;
-        let elf_entry = elf_memory_info.elf_entry;
-        let user_sp = elf_memory_info.user_sp;
+        let ElfMemoryInfo {
+            memory_set,
+            elf_entry,
+            user_sp,
+        } = MemorySet::load_from_path(path).await;
         trace!("[kernel] succeed to load elf data");
         // identifier
         let tid = tid_alloc();
@@ -208,6 +215,7 @@ impl Task {
         // self.fd_table.clone_cow()
         // };
 
+        // TODO: push task into process/thread manager
         if flags.contains(CloneFlags::THREAD) {
             // fork as a new thread
             let task = Arc::new(Self {
@@ -243,6 +251,20 @@ impl Task {
             });
             task
         }
+    }
+
+    /// execute
+    pub async fn exec(self: &Arc<Self>, path: Path, args: Vec<String>, envs: Vec<String>) {
+        let ElfMemoryInfo {
+            memory_set,
+            elf_entry,
+            user_sp,
+        } = MemorySet::load_from_path(path).await;
+        // TODO: delete child
+        unsafe { memory_set.activate() };
+        self.change_memory_set(memory_set);
+        // TODO: init ustack
+        self.set_trap_context(TrapContext::app_init_cx(elf_entry, user_sp));
     }
 
     /// exit current task

@@ -1,4 +1,4 @@
-use crate::{config::fs::INIT_PROC_NAME, fs::path::Path, sched::task::schedule_spawn_new_process};
+use crate::{config::fs::INIT_PROC_PATH, fs::path::Path, sched::task::schedule_spawn_new_process};
 
 /// spawn all apps, only used in debug
 #[allow(unused)]
@@ -20,5 +20,5 @@ pub fn schedule_spawn_all_apps() {
 #[allow(unused)]
 pub fn schedule_spawn_initproc() {
     info!("[init] spawn initproc");
-    schedule_spawn_new_process(Path::from(INIT_PROC_NAME));
+    schedule_spawn_new_process(Path::from(INIT_PROC_PATH));
 }

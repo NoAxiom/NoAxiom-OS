@@ -10,9 +10,10 @@ use riscv::register::satp;
 use super::{address::PhysAddr, frame::FrameTracker, map_area::MapArea, page_table::PageTable};
 use crate::{
     config::mm::{
-        KERNEL_ADDR_OFFSET, KERNEL_VIRT_MEMORY_END, MMIO, PAGE_SIZE, PAGE_WIDTH, USER_HEAP_SIZE,
-        USER_STACK_SIZE,
+        DL_INTERP_OFFSET, KERNEL_ADDR_OFFSET, KERNEL_VIRT_MEMORY_END, MMIO, PAGE_SIZE, PAGE_WIDTH,
+        USER_HEAP_SIZE, USER_STACK_SIZE,
     },
+    constant::{auxv::*, time::CLOCK_FREQ},
     fs::{inode::Inode, path::Path, File},
     map_permission,
     mm::{
@@ -20,7 +21,7 @@ use crate::{
         map_area::MapAreaType,
         permission::MapType,
     },
-    pte_flags,
+    nix::auxv::AuxEntry,
     sync::mutex::SpinMutex,
 };
 
@@ -103,7 +104,7 @@ impl MemorySet {
 
     /// switch into this memory set
     #[inline(always)]
-    pub unsafe fn activate(&mut self) {
+    pub unsafe fn activate(&self) {
         unsafe {
             self.page_table.activate();
         }
@@ -223,36 +224,18 @@ impl MemorySet {
         self.user_heap_area = Some(map_area);
     }
 
+    pub fn load_dl_interp(&mut self, elf: &Arc<dyn File>) -> Option<usize> {
+        todo!("load_dl_interp")
+    }
+
     /// load data from elf file
-    /// TODO: map trampoline?
     pub async fn load_from_elf(elf_file: Arc<dyn File>) -> ElfMemoryInfo {
-        info!("[memory_set] load elf begins");
         let mut memory_set = Self::new_with_kernel();
+        let mut auxv: Vec<AuxEntry> = Vec::new(); // auxiliary vector
+        let mut dl_flag = false; // dynamic link flag
 
-        // // read elf header
-        // const ELF_HEADER_SIZE: usize = 64;
-        // let mut elf_buf = [0u8; ELF_HEADER_SIZE];
-        // elf_file
-        //     .read(0, ELF_HEADER_SIZE, &mut elf_buf)
-        //     .await
-        //     .unwrap();
-        // let elf_ph =
-        // xmas_elf::ElfFile::new(elf_buf.as_slice()).unwrap().header;
-        // debug!("elf_header: {:?}, length = {}", elf_ph, elf_len);
-        // // read all program header
-        // let ph_entry_size = elf_header.pt2.ph_entry_size() as usize;
-        // let ph_offset: usize = elf_header.pt2.ph_offset() as usize;
-        // let ph_count = elf_header.pt2.ph_count() as usize;
-        // let mut elf_buf = vec![0u8; ph_offset + ph_count *
-        // ph_entry_size]; elf_file
-        //     .read(0, ph_offset + ph_count * ph_entry_size, &mut elf_buf)
-        //     .await
-        //     .unwrap();
-        // let elf_ph = xmas_elf::ElfFile::new(elf_buf.as_slice()).unwrap();
-        // debug!("elf_ph: {:?}", elf_ph);
-
+        // TODO: maybe we should only read the header at first
         // read all data
-        // let mut elf_buf = vec![0u8; elf_len];
         let file_data = elf_file.read().await.unwrap();
         let elf = xmas_elf::ElfFile::new(file_data.as_slice()).unwrap();
 
@@ -260,51 +243,90 @@ impl MemorySet {
         let magic = elf.header.pt1.magic;
         assert_eq!(magic, [0x7f, 0x45, 0x4c, 0x46], "invalid elf!");
         let ph_count = elf.header.pt2.ph_count();
-        let mut end_vpn = VirtPageNum(0);
+        let mut start_vpn = None;
+        let mut end_vpn = None;
 
         // map pages by loaded program header
-        info!("[memory_set] data loaded! start to map data pages");
         for i in 0..ph_count {
             let ph = elf.program_header(i).unwrap();
-            if ph.get_type().unwrap() == xmas_elf::program::Type::Load {
-                let map_area = MapArea::new(
-                    (ph.virtual_addr() as usize).into(),
-                    ((ph.virtual_addr() + ph.mem_size()) as usize).into(),
-                    MapType::Framed,
-                    map_permission!(U).merge_from_elf_flags(ph.flags()),
-                    MapAreaType::ElfBinary,
-                );
-                end_vpn = map_area.vpn_range.end();
-                memory_set.push_area(
-                    map_area,
-                    Some(&elf.input[ph.offset() as usize..(ph.offset() + ph.file_size()) as usize]),
-                );
+            match ph.get_type().unwrap() {
+                xmas_elf::program::Type::Load => {
+                    let map_area = MapArea::new(
+                        (ph.virtual_addr() as usize).into(),
+                        ((ph.virtual_addr() + ph.mem_size()) as usize).into(),
+                        MapType::Framed,
+                        map_permission!(U).merge_from_elf_flags(ph.flags()),
+                        MapAreaType::ElfBinary,
+                    );
+                    if start_vpn.is_none() {
+                        start_vpn = Some(map_area.vpn_range.start());
+                    }
+                    end_vpn = Some(map_area.vpn_range.end());
+                    memory_set.push_area(
+                        map_area,
+                        Some(
+                            &elf.input
+                                [ph.offset() as usize..(ph.offset() + ph.file_size()) as usize],
+                        ),
+                    );
+                }
+                xmas_elf::program::Type::Interp => {
+                    dl_flag = true;
+                }
+                _ => {}
             }
         }
-
-        info!("[memory_set] elf data load complete! start to map user stack");
-        let end_va: VirtAddr = end_vpn.into();
+        let end_va: VirtAddr = end_vpn.unwrap().into();
         let elf_entry = elf.header.pt2.entry_point() as usize;
-        info!("[memory_set] entry: {:#x}", elf_entry);
+        info!("[load_elf] raw_entry: {:#x}", elf_entry);
 
+        // user stack
         let user_stack_base: usize = usize::from(end_va) + PAGE_SIZE; // stack bottom
         let user_stack_end = user_stack_base + USER_STACK_SIZE; // stack top
         memory_set.map_user_stack(user_stack_base, user_stack_end);
+        info!(
+            "[memory_set] user stack mapped! [{}, {})",
+            user_stack_base, user_stack_end
+        );
 
-        info!("[memory_set] user stack mapped! start to map user heap");
+        // user heap
         let user_heap_base: usize = user_stack_end + PAGE_SIZE;
         let user_heap_end: usize = user_heap_base + USER_HEAP_SIZE;
         memory_set.map_user_heap(user_heap_base, user_heap_end);
 
-        info!("[memory_set] user heap mapped! elf load complete!");
+        // aux vector
+        let ph_head_addr = elf.header.pt2.ph_offset() as u64;
+        auxv.push(AuxEntry(AT_PHDR, ph_head_addr as usize));
+        auxv.push(AuxEntry(AT_PHENT, elf.header.pt2.ph_entry_size() as usize)); // ELF64 header 64bytes
+        auxv.push(AuxEntry(AT_PHNUM, ph_count as usize));
+        auxv.push(AuxEntry(AT_PAGESZ, PAGE_SIZE as usize));
+        if dl_flag {
+            // let interp_entry_point = memory_set.load_dl_interp(&elf).await;
+            // auxv.push(AuxEntry(AT_BASE, DL_INTERP_OFFSET));
+            // elf_entry = interp_entry_point.unwrap();
+            unimplemented!()
+        } else {
+            auxv.push(AuxEntry(AT_BASE, 0));
+        }
+        auxv.push(AuxEntry(AT_FLAGS, 0 as usize));
+        auxv.push(AuxEntry(AT_ENTRY, elf.header.pt2.entry_point() as usize));
+        auxv.push(AuxEntry(AT_UID, 0 as usize));
+        auxv.push(AuxEntry(AT_EUID, 0 as usize));
+        auxv.push(AuxEntry(AT_GID, 0 as usize));
+        auxv.push(AuxEntry(AT_EGID, 0 as usize));
+        auxv.push(AuxEntry(AT_HWCAP, 0 as usize));
+        auxv.push(AuxEntry(AT_CLKTCK, CLOCK_FREQ as usize));
+        auxv.push(AuxEntry(AT_SECURE, 0 as usize));
+
         ElfMemoryInfo {
             memory_set,
             elf_entry,
-            user_sp: user_stack_end, // stack grows downward
+            user_sp: user_stack_end, // stack grows downward, so return stack_end
         }
     }
 
     pub async fn load_from_path(path: Path) -> ElfMemoryInfo {
+        info!("[load_elf] from path: {}", &path.inner());
         let elf_file = Arc::new(Inode::from(path));
         MemorySet::load_from_elf(elf_file).await
     }

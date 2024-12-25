@@ -1,7 +1,7 @@
 use alloc::{boxed::Box, vec::Vec};
 use core::{future::Future, pin::Pin};
 
-use crate::config::errno::Errno;
+use crate::utils::result::Errno;
 
 /// file's data
 pub struct FileData<T> {
