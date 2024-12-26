@@ -117,13 +117,17 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
                 cx = task.trap_context_mut();
                 cx.user_reg[A0] = result as usize;
             }
-            _ => panic!(
-                "hart: {}, exception {:?} is unsupported, stval = {:#x}, sepc = {:#x}",
-                get_hartid(),
-                scause.cause(),
-                stval,
-                cx.sepc
-            ),
+            _ => {
+                warn!(
+                    "unexpected exit!!! tid: {}, hart: {}, exception {:?} is unsupported, stval = {:#x}, sepc = {:#x}",
+                    task.tid(),
+                    get_hartid(),
+                    scause.cause(),
+                    stval,
+                    cx.sepc
+                );
+                task.exit();
+            }
         },
         Trap::Interrupt(interrupt) => match interrupt {
             Interrupt::SupervisorTimer => {
@@ -142,13 +146,17 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
                 );
                 ext_int_handler();
             }
-            _ => panic!(
-                "hart: {}, interrupt {:?} is unsupported, stval = {:#x}, sepc = {:#x}",
-                get_hartid(),
-                scause.cause(),
-                stval,
-                cx.sepc
-            ),
+            _ => {
+                warn!(
+                    "unexpected exit!!! tid: {}, hart: {}, interrupt {:?} is unsupported, stval = {:#x}, sepc = {:#x}",
+                    task.tid(),
+                    get_hartid(),
+                    scause.cause(),
+                    stval,
+                    cx.sepc,
+                );
+                task.exit();
+            }
         },
     }
 }

@@ -7,6 +7,8 @@ use alloc::{
 };
 use core::sync::atomic::{AtomicIsize, AtomicUsize, Ordering};
 
+use riscv::asm::sfence_vma_all;
+
 use super::taskid::TidTracer;
 use crate::{
     fs::path::Path,
@@ -203,8 +205,9 @@ impl Task {
         let memory_set = if flags.contains(CloneFlags::VM) {
             self.memory_set.clone()
         } else {
-            Arc::new(SpinMutex::new(self.memory_set.lock().clone_cow()))
-            // todo: vfence all?
+            let res = Arc::new(SpinMutex::new(self.memory_set.lock().clone_cow()));
+            unsafe { sfence_vma_all() };
+            res
         };
 
         // TODO: CloneFlags::SIGHAND
@@ -234,6 +237,7 @@ impl Task {
         } else {
             // fork as a new process
             let new_tid = tid_alloc();
+            debug!("fork new process, tid: {}", new_tid.0);
             let task = Arc::new(Self {
                 tgid: Arc::new(AtomicUsize::new(new_tid.0)),
                 tid: new_tid,

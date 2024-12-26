@@ -179,27 +179,9 @@ impl PageTable {
         8usize << 60 | self.root_ppn.0
     }
 
-    /// set copy-on-write for a vpn
-    pub fn set_cow(&mut self, vpn: VirtPageNum) {
-        self.create_pte(vpn).set_cow();
-    }
-
-    /// reset copy-on-write for a vpn
-    pub fn reset_cow(&mut self, vpn: VirtPageNum) {
-        self.create_pte(vpn).reset_cow();
-    }
-
     /// set flags for a vpn
     pub fn set_flags(&mut self, vpn: VirtPageNum, flags: PTEFlags) {
         self.create_pte(vpn).set_flags(flags);
-    }
-
-    /// remap a vpn with new ppn
-    pub fn remap_cow(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, former_ppn: PhysPageNum) {
-        let pte = self.create_pte(vpn);
-        *pte = PageTableEntry::new(ppn, pte.flags() | pte_flags!(COW));
-        ppn.get_bytes_array()
-            .copy_from_slice(former_ppn.get_bytes_array());
     }
 
     /// switch into this page table,

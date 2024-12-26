@@ -326,7 +326,7 @@ impl MemorySet {
     }
 
     pub async fn load_from_path(path: Path) -> ElfMemoryInfo {
-        info!("[load_elf] from path: {}", &path.inner());
+        info!("[load_elf] from path: {}\n", &path.inner());
         let elf_file = Arc::new(Inode::from(path));
         MemorySet::load_from_elf(elf_file).await
     }
@@ -335,8 +335,8 @@ impl MemorySet {
     /// and mark the new memory set as copy-on-write
     /// used in sys_fork
     pub fn clone_cow(&mut self) -> Self {
+        debug!("[clone_cow] start");
         let mut new_set = Self::new_with_kernel();
-        new_set.map_user_stack(self.user_stack_base, self.user_stack_base + USER_STACK_SIZE);
         let mut remap_cow = |vpn: VirtPageNum,
                              new_set: &mut MemorySet,
                              new_area: &mut MapArea,
@@ -345,13 +345,16 @@ impl MemorySet {
             let old_flags = old_pte.flags();
             if !old_flags.is_writable() {
                 new_set.page_table.map(vpn, old_pte.ppn(), old_flags);
-                return;
+            } else {
+                let new_flags = old_flags.switch_to_cow();
+                trace!("remap_cow: vpn = {:#x}, new_flags = {:?}", vpn.0, new_flags);
+                self.page_table.set_flags(vpn, new_flags);
+                new_set.page_table.map(vpn, old_pte.ppn(), new_flags);
+                new_area.frame_map.insert(vpn, frame_tracker.clone());
             }
-            let new_flags = old_flags.switch_to_cow();
-            self.page_table.set_flags(vpn, new_flags);
-            new_set.page_table.map(vpn, old_pte.ppn(), new_flags);
-            new_area.frame_map.insert(vpn, frame_tracker.clone());
         };
+
+        // normal areas
         for area in self.areas.iter() {
             assert!(area.area_type == MapAreaType::ElfBinary);
             let mut new_area = MapArea::from_another(area);
@@ -361,6 +364,21 @@ impl MemorySet {
             }
             new_set.areas.push(new_area);
         }
+
+        // stack
+        trace!(
+            "mapping stack as cow, range: [{:#x}, {:#x})",
+            self.user_stack_base,
+            self.user_stack_base + USER_STACK_SIZE,
+        );
+        let area = self.user_stack_area.as_ref().unwrap();
+        let mut new_area = MapArea::from_another(area);
+        for vpn in area.vpn_range {
+            let frame_tracker = area.frame_map.get(&vpn).unwrap();
+            remap_cow(vpn, &mut new_set, &mut new_area, frame_tracker);
+        }
+        new_set.areas.push(new_area);
+
         new_set
     }
 }

@@ -79,3 +79,11 @@ pub fn sys_read(fd: usize, buf_addr: usize, buf_len: usize) -> isize {
 pub fn sys_yield() -> isize {
     syscall(SYS_SCHED_YIELD, [0, 0, 0, 0, 0, 0])
 }
+
+pub fn sys_fork() -> isize {
+    syscall(SYS_CLONE, [0, 0, 0, 0, 0, 0])
+}
+
+pub fn sys_exec(path: &str) -> isize {
+    syscall(SYS_EXECVE, [path.as_ptr() as usize, 0, 0, 0, 0, 0])
+}

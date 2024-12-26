@@ -22,13 +22,9 @@ impl Syscall<'_> {
         tls: usize,   // TLS线程本地存储描述符
         ctid: usize,  // 子线程ID, addr
     ) -> SyscallResult {
-        trace!(
+        debug!(
             "[sys_fork] flags: {:x} stack: {:?} ptid: {:?} tls: {:?} ctid: {:?}",
-            flags,
-            stack,
-            ptid,
-            tls,
-            ctid
+            flags, stack, ptid, tls, ctid
         );
         let flags = CloneFlags::from_bits_truncate(flags);
         let task = self.task.fork(flags);
@@ -36,8 +32,10 @@ impl Syscall<'_> {
         if stack != 0 {
             trap_cx.set_sp(stack);
         }
+        trace!("[sys_fork] new task context: {:?}", trap_cx);
+        let tid = task.tid();
         spawn_utask(task);
-        Ok(0)
+        Ok(tid as isize)
     }
 
     pub async fn sys_exec(&mut self, path: usize, argv: usize, envp: usize) -> SyscallResult {
