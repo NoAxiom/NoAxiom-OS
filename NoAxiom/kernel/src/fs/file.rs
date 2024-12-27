@@ -3,17 +3,6 @@ use core::{future::Future, pin::Pin};
 
 use async_trait::async_trait;
 
-/// file's data
-pub struct FileData<T> {
-    pub inner: T,
-}
-
-impl<T> FileData<T> {
-    pub fn new(inner: T) -> Self {
-        Self { inner }
-    }
-}
-
 #[async_trait]
 pub trait File: Send + Sync {
     // ! todo: rename to read

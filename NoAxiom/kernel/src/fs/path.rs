@@ -11,6 +11,9 @@ impl Path {
     pub fn as_string(self) -> String {
         self.inner
     }
+    pub fn inner(&self) -> &String {
+        &self.inner
+    }
 }
 
 impl From<String> for Path {

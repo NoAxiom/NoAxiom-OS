@@ -8,8 +8,10 @@ use core::num::NonZeroUsize;
 use lru::LruCache;
 use spin::{Mutex, RwLock};
 
-use super::blockdevice::BlockDevice;
-use crate::config::fs::{BLOCK_SIZE, MAX_LRU_CACHE_SIZE};
+use crate::{
+    config::fs::{BLOCK_SIZE, MAX_LRU_CACHE_SIZE},
+    device::block::BlockDevice,
+};
 
 /// async block cache for data struct `B` with LRU strategy  
 /// for either **one writer** or many readers

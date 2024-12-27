@@ -53,6 +53,8 @@ $(FS_IMG): build_user
 build_kernel:
 	@cd $(PROJECT)/kernel && make build
 
+build: $(FS_IMG) build_kernel
+
 asm: # build_kernel
 	@echo -e "Building Kernel and Generating Assembly..."
 	@riscv64-unknown-elf-objdump -d $(KERNEL_ELF) > $(KERNEL_ELF).asm
@@ -124,7 +126,7 @@ vendor:
 
 count:
 	@echo "kernel code statistic:"
-	@cd $(PROJECT) && cloc $(KERNEL)
+	@cd $(PROJECT) && cloc $(KERNEL) --exclude-dir=.trashbin --exclude-ext=md,toml
 
 # sdcard:
 # 	@echo "\e[49;34m\e[1m----------Making sdcard-----------\e[0m"

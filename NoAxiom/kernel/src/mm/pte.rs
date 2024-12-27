@@ -99,18 +99,6 @@ impl PageTableEntry {
     pub fn set_flags(&mut self, flags: PTEFlags) {
         self.0 = (self.0 & !((1 << PTE_WIDTH) - 1)) | (flags.bits() as usize);
     }
-    /// set copy-on-write flag
-    pub fn set_cow(&mut self) {
-        self.0 |= PTEFlags::COW.bits() as usize;
-    }
-    /// reset copy-on-write flag
-    pub fn reset_cow(&mut self) {
-        self.0 &= !(PTEFlags::COW.bits() as usize);
-    }
-    /// reset write flag
-    pub fn reset_write(&mut self) {
-        self.0 &= !(PTEFlags::W.bits() as usize);
-    }
     /// clear all data
     pub fn reset(&mut self) {
         self.0 = 0;

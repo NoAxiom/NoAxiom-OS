@@ -13,10 +13,9 @@ use spin::Once;
 
 use super::{CharDevice, Device};
 use crate::{
-    config::errno::Errno,
     device::{ADevResult, DeviceType},
     driver::uart::UartDriver,
-    sync::mutex::SpinMutex,
+    sync::mutex::SpinMutex, nix::result::Errno,
 };
 
 pub static UART_DEVICE: Once<Arc<Serial>> = Once::new();

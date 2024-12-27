@@ -15,9 +15,8 @@ use char::CharDevice;
 
 use crate::{
     alloc::string::ToString,
-    config::errno::Errno,
     device::{block::BlockDevice, config::DeviceNumber},
-    driver::Driver,
+    driver::Driver, nix::result::Errno,
 };
 
 #[allow(dead_code)]

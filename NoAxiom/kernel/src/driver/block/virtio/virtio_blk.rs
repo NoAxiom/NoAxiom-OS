@@ -10,14 +10,14 @@ use virtio_drivers::{
 
 use super::virtio_impl::HalImpl;
 use crate::{
-    config::{errno::Errno, fs::BLOCK_SIZE, mm::VIRTIO0},
+    config::{fs::BLOCK_SIZE, mm::VIRTIO0},
     driver::{
         block::BlockDriver,
         probe::{ProbeInfo, PROBE},
         Driver,
     },
-    println,
     sync::mutex::SpinMutex,
+    nix::result::Errno,
 };
 
 pub struct VirtIOBlockDriver {

@@ -1,6 +1,7 @@
 //! reference: https://d1.amobbs.com/bbs_upload782111/files_7/armok01151038.pdf
 
 mod bpb;
+mod error;
 mod fat;
 mod filetree;
 
@@ -15,12 +16,10 @@ use filetree::{
     FileTree,
 };
 
-use super::{
-    blockcache::{AsyncBlockCache, CacheData},
-    blockdevice::BlockDevice,
-};
+use super::blockcache::{AsyncBlockCache, CacheData};
 use crate::{
     config::fs::{FAT32_SECTOR_SIZE, FIRST_CLUSTER, ROOT_FAKE_ENTRY},
+    device::block::BlockDevice,
     print, println,
     utils::reverse,
 };

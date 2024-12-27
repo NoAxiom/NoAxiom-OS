@@ -5,10 +5,10 @@
 
 use thiserror::Error;
 
-// 用于syscall返回值
-// pub type Result = core::result::Result<isize, Errno>;
+// sync syscall result
 // pub type GeneralRes<T> = core::result::Result<T, Errno>;
-// 异步的syscall返回值
+
+// async syscall result
 // pub type SysFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 // pub type AsyscallRet<'a> = SysFuture<'a, Result>;
 

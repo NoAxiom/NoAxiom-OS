@@ -1,15 +1,16 @@
-use super::Syscall;
+use super::{Syscall, SyscallResult};
 use crate::{nix::tms::TMS, sched::utils::yield_now};
 
 impl Syscall<'_> {
     /// yield current task
-    pub async fn sys_yield() -> isize {
+    pub async fn sys_yield() -> SyscallResult {
         trace!("sys_yield");
         yield_now().await;
-        0
+        Ok(0)
     }
 
-    pub fn sys_times(buf: *mut TMS) -> isize {
-        -1
+    pub fn sys_times(tms: usize) -> SyscallResult {
+        let tms = tms as *mut TMS;
+        todo!()
     }
 }

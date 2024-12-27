@@ -12,7 +12,7 @@ use core::{
 
 use fs_node::FSNode;
 
-use crate::config::fs::FileError;
+use super::error::FileError;
 
 /// the node of the file tree with identifier `T`
 pub struct FileNode<T, V> {

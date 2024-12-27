@@ -44,12 +44,12 @@ impl Executor {
         if let Some(runnable) = self.urgent.pop_front() {
             Some(runnable)
         } else if let Some((_, runnable)) = self.normal.pop_first() {
-            debug!(
+            trace!(
                 "poped from normal queue, vruntime: {}",
                 runnable.metadata().sched_entity.inner().vruntime.0
             );
             for it in self.normal.iter() {
-                debug!("normal queue: {:?}", it.1.metadata().sched_entity.inner());
+                trace!("normal queue: {:?}", it.1.metadata().sched_entity.inner());
             }
             Some(runnable)
         } else {

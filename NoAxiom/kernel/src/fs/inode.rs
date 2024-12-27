@@ -32,6 +32,7 @@ where
     T: Clone,
 {
     async fn read_part<'a>(&'a self, offset: usize, len: usize, buf: &'a mut [u8]) {
+        assert!(self.readable);
         let gaurd = FS.lock();
         let fs = gaurd.as_ptr();
         let fs = unsafe { &*fs };
@@ -39,12 +40,16 @@ where
             .await;
     }
     async fn write<'a>(&'a self, buf: &'a [u8]) {
+        assert!(self.writable);
         let gaurd = FS.lock();
         let fs = gaurd.as_ptr();
         let fs = unsafe { &*fs };
         todo!();
     }
+    // ! fixme: delete this temporary function
     fn read<'a>(&'a self) -> Pin<Box<dyn Future<Output = Result<Vec<u8>, ()>> + Send + 'a>> {
+        assert!(self.readable);
+        warn!("TEMPORARY read FUNCTION will be deleted in the future");
         Box::pin(async move {
             let gaurd = FS.lock();
             let fs = gaurd.as_ptr();

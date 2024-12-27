@@ -8,15 +8,15 @@ use crate::{cpu::get_hartid, driver::sbi::shutdown, println};
 fn panic(info: &PanicInfo) -> ! {
     if let Some(location) = info.location() {
         println!(
-            "[kernel panic] panicked at {}:{} {}",
+            "[panic, HART {}] panicked at {}:{} {}",
+            get_hartid(),
             location.file(),
             location.line(),
             info.message().unwrap()
         );
-        println!("[kernel panic] hart: {}", get_hartid());
     } else {
         println!(
-            "[kernel panic (no_detail)] hart {} panicked: {}",
+            "[panic (no_detail), HART {}] panicked: {}",
             get_hartid(),
             info.message().unwrap()
         );

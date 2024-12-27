@@ -1,12 +1,17 @@
 //! memory management system calls
-use super::Syscall;
-use crate::{nix::clone_flags::CloneFlags, sched::task::spawn_utask};
+use alloc::vec::Vec;
+
+use super::{Syscall, SyscallResult};
+use crate::{
+    fs::path::Path, nix::clone_flags::CloneFlags, sched::task::spawn_utask,
+    utils::get_string_from_ptr,
+};
 
 impl Syscall<'_> {
     /// exit current task by marking it as zombie
-    pub fn sys_exit(&mut self) -> isize {
+    pub fn sys_exit(&mut self) -> SyscallResult {
         self.task.exit();
-        0
+        Ok(0)
     }
 
     pub fn sys_fork(
@@ -16,14 +21,10 @@ impl Syscall<'_> {
         ptid: usize,  // 父线程ID, addr
         tls: usize,   // TLS线程本地存储描述符
         ctid: usize,  // 子线程ID, addr
-    ) -> isize {
-        trace!(
+    ) -> SyscallResult {
+        debug!(
             "[sys_fork] flags: {:x} stack: {:?} ptid: {:?} tls: {:?} ctid: {:?}",
-            flags,
-            stack,
-            ptid,
-            tls,
-            ctid
+            flags, stack, ptid, tls, ctid
         );
         let flags = CloneFlags::from_bits_truncate(flags);
         let task = self.task.fork(flags);
@@ -31,12 +32,23 @@ impl Syscall<'_> {
         if stack != 0 {
             trap_cx.set_sp(stack);
         }
+        trace!("[sys_fork] new task context: {:?}", trap_cx);
+        let tid = task.tid();
         spawn_utask(task);
-        0
+        Ok(tid as isize)
     }
 
-    pub async fn sys_exec(&mut self) -> isize {
+    pub async fn sys_exec(&mut self, path: usize, argv: usize, envp: usize) -> SyscallResult {
         trace!("sys_exec");
-        todo!();
+        let path = Path::new(get_string_from_ptr(path as *const u8));
+
+        let argv = argv as *const *const u8;
+        let argv_vec = Vec::new();
+
+        let envp = envp as *const *const u8;
+        let envp_vec = Vec::new();
+
+        self.task.exec(path, argv_vec, envp_vec).await;
+        Ok(0)
     }
 }

@@ -30,8 +30,5 @@ pub const ROOT_FAKE_ENTRY: [u8; 32] = {
     entry
 };
 
-#[derive(Debug)]
-pub enum FileError {
-    FileNotFound,
-}
-pub const INIT_PROC_NAME: &str = "initprocess";
+pub const INIT_PROC_PATH: &str = "initprocess";
+pub const DL_INTERP_PATH: &str = "/lib/musl/libc.so";

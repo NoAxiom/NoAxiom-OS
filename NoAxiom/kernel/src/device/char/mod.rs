@@ -1,7 +1,8 @@
 use core::{fmt::Debug, pin::Pin};
 
+use crate::nix::result::Errno;
+
 use super::{ADevResult, Device};
-use crate::config::errno::Errno;
 
 pub mod uart;
 
