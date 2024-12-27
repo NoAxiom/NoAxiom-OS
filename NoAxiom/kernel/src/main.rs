@@ -55,6 +55,6 @@ pub fn rust_main() {
         is_external_interrupt_enabled()
     );
     loop {
-        sched::run();
+        sched::executor::run();
     }
 }

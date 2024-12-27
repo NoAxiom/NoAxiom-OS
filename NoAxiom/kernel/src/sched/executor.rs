@@ -2,17 +2,19 @@
 //! - [`spawn_raw`] to add a task
 //! - [`run`] to run next task
 
-use alloc::collections::{btree_map::BTreeMap, vec_deque::VecDeque};
 use core::future::Future;
 
 use async_task::{Builder, Runnable, ScheduleInfo, WithInfo};
 use lazy_static::lazy_static;
 
-use super::sched_entity::{SchedEntity, SchedVruntime};
+use super::{
+    sched_entity::SchedEntity,
+    scheduler::{Scheduler, CFS},
+};
 use crate::sync::mutex::TicketMutex;
 
 pub struct TaskScheduleInfo {
-    sched_entity: SchedEntity,
+    pub sched_entity: SchedEntity,
 }
 impl TaskScheduleInfo {
     pub const fn new(sched_entity: SchedEntity) -> Self {
@@ -20,61 +22,30 @@ impl TaskScheduleInfo {
     }
 }
 
-struct Executor {
-    /// cfs tree: (prio, task)
-    normal: BTreeMap<SchedVruntime, Runnable<TaskScheduleInfo>>,
-    /// realtime / just-woken runnable queue
-    urgent: VecDeque<Runnable<TaskScheduleInfo>>,
+struct Runtime<T: Scheduler> {
+    pub scheduler: TicketMutex<T>,
 }
-impl Executor {
+
+impl<T> Runtime<T>
+where
+    T: Scheduler,
+{
     pub fn new() -> Self {
         Self {
-            normal: BTreeMap::new(),
-            urgent: VecDeque::new(),
+            scheduler: TicketMutex::new(T::default()),
         }
     }
-    fn push_normal(&mut self, runnable: Runnable<TaskScheduleInfo>) {
-        self.normal
-            .insert(runnable.metadata().sched_entity.inner().vruntime, runnable);
+    pub fn schedule(&self, runnable: Runnable<TaskScheduleInfo>, info: ScheduleInfo) {
+        self.scheduler.lock().push(runnable, info);
     }
-    fn push_urgent(&mut self, runnable: Runnable<TaskScheduleInfo>) {
-        self.urgent.push_back(runnable);
-    }
-    fn pop(&mut self) -> Option<Runnable<TaskScheduleInfo>> {
-        if let Some(runnable) = self.urgent.pop_front() {
-            Some(runnable)
-        } else if let Some((_, runnable)) = self.normal.pop_first() {
-            trace!(
-                "poped from normal queue, vruntime: {}",
-                runnable.metadata().sched_entity.inner().vruntime.0
-            );
-            for it in self.normal.iter() {
-                trace!("normal queue: {:?}", it.1.metadata().sched_entity.inner());
-            }
-            Some(runnable)
-        } else {
-            None
-        }
+    pub fn pop(&self) -> Option<Runnable<TaskScheduleInfo>> {
+        self.scheduler.lock().pop()
     }
 }
 
 // TODO: add muticore support
 lazy_static! {
-    static ref EXECUTOR: TicketMutex<Executor> = TicketMutex::new(Executor::new());
-}
-
-/// insert task into EXECUTOR when [`core::task::Waker::wake`] get called
-fn schedule(runnable: Runnable<TaskScheduleInfo>, info: ScheduleInfo) {
-    trace!(
-        "[sched] schedule task, sched_entity: {:?}, woken_while_running: {}",
-        runnable.metadata().sched_entity.inner(),
-        info.woken_while_running
-    );
-    if info.woken_while_running {
-        EXECUTOR.lock().push_normal(runnable);
-    } else {
-        EXECUTOR.lock().push_urgent(runnable);
-    }
+    static ref RUNTIME: Runtime<CFS> = Runtime::new();
 }
 
 /// Add a raw task into task queue
@@ -85,7 +56,10 @@ where
 {
     let (runnable, handle) = Builder::new()
         .metadata(TaskScheduleInfo::new(sched_entity))
-        .spawn(move |_: &TaskScheduleInfo| future, WithInfo(schedule));
+        .spawn(
+            move |_: &TaskScheduleInfo| future,
+            WithInfo(move |runnable, info| RUNTIME.schedule(runnable, info)),
+        );
     runnable.schedule();
     handle.detach();
 }
@@ -94,9 +68,7 @@ where
 pub fn run() {
     // spin until find a valid task
     loop {
-        let mut guard = EXECUTOR.lock();
-        let runnable = guard.pop();
-        drop(guard);
+        let runnable = RUNTIME.pop();
         if let Some(runnable) = runnable {
             runnable.run();
             break;
