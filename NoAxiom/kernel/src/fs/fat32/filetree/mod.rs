@@ -10,11 +10,9 @@ use core::{
     pin::Pin,
 };
 
-use directory::ShortDirectory;
-use entry::ShortDirectoryEntry;
 use fs_node::FSNode;
 
-use crate::fs::{FileError, FileReturn};
+use super::error::FileError;
 
 /// the node of the file tree with identifier `T`
 pub struct FileNode<T, V> {
@@ -42,6 +40,11 @@ where
     /// get the content of the node
     pub async fn content<'a>(&'a self) -> Pin<Box<dyn Future<Output = V> + Send + 'a>> {
         self.inner.content()
+    }
+
+    /// get the part of content of the node
+    pub async fn part_content<'a>(&'a self, offset: usize, len: usize, buf: &'a mut [u8]) {
+        self.inner.part_content(offset, len, buf).await
     }
 
     /// identity the node with the given identifier

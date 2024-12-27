@@ -13,4 +13,7 @@ where
         self.ident() == *id
     }
     async fn content(&self) -> V;
+    async fn part_content<'a>(&'a self, offset: usize, len: usize, buf: &'a mut [u8]) {
+        panic!("not implemented");
+    }
 }

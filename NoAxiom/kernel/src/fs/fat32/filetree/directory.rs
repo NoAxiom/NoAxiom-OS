@@ -1,9 +1,4 @@
-use alloc::{
-    boxed::Box,
-    string::{String, ToString},
-    sync::Arc,
-    vec::Vec,
-};
+use alloc::{boxed::Box, string::String, sync::Arc, vec::Vec};
 
 use async_trait::async_trait;
 
@@ -13,7 +8,7 @@ use super::{
 };
 use crate::{
     config::fs::BLOCK_SIZE,
-    fs::fat32::{bpb::cluster_offset_sectors, fat::FAT, ABC},
+    fs::fat32::{fat::FAT, ABC},
 };
 
 #[derive(Clone)]

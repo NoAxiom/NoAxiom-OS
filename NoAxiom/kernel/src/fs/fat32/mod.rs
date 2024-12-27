@@ -1,15 +1,11 @@
 //! reference: https://d1.amobbs.com/bbs_upload782111/files_7/armok01151038.pdf
 
 mod bpb;
+mod error;
 mod fat;
 mod filetree;
 
-use alloc::{
-    boxed::Box,
-    string::{String, ToString},
-    sync::Arc,
-    vec::Vec,
-};
+use alloc::{boxed::Box, string::String, sync::Arc, vec::Vec};
 
 use bpb::BIOSParameterBlockOffset;
 use filetree::{
@@ -20,12 +16,10 @@ use filetree::{
     FileTree,
 };
 
-use super::{
-    blockcache::{AsyncBlockCache, CacheData},
-    blockdevice::BlockDevice,
-};
+use super::blockcache::{AsyncBlockCache, CacheData};
 use crate::{
     config::fs::{FAT32_SECTOR_SIZE, FIRST_CLUSTER, ROOT_FAKE_ENTRY},
+    device::block::BlockDevice,
     print, println,
     utils::reverse,
 };
@@ -221,6 +215,23 @@ impl FAT32FIleSystem {
             Err(e) => {
                 error!("Error loading file: {:?}", e);
                 Vec::new()
+            }
+        }
+    }
+
+    /// load part of the file content
+    pub async fn load_file_part<'a>(
+        &'a self,
+        name: String,
+        offset: usize,
+        len: usize,
+        buf: &'a mut [u8],
+    ) {
+        let node = self.file_tree.find(&name);
+        match node {
+            Ok(node) => node.part_content(offset, len, buf).await,
+            Err(e) => {
+                error!("Error loading file: {:?}", e);
             }
         }
     }

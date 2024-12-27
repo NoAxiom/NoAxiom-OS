@@ -1,5 +1,4 @@
 mod blockcache;
-pub mod blockdevice;
 pub mod fat32;
 mod file;
 pub mod inode;
