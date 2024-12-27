@@ -14,6 +14,7 @@ use crate::{config::mm::PAGE_SIZE, fs::File, mm::address::StepOne};
 #[allow(unused)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MapAreaType {
+    None,
     UserStack,
     UserHeap,
     ElfBinary,
@@ -29,7 +30,7 @@ pub struct MapArea {
     /// program data frame tracker holder,
     /// mapping from vpn to ppn
     /// use Arc because we share it in copy-on-write fork
-    pub frame_map: BTreeMap<VirtPageNum, Arc<FrameTracker>>,
+    pub frame_map: BTreeMap<VirtPageNum, FrameTracker>,
 
     /// address mapping type
     pub map_type: MapType,
@@ -50,6 +51,18 @@ pub struct MapArea {
 }
 
 impl MapArea {
+    pub fn new_bare() -> Self {
+        Self {
+            vpn_range: VpnRange::new(VirtPageNum(0), VirtPageNum(0)),
+            frame_map: BTreeMap::new(),
+            map_permission: MapPermission::empty(),
+            map_type: MapType::Identical,
+            area_type: MapAreaType::None,
+            file: None,
+            file_offset: 0,
+        }
+    }
+
     /// create a new map area
     pub fn new(
         start_va: VirtAddr,
@@ -87,41 +100,71 @@ impl MapArea {
         self.vpn_range.clone()
     }
 
-    /// for each vpn in the range,
-    /// map the vpn to ppn
-    /// pte will be saved into page_table
-    /// and data frame will be saved by self
-    pub fn map_each(&mut self, page_table: &mut PageTable) {
-        trace!("map_each: vpn_range = {:?}", self.vpn_range);
+    pub fn map_one(&mut self, vpn: VirtPageNum, page_table: &mut PageTable) {
+        trace!("map_one: vpn = {:?}", vpn);
         match self.map_type {
             MapType::Identical => {
                 panic!("kernel don't support identical memory mapping");
             }
             // framed: user space
             MapType::Framed => {
-                for vpn in self.vpn_range.into_iter() {
-                    let frame = frame_alloc().unwrap();
-                    let ppn = frame.ppn;
-                    if self.frame_map.contains_key(&vpn) {
-                        panic!("vm area overlap");
-                    }
-                    self.frame_map.insert(vpn, Arc::from(frame));
-                    let flags = PTEFlags::from_bits(self.map_permission.bits()).unwrap();
-                    page_table.map(vpn, ppn, flags);
-                    assert!(page_table.find_pte(vpn).is_some());
+                let frame = frame_alloc();
+                let ppn = frame.ppn();
+                if self.frame_map.contains_key(&vpn) {
+                    panic!("vm area overlap");
                 }
+                self.frame_map.insert(vpn, frame);
+                let flags = PTEFlags::from_bits(self.map_permission.bits()).unwrap();
+                page_table.map(vpn, ppn, flags);
+                assert!(page_table.find_pte(vpn).is_some());
             }
             // direct: kernel space
             MapType::Direct => {
-                for vpn in self.vpn_range.into_iter() {
-                    // trace!("map_each: vpn = {:#x}", vpn.0);
-                    let ppn = vpn.kernel_translate_into_ppn();
-                    // let ppn = PhysPageNum(vpn.0 - KERNEL_ADDR_OFFSET);
-                    let flags = PTEFlags::from_bits(self.map_permission.bits()).unwrap();
-                    page_table.map(vpn, ppn, flags);
-                }
+                let ppn = vpn.kernel_translate_into_ppn();
+                let flags = PTEFlags::from_bits(self.map_permission.bits()).unwrap();
+                page_table.map(vpn, ppn, flags);
             }
         }
+    }
+
+    /// for each vpn in the range,
+    /// map the vpn to ppn
+    /// pte will be saved into page_table
+    /// and data frame will be saved by self
+    pub fn map_each(&mut self, page_table: &mut PageTable) {
+        trace!("map_each: vpn_range = {:?}", self.vpn_range);
+        for vpn in self.vpn_range.into_iter() {
+            self.map_one(vpn, page_table);
+        }
+        // match self.map_type {
+        //     MapType::Identical => {
+        //         panic!("kernel don't support identical memory mapping");
+        //     }
+        //     // framed: user space
+        //     MapType::Framed => {
+        //         for vpn in self.vpn_range.into_iter() {
+        //             let frame = frame_alloc().unwrap();
+        //             let ppn = frame.ppn;
+        //             if self.frame_map.contains_key(&vpn) {
+        //                 panic!("vm area overlap");
+        //             }
+        //             self.frame_map.insert(vpn, Arc::from(frame));
+        //             let flags =
+        // PTEFlags::from_bits(self.map_permission.bits()).unwrap();
+        //             page_table.map(vpn, ppn, flags);
+        //             assert!(page_table.find_pte(vpn).is_some());
+        //         }
+        //     }
+        //     // direct: kernel space
+        //     MapType::Direct => {
+        //         for vpn in self.vpn_range.into_iter() {
+        //             let ppn = vpn.kernel_translate_into_ppn();
+        //             let flags =
+        // PTEFlags::from_bits(self.map_permission.bits()).unwrap();
+        //             page_table.map(vpn, ppn, flags);
+        //         }
+        //     }
+        // }
     }
 
     // TODO: offset

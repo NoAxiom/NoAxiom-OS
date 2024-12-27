@@ -2,23 +2,29 @@
 
 use alloc::sync::Arc;
 
-use plic::Mode;
 use riscv::register::{
     scause::{self, Exception, Interrupt, Trap},
     sepc, stval,
 };
 
 use super::trap::set_kernel_trap_entry;
-#[cfg(feature = "async_fs")]
-use crate::driver::async_virtio_driver::virtio_mm::VIRTIO_BLOCK;
 use crate::{
-    config::fs::WAKE_NUM, constant::register::A0, cpu::get_hartid, platform::plic::PLIC,
-    sched::utils::yield_now, syscall::syscall, task::Task,
+    constant::register::A0,
+    cpu::{current_cpu, get_hartid},
+    sched::utils::yield_now,
+    syscall::syscall,
+    task::Task,
 };
 
 fn ext_int_handler() {
     #[cfg(feature = "async_fs")]
     {
+        use config::fs::WAKE_NUM;
+        use platform::plic::PLIC;
+        use plic::Mode;
+
+        use crate::driver::async_virtio_driver::virtio_mm::VIRTIO_BLOCK;
+
         let plic = PLIC.get().unwrap();
         let irq = plic.claim(get_hartid() as u32, Mode::Supervisor);
         debug!("[SupervisorExternal] hart: {}, irq: {}", get_hartid(), irq);
@@ -42,6 +48,20 @@ pub fn kernel_trap_handler() {
     let sepc = sepc::read();
     match scause.cause() {
         Trap::Exception(exception) => match exception {
+            Exception::LoadPageFault
+            | Exception::StorePageFault
+            | Exception::InstructionPageFault => {
+                if current_cpu().task.as_mut().unwrap().handle_pagefault(stval) {
+                    debug!("clone cow successfully");
+                } else {
+                    panic!("hart: {}, kernel exception {:?}, copy-on-write isn't detected, stval = {:#x}, sepc = {:#x}",
+                        get_hartid(),
+                        scause.cause(),
+                        stval,
+                        sepc
+                    );
+                }
+            }
             _ => panic!(
                 "hart: {}, kernel exception {:?} is unsupported, stval = {:#x}, sepc = {:#x}",
                 get_hartid(),
@@ -106,6 +126,16 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
         scause.cause(),
         stval
     );
+    // for debug, print current error message and exit the task
+    let print_err_msg = || {
+        error!("unexpected exit!!! tid: {}, hart: {}, cause: {:?} is unsupported, stval = {:#x}, sepc = {:#x}",
+            task.tid(),
+            get_hartid(),
+            scause.cause(),
+            stval,
+            cx.sepc
+        );
+    };
     match scause.cause() {
         // syscall
         Trap::Exception(exception) => match exception {
@@ -117,18 +147,23 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
                 cx = task.trap_context_mut();
                 cx.user_reg[A0] = result as usize;
             }
+            // page fault: try to handle copy-on-write, or exit the task
+            Exception::LoadPageFault
+            | Exception::StorePageFault
+            | Exception::InstructionPageFault => {
+                if task.handle_pagefault(stval) {
+                    debug!("clone cow successfully");
+                } else {
+                    print_err_msg();
+                    task.exit();
+                }
+            }
             _ => {
-                warn!(
-                    "unexpected exit!!! tid: {}, hart: {}, exception {:?} is unsupported, stval = {:#x}, sepc = {:#x}",
-                    task.tid(),
-                    get_hartid(),
-                    scause.cause(),
-                    stval,
-                    cx.sepc
-                );
+                print_err_msg();
                 task.exit();
             }
         },
+        // interrupt
         Trap::Interrupt(interrupt) => match interrupt {
             Interrupt::SupervisorTimer => {
                 trace!(
@@ -147,14 +182,7 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
                 ext_int_handler();
             }
             _ => {
-                warn!(
-                    "unexpected exit!!! tid: {}, hart: {}, interrupt {:?} is unsupported, stval = {:#x}, sepc = {:#x}",
-                    task.tid(),
-                    get_hartid(),
-                    scause.cause(),
-                    stval,
-                    cx.sepc,
-                );
+                print_err_msg();
                 task.exit();
             }
         },

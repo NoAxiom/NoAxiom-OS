@@ -13,7 +13,7 @@ pub fn task_count_inc() {
 pub fn task_count_dec() {
     if unsafe { TASK_COUNTER.fetch_sub(1, Ordering::SeqCst) } == 1 {
         info!("[kernel] all tasks are done, shutdown");
-        error!("shutdown is off, please shutdown the terminal manually");
-        // crate::driver::sbi::shutdown();
+        // error!("shutdown is off, please shutdown the terminal manually");
+        crate::driver::sbi::shutdown();
     }
 }
