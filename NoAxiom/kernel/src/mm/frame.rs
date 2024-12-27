@@ -1,4 +1,8 @@
-use alloc::vec::Vec;
+use alloc::{
+    collections::btree_map::BTreeMap,
+    sync::{Arc, Weak},
+    vec::Vec,
+};
 use core::fmt::{self, Debug, Formatter};
 
 use lazy_static::lazy_static;
@@ -9,11 +13,19 @@ use crate::{
     utils::kernel_va_to_pa,
 };
 
-pub struct FrameTracker {
+// pub fn frame_strong_count(ppn: PhysPageNum) -> usize {
+//     FRAME_MAP
+//         .lock()
+//         .get(&ppn.0)
+//         .map(|x| x.strong_count())
+//         .unwrap_or(0)
+// }
+
+/// frame tracker inner
+pub struct FrameTrackerInner {
     pub ppn: PhysPageNum,
 }
-
-impl FrameTracker {
+impl FrameTrackerInner {
     pub fn new(ppn: PhysPageNum) -> Self {
         // page cleaning
         let bytes_array = ppn.get_bytes_array();
@@ -23,16 +35,37 @@ impl FrameTracker {
         Self { ppn }
     }
 }
-
-impl Debug for FrameTracker {
+impl Debug for FrameTrackerInner {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.write_fmt(format_args!("FrameTracker:PPN={:#x}", self.ppn.0))
+        f.write_fmt(format_args!("FrameTrackerInner:PPN={:#x}", self.ppn.0))
+    }
+}
+impl Drop for FrameTrackerInner {
+    fn drop(&mut self) {
+        frame_dealloc(self.ppn);
     }
 }
 
-impl Drop for FrameTracker {
-    fn drop(&mut self) {
-        frame_dealloc(self.ppn);
+/// frame tracker, with ref count
+#[derive(Debug)]
+pub struct FrameTracker {
+    inner: Arc<FrameTrackerInner>,
+}
+impl FrameTracker {
+    pub fn new(inner: FrameTrackerInner) -> Self {
+        let inner = Arc::new(inner);
+        Self { inner }
+    }
+    #[inline(always)]
+    pub fn ppn(&self) -> PhysPageNum {
+        self.inner.ppn
+    }
+}
+impl Clone for FrameTracker {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+        }
     }
 }
 
@@ -41,13 +74,12 @@ trait FrameAllocator {
     fn alloc(&mut self) -> Option<PhysPageNum>;
     fn dealloc(&mut self, ppn: PhysPageNum);
 }
-
 pub struct StackFrameAllocator {
     current: usize,
     end: usize,
     recycled: Vec<usize>,
+    frame_map: BTreeMap<usize, Weak<FrameTrackerInner>>,
 }
-
 impl StackFrameAllocator {
     pub fn init(&mut self, l: PhysPageNum, r: PhysPageNum) {
         self.current = l.0;
@@ -55,13 +87,13 @@ impl StackFrameAllocator {
         println!("last {} Physical Frames.", self.end - self.current);
     }
 }
-
 impl FrameAllocator for StackFrameAllocator {
     fn new() -> Self {
         Self {
             current: 0,
             end: 0,
             recycled: Vec::new(),
+            frame_map: BTreeMap::new(),
         }
     }
     fn alloc(&mut self) -> Option<PhysPageNum> {
@@ -85,6 +117,7 @@ impl FrameAllocator for StackFrameAllocator {
     fn dealloc(&mut self, ppn: PhysPageNum) {
         let ppn = ppn.0;
         // validity check
+        // FIXME: only for debug, remove it in release
         if ppn >= self.current || self.recycled.iter().any(|&v| v == ppn) {
             panic!("Frame ppn={:#x} has not been allocated!", ppn);
         }
@@ -100,12 +133,28 @@ lazy_static! {
         SpinMutex::new(FrameAllocatorImpl::new());
 }
 
-pub fn frame_alloc() -> Option<FrameTracker> {
-    FRAME_ALLOCATOR.lock().alloc().map(|x| FrameTracker::new(x))
+pub fn frame_alloc() -> FrameTracker {
+    let mut guard = FRAME_ALLOCATOR.lock();
+    let ppn = guard.alloc().unwrap();
+    let frame = FrameTracker::new(FrameTrackerInner::new(ppn));
+    guard.frame_map.insert(ppn.0, Arc::downgrade(&frame.inner));
+    frame
 }
 
 pub fn frame_dealloc(ppn: PhysPageNum) {
-    FRAME_ALLOCATOR.lock().dealloc(ppn);
+    let mut guard = FRAME_ALLOCATOR.lock();
+    guard.dealloc(ppn);
+    // FIXME: only for debug, remove it in release
+    assert!(guard.frame_map.contains_key(&ppn.0));
+    guard.frame_map.remove(&ppn.0);
+}
+
+pub fn frame_refcount(ppn: PhysPageNum) -> usize {
+    FRAME_ALLOCATOR
+        .lock()
+        .frame_map
+        .get(&ppn.0)
+        .map_or(0, |x| x.strong_count())
 }
 
 /// init frame allocator
@@ -124,13 +173,13 @@ pub fn frame_init() {
 pub fn frame_allocator_test() {
     let mut v: Vec<FrameTracker> = Vec::new();
     for i in 0..5 {
-        let frame = frame_alloc().unwrap();
+        let frame = frame_alloc();
         println!("{:?}", frame);
         v.push(frame);
     }
     v.clear();
     for i in 0..5 {
-        let frame = frame_alloc().unwrap();
+        let frame = frame_alloc();
         println!("{:?}", frame);
         v.push(frame);
     }

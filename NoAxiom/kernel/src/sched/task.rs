@@ -41,7 +41,7 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
         let p = current_cpu();
         let time_in = get_time_us();
         p.set_task(&mut this.task);
-        warn!("polling task {}", this.task.tid());
+        debug!("polling task {}", this.task.tid());
         let ret = unsafe { Pin::new_unchecked(&mut this.future).poll(cx) };
         p.clear_task();
         let time_out = get_time_us();

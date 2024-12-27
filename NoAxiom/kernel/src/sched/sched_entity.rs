@@ -17,7 +17,7 @@ impl SchedVruntime {
     }
     #[inline(always)]
     pub fn update(&mut self, delta: usize) {
-        debug!("delta: {}", delta);
+        trace!("update vruntime: delta: {}", delta);
         self.0 += delta;
     }
 }
@@ -64,7 +64,7 @@ impl SchedEntityInner {
     }
     /// update vruntime by delta(ms)
     pub fn update_vruntime(&mut self, wall_time: usize) {
-        debug!("wall_time: {}, to_inv: {}", wall_time, self.prio.to_inv_weight());
+        trace!("wall_time: {}, to_inv: {}", wall_time, self.prio.to_inv_weight());
         self.vruntime
             .update((wall_time * NICE_0_LOAD * self.prio.to_inv_weight()) >> 32);
     }

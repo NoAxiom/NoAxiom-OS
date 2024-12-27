@@ -32,11 +32,11 @@ unsafe impl Hal for HalImpl {
     fn dma_alloc(pages: usize, _direction: BufferDirection) -> (VirtioPhysAddr, NonNull<u8>) {
         let mut ppn_base = PhysPageNum(0);
         for i in 0..pages {
-            let frame = frame_alloc().unwrap();
+            let frame = frame_alloc();
             if i == 0 {
-                ppn_base = frame.ppn;
+                ppn_base = frame.ppn();
             }
-            assert_eq!(frame.ppn.0, ppn_base.0 + i);
+            assert_eq!(frame.ppn().0, ppn_base.0 + i);
             DMA_PADDR.lock().push(frame);
         }
         // let kpaddr: KPhysAddr = ppn_base.into();
@@ -85,11 +85,11 @@ pub extern "C" fn virtio_dma_alloc(pages: usize) -> PhysAddr {
     println!("virtio_dma_alloc: {}", pages);
     let mut ppn_base = 0;
     for i in 0..pages {
-        let frame = frame_alloc().unwrap();
+        let frame = frame_alloc();
         if i == 0 {
-            ppn_base = frame.ppn.into();
+            ppn_base = frame.ppn().into();
         }
-        let frame_ppn: usize = frame.ppn.into();
+        let frame_ppn: usize = frame.ppn().into();
         assert_eq!(frame_ppn, ppn_base + i);
         QUEUE_FRAMES.lock().push(frame);
     }

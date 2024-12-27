@@ -76,6 +76,10 @@ impl PTEFlags {
     pub fn switch_to_cow(&self) -> Self {
         *self & !pte_flags!(W) | pte_flags!(COW)
     }
+    #[inline(always)]
+    pub fn switch_to_rw(&self) -> Self {
+        *self & !pte_flags!(COW) | pte_flags!(W)
+    }
 }
 
 #[repr(C)]

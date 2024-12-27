@@ -12,10 +12,24 @@ fn main() -> i32 {
     // }
     let pid = sys_fork();
     if pid == 0 {
-        println!("child process");
-        // sys_exec("\0");
+        sys_exec("hello_world\0");
+        println!("ERROR!!! unreachable: child process1");
     } else {
-        println!("parent process");
+        println!("parent process1");
+    }
+    let pid = sys_fork();
+    if pid == 0 {
+        println!("child process2");
+    } else {
+        sys_exec("ktest\0");
+        println!("ERROR!!! unreachable: parent process2");
+    }
+    let pid = sys_fork();
+    if pid == 0 {
+        println!("child process3");
+    } else {
+        sys_exec("long_loop\0");
+        println!("ERROR!!! unreachable: parent process3");
     }
     0
 }

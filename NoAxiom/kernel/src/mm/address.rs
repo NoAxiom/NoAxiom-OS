@@ -210,6 +210,10 @@ impl VpnRange {
     pub const fn end(&self) -> VirtPageNum {
         self.end
     }
+    #[inline(always)]
+    pub fn is_in_range(&self, vpn: VirtPageNum) -> bool {
+        self.start <= vpn && vpn < self.end
+    }
 }
 
 impl Debug for VpnRange {

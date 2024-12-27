@@ -12,7 +12,10 @@ use riscv::asm::sfence_vma_all;
 use super::taskid::TidTracer;
 use crate::{
     fs::path::Path,
-    mm::memory_set::{ElfMemoryInfo, MemorySet},
+    mm::{
+        address::VirtAddr,
+        memory_set::{ElfMemoryInfo, MemorySet},
+    },
     nix::clone_flags::CloneFlags,
     sched::sched_entity::SchedEntity,
     sync::{cell::SyncUnsafeCell, mutex::SpinMutex},
@@ -151,6 +154,34 @@ impl Task {
     /// change current memory set
     pub fn change_memory_set(&self, memory_set: MemorySet) {
         *self.memory_set.lock() = memory_set;
+    }
+
+    /// Check if is the copy-on-write pages triggered the page fault.
+    /// If it's true, clone pages for the writer(aka current task),
+    /// but should keep original page as cow since it might still be shared.
+    /// Note that if the reference count is one, there's no need to clone pages.
+    /// return value: true if detected lazy alloc orcopy-on-write
+    /// and cloned successfully
+    pub fn handle_pagefault(self: &Arc<Self>, addr: usize) -> bool {
+        let mut memory_set = self.memory_set.lock();
+        let vpn = VirtAddr::from(addr).floor();
+        if let Some(pte) = memory_set.page_table().translate_vpn(vpn) {
+            let flags = pte.flags();
+            if flags.is_cow() {
+                memory_set.realloc_cow(vpn, pte);
+                return true;
+            } else if flags.is_valid() {
+                warn!("[check_lazy] pte is V but not COW, flags: {:?}", flags);
+                return false;
+            }
+        } else if memory_set.user_stack_area.vpn_range.is_in_range(vpn) {
+            self.memory_set.lock().realloc_stack(vpn);
+            return true;
+        } else if memory_set.user_heap_area.vpn_range.is_in_range(vpn) {
+            self.memory_set.lock().realloc_heap(vpn);
+            return true;
+        }
+        false
     }
 
     /// trap context

@@ -37,10 +37,10 @@ impl PageTable {
     /// with allocating a frame for root node
     /// used in raw memory_set initialization
     pub fn new_allocated() -> Self {
-        let frame = frame_alloc().unwrap();
-        info!("[page_table] root_ppn = {:#x}", frame.ppn.0);
+        let frame = frame_alloc();
+        info!("[page_table] root_ppn = {:#x}", frame.ppn().0);
         PageTable {
-            root_ppn: frame.ppn,
+            root_ppn: frame.ppn(),
             frames: vec![frame],
         }
     }
@@ -57,13 +57,13 @@ impl PageTable {
 
     /// clone from another page table, only direct page will be copied
     pub fn clone_from_other(other: &PageTable) -> Self {
-        let new_frame = frame_alloc().unwrap();
+        let new_frame = frame_alloc();
         new_frame
-            .ppn
+            .ppn()
             .get_bytes_array()
             .copy_from_slice(other.root_ppn.get_bytes_array());
         PageTable {
-            root_ppn: new_frame.ppn,
+            root_ppn: new_frame.ppn(),
             frames: vec![new_frame],
         }
     }
@@ -81,8 +81,8 @@ impl PageTable {
                 break;
             }
             if !pte.flags().is_valid() {
-                let frame = frame_alloc().unwrap();
-                *pte = PageTableEntry::new(frame.ppn, pte_flags!(V));
+                let frame = frame_alloc();
+                *pte = PageTableEntry::new(frame.ppn(), pte_flags!(V));
                 self.frames.push(frame);
             }
             ppn = pte.ppn();
@@ -119,13 +119,13 @@ impl PageTable {
         );
         *pte = PageTableEntry::new(ppn, flags | pte_flags!(V, D, A));
 
-        let find_res = self.find_pte(vpn).unwrap();
-        assert!(
-            find_res.flags().is_valid(),
-            "error vpn: {:#x}, flags: {:?}",
-            vpn.0,
-            find_res.flags()
-        );
+        // let find_res = self.find_pte(vpn).unwrap();
+        // assert!(
+        //     find_res.flags().is_valid(),
+        //     "error vpn: {:#x}, flags: {:?}",
+        //     vpn.0,
+        //     find_res.flags()
+        // );
     }
 
     /// unmap a vpn
@@ -193,6 +193,20 @@ impl PageTable {
             satp::write(satp);
             asm!("sfence.vma");
         }
+    }
+
+    /// remap a cow page
+    pub fn remap_cow(
+        &mut self,
+        vpn: VirtPageNum,
+        ppn: PhysPageNum,
+        old_ppn: PhysPageNum,
+        new_flags: PTEFlags,
+    ) {
+        let pte = self.create_pte(vpn);
+        *pte = PageTableEntry::new(ppn, new_flags);
+        ppn.get_bytes_array()
+            .copy_from_slice(old_ppn.get_bytes_array());
     }
 }
 
