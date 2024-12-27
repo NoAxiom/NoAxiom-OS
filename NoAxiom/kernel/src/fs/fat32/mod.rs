@@ -4,12 +4,7 @@ mod bpb;
 mod fat;
 mod filetree;
 
-use alloc::{
-    boxed::Box,
-    string::{String, ToString},
-    sync::Arc,
-    vec::Vec,
-};
+use alloc::{boxed::Box, string::String, sync::Arc, vec::Vec};
 
 use bpb::BIOSParameterBlockOffset;
 use filetree::{
@@ -221,6 +216,23 @@ impl FAT32FIleSystem {
             Err(e) => {
                 error!("Error loading file: {:?}", e);
                 Vec::new()
+            }
+        }
+    }
+
+    /// load part of the file content
+    pub async fn load_file_part<'a>(
+        &'a self,
+        name: String,
+        offset: usize,
+        len: usize,
+        buf: &'a mut [u8],
+    ) {
+        let node = self.file_tree.find(&name);
+        match node {
+            Ok(node) => node.part_content(offset, len, buf).await,
+            Err(e) => {
+                error!("Error loading file: {:?}", e);
             }
         }
     }

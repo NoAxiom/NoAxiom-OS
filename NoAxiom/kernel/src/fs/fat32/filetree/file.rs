@@ -44,7 +44,10 @@ impl FSNode<String, Vec<u8>> for ShortFile {
         let content = self.entry.load(&self.blk, &self.fat, &self.bpb).await;
         content[0..self.size() as usize].to_vec()
     }
-
+    async fn part_content<'a>(&'a self, offset: usize, len: usize, buf: &'a mut [u8]) {
+        let content = self.entry.load(&self.blk, &self.fat, &self.bpb).await;
+        buf.copy_from_slice(&content[offset..offset + len]);
+    }
     fn ident(&self) -> String {
         self.entry.name()
     }
@@ -69,9 +72,6 @@ impl LongFile {
             long_entries,
         }
     }
-    pub fn size(&self) -> u32 {
-        self.short_file.size()
-    }
 }
 
 #[async_trait]
@@ -79,7 +79,9 @@ impl FSNode<String, Vec<u8>> for LongFile {
     async fn content(&self) -> Vec<u8> {
         self.short_file.content().await
     }
-
+    async fn part_content<'a>(&'a self, offset: usize, len: usize, buf: &'a mut [u8]) {
+        self.short_file.part_content(offset, len, buf).await
+    }
     fn ident(&self) -> String {
         let mut name = String::new();
         for l in &self.long_entries {

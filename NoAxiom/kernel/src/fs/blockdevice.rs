@@ -1,13 +1,9 @@
 use alloc::boxed::Box;
-use core::{future::Future, pin::Pin};
 
-use crate::config::errno::Errno;
+use async_trait::async_trait;
 
-pub type BlockReturn<'a> = Pin<Box<dyn Future<Output = Result<isize, Errno>> + Send + 'a>>;
-
+#[async_trait]
 pub trait BlockDevice: Send + Sync {
-    fn read<'a>(&'a self, id: usize, buf: &'a mut [u8]) -> BlockReturn;
-    fn write<'a>(&'a self, id: usize, buf: &'a [u8]) -> BlockReturn;
-    fn flush(&self) -> Result<(), ()>;
-    fn close(&self) -> Result<(), ()>;
+    async fn read<'a>(&'a self, id: usize, buf: &'a mut [u8]);
+    async fn write<'a>(&'a self, id: usize, buf: &'a [u8]);
 }

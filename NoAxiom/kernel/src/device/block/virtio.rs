@@ -3,6 +3,7 @@ use alloc::{
     sync::{Arc, Weak},
 };
 
+use async_trait::async_trait;
 use spin::{Mutex, MutexGuard};
 
 use super::BlockDevice;
@@ -146,23 +147,12 @@ impl Device for virtio {
     }
 }
 
+#[async_trait]
 impl crate::fs::blockdevice::BlockDevice for virtio {
-    fn read<'a>(&'a self, id: usize, buf: &'a mut [u8]) -> crate::fs::blockdevice::BlockReturn {
-        Box::pin(async move {
-            self.read_block(id, buf).unwrap();
-            Ok(buf.len() as isize)
-        })
+    async fn read<'a>(&'a self, id: usize, buf: &'a mut [u8]) {
+        self.read_block(id, buf).unwrap();
     }
-    fn write<'a>(&'a self, id: usize, buf: &'a [u8]) -> crate::fs::blockdevice::BlockReturn {
-        Box::pin(async move {
-            self.write_block(id, buf).unwrap();
-            Ok(buf.len() as isize)
-        })
-    }
-    fn close(&self) -> Result<(), ()> {
-        todo!()
-    }
-    fn flush(&self) -> Result<(), ()> {
-        todo!()
+    async fn write<'a>(&'a self, id: usize, buf: &'a [u8]) {
+        self.write_block(id, buf).unwrap();
     }
 }
