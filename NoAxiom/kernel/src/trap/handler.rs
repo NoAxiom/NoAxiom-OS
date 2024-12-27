@@ -46,29 +46,30 @@ pub fn kernel_trap_handler() {
     let scause = scause::read();
     let stval = stval::read();
     let sepc = sepc::read();
+    let kernel_panic = || {
+        panic!(
+            "kernel trap!!! trap {:?} is unsupported, stval = {:#x}, error pc = {:#x}",
+            scause.cause(),
+            stval,
+            sepc
+        );
+    };
     match scause.cause() {
         Trap::Exception(exception) => match exception {
             Exception::LoadPageFault
             | Exception::StorePageFault
             | Exception::InstructionPageFault => {
-                if current_cpu().task.as_mut().unwrap().handle_pagefault(stval) {
-                    debug!("clone cow successfully");
+                if let Some(task) = current_cpu().task.as_mut() {
+                    if task.handle_pagefault(stval) {
+                        debug!("clone cow successfully");
+                    } else {
+                        kernel_panic();
+                    }
                 } else {
-                    panic!("hart: {}, kernel exception {:?}, copy-on-write isn't detected, stval = {:#x}, sepc = {:#x}",
-                        get_hartid(),
-                        scause.cause(),
-                        stval,
-                        sepc
-                    );
+                    kernel_panic();
                 }
             }
-            _ => panic!(
-                "hart: {}, kernel exception {:?} is unsupported, stval = {:#x}, sepc = {:#x}",
-                get_hartid(),
-                scause.cause(),
-                stval,
-                sepc
-            ),
+            _ => kernel_panic(),
         },
         Trap::Interrupt(interrupt) => match interrupt {
             Interrupt::SupervisorExternal => {
@@ -96,13 +97,7 @@ pub fn kernel_trap_handler() {
                     )
                 }
             }
-            _ => panic!(
-                "hart: {}, kernel interrupt {:?} is unsupported, stval = {:#x}, sepc = {:#x}",
-                get_hartid(),
-                scause.cause(),
-                stval,
-                sepc
-            ),
+            _ => kernel_panic(),
         },
     }
     // panic!(

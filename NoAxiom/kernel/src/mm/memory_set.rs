@@ -407,14 +407,14 @@ impl MemorySet {
         let area = &self.user_heap_area;
         let mut new_area = MapArea::from_another(area);
         for vpn in area.vpn_range {
-            warn!(
-                "vpn: {:#x}, range: [{:#x}, {:#x})",
+            trace!(
+                "[clone_cow] vpn: {:#x}, range: [{:#x}, {:#x})",
                 vpn.0,
                 area.vpn_range.start().0,
                 area.vpn_range.end().0
             );
             for it in area.frame_map.iter() {
-                warn!("frame_map: {:#x}", it.0 .0);
+                trace!("[clone_cow] frame_map: {:#x}", it.0 .0);
             }
             if let Some(frame_tracker) = area.frame_map.get(&vpn) {
                 remap_cow(vpn, &mut new_set, &mut new_area, frame_tracker);

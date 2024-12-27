@@ -36,8 +36,7 @@ pub struct SchedPrio(pub isize);
 
 impl SchedPrio {
     #[inline(always)]
-    #[allow(unused)]
-    pub fn to_weight(&self) -> usize {
+    pub fn to_load_weight(&self) -> usize {
         SCHED_PRIO_TO_WEIGHT[(self.0 + 20) as usize]
     }
     #[inline(always)]
@@ -64,7 +63,11 @@ impl SchedEntityInner {
     }
     /// update vruntime by delta(ms)
     pub fn update_vruntime(&mut self, wall_time: usize) {
-        trace!("wall_time: {}, to_inv: {}", wall_time, self.prio.to_inv_weight());
+        trace!(
+            "wall_time: {}, to_inv: {}",
+            wall_time,
+            self.prio.to_inv_weight()
+        );
         self.vruntime
             .update((wall_time * NICE_0_LOAD * self.prio.to_inv_weight()) >> 32);
     }
