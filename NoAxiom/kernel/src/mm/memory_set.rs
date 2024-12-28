@@ -8,16 +8,16 @@ use lazy_static::lazy_static;
 use riscv::{asm::sfence_vma_all, register::satp};
 
 use super::{
-    address::{PhysAddr, PhysPageNum},
+    address::PhysAddr,
     frame::{frame_alloc, frame_refcount, FrameTracker},
     map_area::MapArea,
     page_table::PageTable,
-    pte::{PTEFlags, PageTableEntry},
+    pte::PageTableEntry,
 };
 use crate::{
     config::mm::{
-        DL_INTERP_OFFSET, KERNEL_ADDR_OFFSET, KERNEL_VIRT_MEMORY_END, MMIO, PAGE_SIZE, PAGE_WIDTH,
-        USER_HEAP_SIZE, USER_STACK_SIZE,
+        KERNEL_ADDR_OFFSET, KERNEL_VIRT_MEMORY_END, MMIO, PAGE_SIZE, PAGE_WIDTH, USER_HEAP_SIZE,
+        USER_STACK_SIZE,
     },
     constant::time::CLOCK_FREQ,
     fs::{inode::Inode, path::Path, File},
@@ -351,7 +351,7 @@ impl MemorySet {
     /// and mark the new memory set as copy-on-write
     /// used in sys_fork
     pub fn clone_cow(&mut self) -> Self {
-        debug!("[clone_cow] start");
+        trace!("[clone_cow] start");
         let mut new_set = Self::new_with_kernel();
         let remap_cow = |vpn: VirtPageNum,
                          new_set: &mut MemorySet,
@@ -442,7 +442,7 @@ impl MemorySet {
         let old_flags = pte.flags();
         let new_flags = old_flags.switch_to_rw();
         if frame_refcount(old_ppn) == 1 {
-            debug!("refcount == 1, set flags to RW");
+            trace!("refcount == 1, set flags to RW");
             self.page_table().set_flags(vpn, new_flags);
         } else {
             let frame = frame_alloc();
@@ -467,7 +467,7 @@ impl MemorySet {
             self.page_table()
                 .remap_cow(vpn, new_ppn, old_ppn, new_flags);
             sfence_vma_all();
-            debug!(
+            trace!(
                 "[realloc_cow] done!!! refcount: old: [{:#x}: {:#x}], new: [{:#x}: {:#x}]",
                 old_ppn.0,
                 frame_refcount(old_ppn),

@@ -61,7 +61,7 @@ pub fn kernel_trap_handler() {
             | Exception::InstructionPageFault => {
                 if let Some(task) = current_cpu().task.as_mut() {
                     if task.handle_pagefault(stval) {
-                        debug!("clone cow successfully");
+                        trace!("clone cow successfully");
                     } else {
                         kernel_panic();
                     }
@@ -147,7 +147,7 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
             | Exception::StorePageFault
             | Exception::InstructionPageFault => {
                 if task.handle_pagefault(stval) {
-                    debug!("clone cow successfully");
+                    trace!("clone cow successfully");
                 } else {
                     print_err_msg();
                     task.exit();

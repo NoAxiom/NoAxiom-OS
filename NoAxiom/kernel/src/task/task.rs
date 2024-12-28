@@ -268,7 +268,7 @@ impl Task {
         } else {
             // fork as a new process
             let new_tid = tid_alloc();
-            debug!("fork new process, tid: {}", new_tid.0);
+            trace!("fork new process, tid: {}", new_tid.0);
             let task = Arc::new(Self {
                 tgid: Arc::new(AtomicUsize::new(new_tid.0)),
                 tid: new_tid,

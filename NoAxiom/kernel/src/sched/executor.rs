@@ -10,8 +10,9 @@ use async_task::{Builder, Runnable, ScheduleInfo, WithInfo};
 use lazy_static::lazy_static;
 
 use super::{
+    cfs::CFS,
     sched_entity::{SchedEntity, SchedTaskInfo},
-    scheduler::{SchedLoadStats, Scheduler, CFS},
+    scheduler::{SchedLoadStats, Scheduler},
 };
 use crate::{config::arch::CPU_NUM, cpu::get_hartid, sync::mutex::SpinMutex};
 
@@ -38,30 +39,30 @@ where
 {
     pub fn new() -> Self {
         Self {
-            scheduler: array_init(|_| SpinMutex::new(T::DEFAULT)),
+            scheduler: array_init(|_| SpinMutex::new(T::default())),
         }
     }
     pub fn schedule(&self, runnable: Runnable<TaskScheduleInfo>, info: ScheduleInfo) {
-        // normally we schedule task in local queue
-        let mut flag = false;
         #[cfg(feature = "multicore")]
-        if !info.woken_while_running {
-            // if the task isn't shared by other thread
+        {
+            // normally we schedule task in local queue
+            // but if the task isn't shared by other thread
             // then we can freely move it to other hart
-            if let Some(info) = runnable.metadata().task_info.as_ref() {
-                if Arc::strong_count(&info.task.memory_set) <= 1 {
-                    flag = true;
+            // for ktask, spawn it in local hart as well
+            let mut hart = get_hartid();
+            if !info.woken_while_running {
+                if let Some(info) = runnable.metadata().task_info.as_ref() {
+                    if Arc::strong_count(&info.task.memory_set) <= 1 {
+                        hart = min_load_hartid();
+                    }
                 }
-            } else {
-                flag = true;
             }
+            self.scheduler[hart].lock().push(runnable, info);
         }
-        let hart = if flag {
-            min_load_hartid()
-        } else {
-            get_hartid()
-        };
-        self.scheduler[hart].lock().push(runnable, info);
+        #[cfg(not(feature = "multicore"))]
+        {
+            self.scheduler[get_hartid()].lock().push(runnable, info);
+        }
     }
     pub fn pop_current(&self) -> Option<Runnable<TaskScheduleInfo>> {
         self.scheduler[get_hartid()].lock().pop()
@@ -99,7 +100,7 @@ fn min_load_hartid() -> usize {
     }
 
     let mut min_load = usize::MAX;
-    let mut min_hartid = 0;
+    let mut min_hartid = get_hartid();
     for (i, cfs) in RUNTIME.scheduler.iter().enumerate() {
         let load = cfs.lock().load_stats().load;
         if load < min_load {
@@ -140,8 +141,9 @@ fn load_balance() -> Option<Runnable<TaskScheduleInfo>> {
         let res = RUNTIME.scheduler[from_hart].lock().steal();
         if res.is_some() {
             warn!(
-                "[load_balance] move task: hart {} -> hart {}",
-                from_hart, current_hart,
+                "[load_balance] move task: hart {} -> hart: {}",
+                from_hart,    // RUNTIME.scheduler[from_hart].lock().load_stats().load,
+                current_hart, // RUNTIME.scheduler[current_hart].lock().load_stats().load
             );
         }
         return res;

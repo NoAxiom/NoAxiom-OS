@@ -41,12 +41,12 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
         let p = current_cpu();
         let time_in = get_time_us();
         p.set_task(&mut this.task);
-        debug!("polling task {}", this.task.tid());
+        trace!("polling task {}", this.task.tid());
         let ret = unsafe { Pin::new_unchecked(&mut this.future).poll(cx) };
         p.clear_task();
         let time_out = get_time_us();
         this.task.sched_entity.update_vruntime(time_out - time_in);
-        debug!(
+        trace!(
             "task {} yield, poll time: {} us, vruntime: {}",
             this.task.tid(),
             time_out - time_in,
@@ -83,6 +83,7 @@ pub fn spawn_utask(task: Arc<Task>) {
     inner_spawn(task);
 }
 
+#[allow(unused)]
 pub fn spawn_ktask<F, R>(future: F)
 where
     F: Future<Output = R> + Send + 'static,
