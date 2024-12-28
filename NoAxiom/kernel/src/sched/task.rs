@@ -11,7 +11,7 @@ use core::{
 
 use super::{
     executor::spawn_raw,
-    sched_entity::SchedEntity,
+    sched_entity::{SchedEntity, SchedTaskInfo},
     task_counter::{task_count_dec, task_count_inc},
 };
 use crate::{
@@ -56,27 +56,31 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
     }
 }
 
+/// inner spawn: spawn a new user task
+fn inner_spawn(task: Arc<Task>) {
+    spawn_raw(
+        UserTaskFuture::new(task.clone(), task_main(task.clone())),
+        task.sched_entity.ref_clone(),
+        Some(SchedTaskInfo { task }),
+    );
+}
+
 /// schedule to allocate resouces and spawn task
 pub fn schedule_spawn_new_process(path: Path) {
     task_count_inc();
     spawn_raw(
         async move {
             let task = Task::new_process(path).await;
-            spawn_raw(
-                UserTaskFuture::new(task.clone(), task_main(task.clone())),
-                task.sched_entity.ref_clone(),
-            );
+            inner_spawn(task);
         },
         SchedEntity::new_bare(),
+        None,
     );
 }
 
 pub fn spawn_utask(task: Arc<Task>) {
     task_count_inc();
-    spawn_raw(
-        UserTaskFuture::new(task.clone(), task_main(task.clone())),
-        task.sched_entity.ref_clone(),
-    );
+    inner_spawn(task);
 }
 
 pub fn spawn_ktask<F, R>(future: F)
@@ -84,7 +88,7 @@ where
     F: Future<Output = R> + Send + 'static,
     R: Send + 'static,
 {
-    spawn_raw(future, SchedEntity::new_bare());
+    spawn_raw(future, SchedEntity::new_bare(), None);
 }
 
 /// user task main

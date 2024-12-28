@@ -61,7 +61,7 @@ pub struct Task {
 
     /// memory set for task
     /// it's a process resource as well
-    memory_set: Arc<SpinMutex<MemorySet>>,
+    pub memory_set: Arc<SpinMutex<MemorySet>>,
 
     /// thread control block ptr
     thread: SyncUnsafeCell<ThreadInfo>,

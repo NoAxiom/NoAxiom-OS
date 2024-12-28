@@ -1,11 +1,12 @@
 //! CFS(completly fair schedule) scheduler entity
 
-use alloc::sync::Arc;
+use alloc::sync::{Arc, Weak};
 use core::cmp::Ordering;
 
 use crate::{
     constant::sched::{NICE_0_LOAD, SCHED_PRIO_TO_WEIGHT, SCHED_PRIO_TO_WMULT},
-    sync::cell::SyncUnsafeCell,
+    mm::memory_set::MemorySet,
+    sync::{cell::SyncUnsafeCell, mutex::SpinMutex}, task::Task,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Ord)]
@@ -25,7 +26,9 @@ impl SchedVruntime {
 impl PartialOrd for SchedVruntime {
     #[inline(always)]
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        let diff = (self.0 - other.0) as i64;
+        // let diff = (self.0 - other.0) as i64;
+        // Reversed order
+        let diff = (other.0 - self.0) as i64;
         diff.partial_cmp(&0)
     }
 }
@@ -111,4 +114,8 @@ impl SchedEntity {
             inner: self.inner.clone(),
         }
     }
+}
+
+pub struct SchedTaskInfo {
+    pub task: Arc<Task>,
 }

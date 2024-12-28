@@ -5,7 +5,8 @@ use async_task::{Runnable, ScheduleInfo};
 use super::{executor::TaskScheduleInfo, sched_entity::SchedVruntime};
 use crate::constant::sched::NICE_0_LOAD;
 
-pub struct SchedulerLoadStats {
+#[derive(Debug)]
+pub struct SchedLoadStats {
     pub load: usize,
     pub task_count: usize,
 }
@@ -13,7 +14,10 @@ pub struct SchedulerLoadStats {
 pub trait Scheduler {
     fn push(&mut self, runnable: Runnable<TaskScheduleInfo>, info: ScheduleInfo);
     fn pop(&mut self) -> Option<Runnable<TaskScheduleInfo>>;
-    fn load_stats(&mut self) -> SchedulerLoadStats;
+    fn steal(&mut self) -> Option<Runnable<TaskScheduleInfo>> {
+        self.pop()
+    }
+    fn load_stats(&mut self) -> SchedLoadStats;
     const DEFAULT: Self;
 }
 
@@ -64,10 +68,12 @@ impl Scheduler for CFS {
         } else {
             self.push_urgent(runnable);
         }
+        info!("pushed task, load: {:?}", self.load_stats());
     }
+
     /// pop a task from scheduler
     fn pop(&mut self) -> Option<Runnable<TaskScheduleInfo>> {
-        if let Some(runnable) = self.urgent.pop_front() {
+        let res = if let Some(runnable) = self.urgent.pop_front() {
             self.load -= NICE_0_LOAD;
             Some(runnable)
         } else if let Some((_, runnable)) = self.normal.pop_first() {
@@ -76,9 +82,6 @@ impl Scheduler for CFS {
                 "poped from normal queue, vruntime: {}",
                 runnable.metadata().sched_entity.inner().vruntime.0
             );
-            for it in self.normal.iter() {
-                trace!("normal queue: {:?}", it.1.metadata().sched_entity.inner());
-            }
             // update load
             self.load -= runnable
                 .metadata()
@@ -89,16 +92,60 @@ impl Scheduler for CFS {
             Some(runnable)
         } else {
             None
+        };
+        if res.is_some() {
+            info!("normally poped task, load: {:?}", self.load_stats());
         }
+        res
     }
+
+    // fn steal(&mut self) -> Option<Runnable<TaskScheduleInfo>> {
+    //     if self.urgent.front().is_some()
+    //         && self
+    //             .urgent
+    //             .front()
+    //             .unwrap()
+    //             .metadata()
+    //             .task_info
+    //             .is_some_and(|info| info.memory_set.strong_count() <= 1)
+    //     {
+    //         self.load -= NICE_0_LOAD;
+    //         Some(self.urgent.pop_front().unwrap())
+    //     } else if let Some(runnable) = {
+    //         let mut res = None;
+    //         for (_, runnable) in self.normal.iter() {
+    //             if runnable
+    //                 .metadata()
+    //                 .task_info
+    //                 .is_some_and(|info| info.memory_set.strong_count() <= 1)
+    //             {
+    //                 res = Some(runnable);
+    //                 break;
+    //             }
+    //         }
+    //         res
+    //     } {
+    //         self.load -= runnable
+    //             .metadata()
+    //             .sched_entity
+    //             .inner()
+    //             .prio
+    //             .to_load_weight();
+    //         Some(runnable)
+    //     } else {
+    //         None
+    //     }
+    // }
+
     /// get load of scheduler
     /// return: (load, task_count)
-    fn load_stats(&mut self) -> SchedulerLoadStats {
-        SchedulerLoadStats {
+    fn load_stats(&mut self) -> SchedLoadStats {
+        SchedLoadStats {
             load: self.load,
             task_count: self.normal.len() + self.urgent.len(),
         }
     }
+
     /// default scheduler for init
     const DEFAULT: Self = Self::new();
 }
