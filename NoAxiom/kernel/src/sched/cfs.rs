@@ -21,7 +21,11 @@ impl PartialEq for CfsTreeNode {
 impl Eq for CfsTreeNode {}
 impl PartialOrd for CfsTreeNode {
     fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
-        self.vruntime.partial_cmp(&other.vruntime)
+        let res = self.vruntime.partial_cmp(&other.vruntime);
+        match res {
+            Some(core::cmp::Ordering::Equal) => Some(core::cmp::Ordering::Less),
+            _ => res,
+        }
     }
 }
 impl Ord for CfsTreeNode {
