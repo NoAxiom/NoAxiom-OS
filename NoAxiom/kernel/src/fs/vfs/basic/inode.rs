@@ -8,11 +8,11 @@ use crate::{
         fs::{InodeMode, Stat},
         result::Errno,
     },
-    sync::mutex::SpinMutex,
+    sync::mutex::SpinLock,
 };
 
 lazy_static::lazy_static! {
-    static ref INODE_ID: SpinMutex<usize> = SpinMutex::new(0);
+    static ref INODE_ID: SpinLock<usize> = SpinLock::new(0);
 }
 fn alloc_id() -> usize {
     let mut id = INODE_ID.lock();
@@ -30,7 +30,7 @@ pub struct InodeMeta {
     /// The inode id, unique in the file system
     id: usize,
     /// The inner data of the inode, maybe modified by multiple tasks
-    inner: SpinMutex<InodeMetaInner>,
+    inner: SpinLock<InodeMetaInner>,
     /// The mode of file
     inode_mode: InodeMode,
     /// The super block of the inode
@@ -41,7 +41,7 @@ impl InodeMeta {
     pub fn new(super_block: Arc<dyn SuperBlock>, inode_mode: InodeMode, size: usize) -> Self {
         Self {
             id: alloc_id(),
-            inner: SpinMutex::new(InodeMetaInner {
+            inner: SpinLock::new(InodeMetaInner {
                 nlink: 1,
                 size,
                 state: InodeState::UnInit,

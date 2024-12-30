@@ -17,11 +17,11 @@ use crate::{
         page_table::PageTable,
     },
     println,
-    sync::mutex::SpinMutex,
+    sync::mutex::SpinLock,
     utils::{kernel_pa_to_va, kernel_va_to_pa},
 };
 
-static DMA_PADDR: SpinMutex<Vec<FrameTracker>> = SpinMutex::new(Vec::new());
+static DMA_PADDR: SpinLock<Vec<FrameTracker>> = SpinLock::new(Vec::new());
 
 pub struct HalImpl;
 

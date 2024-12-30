@@ -9,7 +9,7 @@ use lazy_static::lazy_static;
 
 use super::address::PhysPageNum;
 use crate::{
-    config::mm::KERNEL_PHYS_MEMORY_END, mm::address::PhysAddr, println, sync::mutex::SpinMutex,
+    config::mm::KERNEL_PHYS_MEMORY_END, mm::address::PhysAddr, println, sync::mutex::SpinLock,
     utils::kernel_va_to_pa,
 };
 
@@ -129,8 +129,8 @@ impl FrameAllocator for StackFrameAllocator {
 type FrameAllocatorImpl = StackFrameAllocator;
 
 lazy_static! {
-    pub static ref FRAME_ALLOCATOR: SpinMutex<FrameAllocatorImpl> =
-        SpinMutex::new(FrameAllocatorImpl::new());
+    pub static ref FRAME_ALLOCATOR: SpinLock<FrameAllocatorImpl> =
+        SpinLock::new(FrameAllocatorImpl::new());
 }
 
 pub fn frame_alloc() -> FrameTracker {

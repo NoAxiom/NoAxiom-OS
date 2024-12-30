@@ -15,7 +15,7 @@ use super::{CharDevice, Device};
 use crate::{
     device::{ADevResult, DeviceType},
     driver::uart::UartDriver,
-    sync::mutex::SpinMutex, nix::result::Errno,
+    sync::mutex::SpinLock, nix::result::Errno,
 };
 
 pub static UART_DEVICE: Once<Arc<Serial>> = Once::new();
@@ -26,8 +26,8 @@ pub fn init_uart_device(uart: Arc<Serial>) {
 }
 pub struct Serial {
     inner: UnsafeCell<Box<dyn UartDriver>>,
-    buffer: SpinMutex<ringbuffer::ConstGenericRingBuffer<u8, 512>>, // Hard-coded buffer size
-    waiting: SpinMutex<VecDeque<Waker>>,
+    buffer: SpinLock<ringbuffer::ConstGenericRingBuffer<u8, 512>>, // Hard-coded buffer size
+    waiting: SpinLock<VecDeque<Waker>>,
     base_address: usize,
     size: usize,
     interrupt_number: usize,
@@ -45,11 +45,11 @@ impl Serial {
     ) -> Self {
         Self {
             inner: UnsafeCell::new(driver),
-            buffer: SpinMutex::new(ringbuffer::ConstGenericRingBuffer::new()),
+            buffer: SpinLock::new(ringbuffer::ConstGenericRingBuffer::new()),
             base_address,
             size,
             interrupt_number,
-            waiting: SpinMutex::new(VecDeque::new()),
+            waiting: SpinLock::new(VecDeque::new()),
         }
     }
     pub fn read<'a>(&'a self, buf: Pin<&'a mut [u8]>) -> ADevResult<isize> {
