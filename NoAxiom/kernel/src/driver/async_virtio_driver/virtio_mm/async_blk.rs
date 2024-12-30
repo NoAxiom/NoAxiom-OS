@@ -2,13 +2,15 @@
 
 use alloc::boxed::Box;
 
+use async_trait::async_trait;
+
 use crate::{
     config::mm::VIRTIO0,
+    device::block::BlockDevice,
     driver::async_virtio_driver::{
         block::{InterruptRet, VirtIOBlock},
         mmio::VirtIOHeader,
     },
-    fs::blockdevice::BlockDevice,
 };
 /// 异步虚拟块设备接口
 ///
@@ -106,26 +108,12 @@ impl VirtIOAsyncBlock {
     }
 }
 
+#[async_trait]
 impl BlockDevice for VirtIOAsyncBlock {
-    fn read<'a>(&'a self, id: usize, buf: &'a mut [u8]) -> crate::fs::blockdevice::BlockReturn {
-        Box::pin(async move {
-            self.read_block(id, buf).await;
-            Ok(buf.len() as isize)
-        })
+    async fn read<'a>(&'a self, id: usize, buf: &'a mut [u8]) {
+        self.read_block(id, buf).await
     }
-
-    fn write<'a>(&'a self, id: usize, buf: &'a [u8]) -> crate::fs::blockdevice::BlockReturn {
-        Box::pin(async move {
-            self.write_block(id, buf).await;
-            Ok(buf.len() as isize)
-        })
-    }
-
-    fn close(&self) -> core::result::Result<(), ()> {
-        todo!()
-    }
-
-    fn flush(&self) -> core::result::Result<(), ()> {
-        todo!()
+    async fn write<'a>(&'a self, id: usize, buf: &'a [u8]) {
+        self.write_block(id, buf).await
     }
 }

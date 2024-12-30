@@ -8,19 +8,19 @@ use lazy_static::lazy_static;
 use riscv::{asm::sfence_vma_all, register::satp};
 
 use super::{
-    address::{PhysAddr, PhysPageNum},
+    address::PhysAddr,
     frame::{frame_alloc, frame_refcount, FrameTracker},
     map_area::MapArea,
     page_table::PageTable,
-    pte::{PTEFlags, PageTableEntry},
+    pte::PageTableEntry,
 };
 use crate::{
     config::mm::{
-        DL_INTERP_OFFSET, KERNEL_ADDR_OFFSET, KERNEL_VIRT_MEMORY_END, MMIO, PAGE_SIZE, PAGE_WIDTH,
-        USER_HEAP_SIZE, USER_STACK_SIZE,
+        KERNEL_ADDR_OFFSET, KERNEL_VIRT_MEMORY_END, MMIO, PAGE_SIZE, PAGE_WIDTH, USER_HEAP_SIZE,
+        USER_STACK_SIZE,
     },
     constant::time::CLOCK_FREQ,
-    fs::{inode::Inode, path::Path, File},
+    fs::{fs_root, path::Path, vfs::basic::file::File},
     map_permission,
     mm::{
         address::{VirtAddr, VirtPageNum},
@@ -246,9 +246,8 @@ impl MemorySet {
         let mut auxv: Vec<AuxEntry> = Vec::new(); // auxiliary vector
         let mut dl_flag = false; // dynamic link flag
 
-        // TODO: maybe we should only read the header at first
-        // read all data
-        let file_data = elf_file.read().await.unwrap();
+        // ! fixme: temp used for read all elf file
+        let file_data = elf_file.read_all().await.unwrap();
         let elf = xmas_elf::ElfFile::new(file_data.as_slice()).unwrap();
 
         // check: magic
@@ -342,8 +341,9 @@ impl MemorySet {
     }
 
     pub async fn load_from_path(path: Path) -> ElfMemoryInfo {
-        info!("[load_elf] from path: {}\n", &path.inner());
-        let elf_file = Arc::new(Inode::from(path));
+        info!("[load_elf] from path: {}", &path.inner());
+        let elf_file = fs_root().find(&path.as_string()).unwrap().open().unwrap();
+        info!("[load_elf] file name: {}", elf_file.name());
         MemorySet::load_from_elf(elf_file).await
     }
 

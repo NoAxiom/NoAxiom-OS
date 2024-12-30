@@ -1,3 +1,6 @@
+// ignore warnings for this module
+#![allow(warnings)]
+
 pub mod block;
 pub mod char;
 mod config;
@@ -16,7 +19,8 @@ use char::CharDevice;
 use crate::{
     alloc::string::ToString,
     device::{block::BlockDevice, config::DeviceNumber},
-    driver::Driver, nix::result::Errno,
+    driver::Driver,
+    nix::result::Errno,
 };
 
 #[allow(dead_code)]

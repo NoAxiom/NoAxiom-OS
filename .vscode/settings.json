@@ -9,6 +9,6 @@
         "sv39",
         "multicore",
         "riscv_qemu",
-        // "async_fs"
+        "async_fs"
     ],
 }

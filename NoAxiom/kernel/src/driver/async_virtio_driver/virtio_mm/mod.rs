@@ -28,11 +28,11 @@ lazy_static! {
 pub fn virtio_dma_alloc(pages: usize) -> PhysicalAddress {
     let mut ppn_base = 0;
     for i in 0..pages {
-        let frame = frame_alloc().unwrap();
+        let frame = frame_alloc();
         if i == 0 {
-            ppn_base = frame.ppn.into();
+            ppn_base = frame.ppn().into();
         }
-        let frame_ppn: usize = frame.ppn.into();
+        let frame_ppn: usize = frame.ppn().into();
         assert_eq!(frame_ppn, ppn_base + i);
         QUEUE_FRAMES.lock().push(frame);
     }
@@ -46,7 +46,7 @@ pub fn virtio_dma_dealloc(pa: PhysicalAddress, pages: usize) -> i32 {
     let mut remove_idx = -1;
     let mut q = QUEUE_FRAMES.lock();
     for (idx, frame) in q.iter().enumerate() {
-        if frame.ppn == ppn {
+        if frame.ppn() == ppn {
             remove_idx = idx as i32;
         }
     }

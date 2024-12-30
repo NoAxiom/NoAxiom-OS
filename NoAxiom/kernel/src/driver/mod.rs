@@ -1,3 +1,6 @@
+// ignore warnings for this module
+#![allow(warnings)]
+
 #[cfg(feature = "async_fs")]
 pub mod async_virtio_driver;
 pub mod block;
@@ -14,7 +17,7 @@ use alloc::{fmt::Debug, sync::Arc, vec::Vec};
 use block::BlockDriver;
 use spin::{Lazy, Mutex};
 
-use crate::{nix::result::Errno, device::IdTable};
+use crate::{device::IdTable, nix::result::Errno};
 /// @brief: Driver error
 #[allow(dead_code)]
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]

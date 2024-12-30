@@ -19,11 +19,12 @@ use crate::{
 fn ext_int_handler() {
     #[cfg(feature = "async_fs")]
     {
-        use config::fs::WAKE_NUM;
-        use platform::plic::PLIC;
         use plic::Mode;
 
-        use crate::driver::async_virtio_driver::virtio_mm::VIRTIO_BLOCK;
+        use crate::{
+            config::fs::WAKE_NUM, driver::async_virtio_driver::virtio_mm::VIRTIO_BLOCK,
+            platform::plic::PLIC,
+        };
 
         let plic = PLIC.get().unwrap();
         let irq = plic.claim(get_hartid() as u32, Mode::Supervisor);
@@ -74,6 +75,13 @@ pub fn kernel_trap_handler() {
             Interrupt::SupervisorExternal => {
                 #[cfg(feature = "async_fs")]
                 {
+                    use plic::Mode;
+
+                    use crate::{
+                        config::fs::WAKE_NUM, driver::async_virtio_driver::virtio_mm::VIRTIO_BLOCK,
+                        platform::plic::PLIC,
+                    };
+
                     let plic = PLIC.get().unwrap();
                     let irq = plic.claim(get_hartid() as u32, Mode::Supervisor);
                     debug!("[SupervisorExternal] hart: {}, irq: {}", get_hartid(), irq);
@@ -105,12 +113,6 @@ pub fn kernel_trap_handler() {
             ),
         },
     }
-    // panic!(
-    //     "kernel trap!!! trap {:?} is unsupported, stval = {:#x}, error pc =
-    // {:#x}",     scause.cause(),
-    //     stval,
-    //     sepc,
-    // );
 }
 
 /// user trap handler

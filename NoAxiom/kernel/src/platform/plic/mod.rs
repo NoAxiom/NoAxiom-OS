@@ -40,7 +40,7 @@ pub fn init_plic(plic_addr: usize) {
         let priority;
         #[cfg(feature = "async_fs")]
         {
-            priority = 2;
+            priority = 0;
         }
         #[cfg(not(feature = "async_fs"))]
         {

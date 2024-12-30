@@ -1,0 +1,156 @@
+use bitflags::bitflags;
+
+bitflags! {
+    #[derive(Debug, Clone, Copy)]
+    pub struct FileFlags: u32 {
+        // TODO do not use 0
+        // NOTE: bitflags do not encourage zero bit flag, we should not directly check `O_RDONLY`
+        // const O_RDONLY    = 0;
+        const O_WRONLY    = 1 << 0;
+        const O_RDWR      = 1 << 1;
+        const O_CREATE    = 1 << 6;
+        const O_EXCL      = 1 << 7;
+        const O_TRUNC     = 1 << 9;
+        const O_APPEND    = 1 << 10;
+        const O_NONBLOCK  = 1 << 11;
+        const O_LARGEFILE = 1 << 15;
+        const O_DIRECTROY = 1 << 16;
+        const O_NOFOLLOW  = 1 << 17;
+        const O_CLOEXEC   = 1 << 19;
+    }
+
+    #[derive(Debug, Clone, Copy, Eq, PartialEq)]
+    pub struct InodeMode: u32 {
+        /// Type.
+        const TYPE_MASK = 0o170000;
+        /// FIFO.
+        const FIFO  = 0o010000;
+        /// Character device.
+        const CHAR  = 0o020000;
+        /// Directory
+        const DIR   = 0o040000;
+        /// Block device
+        const BLOCK = 0o060000;
+        /// Regular file.
+        const FILE  = 0o100000;
+        /// Symbolic link.
+        const LINK  = 0o120000;
+        /// Socket
+        const SOCKET = 0o140000;
+
+        /// Set-user-ID on execution.
+        const SET_UID = 0o4000;
+        /// Set-group-ID on execution.
+        const SET_GID = 0o2000;
+        /// sticky bit
+        const STICKY = 0o1000;
+        /// Read, write, execute/search by owner.
+        const OWNER_MASK = 0o700;
+        /// Read permission, owner.
+        const OWNER_READ = 0o400;
+        /// Write permission, owner.
+        const OWNER_WRITE = 0o200;
+        /// Execute/search permission, owner.
+        const OWNER_EXEC = 0o100;
+
+        /// Read, write, execute/search by group.
+        const GROUP_MASK = 0o70;
+        /// Read permission, group.
+        const GROUP_READ = 0o40;
+        /// Write permission, group.
+        const GROUP_WRITE = 0o20;
+        /// Execute/search permission, group.
+        const GROUP_EXEC = 0o10;
+
+        /// Read, write, execute/search by others.
+        const OTHER_MASK = 0o7;
+        /// Read permission, others.
+        const OTHER_READ = 0o4;
+        /// Write permission, others.
+        const OTHER_WRITE = 0o2;
+        /// Execute/search permission, others.
+        const OTHER_EXEC = 0o1;
+    }
+
+    #[derive(Debug)]
+    pub struct MountFlags:u32 {
+        /// This filesystem is mounted read-only.
+        const MS_RDONLY = 1;
+        /// The set-user-ID and set-group-ID bits are ignored by exec(3) for executable files on this filesystem.
+        const MS_NOSUID = 1 << 1;
+        /// Disallow access to device special files on this filesystem.
+        const MS_NODEV = 1 << 2;
+        /// Execution of programs is disallowed on this filesystem.
+        const MS_NOEXEC = 1 << 3;
+        /// Writes are synched to the filesystem immediately (see the description of O_SYNC in open(2)).
+        const MS_SYNCHRONOUS = 1 << 4;
+        /// Alter flags of a mounted FS
+        const MS_REMOUNT = 1 << 5;
+        /// Allow mandatory locks on an FS
+        const MS_MANDLOCK = 1 << 6;
+        /// Directory modifications are synchronous
+        const MS_DIRSYNC = 1 << 7;
+        /// Do not follow symlinks
+        const MS_NOSYMFOLLOW = 1 << 8;
+        /// Do not update access times.
+        const MS_NOATIME = 1 << 10;
+        /// Do not update directory access times
+        const MS_NODEIRATIME = 1 << 11;
+        const MS_BIND = 1 << 12;
+        const MS_MOVE = 1 << 13;
+        const MS_REC = 1 << 14;
+        /// War is peace. Verbosity is silence.
+        const MS_SILENT = 1 << 15;
+        /// VFS does not apply the umask
+        const MS_POSIXACL = 1 << 16;
+        /// change to unbindable
+        const MS_UNBINDABLE = 1 << 17;
+        /// change to private
+        const MS_PRIVATE = 1 << 18;
+        /// change to slave
+        const MS_SLAVE = 1 << 19;
+        /// change to shared
+        const MS_SHARED = 1 << 20;
+        /// Update atime relative to mtime/ctime.
+        const MS_RELATIME = 1 << 21;
+        /// this is a kern_mount call
+        const MS_KERNMOUNT = 1 << 22;
+        /// Update inode I_version field
+        const MS_I_VERSION = 1 << 23;
+        /// Always perform atime updates
+        const MS_STRICTATIME = 1 << 24;
+        /// Update the on-disk [acm]times lazily
+        const MS_LAZYTIME = 1 << 25;
+        /// These sb flags are internal to the kernel
+        const MS_SUBMOUNT = 1 << 26;
+        const MS_NOREMOTELOCK = 1 << 27;
+        const MS_NOSEC = 1 << 28;
+        const MS_BORN = 1 << 29;
+        const MS_ACTIVE = 1 << 30;
+        const MS_NOUSER = 1 << 31;
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+#[repr(C)]
+pub struct Stat {
+    pub st_dev: u64,
+    pub st_ino: u64,
+    pub st_mode: u32,
+    pub st_nlink: u32,
+    pub st_uid: u32,
+    pub st_gid: u32,
+    pub st_rdev: u64,
+    __pad: u64,
+    pub st_size: u64,
+    pub st_blksize: u32,
+    __pad2: u32,
+    pub st_blocks: u64,
+    pub st_atime_sec: u64,
+    pub st_atime_nsec: u64,
+    pub st_mtime_sec: u64,
+    pub st_mtime_nsec: u64,
+    pub st_ctime_sec: u64,
+    pub st_ctime_nsec: u64,
+    unused: u64,
+} // 128

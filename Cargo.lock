@@ -132,6 +132,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "downcast-rs"
+version = "1.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
+
+[[package]]
 name = "embedded-hal"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -229,6 +235,7 @@ dependencies = [
  "bitflags 2.6.0",
  "buddy_system_allocator",
  "crate_interface",
+ "downcast-rs",
  "fdt",
  "hashbrown 0.14.5",
  "kernel-sync",

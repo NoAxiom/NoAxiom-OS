@@ -1,4 +1,5 @@
 use alloc::{string::String, sync::Arc, vec::Vec};
+use core::cmp::min;
 
 use bit_field::BitField;
 
@@ -230,6 +231,43 @@ impl ShortDirectoryEntry {
             sector.iter().for_each(|b| res.push(*b));
         }
         res
+    }
+
+    /// store the `blk` device data occupied by the directory entry
+    /// ! FIXME: MAYBE WRONG
+    pub async fn store(
+        &self,
+        blk: &Arc<ABC>,
+        fat: &Arc<FAT>,
+        bpb: &Arc<[u8; BLOCK_SIZE]>,
+        offset: usize,
+        data: &[u8],
+    ) {
+        let mut data = &data[offset..];
+        let mut offset = offset;
+        let first_cluster = self.first_cluster();
+        let clusters_link = fat.get_link(blk, first_cluster).await;
+        for cluster in clusters_link {
+            if offset >= BLOCK_SIZE {
+                offset -= BLOCK_SIZE;
+                continue;
+            }
+            let cluster = cluster_offset_sectors(&**bpb, cluster);
+            let sector = blk.read_sector(cluster as usize).await;
+            let read_data = sector.read().data;
+            let len = min(BLOCK_SIZE, data.len());
+            let len = min(len, BLOCK_SIZE - offset);
+            let mut write_data = read_data.clone();
+            write_data[offset..offset + len].copy_from_slice(&data[..len]);
+            blk.write_sector(cluster as usize, &write_data).await;
+            if data.len() == len {
+                // todo: expand the file size
+                break;
+            }
+            data = &data[len..];
+            offset = 0;
+        }
+        assert_eq!(data.len(), 0, "store data too long!");
     }
 }
 
