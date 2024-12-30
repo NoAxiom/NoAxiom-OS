@@ -2,10 +2,6 @@
 
 use crate::constant::time::*;
 
-/// this is for multi-level feedback queue schedule algorithm.
-/// TODO: maybe should discard?
-pub const MLFQ_LEVELS: usize = 32;
-
 /// time slice: 10ms,
 /// every second will be spiltted into 100 slices,
 pub const TIME_SLICE_PER_SEC: usize = 100;

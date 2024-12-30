@@ -39,13 +39,6 @@ pub struct ProcessInfo {
     parent: Option<Weak<Task>>,
 }
 
-/// thread resources info
-pub struct ThreadInfo {
-    /// trap context,
-    /// contains stack ptr, registers, etc.
-    pub trap_context: TrapContext,
-}
-
 /// task control block for a coroutine,
 /// a.k.a thread in current project structure
 pub struct Task {
@@ -63,8 +56,9 @@ pub struct Task {
     /// it's a process resource as well
     pub memory_set: Arc<SpinMutex<MemorySet>>,
 
-    /// thread control block ptr
-    thread: SyncUnsafeCell<ThreadInfo>,
+    /// trap context,
+    /// contains stack ptr, registers, etc.
+    trap_cx: SyncUnsafeCell<TrapContext>,
 
     /// task status: ready / running / zombie
     status: SyncUnsafeCell<TaskStatus>,
@@ -131,16 +125,6 @@ impl Task {
         self.exit_code.store(exit_code, Ordering::Relaxed);
     }
 
-    /// thread info
-    #[inline(always)]
-    pub fn thread(&self) -> &ThreadInfo {
-        unsafe { &(*self.thread.get()) }
-    }
-    #[inline(always)]
-    pub fn thread_mut(&self) -> &mut ThreadInfo {
-        unsafe { &mut (*self.thread.get()) }
-    }
-
     /// memory set
     #[inline(always)]
     pub unsafe fn memory_activate(&self) {
@@ -187,15 +171,15 @@ impl Task {
     /// trap context
     #[inline(always)]
     pub fn trap_context(&self) -> &TrapContext {
-        &self.thread().trap_context
+        unsafe { &(*self.trap_cx.get()) }
     }
     #[inline(always)]
     pub fn trap_context_mut(&self) -> &mut TrapContext {
-        &mut self.thread_mut().trap_context
+        unsafe { &mut (*self.trap_cx.get()) }
     }
     #[inline(always)]
     pub fn set_trap_context(&self, trap_context: TrapContext) {
-        self.thread_mut().trap_context = trap_context;
+        *self.trap_context_mut() = trap_context;
     }
 
     /// create new process from elf
@@ -219,9 +203,7 @@ impl Task {
                 parent: None,
             })),
             memory_set: Arc::new(SpinMutex::new(memory_set)),
-            thread: SyncUnsafeCell::new(ThreadInfo {
-                trap_context: TrapContext::app_init_cx(elf_entry, user_sp),
-            }),
+            trap_cx: SyncUnsafeCell::new(TrapContext::app_init_cx(elf_entry, user_sp)),
             status: SyncUnsafeCell::new(TaskStatus::Ready),
             exit_code: AtomicIsize::new(0),
             sched_entity: SchedEntity::new_bare(),
@@ -257,9 +239,7 @@ impl Task {
                 tid: tid_alloc(),
                 pcb: self.pcb.clone(),
                 memory_set,
-                thread: SyncUnsafeCell::new(ThreadInfo {
-                    trap_context: self.trap_context().clone(),
-                }),
+                trap_cx: SyncUnsafeCell::new(self.trap_context().clone()),
                 status: SyncUnsafeCell::new(TaskStatus::Ready),
                 exit_code: AtomicIsize::new(0),
                 sched_entity: self.sched_entity.data_clone(),
@@ -277,9 +257,7 @@ impl Task {
                     parent: Some(Arc::downgrade(self)),
                 })),
                 memory_set,
-                thread: SyncUnsafeCell::new(ThreadInfo {
-                    trap_context: self.trap_context().clone(),
-                }),
+                trap_cx: SyncUnsafeCell::new(self.trap_context().clone()),
                 status: SyncUnsafeCell::new(TaskStatus::Ready),
                 exit_code: AtomicIsize::new(0),
                 sched_entity: self.sched_entity.data_clone(),

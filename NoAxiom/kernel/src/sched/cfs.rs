@@ -1,4 +1,5 @@
 use alloc::collections::{btree_set::BTreeSet, vec_deque::VecDeque};
+use core::cmp::Ordering;
 
 use async_task::{Runnable, ScheduleInfo};
 
@@ -20,20 +21,20 @@ impl PartialEq for CfsTreeNode {
 }
 impl Eq for CfsTreeNode {}
 impl PartialOrd for CfsTreeNode {
-    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         let res = self.vruntime.partial_cmp(&other.vruntime);
         match res {
-            Some(core::cmp::Ordering::Equal) => Some(core::cmp::Ordering::Less),
+            Some(Ordering::Equal) => Some(Ordering::Less),
             _ => res,
         }
     }
 }
 impl Ord for CfsTreeNode {
-    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+    fn cmp(&self, other: &Self) -> Ordering {
         let res = self.vruntime.cmp(&other.vruntime);
         match res {
             // never return equal to convert it into multiset
-            core::cmp::Ordering::Equal => core::cmp::Ordering::Less,
+            Ordering::Equal => Ordering::Less,
             _ => res,
         }
     }
