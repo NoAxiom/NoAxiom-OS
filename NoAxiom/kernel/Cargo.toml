@@ -65,3 +65,4 @@ async-trait = "0.1.50"
 nb = "1.0.0"
 volatile = "0.2"
 downcast-rs = { version = "1.2.0", default-features = false }
+array-init = "2.1.0"

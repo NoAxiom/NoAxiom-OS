@@ -10,12 +10,8 @@ endif
 FEATURES :=
 
 # feature flags
-
 # arch, multicore config is passed from ../makefile
-MULTICORE := 1
 SV39 := 1
-
-# platform
 VF2 :=
 RISCV_QEMU := 1
 ASYNC_FS := 
@@ -29,7 +25,7 @@ DEV :=
 SH := 
 RAMDISK :=
 
-ifneq ($(MULTICORE), )
+ifneq ($(MULTICORE_ARGS), )
 	FEATURES += multicore
 endif
 

@@ -60,18 +60,24 @@ asm: # build_kernel
 	@riscv64-unknown-elf-objdump -d $(KERNEL_ELF) > $(KERNEL_ELF).asm
 	@echo -e "Assembly saved to $(KERNEL_ELF).asm"
 
-MULTICORE_ARGS := 2 # ,cores=1,threads=1,sockets=2
+# NOTE THAT if you want to run in single core
+# you should export this as empty
+export MULTICORE_ARGS := 2
 
 QFLAGS := 
 QFLAGS += -m 128
 QFLAGS += -machine virt
 QFLAGS += -nographic
-QFLAGS += -smp $(MULTICORE_ARGS)
 QFLAGS += -kernel kernel-qemu
 QFLAGS += -device loader,file=$(KERNEL_BIN),addr=0x80200000
 QFLAGS += -drive file=$(FS_IMG),if=none,format=raw,id=x0
 QFLAGS += -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 
 # QFLAGS += -device virtio-net-device,netdev=net -netdev user,id=net
+
+ifneq ($(MULTICORE_ARGS),)
+	QFLAGS += -smp $(MULTICORE_ARGS)
+endif
+
 ifeq ($(BOARD), qemu-virt)
 	QFLAGS += -bios sbi-qemu
 endif

@@ -5,10 +5,7 @@ use crate::{
     cpu::get_hartid,
     device::init::device_init,
     driver::{log::log_init, sbi::hart_start},
-    entry::{
-        boot::_entry_other_hart,
-        init_proc::{schedule_spawn_all_apps, schedule_spawn_initproc},
-    },
+    entry::{boot::_entry_other_hart, init_proc::schedule_spawn_all_apps},
     fs::fs_init,
     mm::{bss::bss_init, frame::frame_init, hart_mm_init, heap::heap_init},
     platform::{
@@ -17,7 +14,7 @@ use crate::{
         plic::{init_plic, register_to_hart},
     },
     println, rust_main,
-    sched::task::spawn_ktask,
+    sched::utils::block_on,
     trap::trap_init,
 };
 
@@ -43,13 +40,6 @@ pub fn wake_other_hart(forbid_hart_id: usize) {
             }
         }
     }
-}
-
-pub async fn async_init() {
-    fs_init().await;
-    // schedule_spawn_all_apps();
-    wake_other_hart(get_hartid());
-    info!("[kernel] async init done");
 }
 
 #[no_mangle]
@@ -81,22 +71,24 @@ pub fn boot_hart_init(_: usize, dtb: usize) {
     hart_mm_init();
     trap_init();
 
-    // global resources: platform & device init
+    // global resources: fs init
     let platfrom_info = platform_info_from_dtb(dtb);
     platform_init(get_hartid(), dtb);
     init_plic(platfrom_info.plic.start + KERNEL_ADDR_OFFSET);
     device_init();
     register_to_hart();
+    block_on(fs_init());
+
+    // spawn init_proc and wake other harts
+    schedule_spawn_all_apps();
+    wake_other_hart(get_hartid());
 
     // main
-    spawn_ktask(async_init());
     println!("{}", NOAXIOM_BANNER);
     info!(
         "[first_init] entry init hart_id: {}, dtb_addr: {:#x}",
         get_hartid(),
         dtb as usize,
     );
-    // schedule_spawn_initproc();
-    schedule_spawn_all_apps();
     rust_main();
 }

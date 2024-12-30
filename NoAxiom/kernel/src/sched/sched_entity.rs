@@ -6,6 +6,7 @@ use core::cmp::Ordering;
 use crate::{
     constant::sched::{NICE_0_LOAD, SCHED_PRIO_TO_WEIGHT, SCHED_PRIO_TO_WMULT},
     sync::cell::SyncUnsafeCell,
+    task::Task,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Ord)]
@@ -26,6 +27,8 @@ impl PartialOrd for SchedVruntime {
     #[inline(always)]
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         let diff = (self.0 - other.0) as i64;
+        // Reversed order
+        // let diff = (other.0 - self.0) as i64;
         diff.partial_cmp(&0)
     }
 }
@@ -36,8 +39,7 @@ pub struct SchedPrio(pub isize);
 
 impl SchedPrio {
     #[inline(always)]
-    #[allow(unused)]
-    pub fn to_weight(&self) -> usize {
+    pub fn to_load_weight(&self) -> usize {
         SCHED_PRIO_TO_WEIGHT[(self.0 + 20) as usize]
     }
     #[inline(always)]
@@ -64,7 +66,11 @@ impl SchedEntityInner {
     }
     /// update vruntime by delta(ms)
     pub fn update_vruntime(&mut self, wall_time: usize) {
-        trace!("wall_time: {}, to_inv: {}", wall_time, self.prio.to_inv_weight());
+        trace!(
+            "wall_time: {}, to_inv: {}",
+            wall_time,
+            self.prio.to_inv_weight()
+        );
         self.vruntime
             .update((wall_time * NICE_0_LOAD * self.prio.to_inv_weight()) >> 32);
     }
@@ -94,6 +100,10 @@ impl SchedEntity {
     pub fn update_vruntime(&self, wall_time: usize) {
         self.inner_mut().update_vruntime(wall_time);
     }
+    #[inline(always)]
+    pub fn get_load(&self) -> usize {
+        self.inner().prio.to_load_weight()
+    }
 
     pub fn data_clone(&self) -> Self {
         Self {
@@ -108,4 +118,8 @@ impl SchedEntity {
             inner: self.inner.clone(),
         }
     }
+}
+
+pub struct SchedTaskInfo {
+    pub task: Arc<Task>,
 }

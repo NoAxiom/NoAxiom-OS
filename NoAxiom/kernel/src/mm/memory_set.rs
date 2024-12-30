@@ -351,7 +351,7 @@ impl MemorySet {
     /// and mark the new memory set as copy-on-write
     /// used in sys_fork
     pub fn clone_cow(&mut self) -> Self {
-        debug!("[clone_cow] start");
+        trace!("[clone_cow] start");
         let mut new_set = Self::new_with_kernel();
         let remap_cow = |vpn: VirtPageNum,
                          new_set: &mut MemorySet,
@@ -407,14 +407,14 @@ impl MemorySet {
         let area = &self.user_heap_area;
         let mut new_area = MapArea::from_another(area);
         for vpn in area.vpn_range {
-            warn!(
-                "vpn: {:#x}, range: [{:#x}, {:#x})",
+            trace!(
+                "[clone_cow] vpn: {:#x}, range: [{:#x}, {:#x})",
                 vpn.0,
                 area.vpn_range.start().0,
                 area.vpn_range.end().0
             );
             for it in area.frame_map.iter() {
-                warn!("frame_map: {:#x}", it.0 .0);
+                trace!("[clone_cow] frame_map: {:#x}", it.0 .0);
             }
             if let Some(frame_tracker) = area.frame_map.get(&vpn) {
                 remap_cow(vpn, &mut new_set, &mut new_area, frame_tracker);
@@ -442,7 +442,7 @@ impl MemorySet {
         let old_flags = pte.flags();
         let new_flags = old_flags.switch_to_rw();
         if frame_refcount(old_ppn) == 1 {
-            debug!("refcount == 1, set flags to RW");
+            trace!("refcount == 1, set flags to RW");
             self.page_table().set_flags(vpn, new_flags);
         } else {
             let frame = frame_alloc();
@@ -467,7 +467,7 @@ impl MemorySet {
             self.page_table()
                 .remap_cow(vpn, new_ppn, old_ppn, new_flags);
             sfence_vma_all();
-            debug!(
+            trace!(
                 "[realloc_cow] done!!! refcount: old: [{:#x}: {:#x}], new: [{:#x}: {:#x}]",
                 old_ppn.0,
                 frame_refcount(old_ppn),
