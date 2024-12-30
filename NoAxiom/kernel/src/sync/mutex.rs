@@ -12,9 +12,7 @@ use crate::{
 };
 
 pub type SpinLock<T> = kernel_sync::spin::SpinMutex<T, NoIrqLockAction>;
-pub type TicketMutex<T> = kernel_sync::ticket::TicketMutex<T, NoIrqLockAction>;
-pub type NoIrqSpinMutex<T> = kernel_sync::spin::SpinMutex<T, NoIrqLockAction>;
-pub type NoIrqTicketMutex<T> = kernel_sync::ticket::TicketMutex<T, NoIrqLockAction>;
+pub type TicketLock<T> = kernel_sync::ticket::TicketMutex<T, NoIrqLockAction>;
 
 #[derive(Debug, Default, Clone, Copy)]
 #[repr(align(64))]
