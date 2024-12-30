@@ -18,7 +18,7 @@ use crate::{
     },
     nix::clone_flags::CloneFlags,
     sched::sched_entity::SchedEntity,
-    sync::{cell::SyncUnsafeCell, mutex::SpinMutex},
+    sync::{cell::SyncUnsafeCell, mutex::SpinLock},
     task::taskid::tid_alloc,
     trap::TrapContext,
 };
@@ -57,11 +57,11 @@ pub struct Task {
 
     /// process control block ptr,
     /// also belongs to other threads
-    pcb: Arc<SpinMutex<ProcessInfo>>,
+    pcb: Arc<SpinLock<ProcessInfo>>,
 
     /// memory set for task
     /// it's a process resource as well
-    pub memory_set: Arc<SpinMutex<MemorySet>>,
+    pub memory_set: Arc<SpinLock<MemorySet>>,
 
     /// thread control block ptr
     thread: SyncUnsafeCell<ThreadInfo>,
@@ -214,11 +214,11 @@ impl Task {
         let task = Arc::new(Self {
             tid,
             tgid,
-            pcb: Arc::new(SpinMutex::new(ProcessInfo {
+            pcb: Arc::new(SpinLock::new(ProcessInfo {
                 children: Vec::new(),
                 parent: None,
             })),
-            memory_set: Arc::new(SpinMutex::new(memory_set)),
+            memory_set: Arc::new(SpinLock::new(memory_set)),
             thread: SyncUnsafeCell::new(ThreadInfo {
                 trap_context: TrapContext::app_init_cx(elf_entry, user_sp),
             }),
@@ -236,7 +236,7 @@ impl Task {
         let memory_set = if flags.contains(CloneFlags::VM) {
             self.memory_set.clone()
         } else {
-            let res = Arc::new(SpinMutex::new(self.memory_set.lock().clone_cow()));
+            let res = Arc::new(SpinLock::new(self.memory_set.lock().clone_cow()));
             unsafe { sfence_vma_all() };
             res
         };
@@ -272,7 +272,7 @@ impl Task {
             let task = Arc::new(Self {
                 tgid: Arc::new(AtomicUsize::new(new_tid.0)),
                 tid: new_tid,
-                pcb: Arc::new(SpinMutex::new(ProcessInfo {
+                pcb: Arc::new(SpinLock::new(ProcessInfo {
                     children: Vec::new(),
                     parent: Some(Arc::downgrade(self)),
                 })),

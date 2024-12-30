@@ -16,12 +16,12 @@ use crate::{
         probe::{ProbeInfo, PROBE},
         Driver,
     },
-    sync::mutex::SpinMutex,
     nix::result::Errno,
+    sync::mutex::SpinLock,
 };
 
 pub struct VirtIOBlockDriver {
-    driver: SpinMutex<VirtIOBlk<HalImpl, MmioTransport>>,
+    driver: SpinLock<VirtIOBlk<HalImpl, MmioTransport>>,
 }
 
 unsafe impl Send for VirtIOBlockDriver {}
@@ -86,7 +86,7 @@ impl VirtIOBlockDriver {
                 .expect("failed to create blk driver"),
         };
         Self {
-            driver: SpinMutex::new(blk),
+            driver: SpinLock::new(blk),
         }
     }
 
@@ -94,7 +94,7 @@ impl VirtIOBlockDriver {
         let blk = VirtIOBlk::<HalImpl, MmioTransport>::new(mmio_transport)
             .expect("failed to create blk driver");
         Self {
-            driver: SpinMutex::new(blk),
+            driver: SpinLock::new(blk),
         }
     }
 }

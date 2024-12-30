@@ -14,7 +14,7 @@ use super::{
     sched_entity::{SchedEntity, SchedTaskInfo},
     scheduler::{SchedLoadStats, Scheduler},
 };
-use crate::{config::arch::CPU_NUM, cpu::get_hartid, sync::mutex::SpinMutex};
+use crate::{config::arch::CPU_NUM, cpu::get_hartid, sync::mutex::SpinLock};
 
 pub struct TaskScheduleInfo {
     pub sched_entity: SchedEntity,
@@ -30,7 +30,7 @@ impl TaskScheduleInfo {
 }
 
 struct Runtime<T: Scheduler> {
-    pub scheduler: [SpinMutex<T>; CPU_NUM],
+    pub scheduler: [SpinLock<T>; CPU_NUM],
 }
 
 impl<T> Runtime<T>
@@ -39,7 +39,7 @@ where
 {
     pub fn new() -> Self {
         Self {
-            scheduler: array_init(|_| SpinMutex::new(T::default())),
+            scheduler: array_init(|_| SpinLock::new(T::default())),
         }
     }
     pub fn schedule(&self, runnable: Runnable<TaskScheduleInfo>, info: ScheduleInfo) {

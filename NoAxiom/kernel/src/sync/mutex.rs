@@ -11,8 +11,8 @@ use crate::{
     cpu::get_hartid,
 };
 
-pub type SpinMutex<T> = kernel_sync::spin::SpinMutex<T, IrqOffLockAction>;
-pub type TicketMutex<T> = kernel_sync::ticket::TicketMutex<T, IrqOffLockAction>;
+pub type SpinLock<T> = kernel_sync::spin::SpinMutex<T, NoIrqLockAction>;
+pub type TicketMutex<T> = kernel_sync::ticket::TicketMutex<T, NoIrqLockAction>;
 pub type NoIrqSpinMutex<T> = kernel_sync::spin::SpinMutex<T, NoIrqLockAction>;
 pub type NoIrqTicketMutex<T> = kernel_sync::ticket::TicketMutex<T, NoIrqLockAction>;
 

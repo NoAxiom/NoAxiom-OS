@@ -1,8 +1,8 @@
 use core::fmt::{self, Write};
 
-use crate::{driver::sbi::console_putchar, sync::mutex::SpinMutex};
+use crate::{driver::sbi::console_putchar, sync::mutex::SpinLock};
 
-static PRINT_MUTEX: SpinMutex<()> = SpinMutex::new(());
+static PRINT_MUTEX: SpinLock<()> = SpinLock::new(());
 struct Stdout;
 
 impl Write for Stdout {

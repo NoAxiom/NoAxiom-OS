@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
 
-use crate::sync::mutex::SpinMutex;
+use crate::sync::mutex::SpinLock;
 
 /// Task ID allocator
 struct IndexAllocator {
@@ -36,7 +36,7 @@ impl IndexAllocator {
     }
 }
 
-static TID_ALLOCATOR: SpinMutex<IndexAllocator> = SpinMutex::new(IndexAllocator::new());
+static TID_ALLOCATOR: SpinLock<IndexAllocator> = SpinLock::new(IndexAllocator::new());
 // static PID_ALLOCATOR: SpinMutex<IndexAllocator> =
 // SpinMutex::new(IndexAllocator::new());
 

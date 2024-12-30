@@ -18,13 +18,13 @@ use crate::{
         },
     },
     nix::{fs::InodeMode, result::Errno},
-    sync::mutex::SpinMutex,
+    sync::mutex::SpinLock,
     syscall::SyscallResult,
 };
 
 pub struct FAT32File {
     meta: FileMeta,
-    file: Arc<SpinMutex<FAT32FIleSystemFile>>,
+    file: Arc<SpinLock<FAT32FIleSystemFile>>,
 }
 
 impl FAT32File {
@@ -75,7 +75,7 @@ impl File for FAT32File {
 
 pub struct FAT32Directory {
     meta: FileMeta,
-    file: Arc<SpinMutex<FAT32FIleSystemDirectory>>,
+    file: Arc<SpinLock<FAT32FIleSystemDirectory>>,
 }
 
 impl FAT32Directory {

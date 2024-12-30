@@ -28,7 +28,7 @@ use crate::{
         permission::MapType,
     },
     nix::auxv::*,
-    sync::{cell::SyncUnsafeCell, mutex::SpinMutex},
+    sync::{cell::SyncUnsafeCell, mutex::SpinLock},
 };
 
 extern "C" {
@@ -44,8 +44,8 @@ extern "C" {
 }
 
 lazy_static! {
-    pub static ref KERNEL_SPACE: SpinMutex<MemorySet> =
-        SpinMutex::new(MemorySet::init_kernel_space());
+    pub static ref KERNEL_SPACE: SpinLock<MemorySet> =
+        SpinLock::new(MemorySet::init_kernel_space());
 }
 
 /// lazily initialized kernel space token
