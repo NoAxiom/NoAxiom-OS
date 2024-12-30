@@ -4,17 +4,17 @@ use alloc::{boxed::Box, string::String, sync::Arc, vec::Vec};
 use core::sync::atomic::AtomicUsize;
 
 use async_trait::async_trait;
-use kernel_sync::SpinMutex;
 
 use super::{dentry::Dentry, inode::Inode};
 use crate::{
     nix::{fs::FileFlags, result::Errno},
+    sync::mutex::SpinLock,
     syscall::SyscallResult,
 };
 
 pub struct FileMeta {
     /// File flags, may be modified by multiple tasks
-    flags: SpinMutex<FileFlags>,
+    flags: SpinLock<FileFlags>,
     /// The position of the file, may be modified by multiple tasks
     pos: AtomicUsize,
     /// Pointer to the Dentry
@@ -26,7 +26,7 @@ pub struct FileMeta {
 impl FileMeta {
     pub fn new(dent: Arc<dyn Dentry>, inode: Arc<dyn Inode>) -> Self {
         Self {
-            flags: SpinMutex::new(FileFlags::empty()),
+            flags: SpinLock::new(FileFlags::empty()),
             pos: AtomicUsize::new(0),
             dentry: dent,
             inode,

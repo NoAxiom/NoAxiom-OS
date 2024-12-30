@@ -69,7 +69,7 @@ pub struct Task {
     /// task exit code
     exit_code: AtomicIsize,
     // /// file descriptor
-    // fd: Arc<SpinMutex<FdTable>>,
+    // fd: Arc<SpinLock<FdTable>>,
 }
 
 /// user tasks

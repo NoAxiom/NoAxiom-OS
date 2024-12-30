@@ -37,8 +37,8 @@ impl IndexAllocator {
 }
 
 static TID_ALLOCATOR: SpinLock<IndexAllocator> = SpinLock::new(IndexAllocator::new());
-// static PID_ALLOCATOR: SpinMutex<IndexAllocator> =
-// SpinMutex::new(IndexAllocator::new());
+// static PID_ALLOCATOR: SpinLock<IndexAllocator> =
+// SpinLock::new(IndexAllocator::new());
 
 /// task id with auto dealloc
 pub struct TidTracer(pub usize);
