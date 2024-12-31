@@ -1,8 +1,10 @@
 //! spin mutex for riscv kernel
 
+use alloc::vec::Vec;
 use core::cell::{RefCell, RefMut};
 
 use kernel_sync::{ticket::TicketMutexGuard, LockAction};
+use spin::Mutex;
 
 use super::cell::SyncRefCell;
 use crate::{
@@ -13,6 +15,7 @@ use crate::{
 
 pub type SpinLock<T> = kernel_sync::spin::SpinMutex<T, NoIrqLockAction>;
 pub type TicketLock<T> = kernel_sync::ticket::TicketMutex<T, NoIrqLockAction>;
+pub type RwLock<T> = kernel_sync::rwlock::RwLock<T, NoIrqLockAction>;
 
 #[derive(Debug, Default, Clone, Copy)]
 #[repr(align(64))]

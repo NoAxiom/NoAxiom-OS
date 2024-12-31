@@ -6,17 +6,17 @@ use alloc::sync::Arc;
 use core::num::NonZeroUsize;
 
 use lru::LruCache;
-use spin::{Mutex, RwLock};
 
 use crate::{
     config::fs::{BLOCK_SIZE, MAX_LRU_CACHE_SIZE},
     device::block::BlockDevice,
+    sync::mutex::{RwLock, SpinLock},
 };
 
 /// async block cache for data struct `B` with LRU strategy  
 /// for either **one writer** or many readers
 pub struct AsyncBlockCache<B> {
-    cache: Mutex<LruCache<usize, Arc<RwLock<B>>>>, // todo: async_mutex ?
+    cache: SpinLock<LruCache<usize, Arc<RwLock<B>>>>, // todo: async_mutex ?
     block_device: Arc<dyn BlockDevice>,
 }
 
@@ -35,7 +35,7 @@ impl AsyncBlockCache<CacheData> {
     /// create a new `AsyncBlockCache` and clear the cache
     pub fn from(device: Arc<dyn BlockDevice>) -> Self {
         Self {
-            cache: Mutex::new(LruCache::new(
+            cache: SpinLock::new(LruCache::new(
                 NonZeroUsize::new(MAX_LRU_CACHE_SIZE).unwrap(),
             )),
             block_device: device,
