@@ -54,24 +54,14 @@ pub fn reverse<T: Clone>(vec: &Vec<T>) -> Vec<T> {
 }
 
 #[inline(always)]
-pub fn div_ceil(dividend: usize, divisor: usize) -> usize {
-    (dividend + divisor - 1) / divisor
-}
-
-#[inline(always)]
 pub fn align_up(addr: usize, align: usize) -> usize {
     (addr + align - 1) & !(align - 1)
 }
 
-pub fn get_string_from_ptr(ptr: &mut UserPtr<u8>) -> String {
-    let mut res = String::new();
-    loop {
-        let ch = *ptr.as_ref() as char;
-        if ch == '\0' {
-            break;
-        }
-        res.push(ch);
-        ptr.inc_and_check(1);
-    }
+pub fn get_string_from_ptr(ptr: &UserPtr<u8>) -> String {
+    let checker = |&c: &u8| c != 0;
+    let slice = unsafe { ptr.as_slice_while_unchecked(&checker) };
+    let res = String::from_utf8(Vec::from(slice)).unwrap();
+    trace!("get_string_from_ptr: {}", res);
     res
 }

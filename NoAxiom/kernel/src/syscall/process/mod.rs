@@ -43,13 +43,13 @@ impl Syscall<'_> {
     }
 
     pub async fn sys_exec(&mut self, path: usize, argv: usize, envp: usize) -> SyscallResult {
-        trace!("sys_exec");
-        let path = Path::new(get_string_from_ptr(&mut UserPtr::new(path)));
+        let path = Path::new(get_string_from_ptr(&UserPtr::new(path)));
+        info!("[sys_exec] path: {}", path.inner());
 
-        // let argv = UserPtr::<*const u8>::new(argv);
+        // let argv = UserPtr::<*const usize>::new(argv);
         let argv_vec = Vec::new();
 
-        // let envp = UserPtr::<*const u8>::new(envp);
+        // let envp = UserPtr::<*const usize>::new(envp);
         let envp_vec = Vec::new();
 
         self.task.exec(path, argv_vec, envp_vec).await;

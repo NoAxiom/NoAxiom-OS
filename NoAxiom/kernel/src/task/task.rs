@@ -8,20 +8,18 @@ use alloc::{
 use core::sync::atomic::{AtomicIsize, AtomicUsize, Ordering};
 
 use ksync::{cell::SyncUnsafeCell, mutex::SpinLock};
-use riscv::register::satp;
+use riscv::register::scause::Exception;
 
 use super::taskid::TidTracer;
 use crate::{
     fs::path::Path,
     mm::{
-        address::{PhysPageNum, VirtAddr},
-        memory_set::{self, ElfMemoryInfo, MemorySet},
-        page_table::translate_vpn_into_pte,
+        memory_set::{ElfMemoryInfo, MemorySet},
+        user_ptr::validate,
     },
     nix::{
         auxv::{AuxEntry, AT_EXECFN, AT_NULL, AT_RANDOM},
         clone_flags::CloneFlags,
-        result::Errno,
     },
     sched::sched_entity::SchedEntity,
     syscall::SyscallResult,
@@ -157,54 +155,9 @@ impl Task {
         }
     }
 
-    // TODO: add mmap check
-    /// # memory validate
-    /// Check if is the copy-on-write/lazy-alloc pages triggered the page fault.
-    ///
-    /// As for cow, clone pages for the writer(aka current task),
-    /// but should keep original page as cow since it might still be shared.
-    /// Note that if the reference count is one, there's no need to clone pages.
-    ///
-    /// As for lazy alloc, realloc pages for the task.
-    /// Associated pages: stack, heap, mmap
-    ///
-    /// Return value: true if successfully handled lazy alloc or copy-on-write;
-    ///               false if the page fault is not in any alloc area.
-    ///
-    /// usages: when any kernel allocation in user_space happens, call this fn;
-    /// when user pagefault happens, call this func to check allocation.
-    pub fn memory_validate(self: &Arc<Self>, addr: usize) -> SyscallResult {
+    pub fn memory_validate(self: &Arc<Self>, addr: usize, exception: Option<Exception>) -> SyscallResult {
         trace!("[memory_validate] check at addr: {:#x}", addr);
-        let mut memory_set = self.memory_set().lock();
-        let vpn = VirtAddr::from(addr).floor();
-        if let Some(pte) = memory_set.page_table().translate_vpn(vpn) {
-            let flags = pte.flags();
-            if flags.is_cow() {
-                info!(
-                    "[memory_validate] realloc COW at va: {:#x}, pte: {:#x}, flags: {:?}",
-                    addr,
-                    pte.0,
-                    pte.flags()
-                );
-                memory_set.realloc_cow(vpn, pte);
-                Ok(0)
-            } else {
-                Err(Errno::EFAULT)
-            }
-        } else {
-            if memory_set.user_stack_area.vpn_range.is_in_range(vpn) {
-                info!("[memory_validate] realloc stack");
-                memory_set.realloc_stack(vpn);
-                Ok(0)
-            } else if memory_set.user_heap_area.vpn_range.is_in_range(vpn) {
-                info!("[memory_validate] realloc heap");
-                memory_set.realloc_heap(vpn);
-                Ok(0)
-            } else {
-                error!("page fault at addr: {:#x}, but not in any alloc area", addr);
-                Err(Errno::EFAULT)
-            }
-        }
+        validate(addr, &mut self.memory_set().lock(), exception)
     }
 
     /// trap context
