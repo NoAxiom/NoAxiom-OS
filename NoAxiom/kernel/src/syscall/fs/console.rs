@@ -1,4 +1,9 @@
-use crate::{cpu::get_hartid, print, syscall::{Syscall, SyscallResult}};
+use crate::{
+    cpu::get_hartid,
+    mm::user_ptr::UserPtr,
+    print,
+    syscall::{Syscall, SyscallResult},
+};
 
 impl Syscall<'_> {
     // todo: complete this
@@ -7,16 +12,16 @@ impl Syscall<'_> {
     }
 
     // todo: add fd
-    pub async fn sys_write(&self, _fd: usize, buf: usize, len: usize) -> SyscallResult {
+    pub async fn sys_write(&self, fd: usize, buf: usize, len: usize) -> SyscallResult {
         trace!(
             "sys_write: fd: {}, buf: {:#x}, len: {}, hart: {}",
-            _fd,
+            fd,
             buf,
             len,
             get_hartid()
         );
-        let buf = unsafe { core::slice::from_raw_parts_mut(buf as *mut u8, len) };
-        let s = core::str::from_utf8(buf).unwrap();
+        let buf = UserPtr::<u8>::new(buf);
+        let s = core::str::from_utf8(buf.as_slice_mut(len)).unwrap();
         print!("{}", s);
         Ok(0)
     }

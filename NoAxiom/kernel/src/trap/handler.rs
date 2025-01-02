@@ -61,10 +61,9 @@ pub fn kernel_trap_handler() {
             | Exception::StorePageFault
             | Exception::InstructionPageFault => {
                 if let Some(task) = current_cpu().task.as_mut() {
-                    if task.memory_validate(stval) {
-                        trace!("[memory_validate] success");
-                    } else {
-                        kernel_panic();
+                    match task.memory_validate(stval) {
+                        Ok(_) => trace!("[memory_validate] success in kernel_trap_handler"),
+                        Err(_) => kernel_panic(),
                     }
                 } else {
                     kernel_panic();
@@ -148,13 +147,17 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
             // page fault: try to handle copy-on-write, or exit the task
             Exception::LoadPageFault
             | Exception::StorePageFault
-            | Exception::InstructionPageFault => {
-                if task.memory_validate(stval) {
-                    trace!("[memory_validate] success");
-                } else {
-                    user_exit();
+            | Exception::InstructionPageFault => match task.memory_validate(stval) {
+                Ok(_) => trace!("[memory_validate] success in user_trap_handler"),
+                Err(_) => {
+                    error!(
+                        "[user_trap] page fault at hart: {}, tid: {}",
+                        get_hartid(),
+                        task.tid()
+                    );
+                    user_exit()
                 }
-            }
+            },
             _ => {
                 user_exit();
             }

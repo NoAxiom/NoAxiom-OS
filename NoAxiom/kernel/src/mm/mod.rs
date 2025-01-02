@@ -9,7 +9,7 @@ pub mod memory_set;
 pub mod page_table;
 pub mod permission;
 pub mod pte;
-pub mod utils;
+pub mod user_ptr;
 
 #[inline(always)]
 pub fn hart_mm_init() {

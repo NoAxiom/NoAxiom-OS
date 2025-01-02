@@ -3,7 +3,6 @@
 use core::cell::RefMut;
 
 use arch::interrupt::{disable_global_interrupt, enable_global_interrupt, is_interrupt_enabled};
-use kernel_sync::LockAction;
 use kutils::get_hartid;
 
 use super::cell::SyncRefCell;
@@ -12,6 +11,11 @@ pub type SpinLock<T> = kernel_sync::spin::SpinMutex<T, NoIrqLockAction>;
 pub type SpinLockGuard<'a, T> = kernel_sync::spin::SpinMutexGuard<'a, T, NoIrqLockAction>;
 pub type TicketLock<T> = kernel_sync::ticket::TicketMutex<T, NoIrqLockAction>;
 pub type RwLock<T> = kernel_sync::rwlock::RwLock<T, NoIrqLockAction>;
+
+pub type RawSpinLock<T, L> = kernel_sync::spin::SpinMutex<T, L>;
+pub type RawSpinLockGuard<'a, T, L> = kernel_sync::spin::SpinMutexGuard<'a, T, L>;
+
+pub use kernel_sync::LockAction;
 
 #[derive(Debug, Default, Clone, Copy)]
 #[repr(align(64))]

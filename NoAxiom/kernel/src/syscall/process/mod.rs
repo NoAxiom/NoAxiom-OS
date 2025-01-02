@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 
 use super::{Syscall, SyscallResult};
 use crate::{
-    fs::path::Path, nix::clone_flags::CloneFlags, sched::task::spawn_utask,
+    fs::path::Path, mm::user_ptr::UserPtr, nix::clone_flags::CloneFlags, sched::task::spawn_utask,
     utils::get_string_from_ptr,
 };
 
@@ -24,7 +24,11 @@ impl Syscall<'_> {
     ) -> SyscallResult {
         trace!(
             "[sys_fork] flags: {:x} stack: {:?} ptid: {:?} tls: {:?} ctid: {:?}",
-            flags, stack, ptid, tls, ctid
+            flags,
+            stack,
+            ptid,
+            tls,
+            ctid
         );
         let flags = CloneFlags::from_bits_truncate(flags);
         let task = self.task.fork(flags);
@@ -40,12 +44,12 @@ impl Syscall<'_> {
 
     pub async fn sys_exec(&mut self, path: usize, argv: usize, envp: usize) -> SyscallResult {
         trace!("sys_exec");
-        let path = Path::new(get_string_from_ptr(path as *const u8));
+        let path = Path::new(get_string_from_ptr(&mut UserPtr::new(path)));
 
-        let argv = argv as *const *const u8;
+        // let argv = UserPtr::<*const u8>::new(argv);
         let argv_vec = Vec::new();
 
-        let envp = envp as *const *const u8;
+        // let envp = UserPtr::<*const u8>::new(envp);
         let envp_vec = Vec::new();
 
         self.task.exec(path, argv_vec, envp_vec).await;

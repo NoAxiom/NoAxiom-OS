@@ -1,5 +1,5 @@
 use super::{Syscall, SyscallResult};
-use crate::{nix::tms::TMS, sched::utils::yield_now};
+use crate::{mm::user_ptr::UserPtr, nix::tms::TMS, sched::utils::yield_now};
 
 impl Syscall<'_> {
     /// yield current task
@@ -10,7 +10,7 @@ impl Syscall<'_> {
     }
 
     pub fn sys_times(tms: usize) -> SyscallResult {
-        let tms = tms as *mut TMS;
+        let tms = UserPtr::<TMS>::new(tms);
         todo!()
     }
 }

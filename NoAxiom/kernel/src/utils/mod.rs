@@ -2,7 +2,10 @@
 
 use alloc::{string::String, vec::Vec};
 
-use crate::config::mm::{KERNEL_ADDR_OFFSET, KERNEL_PAGENUM_MASK};
+use crate::{
+    config::mm::{KERNEL_ADDR_OFFSET, KERNEL_PAGENUM_MASK},
+    mm::user_ptr::UserPtr,
+};
 
 /// signed extend for number without 64/32 bits width
 #[inline(always)]
@@ -60,16 +63,15 @@ pub fn align_up(addr: usize, align: usize) -> usize {
     (addr + align - 1) & !(align - 1)
 }
 
-pub fn get_string_from_ptr(ptr: *const u8) -> String {
-    let mut ptr = ptr as usize;
+pub fn get_string_from_ptr(ptr: &mut UserPtr<u8>) -> String {
     let mut res = String::new();
     loop {
-        let ch = unsafe { *(ptr as *const u8) } as char;
+        let ch = *ptr.as_ref() as char;
         if ch == '\0' {
             break;
         }
         res.push(ch);
-        ptr += 1;
+        ptr.inc_and_check(1);
     }
     res
 }
