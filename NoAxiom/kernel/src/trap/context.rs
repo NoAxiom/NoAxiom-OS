@@ -13,9 +13,52 @@
 //! X10 ~ X17	       a0 ~ a7   用于函数调用，被调用函数需要保存的数据
 //! X18 ~ X27	       s2 ~ s11  用于函数调用，传递参数和返回值
 
+use core::arch::asm;
+
 use riscv::register::sstatus::SPP;
 
-use crate::{arch::regs::Sstatus, constant::register::*};
+use crate::constant::register::*;
+
+/// virtual sstatus register, it's not a real register
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone)]
+pub struct Sstatus(pub usize);
+
+impl Sstatus {
+    pub fn read() -> Self {
+        let val: usize;
+        unsafe {
+            asm!("csrr {},sstatus", out(reg)val);
+        }
+        Sstatus(val)
+    }
+    pub fn sum() -> usize {
+        (Self::read().0 >> 18) & 1
+    }
+    pub fn set_value(&mut self, val: usize) {
+        self.0 = val;
+    }
+    pub fn set_spp(&mut self, spp: SPP) {
+        self.0 = self.0 & !(1 << 8) | ((spp as usize) << 8);
+    }
+    pub fn spp(&self) -> SPP {
+        let v = (self.0 >> 8) & 1;
+        if v == 1 {
+            SPP::Supervisor
+        } else {
+            SPP::User
+        }
+    }
+    pub fn set_spie(&mut self) {
+        self.0 |= 1 << 5;
+    }
+    pub fn sie(&self) -> bool {
+        (self.0 & (1 << 1)) != 0
+    }
+    pub fn set_sie(&mut self, value: bool) {
+        self.0 = self.0 & !(1 << 1) | ((value as usize) << 1);
+    }
+}
 
 /// Trap Context
 /// save registers when trap occurs

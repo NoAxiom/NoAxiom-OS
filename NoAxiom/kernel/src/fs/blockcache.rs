@@ -5,12 +5,12 @@
 use alloc::sync::Arc;
 use core::num::NonZeroUsize;
 
+use ksync::mutex::{RwLock, SpinLock};
 use lru::LruCache;
 
 use crate::{
     config::fs::{BLOCK_SIZE, MAX_LRU_CACHE_SIZE},
     device::block::BlockDevice,
-    sync::mutex::{RwLock, SpinLock},
 };
 
 /// async block cache for data struct `B` with LRU strategy  

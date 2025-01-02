@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
 
-use crate::sync::mutex::SpinLock;
+use ksync::mutex::SpinLock;
 
 /// Task ID allocator
 struct IndexAllocator {

@@ -1,12 +1,11 @@
 use alloc::sync::Arc;
 
+use arch::interrupt::disable_external_interrupt;
 use basic::{dentry::Dentry, filesystem::FileSystem};
 use impls::fat32::filesystem::FAT32FIleSystem;
-use spin::Once;
+use ksync::Once;
 
-use crate::{
-    arch::interrupt::disable_external_interrupt, device::block::BlockDevice, nix::fs::MountFlags,
-};
+use crate::{device::block::BlockDevice, nix::fs::MountFlags};
 pub mod basic;
 mod impls;
 
@@ -20,10 +19,10 @@ pub fn chosen_device() -> Arc<dyn BlockDevice> {
     let device;
     #[cfg(feature = "async_fs")]
     {
-        use crate::{
-            arch::interrupt::{enable_external_interrupt, enable_global_interrupt},
-            driver::async_virtio_driver::virtio_mm::VIRTIO_BLOCK,
-        };
+        use arch::interrupt::{enable_external_interrupt, enable_global_interrupt};
+
+        use crate::driver::async_virtio_driver::virtio_mm::VIRTIO_BLOCK;
+
         info!("async_fs init");
         // enable_global_interrupt();
         enable_external_interrupt();

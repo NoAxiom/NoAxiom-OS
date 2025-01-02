@@ -1,6 +1,7 @@
 use alloc::{boxed::Box, sync::Arc, vec::Vec};
 
 use async_trait::async_trait;
+use ksync::mutex::SpinLock;
 
 use super::{
     dentry::FAT32Dentry,
@@ -18,7 +19,6 @@ use crate::{
         },
     },
     nix::{fs::InodeMode, result::Errno},
-    sync::mutex::SpinLock,
     syscall::SyscallResult,
 };
 

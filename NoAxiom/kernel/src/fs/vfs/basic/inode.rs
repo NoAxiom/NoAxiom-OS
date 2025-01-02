@@ -1,14 +1,12 @@
 use alloc::{string::String, sync::Arc};
 
 use downcast_rs::{impl_downcast, DowncastSync};
+use ksync::mutex::SpinLock;
 
 use super::{file::File, superblock::SuperBlock};
-use crate::{
-    nix::{
-        fs::{InodeMode, Stat},
-        result::Errno,
-    },
-    sync::mutex::SpinLock,
+use crate::nix::{
+    fs::{InodeMode, Stat},
+    result::Errno,
 };
 
 lazy_static::lazy_static! {

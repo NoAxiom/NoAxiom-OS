@@ -5,12 +5,12 @@ use alloc::{
 };
 use core::fmt::{self, Debug, Formatter};
 
+use ksync::mutex::SpinLock;
 use lazy_static::lazy_static;
 
 use super::address::PhysPageNum;
 use crate::{
-    config::mm::KERNEL_PHYS_MEMORY_END, mm::address::PhysAddr, println, sync::mutex::SpinLock,
-    utils::kernel_va_to_pa,
+    config::mm::KERNEL_PHYS_MEMORY_END, mm::address::PhysAddr, println, utils::kernel_va_to_pa,
 };
 
 // pub fn frame_strong_count(ppn: PhysPageNum) -> usize {

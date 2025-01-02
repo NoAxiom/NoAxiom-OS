@@ -1,5 +1,6 @@
+use arch::interrupt::enable_user_memory_access;
+
 use crate::{
-    arch::interrupt::enable_user_memory_access,
     config::{arch::CPU_NUM, mm::KERNEL_ADDR_OFFSET},
     constant::banner::NOAXIOM_BANNER,
     cpu::get_hartid,

@@ -4,7 +4,7 @@ pub mod qemu_riscv;
 use alloc::sync::Arc;
 
 use base_riscv::BaseRISCV;
-use spin::Once;
+use ksync::Once;
 
 use crate::platform::base_riscv::platforminfo::PlatformInfo;
 

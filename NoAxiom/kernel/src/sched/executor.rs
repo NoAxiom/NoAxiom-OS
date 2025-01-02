@@ -7,6 +7,7 @@ use core::future::Future;
 
 use array_init::array_init;
 use async_task::{Builder, Runnable, ScheduleInfo, WithInfo};
+use ksync::mutex::SpinLock;
 use lazy_static::lazy_static;
 
 use super::{
@@ -14,7 +15,7 @@ use super::{
     sched_entity::{SchedEntity, SchedTaskInfo},
     scheduler::{SchedLoadStats, Scheduler},
 };
-use crate::{config::arch::CPU_NUM, cpu::get_hartid, sync::mutex::SpinLock};
+use crate::{config::arch::CPU_NUM, cpu::get_hartid};
 
 pub struct TaskScheduleInfo {
     pub sched_entity: SchedEntity,

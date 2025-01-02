@@ -4,11 +4,10 @@ use alloc::{
     sync::{Arc, Weak},
 };
 
+use ksync::mutex::SpinLock;
+
 use super::{file::File, inode::Inode, superblock::SuperBlock};
-use crate::{
-    nix::{fs::InodeMode, result::Errno},
-    sync::mutex::SpinLock,
-};
+use crate::nix::{fs::InodeMode, result::Errno};
 
 pub struct DentryMeta {
     // todo: dentry states

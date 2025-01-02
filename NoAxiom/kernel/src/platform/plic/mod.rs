@@ -7,7 +7,7 @@ extern crate alloc;
 use config::arch::CPU_NUM;
 // use device_interface::DeviceBase;
 use plic::{Mode, PLIC};
-use spin::Once;
+use ksync::Once;
 
 // use crate::{cpu::get_hartid, device::Device};
 

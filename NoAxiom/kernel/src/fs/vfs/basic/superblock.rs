@@ -1,6 +1,6 @@
 use alloc::sync::{Arc, Weak};
 
-use spin::Once;
+use ksync::Once;
 
 use super::{dentry::Dentry, filesystem::FileSystem};
 use crate::device::block::BlockDevice;

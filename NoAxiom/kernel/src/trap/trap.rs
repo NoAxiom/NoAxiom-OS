@@ -1,18 +1,14 @@
 use alloc::sync::Arc;
 use core::arch::global_asm;
 
+use arch::interrupt::{enable_external_interrupt, enable_stimer_interrupt, is_interrupt_enabled};
 use riscv::register::{
     sstatus,
     stvec::{self, TrapMode},
 };
 
 use super::context::TrapContext;
-use crate::{
-    arch::interrupt::{enable_external_interrupt, enable_stimer_interrupt, is_interrupt_enabled},
-    println,
-    task::Task,
-    utils::current_pc,
-};
+use crate::{println, task::Task, utils::current_pc};
 
 global_asm!(include_str!("./trap.S"));
 extern "C" {

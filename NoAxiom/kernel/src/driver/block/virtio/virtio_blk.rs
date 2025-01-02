@@ -3,6 +3,7 @@
 use alloc::vec::Vec;
 use core::ptr::NonNull;
 
+use ksync::mutex::SpinLock;
 use virtio_drivers::{
     device::blk::VirtIOBlk,
     transport::mmio::{MmioTransport, VirtIOHeader},
@@ -17,7 +18,6 @@ use crate::{
         Driver,
     },
     nix::result::Errno,
-    sync::mutex::SpinLock,
 };
 
 pub struct VirtIOBlockDriver {

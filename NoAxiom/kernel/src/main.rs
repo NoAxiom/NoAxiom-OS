@@ -15,14 +15,11 @@
 // #![feature(custom_mir)]
 // #![feature(core_intrinsics)]
 
-use arch::interrupt::is_external_interrupt_enabled;
-
 #[macro_use]
 extern crate alloc;
 #[macro_use]
 extern crate log;
 
-mod arch;
 mod config;
 mod constant;
 mod cpu;
@@ -35,7 +32,6 @@ mod nix;
 mod panic;
 mod platform;
 mod sched;
-mod sync;
 mod syscall;
 mod task;
 mod time;
@@ -50,10 +46,6 @@ core::arch::global_asm!(include_str!("link_apps.S"));
 pub fn rust_main() {
     trace!("token {:#x}", crate::mm::page_table::current_token());
     info!("[kernel] hart id {} has been booted", cpu::get_hartid());
-    info!(
-        "[kernel] interrupt status: {}",
-        is_external_interrupt_enabled()
-    );
     loop {
         sched::executor::run();
     }

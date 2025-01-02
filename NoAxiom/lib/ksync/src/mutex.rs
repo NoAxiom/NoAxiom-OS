@@ -1,17 +1,12 @@
 //! spin mutex for riscv kernel
 
-use alloc::vec::Vec;
-use core::cell::{RefCell, RefMut};
+use core::cell::RefMut;
 
-use kernel_sync::{ticket::TicketMutexGuard, LockAction};
-use spin::Mutex;
+use arch::interrupt::{disable_global_interrupt, enable_global_interrupt, is_interrupt_enabled};
+use kernel_sync::LockAction;
+use kutils::get_hartid;
 
 use super::cell::SyncRefCell;
-use crate::{
-    arch::interrupt::{disable_global_interrupt, enable_global_interrupt, is_interrupt_enabled},
-    config::arch::CPU_NUM,
-    cpu::get_hartid,
-};
 
 pub type SpinLock<T> = kernel_sync::spin::SpinMutex<T, NoIrqLockAction>;
 pub type TicketLock<T> = kernel_sync::ticket::TicketMutex<T, NoIrqLockAction>;
@@ -33,6 +28,7 @@ impl MutexTracer {
 }
 
 #[allow(clippy::declare_interior_mutable_const)]
+const CPU_NUM: usize = 8; // FIXME: use extern const to config cpu_num
 const DEFAULT_CPU: SyncRefCell<MutexTracer> = SyncRefCell::new(MutexTracer::new());
 static HART_MUTEX_TRACERS: [SyncRefCell<MutexTracer>; CPU_NUM] = [DEFAULT_CPU; CPU_NUM];
 fn current_mutex_tracer() -> RefMut<'static, MutexTracer> {

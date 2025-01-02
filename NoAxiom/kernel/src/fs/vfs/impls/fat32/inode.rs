@@ -1,5 +1,7 @@
 use alloc::sync::Arc;
 
+use ksync::mutex::SpinLock;
+
 use crate::{
     fs::{
         fat32::{
@@ -12,7 +14,6 @@ use crate::{
         },
     },
     nix::fs::InodeMode,
-    sync::mutex::SpinLock,
 };
 
 pub struct FAT32FileInode {

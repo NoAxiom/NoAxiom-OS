@@ -15,7 +15,8 @@ mod virtio_drivers2;
 use alloc::{fmt::Debug, sync::Arc, vec::Vec};
 
 use block::BlockDriver;
-use spin::{Lazy, Mutex};
+use ksync::Lazy;
+use spin::Mutex;
 
 use crate::{device::IdTable, nix::result::Errno};
 /// @brief: Driver error

@@ -3,9 +3,10 @@
 use alloc::sync::Arc;
 use core::cmp::Ordering;
 
+use ksync::cell::SyncUnsafeCell;
+
 use crate::{
     constant::sched::{NICE_0_LOAD, SCHED_PRIO_TO_WEIGHT, SCHED_PRIO_TO_WMULT},
-    sync::cell::SyncUnsafeCell,
     task::Task,
 };
 

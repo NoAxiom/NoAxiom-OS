@@ -6,7 +6,7 @@ use alloc::{
 use core::ops::Range;
 
 use fdt::{standard_nodes::Compatible, Fdt};
-use spin::Once;
+use ksync::Once;
 
 use crate::{platform, println};
 

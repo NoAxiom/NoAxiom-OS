@@ -1,7 +1,7 @@
 pub mod virtio;
 use alloc::sync::Arc;
 
-use spin::Once;
+use ksync::Once;
 
 use crate::device::block::virtio::virtio as Virtio;
 

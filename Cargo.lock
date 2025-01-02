@@ -21,6 +21,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "611cc2ae7d2e242c457e4be7f97036b8ad9ca152b499f53faf99b1ed8fc2553f"
 
 [[package]]
+name = "arch"
+version = "0.1.0"
+dependencies = [
+ "riscv",
+]
+
+[[package]]
 name = "array-init"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -235,6 +242,7 @@ dependencies = [
 name = "kernel"
 version = "0.1.0"
 dependencies = [
+ "arch",
  "array-init",
  "async-task",
  "async-trait",
@@ -245,7 +253,8 @@ dependencies = [
  "downcast-rs",
  "fdt",
  "hashbrown 0.14.5",
- "kernel-sync",
+ "ksync",
+ "kutils",
  "lazy_static",
  "libc",
  "log",
@@ -260,7 +269,6 @@ dependencies = [
  "ringbuffer",
  "riscv",
  "smoltcp",
- "spin",
  "thiserror-core",
  "uart16550",
  "uart8250",
@@ -278,11 +286,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "ksync"
+version = "0.1.0"
+dependencies = [
+ "arch",
+ "kernel-sync",
+ "kutils",
+ "spin",
+]
+
+[[package]]
 name = "ktest"
 version = "0.1.0"
 dependencies = [
  "userlib",
 ]
+
+[[package]]
+name = "kutils"
+version = "0.1.0"
 
 [[package]]
 name = "lazy_static"

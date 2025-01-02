@@ -4,6 +4,7 @@ use core::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
+use ksync::{cell::SyncUnsafeCell, mutex::SpinLock};
 use lazy_static::lazy_static;
 use riscv::{asm::sfence_vma_all, register::satp};
 
@@ -28,7 +29,6 @@ use crate::{
         permission::MapType,
     },
     nix::auxv::*,
-    sync::{cell::SyncUnsafeCell, mutex::SpinLock},
 };
 
 extern "C" {
@@ -175,7 +175,7 @@ impl MemorySet {
                 map_permission!(R, W)
             );
         }
-        trace!("[memory_set] sp: {:#x}", crate::arch::regs::get_sp());
+        // trace!("[memory_set] sp: {:#x}", crate::arch::regs::get_sp());
         info!("[kernel] space initialized");
         info!(
             "[kernel].text [{:#x}, {:#x})",

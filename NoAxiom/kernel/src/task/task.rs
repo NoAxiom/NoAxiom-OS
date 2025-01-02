@@ -7,6 +7,7 @@ use alloc::{
 };
 use core::sync::atomic::{AtomicIsize, AtomicUsize, Ordering};
 
+use ksync::{cell::SyncUnsafeCell, mutex::SpinLock};
 use riscv::asm::sfence_vma_all;
 
 use super::taskid::TidTracer;
@@ -21,7 +22,6 @@ use crate::{
         clone_flags::CloneFlags,
     },
     sched::sched_entity::SchedEntity,
-    sync::{cell::SyncUnsafeCell, mutex::SpinLock},
     task::taskid::tid_alloc,
     trap::TrapContext,
 };

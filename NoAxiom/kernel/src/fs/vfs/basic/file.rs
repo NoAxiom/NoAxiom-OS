@@ -4,11 +4,11 @@ use alloc::{boxed::Box, string::String, sync::Arc, vec::Vec};
 use core::sync::atomic::AtomicUsize;
 
 use async_trait::async_trait;
+use ksync::mutex::SpinLock;
 
 use super::{dentry::Dentry, inode::Inode};
 use crate::{
     nix::{fs::FileFlags, result::Errno},
-    sync::mutex::SpinLock,
     syscall::SyscallResult,
 };
 

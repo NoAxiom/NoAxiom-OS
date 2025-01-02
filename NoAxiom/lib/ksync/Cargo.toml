@@ -1,0 +1,10 @@
+[package]
+name = "ksync"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+spin = "0.9"
+kernel-sync = { git = "https://github.com/os-module/kernel-sync.git" }
+kutils = { path = "../kutils" }
+arch = { path = "../arch" }

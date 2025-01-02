@@ -1,8 +1,10 @@
 use alloc::sync::Arc;
 
+use ksync::cell::SyncUnsafeCell;
+
 use crate::{
-    config::arch::CPU_NUM, mm::memory_set::kernel_space_activate, sync::cell::SyncUnsafeCell,
-    task::Task, time::timer::set_next_trigger,
+    config::arch::CPU_NUM, mm::memory_set::kernel_space_activate, task::Task,
+    time::timer::set_next_trigger,
 };
 
 #[inline(always)]
@@ -38,16 +40,3 @@ pub static mut CPUS: [SyncUnsafeCell<Cpu>; CPU_NUM] = [DEFAULT_CPU; CPU_NUM];
 pub fn current_cpu() -> &'static mut Cpu {
     unsafe { &mut CPUS[get_hartid()] }.get_mut()
 }
-
-// TODO: add mm
-// pub fn init(hart_id: usize) {
-//     // debug!("start to init hart {}...", hart_id);
-//     let hart = get_current_processor();
-//     hart.id = hart_id;
-//     let sp = get_sp();
-//     println!("[kernel][hart{}] set_hart_stack: sp {:#x}", hart.id, sp);
-//     // hart.set_stack((sp & !(PAGE_SIZE - 1)) + PAGE_SIZE);
-//     unsafe {
-//         sstatus::set_fs(FS::Initial);
-//     }
-// }

@@ -7,15 +7,15 @@ use core::{
     task::{Poll, Waker},
 };
 
+use ksync::{mutex::SpinLock, Once};
 use log::{info, warn};
 use ringbuffer::RingBuffer;
-use spin::Once;
 
 use super::{CharDevice, Device};
 use crate::{
     device::{ADevResult, DeviceType},
     driver::uart::UartDriver,
-    sync::mutex::SpinLock, nix::result::Errno,
+    nix::result::Errno,
 };
 
 pub static UART_DEVICE: Once<Arc<Serial>> = Once::new();
