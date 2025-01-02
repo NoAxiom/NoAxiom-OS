@@ -31,12 +31,15 @@ use core::{
 };
 
 use bitflags::bitflags;
-use spin::Mutex;
+// use spin::Mutex;
 use virtio_mm::virtio_phys_to_virt;
 use volatile::Volatile;
 
 use super::{config::*, mmio::VirtIOHeader, queue::VirtQueue, util::AsBuf, *};
 use crate::{driver::event::Event, println};
+
+type Mutex<T> = ksync::mutex::SpinLock<T>;
+// type MutexGuard<'a, T> = ksync::mutex::SpinLockGuard<'a, T>;
 
 /// 块设备读写返回的`Future`
 ///

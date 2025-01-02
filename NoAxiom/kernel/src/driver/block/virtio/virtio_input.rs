@@ -1,11 +1,10 @@
 use alloc::collections::VecDeque;
 use core::any::Any;
 
-use spin::Mutex;
-
+// use spin::Mutex;
 use crate::driver::virtio_drivers2::{input::VirtIOInput, VirtIOHeader};
 
-// use crate::task::current_task;
+type Mutex<T> = ksync::mutex::SpinLock<T>;
 
 pub trait InputDevice: Send + Sync + Any {
     fn read_event(&self) -> u64;

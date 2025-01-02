@@ -4,7 +4,12 @@ use alloc::{
 };
 
 use async_trait::async_trait;
-use spin::{Mutex, MutexGuard};
+use ksync::mutex::SpinLock;
+
+// use spin::{Mutex, MutexGuard};
+
+type Mutex<T> = SpinLock<T>;
+type MutexGuard<'a, T> = ksync::mutex::SpinLockGuard<'a, T>;
 
 use super::BlockDevice;
 use crate::{

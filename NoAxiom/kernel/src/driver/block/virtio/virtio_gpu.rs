@@ -1,6 +1,6 @@
 use core::any::Any;
 
-use spin::Mutex;
+type Mutex<T> = ksync::mutex::SpinLock<T>;
 
 use crate::{
     config::mm::KERNEL_ADDR_OFFSET,

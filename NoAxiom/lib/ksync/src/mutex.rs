@@ -9,6 +9,7 @@ use kutils::get_hartid;
 use super::cell::SyncRefCell;
 
 pub type SpinLock<T> = kernel_sync::spin::SpinMutex<T, NoIrqLockAction>;
+pub type SpinLockGuard<'a, T> = kernel_sync::spin::SpinMutexGuard<'a, T, NoIrqLockAction>;
 pub type TicketLock<T> = kernel_sync::ticket::TicketMutex<T, NoIrqLockAction>;
 pub type RwLock<T> = kernel_sync::rwlock::RwLock<T, NoIrqLockAction>;
 

@@ -3,8 +3,8 @@ use alloc::{sync::Arc, vec::Vec};
 
 use async_blk::VirtIOAsyncBlock;
 use lazy_static::*;
-use spin::Mutex;
 
+// use spin::Mutex;
 use super::dma::VirtualAddress;
 use crate::{
     driver::async_virtio_driver::dma::PhysicalAddress,
@@ -18,6 +18,9 @@ use crate::{
     utils::{kernel_pa_to_va, kernel_va_to_pa},
 };
 pub mod async_blk;
+
+type Mutex<T> = ksync::mutex::SpinLock<T>;
+// type MutexGuard<'a, T> = ksync::mutex::SpinLockGuard<'a, T>;
 
 lazy_static! {
     static ref QUEUE_FRAMES: Mutex<Vec<FrameTracker>> = Mutex::new(Vec::new());

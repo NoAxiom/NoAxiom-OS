@@ -4,9 +4,13 @@
 use alloc::vec::Vec;
 use core::ptr::NonNull;
 
+use ksync::mutex::SpinLock;
 use lazy_static::lazy_static;
-use spin::Mutex;
+// use spin::Mutex;
 use virtio_drivers::{BufferDirection, Hal, PhysAddr as VirtioPhysAddr};
+
+type Mutex<T> = ksync::mutex::SpinLock<T>;
+// type MutexGuard<'a, T> = ksync::mutex::SpinLockGuard<'a, T>;
 
 use crate::{
     config::mm::KERNEL_ADDR_OFFSET,
@@ -17,7 +21,6 @@ use crate::{
         page_table::PageTable,
     },
     println,
-    sync::mutex::SpinLock,
     utils::{kernel_pa_to_va, kernel_va_to_pa},
 };
 

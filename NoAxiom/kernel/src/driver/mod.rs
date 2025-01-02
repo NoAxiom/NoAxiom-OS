@@ -16,7 +16,9 @@ use alloc::{fmt::Debug, sync::Arc, vec::Vec};
 
 use block::BlockDriver;
 use ksync::Lazy;
-use spin::Mutex;
+// use spin::Mutex;
+
+type Mutex<T> = ksync::mutex::SpinLock<T>;
 
 use crate::{device::IdTable, nix::result::Errno};
 /// @brief: Driver error

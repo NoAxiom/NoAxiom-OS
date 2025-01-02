@@ -25,7 +25,9 @@ use arch::interrupt::is_external_interrupt_enabled;
 #[cfg(feature = "kernel")]
 use rv_lock::{Lock, LockGuard};
 #[cfg(any(not(feature = "kernel")))]
-use spin::{Mutex, MutexGuard};
+// use spin::{Mutex, MutexGuard};
+type Mutex<T> = ksync::mutex::SpinLock<T>;
+type MutexGuard<'a, T> = ksync::mutex::SpinLockGuard<'a, T>;
 
 /// [`Event`] 的内部数据
 struct Inner {
