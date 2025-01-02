@@ -4,7 +4,7 @@ use riscv::register::scause::Exception;
 
 use super::{address::VirtAddr, memory_set::MemorySet};
 use crate::{
-    config::mm::PAGE_SIZE,
+    config::mm::{KERNEL_ADDR_OFFSET, PAGE_SIZE},
     cpu::current_cpu,
     mm::address::{VirtPageNum, VpnRange},
     nix::result::Errno,
@@ -86,41 +86,52 @@ fn validate_slice(va: usize, len: usize) {
 
 /// the UserPtr is a wrapper for user-space pointer
 /// it will validate the pointer before we access it
+/// NOTE THAT any function in it should only be called once
+/// since the validation will be done in the first call
+/// and the validation costs lots of time
 pub struct UserPtr<T> {
     ptr: *const T,
 }
 
 impl<T> UserPtr<T> {
     pub fn new(addr: usize) -> Self {
-        validate_slice(addr, core::mem::size_of::<T>());
+        assert!(
+            addr & KERNEL_ADDR_OFFSET == 0,
+            "shouldn't pass kernel address"
+        );
         Self {
             ptr: addr as *const T,
         }
     }
     pub fn as_ptr(&self) -> *const T {
+        validate_slice(self.ptr as usize, core::mem::size_of::<T>());
         self.ptr
     }
     pub fn as_ptr_mut(&self) -> *mut T {
+        validate_slice(self.ptr as usize, core::mem::size_of::<T>());
         self.ptr as *mut T
     }
     pub fn as_ref(&self) -> &T {
+        validate_slice(self.ptr as usize, core::mem::size_of::<T>());
         unsafe { &*self.ptr }
     }
     pub fn as_ref_mut(&self) -> &mut T {
+        validate_slice(self.ptr as usize, core::mem::size_of::<T>());
         unsafe { &mut *(self.ptr as *mut T) }
     }
     /// SAFETY: this is only used for user-write pages
     /// any unallcated memory access should be handled before this
-    pub unsafe fn as_slice_mut_unchecked(&self, len: usize) -> &mut [T] {
+    pub unsafe fn as_unchecked_slice_mut(&self, len: usize) -> &mut [T] {
         from_raw_parts_mut(self.ptr as *mut T, len)
     }
+    /// get user slice and validate it
     pub fn as_slice_mut(&self, len: usize) -> &mut [T] {
         validate_slice(self.ptr as usize, len);
         unsafe { from_raw_parts_mut(self.ptr as *mut T, len) }
     }
     /// SAFETY: this is only used for user-write pages
     /// any unallcated memory access should be handled before this
-    pub unsafe fn as_slice_while_unchecked(&self, checker: &dyn Fn(&T) -> bool) -> &mut [T] {
+    pub unsafe fn as_unchecked_slice_while(&self, checker: &dyn Fn(&T) -> bool) -> &mut [T] {
         let start = self.ptr as usize;
         let mut ptr = self.ptr as usize;
         loop {
@@ -131,6 +142,8 @@ impl<T> UserPtr<T> {
         }
         from_raw_parts_mut(self.ptr as *mut T, ptr - start)
     }
+    /// get user slice until the checker returns false,
+    /// with validating all items in the slice
     pub fn as_slice_while(&self, checker: &dyn Fn(&T) -> bool) -> &mut [T] {
         let start = self.ptr as usize;
         let mut ptr = self.ptr as usize;

@@ -60,7 +60,7 @@ pub fn align_up(addr: usize, align: usize) -> usize {
 
 pub fn get_string_from_ptr(ptr: &UserPtr<u8>) -> String {
     let checker = |&c: &u8| c != 0;
-    let slice = unsafe { ptr.as_slice_while_unchecked(&checker) };
+    let slice = unsafe { ptr.as_unchecked_slice_while(&checker) };
     let res = String::from_utf8(Vec::from(slice)).unwrap();
     trace!("get_string_from_ptr: {}", res);
     res

@@ -1,3 +1,5 @@
+use alloc::string::String;
+
 use crate::{
     cpu::get_hartid,
     mm::user_ptr::UserPtr,
@@ -21,9 +23,8 @@ impl Syscall<'_> {
             get_hartid()
         );
         let buf = UserPtr::<u8>::new(buf);
-        let buf = unsafe { buf.as_slice_mut_unchecked(len) };
-        // let buf = buf.as_slice_mut(len);
-        let s = core::str::from_utf8(buf).unwrap();
+        let buf = unsafe { buf.as_unchecked_slice_mut(len) };
+        let s = String::from(core::str::from_utf8(buf).unwrap());
         print!("{}", s);
         Ok(0)
     }
