@@ -61,8 +61,8 @@ pub fn kernel_trap_handler() {
             | Exception::StorePageFault
             | Exception::InstructionPageFault => {
                 if let Some(task) = current_cpu().task.as_mut() {
-                    if task.handle_pagefault(stval) {
-                        trace!("clone cow successfully");
+                    if task.memory_validate(stval) {
+                        trace!("[memory_validate] success");
                     } else {
                         kernel_panic();
                     }
@@ -119,19 +119,20 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
     let scause = scause::read();
     let stval = stval::read();
     trace!(
-        "[trap_handler] handle begin, scause: {:?}, stval: {:#x}",
+        "[user_trap_handler] handle begin, scause: {:?}, stval: {:#x}",
         scause.cause(),
         stval
     );
     // for debug, print current error message and exit the task
-    let print_err_msg = || {
-        error!("unexpected exit!!! tid: {}, hart: {}, cause: {:?} is unsupported, stval = {:#x}, sepc = {:#x}",
+    let user_exit = || {
+        error!("[user_trap_handler] unexpected exit!!! tid: {}, hart: {}, cause: {:?} is unsupported, stval = {:#x}, sepc = {:#x}",
             task.tid(),
             get_hartid(),
             scause.cause(),
             stval,
             cx.sepc
         );
+        task.exit();
     };
     match scause.cause() {
         // syscall
@@ -148,16 +149,14 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
             Exception::LoadPageFault
             | Exception::StorePageFault
             | Exception::InstructionPageFault => {
-                if task.handle_pagefault(stval) {
-                    trace!("clone cow successfully");
+                if task.memory_validate(stval) {
+                    trace!("[memory_validate] success");
                 } else {
-                    print_err_msg();
-                    task.exit();
+                    user_exit();
                 }
             }
             _ => {
-                print_err_msg();
-                task.exit();
+                user_exit();
             }
         },
         // interrupt
@@ -179,8 +178,7 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
                 ext_int_handler();
             }
             _ => {
-                print_err_msg();
-                task.exit();
+                user_exit();
             }
         },
     }

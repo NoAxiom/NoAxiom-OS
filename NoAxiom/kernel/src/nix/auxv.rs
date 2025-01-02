@@ -1,5 +1,53 @@
 #![allow(unused)]
 
+/*
+    # Auxiliary Vectors
+    ELF auxiliary vectors are a mechanism to transfer certain kernel level
+    information to the user processes. An example of such an information is the
+    pointer to the system call entry point in the memory (AT_SYSINFO); this
+    information is dynamic in nature and is only known after kernel has finished
+    up loading. The information is passed on to the user processes by binary
+    loaders which are part of the kernel subsystem itself; either built-in the
+    kernel or a kernel module. Binary loaders convert a binary file, a program,
+    into a process on the system. Usually there is a different loader for each
+    binary format; thankfully there are not many binary formats - most of the
+    linux based systems now use ELF binaries. ELF binary loader is defined in
+    the following file /usr/src/linux/fs/binfmt_elf.c. The ELF loader parses the
+    ELF file, maps the various program segments in the memory, sets up the entry
+    point and initializes the process stack. It puts ELF auxiliary vectors on
+    the process stack along with other information like argc, argv, envp. After
+    initialization, a process' stack looks something like this:
+
+    position            content                     size (bytes) + comment
+    ------------------------------------------------------------------------
+    stack pointer ->  [ argc = number of args ]     4
+                    [ argv[0] (pointer) ]         4   (program name)
+                    [ argv[1] (pointer) ]         4
+                    [ argv[..] (pointer) ]        4 * x
+                    [ argv[n - 1] (pointer) ]     4
+                    [ argv[n] (pointer) ]         4   (= NULL)
+
+                    [ envp[0] (pointer) ]         4
+                    [ envp[1] (pointer) ]         4
+                    [ envp[..] (pointer) ]        4
+                    [ envp[term] (pointer) ]      4   (= NULL)
+
+                    [ auxv[0] (Elf32_auxv_t) ]    8
+                    [ auxv[1] (Elf32_auxv_t) ]    8
+                    [ auxv[..] (Elf32_auxv_t) ]   8
+                    [ auxv[term] (Elf32_auxv_t) ] 8   (= AT_NULL vector)
+
+                    [ padding ]                   0 - 16
+
+                    [ argument ASCIIZ strings ]   >= 0
+                    [ environment ASCIIZ str. ]   >= 0
+
+    (0xbffffffc)      [ end marker ]                4   (= NULL)
+
+    (0xc0000000)      < bottom of stack >           0   (virtual)
+    ------------------------------------------------------------------------
+*/
+
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct AuxEntry(pub usize, pub usize);

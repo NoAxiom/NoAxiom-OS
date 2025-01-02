@@ -16,7 +16,10 @@ use crate::{
         address::VirtAddr,
         memory_set::{ElfMemoryInfo, MemorySet},
     },
-    nix::clone_flags::CloneFlags,
+    nix::{
+        auxv::{AuxEntry, AT_EXECFN, AT_NULL, AT_RANDOM},
+        clone_flags::CloneFlags,
+    },
     sched::sched_entity::SchedEntity,
     sync::{cell::SyncUnsafeCell, mutex::SpinLock},
     task::taskid::tid_alloc,
@@ -140,14 +143,24 @@ impl Task {
         *self.memory_set.lock() = memory_set;
     }
 
-    /// Check if is the copy-on-write pages triggered the page fault.
-    /// If it's true, clone pages for the writer(aka current task),
+    // TODO: add mmap check
+    /// # memory validate
+    /// Check if is the copy-on-write/lazy-alloc pages triggered the page fault.
+    ///
+    /// As for cow, clone pages for the writer(aka current task),
     /// but should keep original page as cow since it might still be shared.
     /// Note that if the reference count is one, there's no need to clone pages.
-    /// return value: true if detected lazy alloc orcopy-on-write
-    /// and cloned successfully
-    pub fn handle_pagefault(self: &Arc<Self>, addr: usize) -> bool {
-        warn!("[check_lazy] page fault at addr: {:#x}", addr);
+    ///
+    /// As for lazy alloc, realloc pages for the task.
+    /// Associated pages: stack, heap, mmap
+    ///
+    /// Return value: true if successfully handled lazy alloc or copy-on-write;
+    ///               false if the page fault is not in any alloc area.
+    ///
+    /// usages: when any kernel allocation in user_space happens, call this fn;
+    /// when user pagefault happens, call this func to check allocation.
+    pub fn memory_validate(self: &Arc<Self>, addr: usize) -> bool {
+        warn!("[memory_validate] check at addr: {:#x}", addr);
         let mut memory_set = self.memory_set.lock();
         let vpn = VirtAddr::from(addr).floor();
         if let Some(pte) = memory_set.page_table().translate_vpn(vpn) {
@@ -214,6 +227,127 @@ impl Task {
         });
         info!("[spawn] new task spawn complete, tid {}", task.tid.0);
         task
+    }
+
+    // TODO: WIP
+    /// init user stack
+    ///
+    /// stack construction
+    /// +---------------------------+
+    /// | Padding (16-byte align)   | <-- sp
+    /// +---------------------------+
+    /// | argc                      |
+    /// +---------------------------+
+    /// | argv[0]                   |
+    /// | argv[1]                   |
+    /// | ...                       |
+    /// | NULL (argv terminator)    |
+    /// +---------------------------+
+    /// | envp[0]                   |
+    /// | envp[1]                   |
+    /// | ...                       |
+    /// | NULL (envp terminator)    |
+    /// +---------------------------+
+    /// | auxv[0].key, auxv[0].val  |
+    /// | auxv[1].key, auxv[1].val  |
+    /// | ...                       |
+    /// | NULL (auxv terminator)    |
+    /// +---------------------------+
+    pub fn init_user_stack(
+        &self,
+        user_sp: usize,
+        args: Vec<String>,        // argv & argc
+        envs: Vec<String>,        // env vec
+        auxs: &mut Vec<AuxEntry>, // aux vec
+    ) -> (usize, usize, usize, usize) {
+        fn push_slice<T: Copy>(user_sp: &mut usize, slice: &[T]) {
+            let mut sp = *user_sp;
+            sp -= core::mem::size_of_val(slice);
+            sp -= sp % core::mem::align_of::<T>();
+            unsafe { core::slice::from_raw_parts_mut(sp as *mut T, slice.len()) }
+                .copy_from_slice(slice);
+            *user_sp = sp
+        }
+
+        // user stack pointer
+        let mut user_sp = user_sp;
+        // argument vector
+        let mut argv = vec![0; args.len()];
+        // environment pointer, end with NULL
+        let mut envp = vec![0; envs.len() + 1];
+
+        // === push args ===
+        for (i, s) in args.iter().enumerate() {
+            let len = s.len();
+            user_sp -= len + 1;
+            let p = user_sp as *mut u8;
+            argv[i] = user_sp;
+            unsafe {
+                p.copy_from(s.as_ptr(), len);
+                *((p as usize + len) as *mut u8) = 0;
+            }
+        }
+        user_sp -= user_sp % core::mem::size_of::<usize>();
+
+        // === push env ===
+        for (i, s) in envs.iter().enumerate() {
+            let len = s.len();
+            user_sp -= len + 1;
+            let p: *mut u8 = user_sp as *mut u8;
+            envp[i] = user_sp;
+            unsafe {
+                p.copy_from(s.as_ptr(), len);
+                *((p as usize + len) as *mut u8) = 0;
+            }
+        }
+        // terminator: envp end with NULL
+        envp[envs.len()] = 0;
+        user_sp = user_sp % core::mem::align_of::<usize>();
+
+        // === push auxs ===
+        // random (16 bytes aligned, always 0 here)
+        user_sp -= 16;
+        auxs.push(AuxEntry(AT_RANDOM, user_sp as usize));
+        user_sp -= user_sp % 16;
+        // execfn, file name
+        if !argv.is_empty() {
+            auxs.push(AuxEntry(AT_EXECFN, argv[0] as usize)); // file name
+        }
+        // terminator: auxv end with AT_NULL
+        auxs.push(AuxEntry(AT_NULL, 0 as usize)); // end
+
+        // construct auxv
+        let auxs_len = auxs.len() * core::mem::size_of::<AuxEntry>();
+        user_sp -= auxs_len;
+        // let auxv_base = user_sp;
+        for i in 0..auxs.len() {
+            unsafe {
+                *((user_sp + i * core::mem::size_of::<AuxEntry>()) as *mut usize) = auxs[i].0;
+                *((user_sp + i * core::mem::size_of::<AuxEntry>() + core::mem::size_of::<usize>())
+                    as *mut usize) = auxs[i].1;
+            }
+        }
+
+        // construct envp
+        let len = envs.len() * core::mem::size_of::<usize>();
+        user_sp -= len;
+        let envp_base = user_sp;
+        for i in 0..envs.len() {
+            unsafe {
+                *((envp_base + i * core::mem::size_of::<usize>()) as *mut usize) = envp[i];
+            }
+        }
+        unsafe {
+            *((envp_base + envs.len() * core::mem::size_of::<usize>()) as *mut usize) = 0;
+        }
+
+        // push argv
+        push_slice(&mut user_sp, argv.as_slice());
+        let argv_base = user_sp;
+
+        // push argc
+        push_slice(&mut user_sp, &[args.len()]);
+        (user_sp, args.len(), argv_base, envp_base)
     }
 
     /// fork
