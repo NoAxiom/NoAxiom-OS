@@ -1,4 +1,4 @@
-use alloc::vec::Vec;
+use alloc::{string::String, vec::Vec};
 
 use super::address::VirtAddr;
 use crate::{
@@ -52,6 +52,8 @@ pub fn validate_slice(va: usize, len: usize) {
 /// let data_cloned = ptr.as_ref_mut(); // this might trigger pagefault
 /// *data_cloned = should_write_data;
 /// ```
+#[repr(C)]
+#[derive(Clone, Copy)]
 pub struct UserPtr<T> {
     ptr: *mut T,
 }
@@ -67,14 +69,29 @@ impl<T> UserPtr<T> {
         }
     }
 
+    pub fn is_null(&self) -> bool {
+        self.ptr.is_null()
+    }
+
+    pub fn inc(&mut self, count: usize) {
+        self.ptr = unsafe { self.ptr.add(count) };
+    }
+
+    pub fn value(&self) -> T
+    where
+        T: Copy,
+    {
+        unsafe { *self.ptr }
+    }
+
     /// convert ptr into an mutable reference
     /// please write data after memory_set.unlock
-    pub unsafe fn as_ref_mut(&self) -> &mut T {
+    pub fn as_ref_mut(&self) -> &mut T {
         unsafe { &mut *(self.ptr as *mut T) }
     }
 
     /// clone a slice as vec from user space
-    pub unsafe fn as_vec(&self, len: usize) -> Vec<T>
+    pub fn as_vec(&self, len: usize) -> Vec<T>
     where
         T: Copy,
     {
@@ -91,7 +108,7 @@ impl<T> UserPtr<T> {
     }
 
     /// get user slice until the checker returns true
-    pub unsafe fn as_vec_until(&self, checker: &dyn Fn(&T) -> bool) -> Vec<T>
+    pub fn as_vec_until(&self, checker: &dyn Fn(&T) -> bool) -> Vec<T>
     where
         T: Copy,
     {
@@ -106,6 +123,35 @@ impl<T> UserPtr<T> {
             }
             res.push(*value);
             ptr += step;
+        }
+        res
+    }
+}
+
+impl UserPtr<u8> {
+    /// get user string with length provided
+    pub fn as_string(&self, len: usize) -> String {
+        let vec = self.as_vec(len);
+        let res = String::from_utf8(vec).unwrap();
+        res
+    }
+
+    /// get user c-typed string
+    pub fn get_cstr(&self) -> String {
+        let checker = |&c: &u8| c == 0;
+        let slice = self.as_vec_until(&checker);
+        let res = String::from_utf8(Vec::from(slice)).unwrap();
+        res
+    }
+
+    /// get user string vec, end with null
+    pub fn get_string_vec(&self) -> Vec<String> {
+        let mut ptr = self.clone();
+        let mut res = Vec::new();
+        while !ptr.is_null() {
+            let data = ptr.get_cstr();
+            res.push(data);
+            ptr.inc(1);
         }
         res
     }

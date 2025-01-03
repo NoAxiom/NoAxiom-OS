@@ -4,7 +4,6 @@ use alloc::vec::Vec;
 use super::{Syscall, SyscallResult};
 use crate::{
     fs::path::Path, mm::user_ptr::UserPtr, nix::clone_flags::CloneFlags, sched::task::spawn_utask,
-    utils::get_string_from_ptr,
 };
 
 impl Syscall<'_> {
@@ -43,16 +42,11 @@ impl Syscall<'_> {
     }
 
     pub async fn sys_exec(&mut self, path: usize, argv: usize, envp: usize) -> SyscallResult {
-        let path = Path::new(get_string_from_ptr(&UserPtr::new(path)));
+        let path = Path::new(UserPtr::new(path).get_cstr());
         info!("[sys_exec] path: {}", path.inner());
-
-        // let argv = UserPtr::<*const usize>::new(argv);
-        let argv_vec = Vec::new();
-
-        // let envp = UserPtr::<*const usize>::new(envp);
-        let envp_vec = Vec::new();
-
-        self.task.exec(path, argv_vec, envp_vec).await;
+        let args = UserPtr::<u8>::new(argv).get_string_vec();
+        let envs = UserPtr::<u8>::new(envp).get_string_vec();
+        self.task.exec(path, args, envs).await;
         Ok(0)
     }
 }

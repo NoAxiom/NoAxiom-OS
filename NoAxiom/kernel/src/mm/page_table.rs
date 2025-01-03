@@ -1,6 +1,6 @@
 //! page table under sv39
 
-use alloc::{string::String, vec::Vec};
+use alloc::vec::Vec;
 use core::arch::asm;
 
 use riscv::register::satp;

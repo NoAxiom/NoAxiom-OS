@@ -1,11 +1,8 @@
 //! utility functions
 
-use alloc::{string::String, vec::Vec};
+use alloc::vec::Vec;
 
-use crate::{
-    config::mm::{KERNEL_ADDR_OFFSET, KERNEL_PAGENUM_MASK},
-    mm::user_ptr::UserPtr,
-};
+use crate::config::mm::{KERNEL_ADDR_OFFSET, KERNEL_PAGENUM_MASK};
 
 /// signed extend for number without 64/32 bits width
 #[inline(always)]
@@ -57,12 +54,4 @@ pub fn reverse<T: Clone>(vec: &Vec<T>) -> Vec<T> {
 #[allow(unused)]
 pub fn align_up(addr: usize, align: usize) -> usize {
     (addr + align - 1) & !(align - 1)
-}
-
-pub fn get_string_from_ptr(ptr: &UserPtr<u8>) -> String {
-    let checker = |&c: &u8| c == 0;
-    let slice = unsafe { ptr.as_vec_until(&checker) };
-    let res = String::from_utf8(Vec::from(slice)).unwrap();
-    trace!("get_string_from_ptr: {}", res);
-    res
 }
