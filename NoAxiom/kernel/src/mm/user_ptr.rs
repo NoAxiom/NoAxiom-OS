@@ -1,73 +1,11 @@
 use alloc::vec::Vec;
 
-use riscv::register::scause::Exception;
-
-use super::{address::VirtAddr, memory_set::MemorySet};
+use super::address::VirtAddr;
 use crate::{
     config::mm::KERNEL_ADDR_OFFSET,
     cpu::current_cpu,
     mm::address::{VirtPageNum, VpnRange},
-    nix::result::Errno,
-    syscall::SyscallResult,
 };
-
-// TODO: add mmap check
-/// # memory validate
-/// Check if is the copy-on-write/lazy-alloc pages triggered the page fault.
-///
-/// As for cow, clone pages for the writer(aka current task),
-/// but should keep original page as cow since it might still be shared.
-/// Note that if the reference count is one, there's no need to clone pages.
-///
-/// As for lazy alloc, realloc pages for the task.
-/// Associated pages: stack, heap, mmap
-///
-/// Return value: true if successfully handled lazy alloc or copy-on-write;
-///               false if the page fault is not in any alloc area.
-///
-/// usages: when any kernel allocation in user_space happens, call this fn;
-/// when user pagefault happens, call this func to check allocation.
-pub fn validate(
-    addr: usize,
-    memory_set: &mut MemorySet,
-    exception: Option<Exception>,
-) -> SyscallResult {
-    let vpn = VirtAddr::from(addr).floor();
-    if let Some(pte) = memory_set.page_table().translate_vpn(vpn) {
-        let flags = pte.flags();
-        if flags.is_cow() {
-            info!(
-                "[memory_validate] realloc COW at va: {:#x}, pte: {:#x}, flags: {:?}",
-                addr,
-                pte.0,
-                pte.flags()
-            );
-            memory_set.realloc_cow(vpn, pte);
-            Ok(0)
-        } else if exception.is_some() && exception.unwrap() == Exception::StorePageFault {
-            error!(
-                "page fault at addr: {:#x}, store at invalid area, flags: {:?}",
-                addr, flags
-            );
-            Err(Errno::EFAULT)
-        } else {
-            Ok(0)
-        }
-    } else {
-        if memory_set.user_stack_area.vpn_range.is_in_range(vpn) {
-            info!("[memory_validate] realloc stack");
-            memory_set.realloc_stack(vpn);
-            Ok(0)
-        } else if memory_set.user_heap_area.vpn_range.is_in_range(vpn) {
-            info!("[memory_validate] realloc heap");
-            memory_set.realloc_heap(vpn);
-            Ok(0)
-        } else {
-            error!("page fault at addr: {:#x}, not in any alloc area", addr);
-            Err(Errno::EFAULT)
-        }
-    }
-}
 
 /// check if the slice is well-allocated
 /// any unallcated memory access will cause a page fault
@@ -84,7 +22,7 @@ pub fn validate_slice(va: usize, len: usize) {
     let end: VirtPageNum = VirtAddr::from(va + len).ceil();
     let mut memory_set = current_cpu().task.as_ref().unwrap().memory_set().lock();
     for vpn in VpnRange::new(start, end) {
-        let _ = validate(vpn.as_va_usize(), &mut memory_set, None);
+        let _ = memory_set.validate(vpn.as_va_usize(), None);
     }
 }
 

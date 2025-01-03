@@ -6,7 +6,10 @@ use core::{
 
 use ksync::{cell::SyncUnsafeCell, mutex::SpinLock};
 use lazy_static::lazy_static;
-use riscv::{asm::sfence_vma_all, register::satp};
+use riscv::{
+    asm::sfence_vma_all,
+    register::{satp, scause::Exception},
+};
 
 use super::{
     address::PhysAddr,
@@ -28,7 +31,8 @@ use crate::{
         map_area::MapAreaType,
         permission::MapType,
     },
-    nix::auxv::*,
+    nix::{auxv::*, result::Errno},
+    syscall::SyscallResult,
 };
 
 extern "C" {
@@ -474,6 +478,60 @@ impl MemorySet {
                 new_ppn.0,
                 frame_refcount(new_ppn),
             );
+        }
+    }
+
+    // TODO: add mmap check
+    /// # memory validate
+    /// Check if is the copy-on-write/lazy-alloc pages triggered the page fault.
+    ///
+    /// As for cow, clone pages for the writer(aka current task),
+    /// but should keep original page as cow since it might still be shared.
+    /// Note that if the reference count is one, there's no need to clone pages.
+    ///
+    /// As for lazy alloc, realloc pages for the task.
+    /// Associated pages: stack, heap, mmap
+    ///
+    /// Return value: true if successfully handled lazy alloc or copy-on-write;
+    ///               false if the page fault is not in any alloc area.
+    ///
+    /// usages: when any kernel allocation in user_space happens, call this fn;
+    /// when user pagefault happens, call this func to check allocation.
+    pub fn validate(&mut self, addr: usize, exception: Option<Exception>) -> SyscallResult {
+        let vpn = VirtAddr::from(addr).floor();
+        if let Some(pte) = self.page_table().translate_vpn(vpn) {
+            let flags = pte.flags();
+            if flags.is_cow() {
+                info!(
+                    "[memory_validate] realloc COW at va: {:#x}, pte: {:#x}, flags: {:?}",
+                    addr,
+                    pte.0,
+                    pte.flags()
+                );
+                self.realloc_cow(vpn, pte);
+                Ok(0)
+            } else if exception.is_some() && exception.unwrap() == Exception::StorePageFault {
+                error!(
+                    "page fault at addr: {:#x}, store at invalid area, flags: {:?}",
+                    addr, flags
+                );
+                Err(Errno::EFAULT)
+            } else {
+                Ok(0)
+            }
+        } else {
+            if self.user_stack_area.vpn_range.is_in_range(vpn) {
+                info!("[memory_validate] realloc stack");
+                self.realloc_stack(vpn);
+                Ok(0)
+            } else if self.user_heap_area.vpn_range.is_in_range(vpn) {
+                info!("[memory_validate] realloc heap");
+                self.realloc_heap(vpn);
+                Ok(0)
+            } else {
+                error!("page fault at addr: {:#x}, not in any alloc area", addr);
+                Err(Errno::EFAULT)
+            }
         }
     }
 }

@@ -13,10 +13,7 @@ use riscv::register::scause::Exception;
 use super::taskid::TidTracer;
 use crate::{
     fs::path::Path,
-    mm::{
-        memory_set::{ElfMemoryInfo, MemorySet},
-        user_ptr::validate,
-    },
+    mm::memory_set::{ElfMemoryInfo, MemorySet},
     nix::{
         auxv::{AuxEntry, AT_EXECFN, AT_NULL, AT_RANDOM},
         clone_flags::CloneFlags,
@@ -155,9 +152,13 @@ impl Task {
         }
     }
 
-    pub fn memory_validate(self: &Arc<Self>, addr: usize, exception: Option<Exception>) -> SyscallResult {
+    pub fn memory_validate(
+        self: &Arc<Self>,
+        addr: usize,
+        exception: Option<Exception>,
+    ) -> SyscallResult {
         trace!("[memory_validate] check at addr: {:#x}", addr);
-        validate(addr, &mut self.memory_set().lock(), exception)
+        self.memory_set().lock().validate(addr, exception)
     }
 
     /// trap context
