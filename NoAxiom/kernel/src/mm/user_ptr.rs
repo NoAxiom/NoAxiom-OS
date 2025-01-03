@@ -1,15 +1,14 @@
-use core::slice::from_raw_parts_mut;
+use alloc::vec::Vec;
 
 use riscv::register::scause::Exception;
 
 use super::{address::VirtAddr, memory_set::MemorySet};
 use crate::{
-    config::mm::{KERNEL_ADDR_OFFSET, PAGE_SIZE},
+    config::mm::KERNEL_ADDR_OFFSET,
     cpu::current_cpu,
     mm::address::{VirtPageNum, VpnRange},
     nix::result::Errno,
     syscall::SyscallResult,
-    utils::align_up,
 };
 
 // TODO: add mmap check
@@ -74,23 +73,49 @@ pub fn validate(
 /// any unallcated memory access will cause a page fault
 /// and will be handled by the kernel_trap_handler => memory_validate
 /// so we should validate the memory before we lock current memory_set
-fn validate_slice(va: usize, len: usize) {
-    trace!("[validate_slice] buf_addr = {:#x}, len = {:#x}", va, len);
+#[allow(unused)]
+pub fn validate_slice(va: usize, len: usize) {
+    warn!(
+        "DON'T ABUSE THIS FUNCTION!!!\n
+        [validate_slice] buf_addr = {:#x}, len = {:#x}",
+        va, len
+    );
     let start: VirtPageNum = VirtAddr::from(va).floor();
     let end: VirtPageNum = VirtAddr::from(va + len).ceil();
-    let task = current_cpu().task.as_ref().unwrap();
+    let mut memory_set = current_cpu().task.as_ref().unwrap().memory_set().lock();
     for vpn in VpnRange::new(start, end) {
-        let _ = task.memory_validate(vpn.as_va_usize(), None);
+        let _ = validate(vpn.as_va_usize(), &mut memory_set, None);
     }
 }
 
 /// the UserPtr is a wrapper for user-space pointer
-/// it will validate the pointer before we access it
-/// NOTE THAT any function in it should only be called once
-/// since the validation will be done in the first call
-/// and the validation costs lots of time
+/// NOTE THAT: it will NOT validate the pointer
+/// and will probably trigger pagefault when accessing userspace
+/// ## usage
+/// complete any data clone before memory_set.lock
+/// and write data after memory_set.unlock
+/// ## example
+/// ### clone data before memory_set.lock
+/// ```
+/// let addr = 0x1000;
+/// let ptr = UserPtr::<u8>::new(addr);
+/// let data_cloned = ptr.as_vec(); // this might trigger pagefault
+/// let guard = memory_set.lock();
+/// guard.write(data_cloned);
+/// drop(guard);
+/// ```
+/// ### write data after memory_set.unlock
+/// ```
+/// let addr = 0x1000;
+/// let ptr = UserPtr::<u8>::new(addr);
+/// let guard = memory_set.lock();
+/// let should_write_data = guard.read();
+/// drop(guard);
+/// let data_cloned = ptr.as_ref_mut(); // this might trigger pagefault
+/// *data_cloned = should_write_data;
+/// ```
 pub struct UserPtr<T> {
-    ptr: *const T,
+    ptr: *mut T,
 }
 
 impl<T> UserPtr<T> {
@@ -100,72 +125,50 @@ impl<T> UserPtr<T> {
             "shouldn't pass kernel address"
         );
         Self {
-            ptr: addr as *const T,
+            ptr: addr as *mut T,
         }
     }
-    pub fn as_ptr(&self) -> *const T {
-        validate_slice(self.ptr as usize, core::mem::size_of::<T>());
-        self.ptr
-    }
-    pub fn as_ptr_mut(&self) -> *mut T {
-        validate_slice(self.ptr as usize, core::mem::size_of::<T>());
-        self.ptr as *mut T
-    }
-    pub fn as_ref(&self) -> &T {
-        validate_slice(self.ptr as usize, core::mem::size_of::<T>());
-        unsafe { &*self.ptr }
-    }
-    pub fn as_ref_mut(&self) -> &mut T {
-        validate_slice(self.ptr as usize, core::mem::size_of::<T>());
+
+    /// convert ptr into an mutable reference
+    /// please write data after memory_set.unlock
+    pub unsafe fn as_ref_mut(&self) -> &mut T {
         unsafe { &mut *(self.ptr as *mut T) }
     }
-    /// SAFETY: this is only used for user-write pages
-    /// any unallcated memory access should be handled before this
-    pub unsafe fn as_unchecked_slice_mut(&self, len: usize) -> &mut [T] {
-        from_raw_parts_mut(self.ptr as *mut T, len)
-    }
-    /// get user slice and validate it
-    pub fn as_slice_mut(&self, len: usize) -> &mut [T] {
-        validate_slice(self.ptr as usize, len);
-        unsafe { from_raw_parts_mut(self.ptr as *mut T, len) }
-    }
-    /// SAFETY: this is only used for user-write pages
-    /// any unallcated memory access should be handled before this
-    pub unsafe fn as_unchecked_slice_while(&self, checker: &dyn Fn(&T) -> bool) -> &mut [T] {
-        let start = self.ptr as usize;
+
+    /// clone a slice as vec from user space
+    pub unsafe fn as_vec(&self, len: usize) -> Vec<T>
+    where
+        T: Copy,
+    {
         let mut ptr = self.ptr as usize;
+        let mut res = Vec::with_capacity(len);
+        let step = core::mem::size_of::<T>();
+        trace!("[as_vec] ptr: {:#x}", ptr);
+        for _ in 0..len {
+            let value = unsafe { &*(ptr as *const T) };
+            res.push(*value);
+            ptr += step;
+        }
+        res
+    }
+
+    /// get user slice until the checker returns true
+    pub unsafe fn as_vec_until(&self, checker: &dyn Fn(&T) -> bool) -> Vec<T>
+    where
+        T: Copy,
+    {
+        let mut ptr = self.ptr as usize;
+        let mut res = Vec::new();
+        let step = core::mem::size_of::<T>();
+        debug!("[as_vec_while] ptr: {:#x}", ptr);
         loop {
-            if !checker(&*(ptr as *const T)) {
+            let value = unsafe { &*(ptr as *const T) };
+            if checker(value) {
                 break;
             }
-            ptr += 1;
+            res.push(*value);
+            ptr += step;
         }
-        from_raw_parts_mut(self.ptr as *mut T, ptr - start)
-    }
-    /// get user slice until the checker returns false,
-    /// with validating all items in the slice
-    pub fn as_slice_while(&self, checker: &dyn Fn(&T) -> bool) -> &mut [T] {
-        let start = self.ptr as usize;
-        let mut ptr = self.ptr as usize;
-        let mut memory_set = current_cpu().task.as_mut().unwrap().memory_set().lock();
-        let mut page_end = align_up(ptr + 1, PAGE_SIZE);
-        let _ = validate(ptr as usize, &mut memory_set, None);
-        debug!("[as_slice_mut] {:#x} end: {:#x}", ptr, page_end);
-        loop {
-            let ptr_end = ptr + core::mem::size_of::<T>() - 1;
-            if ptr_end >= page_end {
-                warn!(
-                    "[as_slice_while] page_end: {:#x}, ptr_end: {:#x}",
-                    page_end, ptr_end
-                );
-                let _ = validate(ptr_end as usize, &mut memory_set, None);
-                page_end += PAGE_SIZE;
-            }
-            if !checker(unsafe { &*(ptr as *const T) }) {
-                break;
-            }
-            ptr += 1;
-        }
-        unsafe { from_raw_parts_mut(self.ptr as *mut T, ptr - start) }
+        res
     }
 }

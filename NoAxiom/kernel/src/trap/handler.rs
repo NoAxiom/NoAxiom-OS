@@ -47,9 +47,10 @@ pub fn kernel_trap_handler() {
     let scause = scause::read();
     let stval = stval::read();
     let sepc = sepc::read();
-    let kernel_panic = || {
+    let kernel_panic = |msg: &str| {
         panic!(
-            "kernel trap!!! trap {:?} is unsupported, stval = {:#x}, error pc = {:#x}",
+            "kernel trap!!! msg: {}, trap {:?} is unsupported, stval = {:#x}, error pc = {:#x}",
+            msg,
             scause.cause(),
             stval,
             sepc
@@ -63,13 +64,13 @@ pub fn kernel_trap_handler() {
                 if let Some(task) = current_cpu().task.as_mut() {
                     match task.memory_validate(stval, Some(exception)) {
                         Ok(_) => trace!("[memory_validate] success in kernel_trap_handler"),
-                        Err(_) => kernel_panic(),
+                        Err(_) => kernel_panic("memory_validate failed"),
                     }
                 } else {
-                    kernel_panic();
+                    kernel_panic("page fault without task running");
                 }
             }
-            _ => kernel_panic(),
+            _ => kernel_panic("unsupported exception"),
         },
         Trap::Interrupt(interrupt) => match interrupt {
             Interrupt::SupervisorExternal => {
@@ -104,7 +105,7 @@ pub fn kernel_trap_handler() {
                     )
                 }
             }
-            _ => kernel_panic(),
+            _ => kernel_panic("unsupported interrupt"),
         },
     }
 }
@@ -123,8 +124,9 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
         stval
     );
     // for debug, print current error message and exit the task
-    let user_exit = || {
-        error!("[user_trap_handler] unexpected exit!!! tid: {}, hart: {}, cause: {:?} is unsupported, stval = {:#x}, sepc = {:#x}",
+    let user_exit = |msg: &str| {
+        error!("[user_trap_handler] unexpected exit!!! msg: {}, tid: {}, hart: {}, cause: {:?} is unsupported, stval = {:#x}, sepc = {:#x}",
+            msg,
             task.tid(),
             get_hartid(),
             scause.cause(),
@@ -156,11 +158,11 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
                         get_hartid(),
                         task.tid()
                     );
-                    user_exit()
+                    user_exit("memory_validate failed");
                 }
             },
             _ => {
-                user_exit();
+                user_exit("unsupported exception");
             }
         },
         // interrupt
@@ -182,7 +184,7 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
                 ext_int_handler();
             }
             _ => {
-                user_exit();
+                user_exit("unsupported interrupt");
             }
         },
     }

@@ -22,9 +22,8 @@ impl Syscall<'_> {
             len,
             get_hartid()
         );
-        let buf = UserPtr::<u8>::new(buf);
-        let buf = unsafe { buf.as_unchecked_slice_mut(len) };
-        let s = String::from(core::str::from_utf8(buf).unwrap());
+        let buf = unsafe { UserPtr::<u8>::new(buf).as_vec(len) };
+        let s = String::from_utf8(buf).unwrap();
         print!("{}", s);
         Ok(0)
     }
