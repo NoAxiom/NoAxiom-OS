@@ -1,11 +1,17 @@
-use arch::interrupt::enable_user_memory_access;
+use arch::interrupt::{
+    enable_global_interrupt, enable_user_memory_access, is_external_interrupt_enabled,
+};
 
 use crate::{
     config::{arch::CPU_NUM, mm::KERNEL_ADDR_OFFSET},
     constant::banner::NOAXIOM_BANNER,
     cpu::get_hartid,
     device::init::device_init,
-    driver::{log::log_init, sbi::hart_start},
+    driver::{
+        async_virtio_driver::virtio_mm::async_virtio_blk_test,
+        log::log_init,
+        sbi::{hart_start, shutdown},
+    },
     entry::{boot::_entry_other_hart, init_proc::schedule_spawn_all_apps},
     fs::fs_init,
     mm::{bss::bss_init, frame::frame_init, hart_mm_init, heap::heap_init},
@@ -78,6 +84,11 @@ pub fn boot_hart_init(_: usize, dtb: usize) {
     init_plic(platfrom_info.plic.start + KERNEL_ADDR_OFFSET);
     device_init();
     register_to_hart();
+
+    enable_global_interrupt();
+    block_on(async_virtio_blk_test());
+    shutdown();
+
     block_on(fs_init());
 
     // spawn init_proc and wake other harts

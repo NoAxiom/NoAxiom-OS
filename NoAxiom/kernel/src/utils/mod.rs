@@ -1,6 +1,10 @@
 //! utility functions
 
+mod crossover;
+
 use alloc::{string::String, vec::Vec};
+
+use crossover::{Crossover, CrossoverManager};
 
 use crate::config::mm::{KERNEL_ADDR_OFFSET, KERNEL_PAGENUM_MASK};
 
@@ -72,4 +76,16 @@ pub fn get_string_from_ptr(ptr: *const u8) -> String {
         ptr += 1;
     }
     res
+}
+
+#[allow(unused)]
+/// Execute a function every `interval` times
+pub fn intermit(f: impl FnOnce()) {
+    let interval = 89102;
+    let id = &f as *const _ as usize;
+    let mut guard = CrossoverManager.lock();
+    let crossover = guard.entry(id).or_insert(Crossover::new(interval));
+    if crossover.trigger() {
+        f();
+    }
 }
