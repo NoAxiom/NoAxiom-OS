@@ -84,6 +84,10 @@ impl<T> UserPtr<T> {
         unsafe { *self.ptr }
     }
 
+    pub fn set(&self, value: T) {
+        unsafe { *self.ptr = value };
+    }
+
     /// convert ptr into an mutable reference
     /// please write data after memory_set.unlock
     pub fn as_ref_mut(&self) -> &mut T {

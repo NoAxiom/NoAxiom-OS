@@ -3,45 +3,59 @@
 
 use userlib::{
     println,
-    syscall::{sys_exec, sys_fork, sys_yield},
+    syscall::{sys_exec, sys_fork, sys_times, sys_yield, TMS},
 };
 
 #[no_mangle]
 fn main() -> i32 {
     println!("process_test: Hello, world!");
+
+    let mut tms_start = TMS::new();
+    sys_times(&mut tms_start);
+
     let pid = sys_fork();
     if pid == 0 {
-        println!("child process0, exec long_loop");
-        sys_exec("long_loop\0");
+        println!("child process0, exec hello_world");
+        sys_exec("hello_world\0");
     }
-    sys_fork();
+
     let pid = sys_fork();
     if pid == 0 {
-        // sys_exec("hello_world\0");
-        // println!("ERROR!!! unreachable: child process1");
-        println!("child process1");
+        let mut tms = TMS::new();
+        sys_times(&mut tms);
+        println!("[child process1] tms: {:?}", tms);
     } else {
-        println!("parent process1");
+        println!("[parent process1] do nothing");
     }
+
     let pid = sys_fork();
     if pid == 0 {
-        println!("child process2");
+        println!("[child process2] do nothing");
     } else {
-        // sys_exec("ktest\0");
-        // println!("ERROR!!! unreachable: parent process2");
-        println!("parent process2, do yield");
+        println!("[parent process2] yield start");
         for i in 0..10 {
-            println!("yield: {}", i);
+            println!("[parent process2] yield: {}", i);
             sys_yield();
         }
+        println!("[parent process2] yield done");
     }
+
     let pid = sys_fork();
     if pid == 0 {
-        println!("child process3");
+        println!("[child process3] do nothing");
     } else {
-        // sys_exec("long_loop\0");
-        // println!("ERROR!!! unreachable: parent process3");
-        println!("parent process3");
+        println!("[parent process3] exec ktest");
+        sys_exec("ktest\0");
+        println!("ERROR!!! unreachable: parent process3");
     }
+
+    let mut tms_end = TMS::new();
+    sys_times(&mut tms_end);
+    println!(
+        "[main] tms_start: {:?}, tms_end: {:?}, gap: {}",
+        tms_start,
+        tms_end,
+        tms_end.0 - tms_start.0
+    );
     0
 }

@@ -1,6 +1,4 @@
 //! memory management system calls
-use alloc::vec::Vec;
-
 use super::{Syscall, SyscallResult};
 use crate::{
     fs::path::Path, mm::user_ptr::UserPtr, nix::clone_flags::CloneFlags, sched::task::spawn_utask,
