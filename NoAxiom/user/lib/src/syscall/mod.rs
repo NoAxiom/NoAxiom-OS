@@ -87,3 +87,14 @@ pub fn sys_fork() -> isize {
 pub fn sys_exec(path: &str) -> isize {
     syscall(SYS_EXECVE, [path.as_ptr() as usize, 0, 0, 0, 0, 0])
 }
+
+#[derive(Debug)]
+pub struct TMS(pub isize, pub isize, pub isize, pub isize);
+impl TMS {
+    pub fn new() -> Self {
+        TMS(0, 0, 0, 0)
+    }
+}
+pub fn sys_times(tms: &mut TMS) {
+    syscall(SYS_TIMES, [tms as *const TMS as usize, 0, 0, 0, 0, 0]);
+}

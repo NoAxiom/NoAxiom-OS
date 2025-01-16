@@ -1,5 +1,3 @@
-use alloc::string::String;
-
 use crate::{
     cpu::get_hartid,
     mm::user_ptr::UserPtr,
@@ -22,8 +20,7 @@ impl Syscall<'_> {
             len,
             get_hartid()
         );
-        let buf = unsafe { UserPtr::<u8>::new(buf).as_vec(len) };
-        let s = String::from_utf8(buf).unwrap();
+        let s = UserPtr::<u8>::new(buf).as_string(len);
         print!("{}", s);
         Ok(0)
     }
