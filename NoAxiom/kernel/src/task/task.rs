@@ -8,20 +8,21 @@ use alloc::{
 use core::sync::atomic::{AtomicIsize, AtomicUsize, Ordering};
 
 use ksync::{cell::SyncUnsafeCell, mutex::SpinLock};
-use riscv::asm::sfence_vma_all;
+use riscv::register::scause::Exception;
 
 use super::taskid::TidTracer;
 use crate::{
     fs::path::Path,
     mm::{
-        address::VirtAddr,
         memory_set::{ElfMemoryInfo, MemorySet},
+        user_ptr::validate,
     },
     nix::{
         auxv::{AuxEntry, AT_EXECFN, AT_NULL, AT_RANDOM},
         clone_flags::CloneFlags,
     },
     sched::sched_entity::SchedEntity,
+    syscall::SyscallResult,
     task::taskid::tid_alloc,
     trap::TrapContext,
 };
@@ -57,7 +58,12 @@ pub struct Task {
 
     /// memory set for task
     /// it's a process resource as well
-    pub memory_set: Arc<SpinLock<MemorySet>>,
+    ///
+    /// explanation:
+    /// SyncUnsafeCell: allow to change memory set in immutable context
+    /// Arc: allow to share memory set between tasks, also provides refcount
+    /// SpinLock: allow to lock memory set in multi-core context
+    pub memory_set: SyncUnsafeCell<Arc<SpinLock<MemorySet>>>,
 
     /// trap context,
     /// contains stack ptr, registers, etc.
@@ -130,59 +136,28 @@ impl Task {
 
     /// memory set
     #[inline(always)]
+    pub fn memory_set(&self) -> &Arc<SpinLock<MemorySet>> {
+        unsafe { &(*self.memory_set.get()) }
+    }
+    #[inline(always)]
     pub unsafe fn memory_activate(&self) {
-        unsafe { self.memory_set.lock().activate() };
+        unsafe { self.memory_set().lock().activate() };
     }
     /// get token from memory set
     #[inline(always)]
     pub fn token(&self) -> usize {
-        self.memory_set.lock().token()
+        self.memory_set().lock().token()
     }
     /// change current memory set
     pub fn change_memory_set(&self, memory_set: MemorySet) {
-        *self.memory_set.lock() = memory_set;
+        unsafe {
+            (*self.memory_set.get()) = Arc::new(SpinLock::new(memory_set));
+        }
     }
 
-    // TODO: add mmap check
-    /// # memory validate
-    /// Check if is the copy-on-write/lazy-alloc pages triggered the page fault.
-    ///
-    /// As for cow, clone pages for the writer(aka current task),
-    /// but should keep original page as cow since it might still be shared.
-    /// Note that if the reference count is one, there's no need to clone pages.
-    ///
-    /// As for lazy alloc, realloc pages for the task.
-    /// Associated pages: stack, heap, mmap
-    ///
-    /// Return value: true if successfully handled lazy alloc or copy-on-write;
-    ///               false if the page fault is not in any alloc area.
-    ///
-    /// usages: when any kernel allocation in user_space happens, call this fn;
-    /// when user pagefault happens, call this func to check allocation.
-    pub fn memory_validate(self: &Arc<Self>, addr: usize) -> bool {
-        warn!("[memory_validate] check at addr: {:#x}", addr);
-        let mut memory_set = self.memory_set.lock();
-        let vpn = VirtAddr::from(addr).floor();
-        if let Some(pte) = memory_set.page_table().translate_vpn(vpn) {
-            let flags = pte.flags();
-            if flags.is_cow() {
-                memory_set.realloc_cow(vpn, pte);
-                return true;
-            } else if flags.is_valid() {
-                error!("[check_lazy] pte is V but not COW, flags: {:?}", flags);
-                return false;
-            }
-        } else if memory_set.user_stack_area.vpn_range.is_in_range(vpn) {
-            trace!("page fault at lazy-alloc stack, realloc stack");
-            memory_set.realloc_stack(vpn);
-            trace!("stack reallocated");
-            return true;
-        } else if memory_set.user_heap_area.vpn_range.is_in_range(vpn) {
-            memory_set.realloc_heap(vpn);
-            return true;
-        }
-        error!("page fault at addr: {:#x}, but not in any alloc area", addr);
-        false
+    pub fn memory_validate(self: &Arc<Self>, addr: usize, exception: Option<Exception>) -> SyscallResult {
+        trace!("[memory_validate] check at addr: {:#x}", addr);
+        validate(addr, &mut self.memory_set().lock(), exception)
     }
 
     /// trap context
@@ -219,7 +194,7 @@ impl Task {
                 children: Vec::new(),
                 parent: None,
             })),
-            memory_set: Arc::new(SpinLock::new(memory_set)),
+            memory_set: SyncUnsafeCell::new(Arc::new(SpinLock::new(memory_set))),
             trap_cx: SyncUnsafeCell::new(TrapContext::app_init_cx(elf_entry, user_sp)),
             status: SyncUnsafeCell::new(TaskStatus::Ready),
             exit_code: AtomicIsize::new(0),
@@ -353,13 +328,11 @@ impl Task {
     /// fork
     pub fn fork(self: &Arc<Task>, flags: CloneFlags) -> Arc<Self> {
         // memory set clone
-        let memory_set = if flags.contains(CloneFlags::VM) {
-            self.memory_set.clone()
+        let memory_set = SyncUnsafeCell::new(if flags.contains(CloneFlags::VM) {
+            self.memory_set().clone()
         } else {
-            let res = Arc::new(SpinLock::new(self.memory_set.lock().clone_cow()));
-            unsafe { sfence_vma_all() };
-            res
-        };
+            Arc::new(SpinLock::new(self.memory_set().lock().clone_cow()))
+        });
 
         // TODO: CloneFlags::SIGHAND
         // TODO: fd table (CloneFlags::FILES)

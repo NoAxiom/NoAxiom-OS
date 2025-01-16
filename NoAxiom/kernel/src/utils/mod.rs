@@ -6,7 +6,10 @@ use alloc::{string::String, vec::Vec};
 
 use crossover::{Crossover, CrossoverManager};
 
-use crate::config::mm::{KERNEL_ADDR_OFFSET, KERNEL_PAGENUM_MASK};
+use crate::{
+    config::mm::{KERNEL_ADDR_OFFSET, KERNEL_PAGENUM_MASK},
+    mm::user_ptr::UserPtr,
+};
 
 /// signed extend for number without 64/32 bits width
 #[inline(always)]
@@ -55,26 +58,16 @@ pub fn reverse<T: Clone>(vec: &Vec<T>) -> Vec<T> {
 }
 
 #[inline(always)]
-pub fn div_ceil(dividend: usize, divisor: usize) -> usize {
-    (dividend + divisor - 1) / divisor
-}
-
-#[inline(always)]
+#[allow(unused)]
 pub fn align_up(addr: usize, align: usize) -> usize {
     (addr + align - 1) & !(align - 1)
 }
 
-pub fn get_string_from_ptr(ptr: *const u8) -> String {
-    let mut ptr = ptr as usize;
-    let mut res = String::new();
-    loop {
-        let ch = unsafe { *(ptr as *const u8) } as char;
-        if ch == '\0' {
-            break;
-        }
-        res.push(ch);
-        ptr += 1;
-    }
+pub fn get_string_from_ptr(ptr: &UserPtr<u8>) -> String {
+    let checker = |&c: &u8| c == 0;
+    let slice = unsafe { ptr.as_vec_until(&checker) };
+    let res = String::from_utf8(Vec::from(slice)).unwrap();
+    trace!("get_string_from_ptr: {}", res);
     res
 }
 

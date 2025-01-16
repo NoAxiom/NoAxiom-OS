@@ -24,6 +24,7 @@ use crate::constant::register::*;
 #[derive(Debug, Default, Copy, Clone)]
 pub struct Sstatus(pub usize);
 
+#[allow(unused)]
 impl Sstatus {
     pub fn read() -> Self {
         let val: usize;

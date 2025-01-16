@@ -103,6 +103,10 @@ impl VirtPageNum {
         let pa = kernel_vpn_to_ppn(self.0);
         PhysPageNum::from(pa)
     }
+    #[inline(always)]
+    pub fn as_va_usize(&self) -> usize {
+        self.0 << PAGE_WIDTH
+    }
 }
 
 /// physical address

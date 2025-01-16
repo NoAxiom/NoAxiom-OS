@@ -1,6 +1,6 @@
 //! page table under sv39
 
-use alloc::vec::Vec;
+use alloc::{string::String, vec::Vec};
 use core::arch::asm;
 
 use riscv::register::satp;
@@ -91,22 +91,9 @@ impl PageTable {
     }
 
     /// try to find pte, returns None at failure
+    #[inline(always)]
     pub fn find_pte(&self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
-        let index = vpn.get_index();
-        let mut ppn = self.root_ppn;
-        let mut result: Option<&mut PageTableEntry> = None;
-        for (i, idx) in index.iter().enumerate() {
-            let pte = &mut ppn.get_pte_array()[*idx];
-            if !pte.flags().is_valid() {
-                return None;
-            }
-            if i == 2 {
-                result = Some(pte);
-                break;
-            }
-            ppn = pte.ppn();
-        }
-        result
+        translate_vpn_into_pte(self.root_ppn, vpn)
     }
 
     /// map vpn -> ppn
@@ -214,4 +201,28 @@ pub fn current_token() -> usize {
     let satp: usize;
     unsafe { asm!("csrr {}, satp", out(reg) satp) }
     satp
+}
+
+/// translate the vpn into PTE entry (sv39)
+/// it won't use memory_set to translate the vpn
+/// note that this is read only
+pub fn translate_vpn_into_pte<'a>(
+    root_ppn: PhysPageNum,
+    vpn: VirtPageNum,
+) -> Option<&'a mut PageTableEntry> {
+    let index = vpn.get_index();
+    let mut ppn = root_ppn;
+    let mut result: Option<&mut PageTableEntry> = None;
+    for (i, idx) in index.iter().enumerate() {
+        let pte = &mut ppn.get_pte_array()[*idx];
+        if !pte.flags().is_valid() {
+            return None;
+        }
+        if i == 2 {
+            result = Some(pte);
+            break;
+        }
+        ppn = pte.ppn();
+    }
+    result
 }
