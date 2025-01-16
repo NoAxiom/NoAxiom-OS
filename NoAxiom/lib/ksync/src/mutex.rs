@@ -73,3 +73,16 @@ impl LockAction for IrqOffLockAction {
         assert!(!is_interrupt_enabled());
     }
 }
+
+pub type SpinNoIrqLock<T> = kernel_sync::spin::SpinMutex<T, NoIrqMutex>;
+pub type SpinNoIrqLockGuard<'a, T> = kernel_sync::spin::SpinMutexGuard<'a, T, NoIrqMutex>;
+
+pub struct NoIrqMutex;
+impl LockAction for NoIrqMutex {
+    fn before_lock() {
+        disable_global_interrupt();
+    }
+    fn after_lock() {
+        enable_global_interrupt();
+    }
+}

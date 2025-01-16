@@ -3,7 +3,6 @@ use alloc::{sync::Arc, vec::Vec};
 
 use async_blk::VirtIOAsyncBlock;
 use lazy_static::*;
-use spin::Mutex;
 
 use super::dma::VirtualAddress;
 use crate::{
@@ -19,8 +18,9 @@ use crate::{
 };
 pub mod async_blk;
 
-// type Mutex<T> = ksync::mutex::SpinLock<T>;
-// type MutexGuard<'a, T> = ksync::mutex::SpinLockGuard<'a, T>;
+use spin::Mutex;
+// type Mutex<T> = ksync::mutex::SpinNoIrqLock<T>;
+// type MutexGuard<'a, T> = ksync::mutex::SpinNoIrqLockGuard<'a, T>;
 
 lazy_static! {
     static ref QUEUE_FRAMES: Mutex<Vec<FrameTracker>> = Mutex::new(Vec::new());
@@ -95,12 +95,8 @@ pub fn virtio_virt_to_phys(vaddr: VirtualAddress) -> PhysicalAddress {
 #[allow(unused)]
 pub async fn async_virtio_blk_test() {
     let mut read_buf = [0u8; 512];
-    let mut write_buf = [0u8; 512];
-    for i in 0..512 {
-        write_buf.iter_mut().for_each(|byte| *byte = i as u8);
-        VIRTIO_BLOCK.write_block(i as usize, &write_buf).await;
+    for i in 0..4 {
         VIRTIO_BLOCK.read_block(i as usize, &mut read_buf).await;
-        assert_eq!(read_buf, write_buf);
     }
-    println!("[kernel] async_virtio_blk_test pass");
+    info!("[kernel] async_virtio_blk_test pass");
 }

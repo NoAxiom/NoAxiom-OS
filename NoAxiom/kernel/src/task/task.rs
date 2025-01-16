@@ -7,6 +7,7 @@ use alloc::{
 };
 use core::sync::atomic::{AtomicIsize, AtomicUsize, Ordering};
 
+use arch::interrupt::is_interrupt_enabled;
 use ksync::{cell::SyncUnsafeCell, mutex::SpinLock};
 use riscv::register::scause::Exception;
 
@@ -155,7 +156,11 @@ impl Task {
         }
     }
 
-    pub fn memory_validate(self: &Arc<Self>, addr: usize, exception: Option<Exception>) -> SyscallResult {
+    pub fn memory_validate(
+        self: &Arc<Self>,
+        addr: usize,
+        exception: Option<Exception>,
+    ) -> SyscallResult {
         trace!("[memory_validate] check at addr: {:#x}", addr);
         validate(addr, &mut self.memory_set().lock(), exception)
     }

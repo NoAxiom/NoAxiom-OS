@@ -1,7 +1,7 @@
 use alloc::{boxed::Box, sync::Arc, vec::Vec};
 
 use async_trait::async_trait;
-use ksync::mutex::SpinLock;
+use spin::Mutex;
 
 use super::{
     dentry::FAT32Dentry,
@@ -24,7 +24,7 @@ use crate::{
 
 pub struct FAT32File {
     meta: FileMeta,
-    file: Arc<SpinLock<FAT32FIleSystemFile>>,
+    file: Arc<Mutex<FAT32FIleSystemFile>>,
 }
 
 impl FAT32File {
@@ -75,7 +75,7 @@ impl File for FAT32File {
 
 pub struct FAT32Directory {
     meta: FileMeta,
-    file: Arc<SpinLock<FAT32FIleSystemDirectory>>,
+    file: Arc<Mutex<FAT32FIleSystemDirectory>>,
 }
 
 impl FAT32Directory {

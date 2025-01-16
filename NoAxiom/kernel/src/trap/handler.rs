@@ -90,10 +90,13 @@ pub fn kernel_trap_handler() {
                         VIRTIO_BLOCK
                             .0
                             .handle_interrupt()
-                            .expect("virtio handle interrupt error!")
+                            .expect("virtio handle interrupt error!");
+                        debug!("virtio handle interrupt done!  Notify begin...");
+                        VIRTIO_BLOCK.0.wake_ops.notify(WAKE_NUM);
                     };
-                    VIRTIO_BLOCK.0.wake_ops.notify(WAKE_NUM);
+                    debug!("Notify done!");
                     plic.complete(get_hartid() as u32, Mode::Supervisor, irq);
+                    debug!("plic complete done!");
                 }
                 #[cfg(not(feature = "async_fs"))]
                 {

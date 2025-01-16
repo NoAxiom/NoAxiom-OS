@@ -1,7 +1,10 @@
 use alloc::sync::Arc;
 use core::arch::global_asm;
 
-use arch::interrupt::{enable_external_interrupt, enable_stimer_interrupt, is_interrupt_enabled};
+use arch::interrupt::{
+    enable_external_interrupt, enable_global_interrupt, enable_stimer_interrupt,
+    is_interrupt_enabled,
+};
 use riscv::register::{
     sstatus,
     stvec::{self, TrapMode},
@@ -36,6 +39,7 @@ pub fn trap_init() {
     );
     // disable_global_interrupt();
     enable_external_interrupt();
+    enable_global_interrupt();
     enable_stimer_interrupt();
 }
 

@@ -2,6 +2,7 @@
 
 use alloc::boxed::Box;
 
+use arch::interrupt::{is_external_interrupt_enabled, is_interrupt_enabled};
 use async_trait::async_trait;
 
 use crate::{
@@ -111,9 +112,13 @@ impl VirtIOAsyncBlock {
 #[async_trait]
 impl BlockDevice for VirtIOAsyncBlock {
     async fn read<'a>(&'a self, id: usize, buf: &'a mut [u8]) {
+        assert!(is_interrupt_enabled());
+        assert!(is_external_interrupt_enabled());
         self.read_block(id, buf).await
     }
     async fn write<'a>(&'a self, id: usize, buf: &'a [u8]) {
+        assert!(is_interrupt_enabled());
+        assert!(is_external_interrupt_enabled());
         self.write_block(id, buf).await
     }
 }

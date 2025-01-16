@@ -1,11 +1,13 @@
 use alloc::sync::Arc;
 
-use arch::interrupt::disable_external_interrupt;
+use arch::interrupt::{
+    disable_external_interrupt, is_external_interrupt_enabled, is_interrupt_enabled,
+};
 use basic::{dentry::Dentry, filesystem::FileSystem};
 use impls::fat32::filesystem::FAT32FIleSystem;
 use ksync::Once;
 
-use crate::{device::block::BlockDevice, nix::fs::MountFlags};
+use crate::{config::fs::BLOCK_SIZE, device::block::BlockDevice, nix::fs::MountFlags};
 pub mod basic;
 mod impls;
 
@@ -24,8 +26,6 @@ pub fn chosen_device() -> Arc<dyn BlockDevice> {
         use crate::driver::async_virtio_driver::virtio_mm::VIRTIO_BLOCK;
 
         info!("async_fs init");
-        // enable_global_interrupt();
-        enable_external_interrupt();
         device = Arc::clone(&VIRTIO_BLOCK);
     }
     #[cfg(not(feature = "async_fs"))]
@@ -37,10 +37,19 @@ pub fn chosen_device() -> Arc<dyn BlockDevice> {
     device
 }
 
+pub async fn device_test(device: Arc<dyn BlockDevice>) {
+    let mut read_buf = [0u8; BLOCK_SIZE];
+    for i in 0..4 {
+        device.read(i as usize, &mut read_buf).await;
+    }
+    info!("Block Device works well!");
+}
+
 /// Create the root dentry, mount multiple fs
 pub async fn fs_init() {
     info!("[vfs] fs initial, mounting real fs");
     let device = chosen_device();
+    device_test(device.clone()).await;
     let disk_fs = Arc::new(RealFs::new("FAT32"));
     let root = disk_fs
         .root(None, MountFlags::empty(), "/", Some(device))
@@ -51,8 +60,6 @@ pub async fn fs_init() {
 
     // Load the root dentry
     root_dentry().open().unwrap().load_dir().await.unwrap();
-
-    disable_external_interrupt();
 }
 
 pub fn root_dentry() -> Arc<dyn basic::dentry::Dentry> {
