@@ -1,7 +1,9 @@
 use alloc::sync::Arc;
 use core::result::Result;
 
-use crate::{constant::register::*, task::Task, trap::TrapContext, nix::result::Errno};
+use arch::interrupt::{enable_global_interrupt, is_interrupt_enabled};
+
+use crate::{constant::register::*, nix::result::Errno, task::Task, trap::TrapContext};
 
 pub mod fs;
 pub mod mm;
@@ -23,6 +25,12 @@ impl<'a> Syscall<'a> {
     }
     pub async fn syscall(&mut self, id: usize, args: [usize; 6]) -> SyscallResult {
         trace!("syscall id: {}, args: {:?}", id, args);
+        // fixme: turn on the interrupt. When call yield_now().await, it must be in the
+        // interrupt off state, because it comes from trap_handler, cpu would turn off
+        // the interrupt until cpu ertn. And we call yield_now().await to switch to
+        // another task, but the whole life time is in the interrupt off state.
+        assert!(!is_interrupt_enabled());
+        enable_global_interrupt();
         match id {
             // fs
             SYS_READ => self.sys_read().await,

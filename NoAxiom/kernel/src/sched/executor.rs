@@ -5,6 +5,7 @@
 use alloc::sync::Arc;
 use core::future::Future;
 
+use arch::interrupt::{enable_external_interrupt, enable_global_interrupt, is_interrupt_enabled};
 use array_init::array_init;
 use async_task::{Builder, Runnable, ScheduleInfo, WithInfo};
 use ksync::mutex::SpinLock;
@@ -157,12 +158,22 @@ pub fn run() {
     // spin until find a valid task
     let runnable = RUNTIME.pop_current();
     if let Some(runnable) = runnable {
+        // debug!(
+        //     "run task {}, now hart interrupt: {}",
+        //     runnable.metadata().task_info.as_ref().unwrap().task.tid(),
+        //     arch::interrupt::is_interrupt_enabled()
+        // );
+        assert!(arch::interrupt::is_interrupt_enabled());
         runnable.run();
     } else {
         // TODO: 使用请求模式而不是抢占模式进行负载均衡
         #[cfg(feature = "multicore")]
         if let Some(runnable) = load_balance() {
+            assert!(arch::interrupt::is_interrupt_enabled());
             runnable.run();
         }
     }
+    // FIXME!! we should think carefully about this
+    enable_global_interrupt();
+    assert!(arch::interrupt::is_interrupt_enabled());
 }

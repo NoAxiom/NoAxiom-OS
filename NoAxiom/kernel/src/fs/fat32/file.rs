@@ -41,7 +41,6 @@ impl ShortFile {
 impl ShortFile {
     pub async fn part_content<'a>(&'a self, offset: usize, buf: &'a mut [u8]) -> SyscallResult {
         let len = buf.len();
-        info!("part_content: offset: {}, len: {}", offset, len);
         let content = self.entry.load(&self.blk, &self.fat, &self.bpb).await;
         buf.copy_from_slice(&content[offset..offset + len]);
         Ok(len as isize)

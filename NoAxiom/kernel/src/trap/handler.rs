@@ -2,6 +2,7 @@
 
 use alloc::sync::Arc;
 
+use arch::interrupt::is_interrupt_enabled;
 use riscv::register::{
     scause::{self, Exception, Interrupt, Trap},
     sepc, stval,
@@ -28,16 +29,31 @@ fn ext_int_handler() {
 
         let plic = PLIC.get().unwrap();
         let irq = plic.claim(get_hartid() as u32, Mode::Supervisor);
-        debug!("[SupervisorExternal] hart: {}, irq: {}", get_hartid(), irq);
+        // debug!("[SupervisorExternal] hart: {}, irq: {}", get_hartid(), irq);
         unsafe {
             VIRTIO_BLOCK
                 .0
                 .handle_interrupt()
-                .expect("virtio handle interrupt error!")
+                .expect("virtio handle interrupt error!");
+            assert!(!is_interrupt_enabled());
+            // debug!("virtio handle interrupt done!  Notify begin...");
+            VIRTIO_BLOCK.0.wake_ops.notify(WAKE_NUM);
         };
-        VIRTIO_BLOCK.0.wake_ops.notify(WAKE_NUM);
+        // debug!("Notify done!");
         plic.complete(get_hartid() as u32, Mode::Supervisor, irq);
-        debug!("[SupervisorExternal] plic complete done!");
+        // debug!("plic complete done!");
+    }
+    #[cfg(not(feature = "async_fs"))]
+    {
+        let scause = scause::read();
+        let stval = stval::read();
+        let sepc = sepc::read();
+        panic!(
+            "hart: {}, kernel SupervisorExternal interrupt is unsupported, stval = {:#x}, sepc = {:#x}",
+            get_hartid(),
+            stval,
+            sepc
+        )
     }
 }
 
@@ -85,18 +101,19 @@ pub fn kernel_trap_handler() {
 
                     let plic = PLIC.get().unwrap();
                     let irq = plic.claim(get_hartid() as u32, Mode::Supervisor);
-                    debug!("[SupervisorExternal] hart: {}, irq: {}", get_hartid(), irq);
+                    trace!("[SupervisorExternal] hart: {}, irq: {}", get_hartid(), irq);
                     unsafe {
                         VIRTIO_BLOCK
                             .0
                             .handle_interrupt()
                             .expect("virtio handle interrupt error!");
-                        debug!("virtio handle interrupt done!  Notify begin...");
+                        assert!(!is_interrupt_enabled());
+                        // debug!("virtio handle interrupt done!  Notify begin...");
                         VIRTIO_BLOCK.0.wake_ops.notify(WAKE_NUM);
                     };
-                    debug!("Notify done!");
+                    // debug!("Notify done!");
                     plic.complete(get_hartid() as u32, Mode::Supervisor, irq);
-                    debug!("plic complete done!");
+                    // debug!("plic complete done!");
                 }
                 #[cfg(not(feature = "async_fs"))]
                 {
@@ -107,6 +124,11 @@ pub fn kernel_trap_handler() {
                         sepc
                     )
                 }
+            }
+            Interrupt::SupervisorTimer => {
+                trace!("[SupervisorTimer] kernel Timer");
+                // fixme: now is just reset timer
+                crate::time::timer::set_next_trigger();
             }
             _ => kernel_panic("unsupported interrupt"),
         },
