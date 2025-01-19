@@ -1,7 +1,7 @@
 use alloc::sync::Arc;
 use core::result::Result;
 
-use crate::{constant::register::*, task::Task, trap::TrapContext, nix::result::Errno};
+use crate::{constant::register::*, nix::result::Errno, task::Task, trap::TrapContext};
 
 pub mod fs;
 pub mod mm;
@@ -23,6 +23,14 @@ impl<'a> Syscall<'a> {
     }
     pub async fn syscall(&mut self, id: usize, args: [usize; 6]) -> SyscallResult {
         trace!("syscall id: {}, args: {:?}", id, args);
+        #[cfg(feature = "async_fs")]
+        {
+            // fixme: turn on the interrupt. When call trap_handler, cpu would turn off
+            // the interrupt until cpu ertn. But if we switch to another task, the whole
+            // life time is in the interrupt off state until previous task ertn.
+            assert!(!arch::interrupt::is_interrupt_enabled());
+            arch::interrupt::enable_global_interrupt();
+        }
         match id {
             // fs
             SYS_READ => self.sys_read().await,

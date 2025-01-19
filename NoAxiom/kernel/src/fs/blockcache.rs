@@ -5,8 +5,10 @@
 use alloc::sync::Arc;
 use core::num::NonZeroUsize;
 
-use ksync::mutex::{RwLock, SpinLock};
+use arch::interrupt::{is_external_interrupt_enabled, is_interrupt_enabled};
+use ksync::mutex::RwLock;
 use lru::LruCache;
+use spin::Mutex;
 
 use crate::{
     config::fs::{BLOCK_SIZE, MAX_LRU_CACHE_SIZE},
@@ -16,7 +18,7 @@ use crate::{
 /// async block cache for data struct `B` with LRU strategy  
 /// for either **one writer** or many readers
 pub struct AsyncBlockCache<B> {
-    cache: SpinLock<LruCache<usize, Arc<RwLock<B>>>>, // todo: async_mutex ?
+    cache: Mutex<LruCache<usize, Arc<RwLock<B>>>>, // todo: async_mutex ?
     block_device: Arc<dyn BlockDevice>,
 }
 
@@ -35,7 +37,7 @@ impl AsyncBlockCache<CacheData> {
     /// create a new `AsyncBlockCache` and clear the cache
     pub fn from(device: Arc<dyn BlockDevice>) -> Self {
         Self {
-            cache: SpinLock::new(LruCache::new(
+            cache: Mutex::new(LruCache::new(
                 NonZeroUsize::new(MAX_LRU_CACHE_SIZE).unwrap(),
             )),
             block_device: device,
@@ -53,7 +55,7 @@ impl AsyncBlockCache<CacheData> {
 
         // else read the data from cache
         let mut data = [0; BLOCK_SIZE]; // todo: use vector
-        let _ = self.block_device.read(sector, &mut data).await;
+        self.block_device.read(sector, &mut data).await;
         let res = Arc::new(RwLock::new(CacheData::from(data, false)));
 
         // If the key already exists in the cache, write back the old data

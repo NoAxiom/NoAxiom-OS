@@ -7,6 +7,7 @@ use alloc::{
 };
 use core::sync::atomic::{AtomicIsize, AtomicUsize, Ordering};
 
+use arch::interrupt::is_interrupt_enabled;
 use ksync::{cell::SyncUnsafeCell, mutex::SpinLock};
 use riscv::register::scause::Exception;
 

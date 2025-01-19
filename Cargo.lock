@@ -80,7 +80,7 @@ version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d44d578cadd17312c75e7d0ef489361f160ace58f7139aa32001fee1a51b89b5"
 dependencies = [
- "spin",
+ "spin 0.9.8",
 ]
 
 [[package]]
@@ -269,6 +269,7 @@ dependencies = [
  "ringbuffer",
  "riscv",
  "smoltcp",
+ "spin 0.7.1",
  "thiserror-core",
  "uart16550",
  "uart8250",
@@ -292,7 +293,7 @@ dependencies = [
  "arch",
  "kernel-sync",
  "kutils",
- "spin",
+ "spin 0.9.8",
 ]
 
 [[package]]
@@ -312,7 +313,7 @@ version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 dependencies = [
- "spin",
+ "spin 0.9.8",
 ]
 
 [[package]]
@@ -493,6 +494,12 @@ dependencies = [
  "log",
  "managed",
 ]
+
+[[package]]
+name = "spin"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "13287b4da9d1207a4f4929ac390916d64eacfe236a487e9a9f5b3be392be5162"
 
 [[package]]
 name = "spin"

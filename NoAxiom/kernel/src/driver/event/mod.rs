@@ -21,13 +21,18 @@ use core::{
     usize,
 };
 
-use arch::interrupt::is_external_interrupt_enabled;
+use arch::interrupt::{
+    disable_global_interrupt, enable_global_interrupt, is_external_interrupt_enabled,
+};
+use ksync::mutex::LockAction;
 #[cfg(feature = "kernel")]
 use rv_lock::{Lock, LockGuard};
-#[cfg(any(not(feature = "kernel")))]
+
 // use spin::{Mutex, MutexGuard};
-type Mutex<T> = ksync::mutex::SpinLock<T>;
-type MutexGuard<'a, T> = ksync::mutex::SpinLockGuard<'a, T>;
+use crate::utils::intermit;
+
+type Mutex<T> = ksync::mutex::Lock<T>;
+type MutexGuard<'a, T> = ksync::mutex::LockGuard<'a, T>;
 
 /// [`Event`] 的内部数据
 struct Inner {
@@ -389,6 +394,7 @@ impl Future for EventListener {
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut list = self.inner.lock();
+        // debug!("[event] poll lock");
 
         let entry = match self.entry {
             None => unreachable!("cannot poll a completed `EventListener` future"),
@@ -402,6 +408,7 @@ impl Future for EventListener {
                 list.remove(entry, self.inner.cache_ptr());
                 drop(list);
                 self.entry = None;
+                // debug!("[event] poll unlock");
                 return Poll::Ready(());
             }
             // 刚被创建，被poll了，就保存住waker，返回pending
@@ -410,7 +417,8 @@ impl Future for EventListener {
             }
             // 可以被poll的状态，重设waker，返回pending
             State::Polling(w) => {
-                info!("polling");
+                intermit(|| info!("[event] listener polling!"));
+
                 if w.will_wake(cx.waker()) {
                     state.set(State::Polling(w));
                 } else {
@@ -418,6 +426,8 @@ impl Future for EventListener {
                 }
             }
         }
+
+        // debug!("[event] poll unlock");
 
         Poll::Pending
     }

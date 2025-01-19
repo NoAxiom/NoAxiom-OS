@@ -1,7 +1,7 @@
 use alloc::{string::String, sync::Arc};
 
 use downcast_rs::{impl_downcast, DowncastSync};
-use ksync::mutex::SpinLock;
+use spin::Mutex;
 
 use super::{file::File, superblock::SuperBlock};
 use crate::nix::{
@@ -10,7 +10,7 @@ use crate::nix::{
 };
 
 lazy_static::lazy_static! {
-    static ref INODE_ID: SpinLock<usize> = SpinLock::new(0);
+    static ref INODE_ID: Mutex<usize> = Mutex::new(0);
 }
 fn alloc_id() -> usize {
     let mut id = INODE_ID.lock();
@@ -28,7 +28,7 @@ pub struct InodeMeta {
     /// The inode id, unique in the file system
     id: usize,
     /// The inner data of the inode, maybe modified by multiple tasks
-    inner: SpinLock<InodeMetaInner>,
+    inner: Mutex<InodeMetaInner>,
     /// The mode of file
     inode_mode: InodeMode,
     /// The super block of the inode
@@ -39,7 +39,7 @@ impl InodeMeta {
     pub fn new(super_block: Arc<dyn SuperBlock>, inode_mode: InodeMode, size: usize) -> Self {
         Self {
             id: alloc_id(),
-            inner: SpinLock::new(InodeMetaInner {
+            inner: Mutex::new(InodeMetaInner {
                 nlink: 1,
                 size,
                 state: InodeState::UnInit,

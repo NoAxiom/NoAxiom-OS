@@ -4,7 +4,7 @@ use alloc::{
     sync::{Arc, Weak},
 };
 
-use ksync::mutex::SpinLock;
+use spin::Mutex;
 
 use super::{file::File, inode::Inode, superblock::SuperBlock};
 use crate::nix::{fs::InodeMode, result::Errno};
@@ -20,9 +20,9 @@ pub struct DentryMeta {
     /// The parent of the dentry, None if it is root
     parent: Option<Weak<dyn Dentry>>,
     /// The children of the dentry
-    children: SpinLock<BTreeMap<String, Arc<dyn Dentry>>>,
+    children: Mutex<BTreeMap<String, Arc<dyn Dentry>>>,
     /// The inode of the dentry, None if it is negative
-    inode: SpinLock<Option<Arc<dyn Inode>>>,
+    inode: Mutex<Option<Arc<dyn Inode>>>,
 }
 
 impl DentryMeta {
@@ -31,12 +31,12 @@ impl DentryMeta {
         name: &str,
         super_block: Arc<dyn SuperBlock>,
     ) -> Self {
-        let inode = SpinLock::new(None);
+        let inode = Mutex::new(None);
         Self {
             name: name.to_string(),
             super_block,
             parent: parent.map(|p| Arc::downgrade(&p)),
-            children: SpinLock::new(BTreeMap::new()),
+            children: Mutex::new(BTreeMap::new()),
             inode,
         }
     }

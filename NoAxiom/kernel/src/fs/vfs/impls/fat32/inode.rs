@@ -1,6 +1,6 @@
 use alloc::sync::Arc;
 
-use ksync::mutex::SpinLock;
+use spin::Mutex;
 
 use crate::{
     fs::{
@@ -18,17 +18,17 @@ use crate::{
 
 pub struct FAT32FileInode {
     meta: InodeMeta,
-    pub file: Arc<SpinLock<FAT32FIleSystemFile>>,
+    pub file: Arc<Mutex<FAT32FIleSystemFile>>,
 }
 
 impl FAT32FileInode {
     pub fn new(superblock: Arc<dyn superblock::SuperBlock>, file: FAT32FIleSystemFile) -> Self {
         Self {
             meta: InodeMeta::new(superblock, InodeMode::FILE, file.size()),
-            file: Arc::new(SpinLock::new(file)),
+            file: Arc::new(Mutex::new(file)),
         }
     }
-    pub fn get_file(&self) -> Arc<SpinLock<FAT32FIleSystemFile>> {
+    pub fn get_file(&self) -> Arc<Mutex<FAT32FIleSystemFile>> {
         self.file.clone()
     }
 }
@@ -44,7 +44,7 @@ impl Inode for FAT32FileInode {
 
 pub struct FAT32DirInode {
     meta: InodeMeta,
-    pub file: Arc<SpinLock<FAT32FIleSystemDirectory>>,
+    pub file: Arc<Mutex<FAT32FIleSystemDirectory>>,
 }
 
 impl FAT32DirInode {
@@ -54,10 +54,10 @@ impl FAT32DirInode {
     ) -> Self {
         Self {
             meta: InodeMeta::new(superblock, InodeMode::DIR, 0),
-            file: Arc::new(SpinLock::new(directory)),
+            file: Arc::new(Mutex::new(directory)),
         }
     }
-    pub fn get_dir(&self) -> Arc<SpinLock<FAT32FIleSystemDirectory>> {
+    pub fn get_dir(&self) -> Arc<Mutex<FAT32FIleSystemDirectory>> {
         self.file.clone()
     }
 }

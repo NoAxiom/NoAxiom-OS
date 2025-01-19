@@ -48,7 +48,7 @@ pub fn other_hart_init(hart_id: usize, dtb: usize) {
     enable_user_memory_access();
     hart_mm_init();
     trap_init();
-    register_to_hart();
+    // register_to_hart(); // todo: add multipule devices interrupt support
     info!(
         "[other_init] entry init hart_id: {}, dtb_addr: {:#x}",
         hart_id, dtb as usize,
@@ -78,6 +78,7 @@ pub fn boot_hart_init(_: usize, dtb: usize) {
     init_plic(platfrom_info.plic.start + KERNEL_ADDR_OFFSET);
     device_init();
     register_to_hart();
+
     block_on(fs_init());
 
     // spawn init_proc and wake other harts

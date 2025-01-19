@@ -42,19 +42,34 @@ pub struct FAT32FIleSystem {
 impl FAT32FIleSystem {
     /// Load bpb and root cluster to get root entry content
     pub async fn load_root(device: Arc<dyn BlockDevice>) -> FAT32Directory {
-        debug!("load_root");
-        let bpb = {
-            let mut sector = [0u8; FAT32_SECTOR_SIZE]; // todo: use vec
-            let _ = device.read(0, &mut sector).await;
-            sector
-        };
+        #[cfg(feature = "async_fs")]
+        {
+            use arch::interrupt::{is_external_interrupt_enabled, is_interrupt_enabled};
+            assert!(is_interrupt_enabled());
+            assert!(is_external_interrupt_enabled());
+        }
+
+        let mut bpb = [0u8; FAT32_SECTOR_SIZE];
+        device.read(0, &mut bpb).await;
+
+        let bpb = bpb;
         // normally, root cluster is 2
         let root_cluster = BIOSParameterBlockOffset::root_cluster(&bpb);
-        assert_eq!(root_cluster, FIRST_CLUSTER);
+        assert_eq!(root_cluster, FIRST_CLUSTER, "bpb: {:?}", bpb);
 
         let blk = Arc::new(AsyncBlockCache::from(device));
         let fat = Arc::new(fat::FAT::new(&bpb));
         let bpb = Arc::new(bpb);
+
+        // ! fixme: Now load all the content into memory as cache, avoid read disk
+        // ! later. Because read/write disk later should turn on the interrupt, which is
+        // ! dangerous when the hart be sched.
+        // for block_id in 0..1000 {
+        //     blk.read_sector(block_id).await;
+        // }
+        // blk.read_sector(23).await;
+        // blk.read_sector(23).await;
+        // blk.read_sector(23).await;
 
         // check the ROOT_FAKE_ENTRY
         let root_entry = ShortDirectoryEntry::from(ROOT_FAKE_ENTRY);

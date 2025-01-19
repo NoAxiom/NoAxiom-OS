@@ -7,8 +7,11 @@ use kutils::get_hartid;
 
 use super::cell::SyncRefCell;
 
-pub type SpinLock<T> = kernel_sync::spin::SpinMutex<T, NoIrqLockAction>;
-pub type SpinLockGuard<'a, T> = kernel_sync::spin::SpinMutexGuard<'a, T, NoIrqLockAction>;
+pub type SpinLock<T> = Lock<T>;
+pub type SpinLockGuard<'a, T> = LockGuard<'a, T>;
+// pub type SpinLock<T> = kernel_sync::spin::SpinMutex<T, NoIrqLockAction>;
+// pub type SpinLockGuard<'a, T> = kernel_sync::spin::SpinMutexGuard<'a, T,
+// NoIrqLockAction>;
 pub type TicketLock<T> = kernel_sync::ticket::TicketMutex<T, NoIrqLockAction>;
 pub type RwLock<T> = kernel_sync::rwlock::RwLock<T, NoIrqLockAction>;
 
@@ -44,22 +47,22 @@ fn current_mutex_tracer() -> RefMut<'static, MutexTracer> {
 pub struct NoIrqLockAction;
 impl LockAction for NoIrqLockAction {
     fn before_lock() {
-        let old = is_interrupt_enabled();
-        disable_global_interrupt();
-        let mut cpu = current_mutex_tracer();
-        if cpu.depth == 0 {
-            cpu.int_record = old;
-        }
-        cpu.depth += 1;
+        // let old = is_interrupt_enabled();
+        // disable_global_interrupt();
+        // let mut cpu = current_mutex_tracer();
+        // if cpu.depth == 0 {
+        //     cpu.int_record = old;
+        // }
+        // cpu.depth += 1;
     }
     fn after_lock() {
-        let mut cpu = current_mutex_tracer();
-        cpu.depth -= 1;
-        let should_enable = cpu.depth == 0 && cpu.int_record;
-        drop(cpu); // drop before int_en
-        if should_enable {
-            enable_global_interrupt();
-        }
+        // let mut cpu = current_mutex_tracer();
+        // cpu.depth -= 1;
+        // let should_enable = cpu.depth == 0 && cpu.int_record;
+        // drop(cpu); // drop before int_en
+        // if should_enable {
+        //     enable_global_interrupt();
+        // }
     }
 }
 
@@ -71,5 +74,50 @@ impl LockAction for IrqOffLockAction {
     }
     fn after_lock() {
         assert!(!is_interrupt_enabled());
+    }
+}
+
+use spin::{Mutex, MutexGuard};
+#[derive(Default)]
+pub struct Lock<T>(pub(self) Mutex<T>);
+
+pub struct LockGuard<'a, T> {
+    guard: Option<MutexGuard<'a, T>>,
+    int_record: bool,
+}
+
+impl<T> Lock<T> {
+    pub const fn new(obj: T) -> Self {
+        Self(Mutex::new(obj))
+    }
+    pub fn lock(&self) -> LockGuard<'_, T> {
+        let old = is_interrupt_enabled();
+        disable_global_interrupt();
+        LockGuard {
+            guard: Some(self.0.lock()),
+            int_record: old,
+        }
+    }
+}
+
+impl<'a, T> Drop for LockGuard<'a, T> {
+    fn drop(&mut self) {
+        self.guard.take();
+        if self.int_record {
+            enable_global_interrupt();
+        }
+    }
+}
+
+impl<'a, T> core::ops::Deref for LockGuard<'a, T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        self.guard.as_ref().unwrap().deref()
+    }
+}
+
+impl<'a, T> core::ops::DerefMut for LockGuard<'a, T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.guard.as_mut().unwrap().deref_mut()
     }
 }
