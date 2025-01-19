@@ -119,7 +119,7 @@ impl<T> UserPtr<T> {
         let mut ptr = self.ptr as usize;
         let mut res = Vec::new();
         let step = core::mem::size_of::<T>();
-        debug!("[as_vec_while] ptr: {:#x}", ptr);
+        trace!("[as_vec_while] ptr: {:#x}", ptr);
         loop {
             let value = unsafe { &*(ptr as *const T) };
             if checker(value) {

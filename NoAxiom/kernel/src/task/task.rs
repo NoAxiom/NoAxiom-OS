@@ -182,6 +182,7 @@ impl Task {
             memory_set,
             elf_entry,
             user_sp,
+            auxs,
         } = MemorySet::load_from_path(path).await;
         trace!("[kernel] succeed to load elf data");
         // identifier
@@ -232,10 +233,12 @@ impl Task {
     pub fn init_user_stack(
         &self,
         user_sp: usize,
-        args: Vec<String>,        // argv & argc
-        envs: Vec<String>,        // env vec
-        auxs: &mut Vec<AuxEntry>, // aux vec
+        args: Vec<String>,       // argv & argc
+        envs: Vec<String>,       // env vec
+        mut auxs: Vec<AuxEntry>, // aux vec
     ) -> (usize, usize, usize, usize) {
+        trace!("[init_user_stack] start");
+
         fn push_slice<T: Copy>(user_sp: &mut usize, slice: &[T]) {
             let mut sp = *user_sp;
             sp -= core::mem::size_of_val(slice);
@@ -253,6 +256,7 @@ impl Task {
         let mut envp = vec![0; envs.len() + 1];
 
         // === push args ===
+        trace!("[init_user_stack] push args: {:?}", args);
         for (i, s) in args.iter().enumerate() {
             let len = s.len();
             user_sp -= len + 1;
@@ -266,6 +270,7 @@ impl Task {
         user_sp -= user_sp % core::mem::size_of::<usize>();
 
         // === push env ===
+        trace!("[init_user_stack] push envs: {:?}", envs);
         for (i, s) in envs.iter().enumerate() {
             let len = s.len();
             user_sp -= len + 1;
@@ -278,9 +283,10 @@ impl Task {
         }
         // terminator: envp end with NULL
         envp[envs.len()] = 0;
-        user_sp = user_sp % core::mem::align_of::<usize>();
+        user_sp -= user_sp % core::mem::align_of::<usize>();
 
         // === push auxs ===
+        trace!("[init_user_stack] push auxs");
         // random (16 bytes aligned, always 0 here)
         user_sp -= 16;
         auxs.push(AuxEntry(AT_RANDOM, user_sp as usize));
@@ -293,6 +299,7 @@ impl Task {
         auxs.push(AuxEntry(AT_NULL, 0 as usize)); // end
 
         // construct auxv
+        trace!("[init_user_stack] construct auxv");
         let auxs_len = auxs.len() * core::mem::size_of::<AuxEntry>();
         user_sp -= auxs_len;
         // let auxv_base = user_sp;
@@ -305,6 +312,7 @@ impl Task {
         }
 
         // construct envp
+        trace!("[init_user_stack] construct envp");
         let len = envs.len() * core::mem::size_of::<usize>();
         user_sp -= len;
         let envp_base = user_sp;
@@ -318,11 +326,15 @@ impl Task {
         }
 
         // push argv
+        trace!("[init_user_stack] push argv");
         push_slice(&mut user_sp, argv.as_slice());
         let argv_base = user_sp;
 
         // push argc
+        trace!("[init_user_stack] push argc");
         push_slice(&mut user_sp, &[args.len()]);
+
+        // return value: sp, argc, argv, envp
         (user_sp, args.len(), argv_base, envp_base)
     }
 
@@ -384,10 +396,13 @@ impl Task {
             memory_set,
             elf_entry,
             user_sp,
+            auxs,
         } = MemorySet::load_from_path(path).await;
         // TODO: delete child
         unsafe { memory_set.activate() };
         self.change_memory_set(memory_set);
+        trace!("init usatck");
+        let (user_sp, argc, argv_base, envp_base) = self.init_user_stack(user_sp, args, envs, auxs);
         // TODO: init ustack
         self.set_trap_context(TrapContext::app_init_cx(elf_entry, user_sp));
     }

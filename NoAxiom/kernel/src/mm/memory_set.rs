@@ -68,6 +68,7 @@ pub struct ElfMemoryInfo {
     pub memory_set: MemorySet,
     pub elf_entry: usize,
     pub user_sp: usize,
+    pub auxs: Vec<AuxEntry>,
 }
 
 pub struct MemorySet {
@@ -247,7 +248,7 @@ impl MemorySet {
     /// load data from elf file
     pub async fn load_from_elf(elf_file: Arc<dyn File>) -> ElfMemoryInfo {
         let mut memory_set = Self::new_with_kernel();
-        let mut auxv: Vec<AuxEntry> = Vec::new(); // auxiliary vector
+        let mut auxs: Vec<AuxEntry> = Vec::new(); // auxiliary vector
         let mut dl_flag = false; // dynamic link flag
 
         // ! fixme: temp used for read all elf file
@@ -315,32 +316,33 @@ impl MemorySet {
 
         // aux vector
         let ph_head_addr = elf.header.pt2.ph_offset() as u64;
-        auxv.push(AuxEntry(AT_PHDR, ph_head_addr as usize));
-        auxv.push(AuxEntry(AT_PHENT, elf.header.pt2.ph_entry_size() as usize)); // ELF64 header 64bytes
-        auxv.push(AuxEntry(AT_PHNUM, ph_count as usize));
-        auxv.push(AuxEntry(AT_PAGESZ, PAGE_SIZE as usize));
+        auxs.push(AuxEntry(AT_PHDR, ph_head_addr as usize));
+        auxs.push(AuxEntry(AT_PHENT, elf.header.pt2.ph_entry_size() as usize)); // ELF64 header 64bytes
+        auxs.push(AuxEntry(AT_PHNUM, ph_count as usize));
+        auxs.push(AuxEntry(AT_PAGESZ, PAGE_SIZE as usize));
         if dl_flag {
             // let interp_entry_point = memory_set.load_dl_interp(&elf).await;
             // auxv.push(AuxEntry(AT_BASE, DL_INTERP_OFFSET));
             // elf_entry = interp_entry_point.unwrap();
             unimplemented!()
         } else {
-            auxv.push(AuxEntry(AT_BASE, 0));
+            auxs.push(AuxEntry(AT_BASE, 0));
         }
-        auxv.push(AuxEntry(AT_FLAGS, 0 as usize));
-        auxv.push(AuxEntry(AT_ENTRY, elf.header.pt2.entry_point() as usize));
-        auxv.push(AuxEntry(AT_UID, 0 as usize));
-        auxv.push(AuxEntry(AT_EUID, 0 as usize));
-        auxv.push(AuxEntry(AT_GID, 0 as usize));
-        auxv.push(AuxEntry(AT_EGID, 0 as usize));
-        auxv.push(AuxEntry(AT_HWCAP, 0 as usize));
-        auxv.push(AuxEntry(AT_CLKTCK, CLOCK_FREQ as usize));
-        auxv.push(AuxEntry(AT_SECURE, 0 as usize));
+        auxs.push(AuxEntry(AT_FLAGS, 0 as usize));
+        auxs.push(AuxEntry(AT_ENTRY, elf.header.pt2.entry_point() as usize));
+        auxs.push(AuxEntry(AT_UID, 0 as usize));
+        auxs.push(AuxEntry(AT_EUID, 0 as usize));
+        auxs.push(AuxEntry(AT_GID, 0 as usize));
+        auxs.push(AuxEntry(AT_EGID, 0 as usize));
+        auxs.push(AuxEntry(AT_HWCAP, 0 as usize));
+        auxs.push(AuxEntry(AT_CLKTCK, CLOCK_FREQ as usize));
+        auxs.push(AuxEntry(AT_SECURE, 0 as usize));
 
         ElfMemoryInfo {
             memory_set,
             elf_entry,
             user_sp: user_stack_end, // stack grows downward, so return stack_end
+            auxs,
         }
     }
 
