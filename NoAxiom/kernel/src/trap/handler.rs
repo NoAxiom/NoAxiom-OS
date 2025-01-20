@@ -140,7 +140,7 @@ pub fn kernel_trap_handler() {
 pub async fn user_trap_handler(task: &Arc<Task>) {
     trace!("[trap_handler] call trap handler");
     set_kernel_trap_entry();
-    let mut cx = task.trap_context_mut();
+    let cx = task.trap_context_mut();
     let scause = scause::read();
     let stval = stval::read();
     trace!(
@@ -168,8 +168,7 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
                 trace!("[syscall] doing syscall");
                 let result = syscall(task, cx).await;
                 trace!("[syscall] done! result {:#x}", result);
-                cx = task.trap_context_mut();
-                cx.user_reg[A0] = result as usize;
+                task.trap_context_mut().user_reg[A0] = result as usize;
             }
             // page fault: try to handle copy-on-write, or exit the task
             Exception::LoadPageFault

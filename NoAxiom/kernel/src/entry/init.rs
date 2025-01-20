@@ -54,6 +54,7 @@ pub fn other_hart_init(hart_id: usize, dtb: usize) {
         hart_id, dtb as usize,
     );
     rust_main();
+    unreachable!();
 }
 
 // TODO: dtb, init_proc
@@ -93,4 +94,5 @@ pub fn boot_hart_init(_: usize, dtb: usize) {
         dtb as usize,
     );
     rust_main();
+    unreachable!();
 }

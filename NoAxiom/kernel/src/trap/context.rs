@@ -113,8 +113,22 @@ impl TrapContext {
         cx.user_reg[SP] = sp;
         cx
     }
+    pub fn update_cx(&mut self, entry: usize, sp: usize, argc: usize, argv: usize, envp: usize) {
+        self.sepc = entry;
+        self.set_sp(sp);
+        self.set_reg(A0, argc);
+        self.set_reg(A1, argv);
+        self.set_reg(A2, envp);
+        let mut sstatus = Sstatus::read();
+        sstatus.set_spp(SPP::User);
+        self.sstatus = sstatus;
+    }
     #[inline(always)]
     pub fn set_sp(&mut self, sp: usize) {
         self.user_reg[SP] = sp;
+    }
+    #[inline(always)]
+    pub fn set_reg(&mut self, id: usize, value: usize) {
+        self.user_reg[id] = value;
     }
 }

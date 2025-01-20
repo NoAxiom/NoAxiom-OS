@@ -2,6 +2,7 @@
 use super::{Syscall, SyscallResult};
 use crate::{
     fs::path::Path, mm::user_ptr::UserPtr, nix::clone_flags::CloneFlags, sched::task::spawn_utask,
+    syscall::A0,
 };
 
 impl Syscall<'_> {
@@ -45,6 +46,8 @@ impl Syscall<'_> {
         let args = UserPtr::<u8>::new(argv).get_string_vec();
         let envs = UserPtr::<u8>::new(envp).get_string_vec();
         self.task.exec(path, args, envs).await;
-        Ok(0)
+        // On success, execve() does not return, on error -1 is returned, and errno is
+        // set to indicate the error.
+        Ok(self.task.trap_context().user_reg[A0] as isize)
     }
 }

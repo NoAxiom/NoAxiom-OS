@@ -47,12 +47,16 @@ pub fn trap_init() {
 /// kernel back to user
 pub fn trap_restore(task: &Arc<Task>) {
     set_user_trap_entry();
-    let cx = task.trap_context_mut();
+    let cx = task.trap_context();
+    trace!("[trap_restore] cx: {:?}", cx);
     trace!(
-        "[trap_restore] tid {}, sepc {:#x}, sp {:#x}",
+        "[trap_restore] tid {}, sepc {:#x}, sp {:#x}, argc {:#x}, argv {:#x}, envp {:#x}",
         task.tid(),
         cx.sepc,
-        cx.user_reg[2]
+        cx.user_reg[2],
+        cx.user_reg[10],
+        cx.user_reg[11],
+        cx.user_reg[12],
     );
     // kernel -> user
     unsafe {

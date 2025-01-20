@@ -39,7 +39,11 @@ impl<'a> Syscall<'a> {
             // process
             SYS_EXIT => self.sys_exit(),
             SYS_CLONE => self.sys_fork(args[0], args[1], args[2], args[3], args[4]),
-            SYS_EXECVE => self.sys_exec(args[0], args[1], args[2]).await,
+            SYS_EXECVE => {
+                let res = self.sys_exec(args[0], args[1], args[2]).await;
+                debug!("trap_cx after execve: {:?}", self.task.trap_context());
+                res
+            }
 
             // mm
             SYS_BRK => todo!(),
@@ -58,7 +62,7 @@ impl<'a> Syscall<'a> {
     }
 }
 
-pub async fn syscall(task: &Arc<Task>, cx: &mut TrapContext) -> isize {
+pub async fn syscall(task: &Arc<Task>, cx: &TrapContext) -> isize {
     let res = Syscall::new(task)
         .syscall(
             cx.user_reg[A7],

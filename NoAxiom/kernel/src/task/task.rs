@@ -1,13 +1,15 @@
 //! # Task
 
 use alloc::{
-    string::String,
+    string::{String, ToString},
     sync::{Arc, Weak},
     vec::Vec,
 };
-use core::sync::atomic::{AtomicIsize, AtomicUsize, Ordering};
+use core::{
+    ptr::null,
+    sync::atomic::{AtomicIsize, AtomicUsize, Ordering},
+};
 
-use arch::interrupt::is_interrupt_enabled;
 use ksync::{cell::SyncUnsafeCell, mutex::SpinLock};
 use riscv::register::scause::Exception;
 
@@ -171,10 +173,6 @@ impl Task {
     pub fn trap_context_mut(&self) -> &mut TrapContext {
         unsafe { &mut (*self.trap_cx.get()) }
     }
-    #[inline(always)]
-    pub fn set_trap_context(&self, trap_context: TrapContext) {
-        *self.trap_context_mut() = trap_context;
-    }
 
     /// create new process from elf
     pub async fn new_process(path: Path) -> Arc<Self> {
@@ -207,7 +205,6 @@ impl Task {
         task
     }
 
-    // TODO: WIP
     /// init user stack
     ///
     /// stack construction
@@ -234,11 +231,11 @@ impl Task {
     pub fn init_user_stack(
         &self,
         user_sp: usize,
-        args: Vec<String>,       // argv & argc
-        envs: Vec<String>,       // env vec
-        mut auxs: Vec<AuxEntry>, // aux vec
+        args: Vec<String>,        // argv & argc
+        envs: Vec<String>,        // env vec
+        auxs: &mut Vec<AuxEntry>, // aux vec
     ) -> (usize, usize, usize, usize) {
-        trace!("[init_user_stack] start");
+        debug!("[init_user_stack] start");
 
         fn push_slice<T: Copy>(user_sp: &mut usize, slice: &[T]) {
             let mut sp = *user_sp;
@@ -246,18 +243,25 @@ impl Task {
             sp -= sp % core::mem::align_of::<T>();
             unsafe { core::slice::from_raw_parts_mut(sp as *mut T, slice.len()) }
                 .copy_from_slice(slice);
-            *user_sp = sp
+            *user_sp = sp;
+
+            debug!(
+                "[init_user_stack] sp {:#x}, push_slice: {:#x?}",
+                sp,
+                unsafe { core::slice::from_raw_parts(sp as *const usize, slice.len()) }
+            );
         }
 
         // user stack pointer
-        let mut user_sp = user_sp;
+        let mut user_sp = user_sp - 16;
+        info!("user_sp: {:#x}", user_sp);
         // argument vector
-        let mut argv = vec![0; args.len()];
+        let mut argv = vec![0; args.len() + 1];
         // environment pointer, end with NULL
         let mut envp = vec![0; envs.len() + 1];
 
         // === push args ===
-        trace!("[init_user_stack] push args: {:?}", args);
+        debug!("[init_user_stack] push args: {:?}", args);
         for (i, s) in args.iter().enumerate() {
             let len = s.len();
             user_sp -= len + 1;
@@ -271,7 +275,7 @@ impl Task {
         user_sp -= user_sp % core::mem::size_of::<usize>();
 
         // === push env ===
-        trace!("[init_user_stack] push envs: {:?}", envs);
+        debug!("[init_user_stack] push envs: {:?}", envs);
         for (i, s) in envs.iter().enumerate() {
             let len = s.len();
             user_sp -= len + 1;
@@ -287,7 +291,7 @@ impl Task {
         user_sp -= user_sp % core::mem::align_of::<usize>();
 
         // === push auxs ===
-        trace!("[init_user_stack] push auxs");
+        debug!("[init_user_stack] push auxs");
         // random (16 bytes aligned, always 0 here)
         user_sp -= 16;
         auxs.push(AuxEntry(AT_RANDOM, user_sp as usize));
@@ -298,9 +302,10 @@ impl Task {
         }
         // terminator: auxv end with AT_NULL
         auxs.push(AuxEntry(AT_NULL, 0 as usize)); // end
+        debug!("[init_user_stack] auxs: {:?}", auxs);
 
         // construct auxv
-        trace!("[init_user_stack] construct auxv");
+        debug!("[init_user_stack] construct auxv");
         let auxs_len = auxs.len() * core::mem::size_of::<AuxEntry>();
         user_sp -= auxs_len;
         // let auxv_base = user_sp;
@@ -313,26 +318,17 @@ impl Task {
         }
 
         // construct envp
-        trace!("[init_user_stack] construct envp");
-        let len = envs.len() * core::mem::size_of::<usize>();
-        user_sp -= len;
+        debug!("[init_user_stack] construct envp, data: {:#x?}", envp);
+        push_slice(&mut user_sp, envp.as_slice());
         let envp_base = user_sp;
-        for i in 0..envs.len() {
-            unsafe {
-                *((envp_base + i * core::mem::size_of::<usize>()) as *mut usize) = envp[i];
-            }
-        }
-        unsafe {
-            *((envp_base + envs.len() * core::mem::size_of::<usize>()) as *mut usize) = 0;
-        }
 
         // push argv
-        trace!("[init_user_stack] push argv");
+        debug!("[init_user_stack] push argv, data: {:#x?}", argv);
         push_slice(&mut user_sp, argv.as_slice());
         let argv_base = user_sp;
 
         // push argc
-        trace!("[init_user_stack] push argc");
+        debug!("[init_user_stack] push argc");
         push_slice(&mut user_sp, &[args.len()]);
 
         // return value: sp, argc, argv, envp
@@ -392,20 +388,35 @@ impl Task {
     }
 
     /// execute
-    pub async fn exec(self: &Arc<Self>, path: Path, args: Vec<String>, envs: Vec<String>) {
+    pub async fn exec(self: &Arc<Self>, path: Path, mut args: Vec<String>, mut envs: Vec<String>) {
         let ElfMemoryInfo {
             memory_set,
             elf_entry,
             user_sp,
-            auxs,
+            mut auxs,
         } = MemorySet::load_from_path(path).await;
         // TODO: delete child
         unsafe { memory_set.activate() };
         self.change_memory_set(memory_set);
         trace!("init usatck");
-        let (user_sp, argc, argv_base, envp_base) = self.init_user_stack(user_sp, args, envs, auxs);
-        // TODO: init ustack
-        self.set_trap_context(TrapContext::app_init_cx(elf_entry, user_sp));
+        args.push("hello".to_string());
+        args.push("world".to_string());
+        args.push("qwq".to_string());
+        envs.push("PATH=/usr/bin".to_string());
+        envs.push("test_for_execve".to_string());
+        let (user_sp, argc, argv_base, envp_base) =
+            self.init_user_stack(user_sp, args, envs, &mut auxs);
+        self.trap_context_mut()
+            .update_cx(elf_entry, user_sp, argc, argv_base, envp_base);
+        // debug!("trap_context: {:#x?}", self.trap_context());
+        debug!(
+            "trap_context: tid: {}, A0: {:#x}, A1: {:#x}, A2: {:#x}",
+            self.tid(),
+            self.trap_context().user_reg[10],
+            self.trap_context().user_reg[11],
+            self.trap_context().user_reg[12],
+        );
+        // TODO: close fd table, reset sigactions
     }
 
     /// exit current task
