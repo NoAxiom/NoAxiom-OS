@@ -14,6 +14,14 @@ export SBI ?= $(ROOT)/$(PROJECT)/bootloader/rustsbi-qemu.bin
 export LOG ?= DEBUG
 
 export SAMPLE ?= Test # Custom / Test samples
+MKFS_SH := mk_fat32img.sh
+
+export ELF_PATH ?= ./test/riscv-syscalls-testing/user/build/riscv64
+
+# fixme: export custom samples
+ifeq ($(SAMPLE), Custom)
+	export ELF_PATH ?= target/riscv64gc-unknown-none-elf/release
+endif
 
 # partition config
 # export ROOTFS  ?= $(ROOT)/part/img/sdcard-riscv.img
@@ -32,13 +40,7 @@ KERNEL_BIN := $(KERNEL_ELF).bin
 
 TEST_DIR := ./test/riscv-syscalls-testing/user
 FS_IMG := fs.img
-MKFS_SH := mk_fat32img.sh
-
-ifeq ($(SAMPLE), Custom)
 MKFS_SH := ./mk_fat32img.sh
-else
-MKFS_SH := ./test/mk_fat32img.sh
-endif
 
 export OBJCOPY := rust-objcopy --binary-architecture=riscv64
 

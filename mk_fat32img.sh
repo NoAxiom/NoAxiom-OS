@@ -1,5 +1,5 @@
 #!/bin/bash
-elf_path="target/riscv64gc-unknown-none-elf/release"
+elf_path="${ELF_PATH}"
 ERROR="\e[31m"
 WARN="\e[33m"
 NORMAL="\e[32m"
