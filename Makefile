@@ -13,6 +13,8 @@ export SBI ?= $(ROOT)/$(PROJECT)/bootloader/rustsbi-qemu.bin
 
 export LOG ?= DEBUG
 
+export SAMPLE ?= Test # Custom / Test samples
+
 # partition config
 # export ROOTFS  ?= $(ROOT)/part/img/sdcard-riscv.img
 # export TESTFS  ?= $(ROOT)/fs.img
@@ -28,9 +30,15 @@ KERNEL_BIN := $(KERNEL_ELF).bin
 # SDCARD_BAK = $(ROOTFS).bak
 # FS_BAK = $(TESTFS).bak
 
-# TEST_DIR := ./tests/final
+TEST_DIR := ./test/riscv-syscalls-testing/user
 FS_IMG := fs.img
 MKFS_SH := mk_fat32img.sh
+
+ifeq ($(SAMPLE), Custom)
+MKFS_SH := ./mk_fat32img.sh
+else
+MKFS_SH := ./test/mk_fat32img.sh
+endif
 
 export OBJCOPY := rust-objcopy --binary-architecture=riscv64
 
@@ -48,7 +56,17 @@ build_user:
 	@cd $(PROJECT)/user && make build
 
 $(FS_IMG): build_user
-	@./$(MKFS_SH)
+	@$(MKFS_SH)
+
+TEST_FLAGS :=
+TEST_FLAGS += all
+TEST_FLAGS += CHAPTER=7
+
+$(TEST_DIR)/build: 
+	@cd $(TEST_DIR) && make $(TEST_FLAGS)
+
+test: $(TEST_DIR)/build
+	@$(MKFS_SH)
 
 build_kernel:
 	@cd $(PROJECT)/kernel && make build
@@ -123,6 +141,8 @@ clean:
 	@rm -f kernel-qemu
 	@rm -f sbi-qemu
 	@rm -f $(FS_IMG)
+	@rm -rf $(TEST_DIR)/build
+	@rm -rf $(TEST_DIR)/riscv64
 	# @rm -f sdcard.img
 	cargo clean
 
@@ -179,4 +199,4 @@ count:
 # board:
 # 	@cp $(TARGET_DIR)/$(KERNEL).bin  $(TFTPBOOT)
 
-.PHONY: all build run debug clean debug-client sbi-qemu backup sdcard build-gui board vendor count asm
+.PHONY: all build run debug clean debug-client sbi-qemu backup sdcard build-gui board vendor count asm test
