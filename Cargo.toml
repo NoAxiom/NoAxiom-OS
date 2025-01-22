@@ -1,6 +1,6 @@
 # complete these after
 [workspace]
-members = ["NoAxiom/kernel",  "NoAxiom/user/apps/*", "NoAxiom/user/lib"]
+members = ["NoAxiom/kernel", "NoAxiom/lib/console",  "NoAxiom/user/apps/*", "NoAxiom/user/lib"]
 # exclude = ["NoAxiom/user/.*"]
 resolver = "2"
 

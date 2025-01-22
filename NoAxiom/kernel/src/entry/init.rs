@@ -1,11 +1,12 @@
 use arch::interrupt::enable_user_memory_access;
+use sbi_rt::hart_start;
 
 use crate::{
     config::{arch::CPU_NUM, mm::KERNEL_ADDR_OFFSET},
     constant::banner::NOAXIOM_BANNER,
     cpu::get_hartid,
     device::init::device_init,
-    driver::{log::log_init, sbi::hart_start},
+    driver::log::log_init,
     entry::{boot::_entry_other_hart, init_proc::schedule_spawn_all_apps},
     fs::fs_init,
     mm::{bss::bss_init, frame::frame_init, hart_mm_init, heap::heap_init},
@@ -14,7 +15,7 @@ use crate::{
         platform_init,
         plic::{init_plic, register_to_hart},
     },
-    println, rust_main,
+    rust_main,
     sched::utils::block_on,
     trap::trap_init,
 };
@@ -35,8 +36,7 @@ pub fn wake_other_hart(forbid_hart_id: usize) {
             } else {
                 error!(
                     "[awake_other_hart] error when waking {}, error code: {:?}",
-                    i,
-                    result.get_sbi_error()
+                    i, result
                 );
             }
         }

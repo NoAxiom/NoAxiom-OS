@@ -2,8 +2,8 @@ use alloc::sync::Arc;
 use core::arch::global_asm;
 
 use arch::interrupt::{
-    enable_external_interrupt, enable_global_interrupt, enable_stimer_interrupt,
-    is_interrupt_enabled,
+    disable_global_interrupt, enable_external_interrupt, enable_global_interrupt,
+    enable_stimer_interrupt, is_interrupt_enabled,
 };
 use riscv::register::{
     sstatus,
@@ -11,7 +11,7 @@ use riscv::register::{
 };
 
 use super::context::TrapContext;
-use crate::{println, task::Task, utils::current_pc};
+use crate::{task::Task, utils::current_pc};
 
 global_asm!(include_str!("./trap.S"));
 extern "C" {
@@ -46,6 +46,7 @@ pub fn trap_init() {
 #[no_mangle]
 /// kernel back to user
 pub fn trap_restore(task: &Arc<Task>) {
+    // FIXME: disable interrupt before restore
     set_user_trap_entry();
     let cx = task.trap_context();
     trace!("[trap_restore] cx: {:?}", cx);

@@ -1,0 +1,8 @@
+[package]
+name = "console"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+sbi-rt = { version = "0.0.3", features = ["legacy"] }
+ksync = { path = "../ksync" }

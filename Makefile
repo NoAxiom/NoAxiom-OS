@@ -16,12 +16,12 @@ export LOG ?= DEBUG
 export SAMPLE ?= Test # Custom / Test samples
 MKFS_SH := mk_fat32img.sh
 
-export ELF_PATH ?= ./test/riscv-syscalls-testing/user/build/riscv64
+# export ELF_PATH ?= ./test/riscv-syscalls-testing/user/build/riscv64
+export ELF_PATH ?= target/riscv64gc-unknown-none-elf/release
 
 # fixme: export custom samples
-ifeq ($(SAMPLE), Custom)
-	export ELF_PATH ?= target/riscv64gc-unknown-none-elf/release
-endif
+# ifeq ($(SAMPLE), Custom)
+# endif
 
 # partition config
 # export ROOTFS  ?= $(ROOT)/part/img/sdcard-riscv.img

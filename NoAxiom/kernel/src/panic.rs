@@ -2,7 +2,7 @@
 
 use core::panic::PanicInfo;
 
-use crate::{cpu::get_hartid, driver::sbi::shutdown, println};
+use crate::cpu::get_hartid;
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
@@ -21,5 +21,5 @@ fn panic(info: &PanicInfo) -> ! {
             info.message().unwrap()
         );
     }
-    shutdown()
+    sbi_rt::legacy::shutdown()
 }

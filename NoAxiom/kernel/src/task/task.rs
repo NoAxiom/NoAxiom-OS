@@ -253,7 +253,7 @@ impl Task {
         }
 
         // user stack pointer
-        let mut user_sp = user_sp - 16;
+        let mut user_sp = user_sp;
         info!("user_sp: {:#x}", user_sp);
         // argument vector
         let mut argv = vec![0; args.len() + 1];

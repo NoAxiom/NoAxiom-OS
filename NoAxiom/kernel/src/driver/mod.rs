@@ -4,11 +4,9 @@
 #[cfg(feature = "async_fs")]
 pub mod async_virtio_driver;
 pub mod block;
-pub mod console;
 pub mod event;
 pub mod log;
 pub mod probe;
-pub mod sbi;
 pub mod uart;
 mod virtio_drivers2;
 

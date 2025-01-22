@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
 
-use crate::{driver::heap, print, syscall::sys_exit};
+use crate::{driver::heap, syscall::sys_exit};
 
 macro_rules! get_reg {
     ($reg:ident) => {{

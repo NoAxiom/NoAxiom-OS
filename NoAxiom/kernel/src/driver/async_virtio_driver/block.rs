@@ -36,7 +36,7 @@ use virtio_mm::virtio_phys_to_virt;
 use volatile::Volatile;
 
 use super::{config::*, mmio::VirtIOHeader, queue::VirtQueue, util::AsBuf, *};
-use crate::{driver::event::Event, println};
+use crate::driver::event::Event;
 // type Mutex<T> = ksync::mutex::SpinNoIrqLock<T>;
 // type MutexGuard<'a, T> = ksync::mutex::SpinLockGuard<'a, T>;
 

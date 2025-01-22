@@ -13,7 +13,6 @@ use crate::{
         memory_set::KERNEL_SPACE,
         page_table::PageTable,
     },
-    println,
     utils::{kernel_pa_to_va, kernel_va_to_pa},
 };
 pub mod async_blk;

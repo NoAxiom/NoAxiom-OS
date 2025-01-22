@@ -9,9 +9,7 @@ use ksync::mutex::SpinLock;
 use lazy_static::lazy_static;
 
 use super::address::PhysPageNum;
-use crate::{
-    config::mm::KERNEL_PHYS_MEMORY_END, mm::address::PhysAddr, println, utils::kernel_va_to_pa,
-};
+use crate::{config::mm::KERNEL_PHYS_MEMORY_END, mm::address::PhysAddr, utils::kernel_va_to_pa};
 
 // pub fn frame_strong_count(ppn: PhysPageNum) -> usize {
 //     FRAME_MAP

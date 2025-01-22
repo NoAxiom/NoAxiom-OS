@@ -342,7 +342,7 @@ impl MemorySet {
         ElfMemoryInfo {
             memory_set,
             elf_entry,
-            user_sp: user_stack_end, // stack grows downward, so return stack_end
+            user_sp: user_stack_end - 16, // stack grows downward, so return stack_end
             auxs,
         }
     }

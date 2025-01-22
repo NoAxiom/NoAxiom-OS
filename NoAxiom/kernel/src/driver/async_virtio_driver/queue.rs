@@ -13,7 +13,6 @@ use virtio_mm::virtio_virt_to_phys;
 use volatile::Volatile;
 
 use super::{config::*, dma::DMA, mmio::VirtIOHeader, *};
-use crate::println;
 
 type AvailableRing = Ring<Volatile<u16>>;
 type UsedRing = Ring<UsedElement>;

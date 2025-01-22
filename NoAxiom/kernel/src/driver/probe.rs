@@ -8,7 +8,7 @@ use core::ops::Range;
 use fdt::{standard_nodes::Compatible, Fdt};
 use ksync::Once;
 
-use crate::{platform, println};
+use crate::platform;
 
 pub static PROBE: Once<Arc<Probe>> = Once::new();
 

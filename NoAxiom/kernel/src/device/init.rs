@@ -15,7 +15,7 @@ use crate::{
         probe::{Probe, ProbeInfo, PROBE},
         Driver, DRIVER_MANAGER,
     },
-    platform, println,
+    platform,
 };
 
 pub fn device_init() {

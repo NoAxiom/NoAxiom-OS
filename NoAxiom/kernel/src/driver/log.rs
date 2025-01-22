@@ -4,7 +4,7 @@ use core::sync::atomic::{AtomicBool, Ordering};
 
 use log::{self, Level, LevelFilter, Log, Metadata, Record};
 
-use crate::{cpu::get_hartid, println};
+use crate::cpu::get_hartid;
 
 pub static mut LOG_BOOTED: AtomicBool = AtomicBool::new(false);
 

@@ -1,7 +1,6 @@
 use crate::{
     cpu::get_hartid,
     mm::user_ptr::UserPtr,
-    print,
     syscall::{Syscall, SyscallResult},
 };
 

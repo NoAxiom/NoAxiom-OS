@@ -11,6 +11,7 @@
 #![feature(panic_info_message)]
 #![feature(alloc_error_handler)]
 #![feature(slice_from_ptr_range)]
+#![allow(deprecated)]
 // #![allow(dead_code, unused_imports, unused_variables)]
 // #![feature(custom_mir)]
 // #![feature(core_intrinsics)]
@@ -19,6 +20,8 @@
 extern crate alloc;
 #[macro_use]
 extern crate log;
+#[macro_use]
+extern crate console;
 
 mod config;
 mod constant;
