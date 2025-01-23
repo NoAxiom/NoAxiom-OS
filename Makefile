@@ -13,15 +13,21 @@ export SBI ?= $(ROOT)/$(PROJECT)/bootloader/rustsbi-qemu.bin
 
 export LOG ?= DEBUG
 
-export SAMPLE ?= Test # Custom / Test samples
+# choose Custom or Official test samples
+SAMPLE := Custom
 MKFS_SH := mk_fat32img.sh
 
-# export ELF_PATH ?= ./test/riscv-syscalls-testing/user/build/riscv64
-export ELF_PATH ?= target/riscv64gc-unknown-none-elf/release
+CHOSEN_PATN := 
 
-# fixme: export custom samples
-# ifeq ($(SAMPLE), Custom)
-# endif
+ifeq ($(SAMPLE), Custom)
+	CHOSEN_PATN := ./target/riscv64gc-unknown-none-elf/release
+else ifeq ($(SAMPLE), Official)
+	CHOSEN_PATN := ./test/riscv-syscalls-testing/user/build/riscv64
+else 
+	CHOSEN_PATN := Please check your ELF path.
+endif
+
+export ELF_PATH ?= $(CHOSEN_PATN)
 
 # partition config
 # export ROOTFS  ?= $(ROOT)/part/img/sdcard-riscv.img
