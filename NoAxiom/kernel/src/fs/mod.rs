@@ -3,7 +3,9 @@
 
 mod blockcache;
 pub mod fat32;
+pub mod fdtable;
 pub mod path;
+mod stdio;
 pub mod vfs;
 
 use alloc::sync::Arc;

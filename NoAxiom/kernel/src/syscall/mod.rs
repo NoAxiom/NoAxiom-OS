@@ -33,7 +33,7 @@ impl<'a> Syscall<'a> {
         }
         match id {
             // fs
-            SYS_READ => self.sys_read().await,
+            SYS_READ => self.sys_read(args[0], args[1], args[2]).await,
             SYS_WRITE => self.sys_write(args[0], args[1], args[2]).await,
 
             // process

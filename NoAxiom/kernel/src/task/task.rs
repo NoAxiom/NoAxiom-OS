@@ -10,12 +10,15 @@ use core::{
     sync::atomic::{AtomicIsize, AtomicUsize, Ordering},
 };
 
-use ksync::{cell::SyncUnsafeCell, mutex::SpinLock};
+use ksync::{
+    cell::SyncUnsafeCell,
+    mutex::{SpinLock, SpinLockGuard},
+};
 use riscv::register::scause::Exception;
 
 use super::taskid::TidTracer;
 use crate::{
-    fs::path::Path,
+    fs::{fdtable::FdTable, path::Path},
     mm::memory_set::{ElfMemoryInfo, MemorySet},
     nix::{
         auxv::{AuxEntry, AT_EXECFN, AT_NULL, AT_RANDOM},
@@ -41,6 +44,9 @@ pub struct ProcessInfo {
 
     /// parent task, weak ptr
     parent: Option<Weak<Task>>,
+
+    /// current work directory
+    pub cwd: Path,
 }
 
 /// task control block for a coroutine,
@@ -77,8 +83,9 @@ pub struct Task {
 
     /// task exit code
     exit_code: AtomicIsize,
-    // /// file descriptor
-    // fd: Arc<SpinLock<FdTable>>,
+
+    /// file descriptor table
+    fd_table: Arc<SpinLock<FdTable>>,
 }
 
 /// user tasks
@@ -164,6 +171,18 @@ impl Task {
         self.memory_set().lock().validate(addr, exception)
     }
 
+    /// get pcb
+    #[inline(always)]
+    pub fn pcb(&self) -> SpinLockGuard<ProcessInfo> {
+        self.pcb.lock()
+    }
+
+    /// get fd_table
+    #[inline(always)]
+    pub fn fd_table(&self) -> SpinLockGuard<FdTable> {
+        self.fd_table.lock()
+    }
+
     /// trap context
     #[inline(always)]
     pub fn trap_context(&self) -> &TrapContext {
@@ -182,7 +201,7 @@ impl Task {
             elf_entry,
             user_sp,
             auxs,
-        } = MemorySet::load_from_path(path).await;
+        } = MemorySet::load_from_path(path.clone()).await;
         trace!("[kernel] succeed to load elf data");
         // identifier
         let tid = tid_alloc();
@@ -194,12 +213,14 @@ impl Task {
             pcb: Arc::new(SpinLock::new(ProcessInfo {
                 children: Vec::new(),
                 parent: None,
+                cwd: path,
             })),
             memory_set: SyncUnsafeCell::new(Arc::new(SpinLock::new(memory_set))),
             trap_cx: SyncUnsafeCell::new(TrapContext::app_init_cx(elf_entry, user_sp)),
             status: SyncUnsafeCell::new(TaskStatus::Ready),
             exit_code: AtomicIsize::new(0),
             sched_entity: SchedEntity::new_bare(),
+            fd_table: Arc::new(SpinLock::new(FdTable::new())),
         });
         info!("[spawn] new task spawn complete, tid {}", task.tid.0);
         task
@@ -364,6 +385,7 @@ impl Task {
                 status: SyncUnsafeCell::new(TaskStatus::Ready),
                 exit_code: AtomicIsize::new(0),
                 sched_entity: self.sched_entity.data_clone(),
+                fd_table: self.fd_table.clone(),
             });
             task
         } else {
@@ -376,12 +398,14 @@ impl Task {
                 pcb: Arc::new(SpinLock::new(ProcessInfo {
                     children: Vec::new(),
                     parent: Some(Arc::downgrade(self)),
+                    cwd: self.pcb().cwd.clone(),
                 })),
                 memory_set,
                 trap_cx: SyncUnsafeCell::new(self.trap_context().clone()),
                 status: SyncUnsafeCell::new(TaskStatus::Ready),
                 exit_code: AtomicIsize::new(0),
                 sched_entity: self.sched_entity.data_clone(),
+                fd_table: self.fd_table.clone(),
             });
             task
         }

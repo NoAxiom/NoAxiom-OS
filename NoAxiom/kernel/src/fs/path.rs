@@ -1,5 +1,8 @@
 use alloc::string::{String, ToString};
 
+use super::vfs::root_dentry;
+
+#[derive(Debug, Clone)]
 pub struct Path {
     inner: String,
 }
@@ -28,4 +31,8 @@ impl From<&str> for Path {
             inner: inner.to_string(),
         }
     }
+}
+
+pub fn check_path(path: &str) -> bool {
+    root_dentry().find(path).is_some()
 }

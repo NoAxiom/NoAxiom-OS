@@ -35,6 +35,14 @@ impl FileMeta {
     pub fn dentry(&self) -> Arc<dyn Dentry> {
         self.dentry.clone()
     }
+    pub fn readable(&self) -> bool {
+        let flags = self.flags.lock();
+        !flags.contains(FileFlags::O_WRONLY) || flags.contains(FileFlags::O_RDWR)
+    }
+    pub fn writable(&self) -> bool {
+        let flags = self.flags.lock();
+        flags.contains(FileFlags::O_WRONLY) || flags.contains(FileFlags::O_RDWR)
+    }
 }
 
 #[async_trait]
