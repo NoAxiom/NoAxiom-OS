@@ -5,10 +5,7 @@ use alloc::{
     sync::{Arc, Weak},
     vec::Vec,
 };
-use core::{
-    ptr::null,
-    sync::atomic::{AtomicIsize, AtomicUsize, Ordering},
-};
+use core::sync::atomic::{AtomicIsize, AtomicUsize, Ordering};
 
 use ksync::{
     cell::SyncUnsafeCell,
