@@ -37,9 +37,10 @@ impl<'a> Syscall<'a> {
             SYS_CLONE => self.sys_fork(args[0], args[1], args[2], args[3], args[4]),
             SYS_EXECVE => {
                 let res = self.sys_exec(args[0], args[1], args[2]).await;
-                debug!("trap_cx after execve: {:?}", self.task.trap_context());
+                trace!("trap_cx after execve: {:?}", self.task.trap_context());
                 res
             }
+            SYS_WAIT4 => self.sys_wait4(args[0], args[1], args[2]).await,
 
             // mm
             SYS_BRK => todo!(),

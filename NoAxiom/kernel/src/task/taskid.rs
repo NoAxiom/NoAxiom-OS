@@ -2,10 +2,15 @@ use alloc::vec::Vec;
 
 use ksync::mutex::SpinLock;
 
+pub type TID = usize;
+pub type TGID = TID;
+pub type PID = TGID;
+pub type PGID = usize;
+
 /// Task ID allocator
 struct IndexAllocator {
-    current: usize,
-    recycled: Vec<usize>,
+    current: TID,
+    recycled: Vec<TID>,
 }
 
 impl IndexAllocator {
@@ -16,7 +21,7 @@ impl IndexAllocator {
         }
     }
 
-    fn alloc(&mut self) -> usize {
+    fn alloc(&mut self) -> TID {
         if let Some(tid) = self.recycled.pop() {
             tid
         } else {
@@ -25,7 +30,7 @@ impl IndexAllocator {
         }
     }
 
-    fn dealloc(&mut self, tid: usize) {
+    fn dealloc(&mut self, tid: TID) {
         debug_assert!(tid <= self.current);
         debug_assert!(
             !self.recycled.iter().any(|ttid| *ttid == tid),
@@ -37,18 +42,16 @@ impl IndexAllocator {
 }
 
 static TID_ALLOCATOR: SpinLock<IndexAllocator> = SpinLock::new(IndexAllocator::new());
-// static PID_ALLOCATOR: SpinLock<IndexAllocator> =
-// SpinLock::new(IndexAllocator::new());
 
 /// task id with auto dealloc
-pub struct TidTracer(pub usize);
-impl Into<usize> for TidTracer {
-    fn into(self) -> usize {
+pub struct TidTracer(pub TID);
+impl Into<TID> for TidTracer {
+    fn into(self) -> TID {
         self.0
     }
 }
-impl From<usize> for TidTracer {
-    fn from(tid: usize) -> Self {
+impl From<TID> for TidTracer {
+    fn from(tid: TID) -> Self {
         TidTracer(tid)
     }
 }
@@ -60,24 +63,3 @@ impl Drop for TidTracer {
 pub fn tid_alloc() -> TidTracer {
     TID_ALLOCATOR.lock().alloc().into()
 }
-
-// /// pid with auto dealloc
-// pub struct PidTracer(pub usize);
-// impl Into<usize> for PidTracer {
-//     fn into(self) -> usize {
-//         self.0
-//     }
-// }
-// impl From<usize> for PidTracer {
-//     fn from(pid: usize) -> Self {
-//         PidTracer(pid)
-//     }
-// }
-// impl Drop for PidTracer {
-//     fn drop(&mut self) {
-//         PID_ALLOCATOR.lock().dealloc(self.0);
-//     }
-// }
-// pub fn pid_alloc() -> PidTracer {
-//     PID_ALLOCATOR.lock().alloc().into()
-// }

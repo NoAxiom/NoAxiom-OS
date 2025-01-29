@@ -17,7 +17,7 @@ use super::{
 use crate::{
     cpu::current_cpu,
     fs::path::Path,
-    task::Task,
+    task::{exit_handler::exit_handler, Task},
     time::gettime::get_time_us,
     trap::{trap_restore, user_trap_handler},
 };
@@ -112,4 +112,5 @@ pub async fn task_main(task: Arc<Task>) {
         user_trap_handler(&task).await;
     }
     task_count_dec();
+    exit_handler(&task);
 }

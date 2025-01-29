@@ -9,7 +9,7 @@ pub fn schedule_spawn_all_apps() {
         // "long_loop",
         // "long_loop",
         // "long_loop",
-        "long_loop",
+        "yield",
     ];
     for path in PATHS {
         schedule_spawn_new_process(Path::from(path));

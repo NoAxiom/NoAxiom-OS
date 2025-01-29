@@ -505,7 +505,7 @@ impl MemorySet {
         if let Some(pte) = self.page_table().translate_vpn(vpn) {
             let flags = pte.flags();
             if flags.is_cow() {
-                info!(
+                trace!(
                     "[memory_validate] realloc COW at va: {:#x}, pte: {:#x}, flags: {:?}",
                     addr,
                     pte.0,

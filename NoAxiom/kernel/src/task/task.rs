@@ -13,7 +13,10 @@ use ksync::{
 };
 use riscv::register::scause::Exception;
 
-use super::taskid::TidTracer;
+use super::{
+    manager::{ThreadGroup, PROCESS_GROUP_MANAGER, TASK_MANAGER},
+    taskid::{TidTracer, TGID, TID},
+};
 use crate::{
     fs::{fdtable::FdTable, path::Path},
     mm::memory_set::{ElfMemoryInfo, MemorySet},
@@ -23,7 +26,7 @@ use crate::{
     },
     sched::sched_entity::SchedEntity,
     syscall::SyscallResult,
-    task::taskid::tid_alloc,
+    task::{manager::add_new_process, taskid::tid_alloc},
     trap::TrapContext,
 };
 
@@ -37,10 +40,10 @@ pub enum TaskStatus {
 /// process resources info
 pub struct ProcessInfo {
     /// children tasks, holds lifetime
-    children: Vec<Arc<Task>>,
+    pub children: Vec<Arc<Task>>,
 
     /// parent task, weak ptr
-    parent: Option<Weak<Task>>,
+    pub parent: Option<Weak<Task>>,
 
     /// current work directory
     pub cwd: Path,
@@ -49,11 +52,17 @@ pub struct ProcessInfo {
 /// task control block for a coroutine,
 /// a.k.a thread in current project structure
 pub struct Task {
-    /// task group id, aka process_id
+    /// task id
+    tid: TidTracer,
+
+    /// task group id, aka pid
     tgid: Arc<AtomicUsize>,
 
-    /// task id, aka thread_id
-    tid: TidTracer,
+    /// process group id
+    pgid: Arc<AtomicUsize>,
+
+    /// thread group tracer
+    pub thread_group: Arc<SpinLock<ThreadGroup>>,
 
     /// process control block ptr,
     /// also belongs to other threads
@@ -91,11 +100,14 @@ pub struct Task {
 impl Task {
     /// tid
     #[inline(always)]
-    pub fn tid(&self) -> usize {
+    pub fn tid(&self) -> TID {
         self.tid.0
     }
-    pub fn tgid(&self) -> usize {
+    pub fn tgid(&self) -> TGID {
         self.tgid.load(Ordering::SeqCst)
+    }
+    pub fn pgid(&self) -> usize {
+        self.pgid.load(Ordering::SeqCst)
     }
     #[inline(always)]
     pub fn is_leader(&self) -> bool {
@@ -207,6 +219,8 @@ impl Task {
         let task = Arc::new(Self {
             tid,
             tgid,
+            pgid: Arc::new(AtomicUsize::new(0)),
+            thread_group: Arc::new(SpinLock::new(ThreadGroup::new())),
             pcb: Arc::new(SpinLock::new(ProcessInfo {
                 children: Vec::new(),
                 parent: None,
@@ -219,6 +233,7 @@ impl Task {
             sched_entity: SchedEntity::new_bare(),
             fd_table: Arc::new(SpinLock::new(FdTable::new())),
         });
+        add_new_process(&task);
         info!("[spawn] new task spawn complete, tid {}", task.tid.0);
         task
     }
@@ -355,7 +370,6 @@ impl Task {
 
     /// fork
     pub fn fork(self: &Arc<Task>, flags: CloneFlags) -> Arc<Self> {
-        // memory set clone
         let memory_set = SyncUnsafeCell::new(if flags.contains(CloneFlags::VM) {
             self.memory_set().clone()
         } else {
@@ -363,48 +377,58 @@ impl Task {
         });
 
         // TODO: CloneFlags::SIGHAND
-        // TODO: fd table (CloneFlags::FILES)
-        // let fd = if flags.contains(CloneFlags::FILES) {
-        // self.fd_table.clone()
-        // } else {
-        // self.fd_table.clone_cow()
-        // };
 
-        // TODO: push task into process/thread manager
+        let fd_table = self.fd_table.clone();
+        let fd = if flags.contains(CloneFlags::FILES) {
+            self.fd_table.clone()
+        } else {
+            Arc::new(SpinLock::new(self.fd_table.lock().clone()))
+        };
+
         if flags.contains(CloneFlags::THREAD) {
             // fork as a new thread
-            let task = Arc::new(Self {
-                tgid: self.tgid.clone(),
+            trace!("fork new thread");
+            let new_thread = Arc::new(Self {
                 tid: tid_alloc(),
+                tgid: self.tgid.clone(),
+                pgid: self.pgid.clone(),
+                thread_group: self.thread_group.clone(),
                 pcb: self.pcb.clone(),
                 memory_set,
                 trap_cx: SyncUnsafeCell::new(self.trap_context().clone()),
                 status: SyncUnsafeCell::new(TaskStatus::Ready),
                 exit_code: AtomicIsize::new(0),
                 sched_entity: self.sched_entity.data_clone(),
-                fd_table: self.fd_table.clone(),
+                fd_table,
             });
-            task
+            self.thread_group.lock().insert(&new_thread);
+            new_thread
         } else {
             // fork as a new process
-            let new_tid = tid_alloc();
-            trace!("fork new process, tid: {}", new_tid.0);
-            let task = Arc::new(Self {
-                tgid: Arc::new(AtomicUsize::new(new_tid.0)),
-                tid: new_tid,
+            let tid = tid_alloc();
+            let tgid_val = tid.0;
+            trace!("fork new process, tgid: {}", tgid_val);
+            let mut parent_pcb = self.pcb();
+            let new_process = Arc::new(Self {
+                tid,
+                tgid: Arc::new(AtomicUsize::new(tgid_val)),
+                pgid: self.pgid.clone(),
+                thread_group: self.thread_group.clone(),
                 pcb: Arc::new(SpinLock::new(ProcessInfo {
                     children: Vec::new(),
                     parent: Some(Arc::downgrade(self)),
-                    cwd: self.pcb().cwd.clone(),
+                    cwd: parent_pcb.cwd.clone(),
                 })),
                 memory_set,
                 trap_cx: SyncUnsafeCell::new(self.trap_context().clone()),
                 status: SyncUnsafeCell::new(TaskStatus::Ready),
                 exit_code: AtomicIsize::new(0),
                 sched_entity: self.sched_entity.data_clone(),
-                fd_table: self.fd_table.clone(),
+                fd_table,
             });
-            task
+            add_new_process(&new_process);
+            parent_pcb.children.push(new_process.clone());
+            new_process
         }
     }
 
@@ -420,11 +444,8 @@ impl Task {
         unsafe { memory_set.activate() };
         self.change_memory_set(memory_set);
         trace!("init usatck");
-        args.push("hello".to_string());
-        args.push("world".to_string());
-        args.push("qwq".to_string());
-        envs.push("PATH=/usr/bin".to_string());
-        envs.push("test_for_execve".to_string());
+        args.push("ARGSTEST".to_string());
+        envs.push("ENVSTEST".to_string());
         let (user_sp, argc, argv_base, envp_base) =
             self.init_user_stack(user_sp, args, envs, &mut auxs);
         self.trap_context_mut()

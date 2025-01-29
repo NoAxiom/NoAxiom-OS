@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use alloc::{string::String, vec::Vec};
 
 use super::address::VirtAddr;

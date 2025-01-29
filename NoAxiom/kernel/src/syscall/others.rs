@@ -6,7 +6,7 @@ use crate::{
 impl Syscall<'_> {
     /// yield current task
     pub async fn sys_yield() -> SyscallResult {
-        trace!("sys_yield");
+        debug!("sys_yield");
         yield_now().await;
         Ok(0)
     }
