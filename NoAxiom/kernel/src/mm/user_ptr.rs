@@ -86,8 +86,16 @@ impl<T> UserPtr<T> {
         unsafe { *self.ptr }
     }
 
-    pub fn set(&self, value: T) {
+    pub fn addr(&self) -> usize {
+        self.ptr as usize
+    }
+
+    pub unsafe fn set(&self, value: T) {
         unsafe { *self.ptr = value };
+    }
+
+    pub fn write_volatile(&self, value: T) {
+        unsafe { self.ptr.write_volatile(value) };
     }
 
     /// convert ptr into an mutable reference

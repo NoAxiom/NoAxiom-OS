@@ -158,7 +158,7 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
             stval,
             cx.sepc
         );
-        task.exit();
+        task.exit(-1);
     };
     match scause.cause() {
         // syscall

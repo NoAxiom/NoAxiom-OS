@@ -5,7 +5,7 @@ use alloc::{
     sync::{Arc, Weak},
     vec::Vec,
 };
-use core::sync::atomic::{AtomicIsize, AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
 
 use ksync::{
     cell::SyncUnsafeCell,
@@ -14,7 +14,7 @@ use ksync::{
 use riscv::register::scause::Exception;
 
 use super::{
-    manager::{ThreadGroup, PROCESS_GROUP_MANAGER, TASK_MANAGER},
+    manager::ThreadGroup,
     taskid::{TidTracer, TGID, TID},
 };
 use crate::{
@@ -69,8 +69,6 @@ pub struct Task {
     pcb: Arc<SpinLock<ProcessInfo>>,
 
     /// memory set for task
-    /// it's a process resource as well
-    ///
     /// explanation:
     /// SyncUnsafeCell: allow to change memory set in immutable context
     /// Arc: allow to share memory set between tasks, also provides refcount
@@ -88,7 +86,7 @@ pub struct Task {
     pub sched_entity: SchedEntity,
 
     /// task exit code
-    exit_code: AtomicIsize,
+    exit_code: AtomicI32,
 
     /// file descriptor table
     fd_table: Arc<SpinLock<FdTable>>,
@@ -110,7 +108,7 @@ impl Task {
         self.pgid.load(Ordering::SeqCst)
     }
     #[inline(always)]
-    pub fn is_leader(&self) -> bool {
+    pub fn is_group_leader(&self) -> bool {
         self.tid() == self.tgid()
     }
 
@@ -142,12 +140,12 @@ impl Task {
 
     /// exit code
     #[inline(always)]
-    pub fn exit_code(&self) -> isize {
-        self.exit_code.load(Ordering::Relaxed)
+    pub fn exit_code(&self) -> i32 {
+        self.exit_code.load(Ordering::SeqCst)
     }
     #[inline(always)]
-    pub fn set_exit_code(&self, exit_code: isize) {
-        self.exit_code.store(exit_code, Ordering::Relaxed);
+    pub fn set_exit_code(&self, exit_code: i32) {
+        self.exit_code.store(exit_code, Ordering::SeqCst);
     }
 
     /// memory set
@@ -229,7 +227,7 @@ impl Task {
             memory_set: SyncUnsafeCell::new(Arc::new(SpinLock::new(memory_set))),
             trap_cx: SyncUnsafeCell::new(TrapContext::app_init_cx(elf_entry, user_sp)),
             status: SyncUnsafeCell::new(TaskStatus::Ready),
-            exit_code: AtomicIsize::new(0),
+            exit_code: AtomicI32::new(0),
             sched_entity: SchedEntity::new_bare(),
             fd_table: Arc::new(SpinLock::new(FdTable::new())),
         });
@@ -397,7 +395,7 @@ impl Task {
                 memory_set,
                 trap_cx: SyncUnsafeCell::new(self.trap_context().clone()),
                 status: SyncUnsafeCell::new(TaskStatus::Ready),
-                exit_code: AtomicIsize::new(0),
+                exit_code: AtomicI32::new(0),
                 sched_entity: self.sched_entity.data_clone(),
                 fd_table,
             });
@@ -422,7 +420,7 @@ impl Task {
                 memory_set,
                 trap_cx: SyncUnsafeCell::new(self.trap_context().clone()),
                 status: SyncUnsafeCell::new(TaskStatus::Ready),
-                exit_code: AtomicIsize::new(0),
+                exit_code: AtomicI32::new(0),
                 sched_entity: self.sched_entity.data_clone(),
                 fd_table,
             });
@@ -462,7 +460,10 @@ impl Task {
     }
 
     /// exit current task
-    pub fn exit(&self) {
+    pub fn exit(&self, exit_code: i32) {
+        if self.is_group_leader() {
+            self.set_exit_code(exit_code);
+        }
         self.set_status(TaskStatus::Zombie);
     }
 }

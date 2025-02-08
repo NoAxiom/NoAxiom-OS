@@ -72,5 +72,4 @@ sbi-rt = { version = "0.0.3", features = ["legacy"] }
 # no_axiom defined libs
 arch = { path = "../lib/arch" }
 ksync = { path = "../lib/ksync" }
-kutils = { path = "../lib/kutils" }
 console = { path = "../lib/console" }

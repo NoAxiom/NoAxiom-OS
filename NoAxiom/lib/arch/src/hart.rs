@@ -1,5 +1,3 @@
-#![no_std]
-
 #[inline(always)]
 pub fn get_hartid() -> usize {
     let hartid: usize;

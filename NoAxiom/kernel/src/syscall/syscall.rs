@@ -33,14 +33,10 @@ impl<'a> Syscall<'a> {
             SYS_WRITE => self.sys_write(args[0], args[1], args[2]).await,
 
             // process
-            SYS_EXIT => self.sys_exit(),
+            SYS_EXIT => self.sys_exit(args[0]),
             SYS_CLONE => self.sys_fork(args[0], args[1], args[2], args[3], args[4]),
-            SYS_EXECVE => {
-                let res = self.sys_exec(args[0], args[1], args[2]).await;
-                trace!("trap_cx after execve: {:?}", self.task.trap_context());
-                res
-            }
-            SYS_WAIT4 => self.sys_wait4(args[0], args[1], args[2]).await,
+            SYS_EXECVE => self.sys_exec(args[0], args[1], args[2]).await,
+            SYS_WAIT4 => self.sys_wait4(args[0], args[1], args[2], args[3]).await,
 
             // mm
             SYS_BRK => todo!(),

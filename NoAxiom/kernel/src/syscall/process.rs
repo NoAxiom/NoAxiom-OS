@@ -1,20 +1,24 @@
 //! memory management system calls
-use bitflags::bitflags;
-
 use super::{Syscall, SyscallResult};
 use crate::{
     fs::path::Path,
     mm::user_ptr::UserPtr,
-    nix::{clone_flags::CloneFlags, result::Errno},
+    nix::{
+        clone_flags::CloneFlags,
+        process::{PidSel, WaitOption},
+        result::Errno,
+    },
     return_errno,
     sched::task::spawn_utask,
     syscall::A0,
+    task::manager::TASK_MANAGER,
 };
 
 impl Syscall<'_> {
     /// exit current task by marking it as zombie
-    pub fn sys_exit(&mut self) -> SyscallResult {
-        self.task.exit();
+    pub fn sys_exit(&mut self, exit_code: usize) -> SyscallResult {
+        let exit_code = exit_code as i32;
+        self.task.exit(exit_code);
         Ok(0)
     }
 
@@ -53,150 +57,139 @@ impl Syscall<'_> {
         Ok(self.task.trap_context().user_reg[A0] as isize)
     }
 
-    pub async fn sys_wait4(&self, pid: usize, status_ptr: usize, options: usize) -> SyscallResult {
+    pub async fn sys_wait4(
+        &self,
+        pid: usize,
+        status_addr: usize,
+        options: usize,
+        _rusage: usize,
+    ) -> SyscallResult {
+        info!(
+            "[sys_wait4] pid: {:?}, status_addr: {:?}, options: {:?}",
+            pid, status_addr, options
+        );
         let pid = pid as isize;
-        let options = options as i32;
-        bitflags! {
-            struct WaitOption: i32 {
-                const WNOHANG = 1 << 0;
-                const WUNTRACED = 1 << 1;
-                const WCONTINUED = 1 << 3;
-            }
-        }
-        #[derive(Debug, Clone, Copy)]
-        pub enum PidSelection {
-            Group(Option<usize>),
-            Task(Option<usize>),
-        }
-        //根据不同的pid值我们分离出不同的解决方式
-        impl From<isize> for PidSelection {
-            fn from(value: isize) -> Self {
-                match value {
-                    -1 => PidSelection::Task(None),
-                    0 => PidSelection::Group(None),
-                    x if x > 0 => PidSelection::Task(Some(x as usize)),
-                    x => PidSelection::Group(Some(x as usize)),
-                }
-            }
-        }
-        info!("[sys_wait4]: enter, pid {}, options {:#x}", pid, options);
-        let task = self.task;
-        let options = WaitOption::from_bits(options).ok_or(Errno::EINVAL)?;
-        let target: PidSelection = pid.into();
-        let children = task.pcb().children.clone();
+        let options = WaitOption::from_bits(options as i32).ok_or(Errno::EINVAL)?;
+        let status: UserPtr<i32> = UserPtr::new(status_addr);
+
+        // clone children info
+        let children = self.task.pcb().children.clone();
         if children.is_empty() {
-            drop(children);
             return_errno!(Errno::ECHILD);
         }
-        // 先检查一遍进程的子进程队列此时是否有符合条件的可回收的子进程，有的话直接执行
-        let target_task = match target {
-            PidSelection::Task(None) => children.into_iter().find(|task| task.is_zombie()),
-            PidSelection::Group(None) => unimplemented!(),
-            PidSelection::Task(pid) => {
-                if let Some(task) = children
-                    .iter()
-                    .find(|task| task.tid() == pid.unwrap())
-                    .cloned()
-                {
-                    if task.is_zombie() {
-                        Some(task)
-                    } else {
+
+        // pid type
+        // -1: all children, >0: specific pid, other: group unimplemented
+        let pid_type = match pid {
+            -1 => PidSel::Task(None),
+            0 => PidSel::Group(None),
+            pid if pid > 0 => PidSel::Task(Some(pid as usize)),
+            pid => PidSel::Group(Some(pid as usize)),
+        };
+
+        // work out target tasks
+        let target_task = match pid_type {
+            PidSel::Task(None) => {
+                info!("[sys_wait4] task {} wait for all children", self.task.tid());
+                children.into_iter().find(|task| task.is_zombie())
+            }
+            PidSel::Task(Some(pid)) => {
+                if let Some(task) = children.iter().find(|task| task.tid() == pid).cloned() {
+                    task.is_zombie().then(|| task).or_else(|| {
+                        error!("[sys_wait4] task {} not found", pid);
                         None
-                    }
+                    })
                 } else {
                     return_errno!(Errno::ECHILD);
                 }
             }
-            PidSelection::Group(x) => unimplemented!(),
+            PidSel::Group(_) => {
+                error!("wait for process group is not implemented");
+                return Err(Errno::EINVAL);
+            }
         };
-        Ok(0)
-        // todo!()
-        // if let Some(res_task) = target_task {
-        //     info!("sys_wait4 find a target task");
-        //     if status_ptr != 0 {
-        //         task.check_lazy(status_ptr.into());
-        //         info!(
-        //             "[sys_wait4]: write pid to exit_status_ptr {:#x} before",
-        //             status_ptr
-        //         );
-        //         let exit_status_ptr = status_ptr as *mut i32;
-        //         unsafe {
-        //             exit_status_ptr.write_volatile((res_task.exitcode() &
-        // 0xff) << 8);             info!(
-        //                 "[sys_wait4]: write pid to exit_code_ptr after, exit
-        // code {:#x}",                 (*exit_status_ptr & 0xff00) >> 8
-        //             );
-        //         };
-        //     }
-        //     let taskid = res_task.get_taskid();
-        //     // 将进程从子进程数组和全局任务管理器中删除，至此进程彻底被回收
-        //     // rust的资源回收不需要一个个手动回收资源，
-        // 只需要彻底回收资源所有者，     // 其资源通过rust机制自然回收
-        //     task.pcb().children.retain(|x| x.get_taskid() != taskid);
-        //     TASK_MANAGER.remove(taskid);
-        //     drop(res_task);
-        //     return Ok(taskid as isize);
-        // } else if options.contains(WaitOption::WNOHANG) {
-        //     return Ok(0);
-        // } else {
-        //     // 先检查一遍进程的子进程队列此时是否有符合条件的可回收的子进程，
-        //     // 没有的话此时任务会直接阻塞等待 这里利用了无栈协程的机制
-        //     // 等待的事件就是SIGCHLD信号，直到进程向父进程发送这个信号后，
-        //     // 父进程才从此处唤醒继续执行
-        //     let (found_pid, exit_code) = loop {
-        //         task.set_wake_up_signal(!*task.sig_mask() |
-        // SigMask::SIGCHLD);         info!("suspend_now");
-        //         suspend_now().await; // 这里利用了无栈协程的机制
-        //         let siginfo =
-        // task.pending_signals.lock().dequeue_except(SigMask::SIGCHLD);
-        //         // 根据siginfo中传递的pid信息和status信息实现进程的退出和回收
-        //         if let Some(siginfo) = siginfo {
-        //             if let OtherInfo::Extend {
-        //                 si_pid,
-        //                 si_status,
-        //                 si_stime: _,
-        //                 si_utime: _,
-        //             } = siginfo.otherinfo
-        //             {
-        //                 match target {
-        //                     PidSelection::Task(None) => break (si_pid,
-        // si_status),
-        // PidSelection::Task(target_pid) => {
-        // if si_pid as usize == target_pid.unwrap() {
-        // break (si_pid, si_status);                         }
-        //                     }
-        //                     PidSelection::Group(_) => unimplemented!(),
-        //                     PidSelection::Group(None) => unimplemented!(),
-        //                 }
-        //             }
-        //         } else {
-        //             return_errno!(Errno::EINTR);
-        //         }
-        //     };
-        //     if status_ptr != 0 {
-        //         task.check_lazy(status_ptr.into());
-        //         info!(
-        //             "[sys_waitpid]: write pid to exit_status_ptr {:#x}
-        // before",             status_ptr
-        //         );
-        //         let exit_status_ptr = status_ptr as *mut i32;
-        //         unsafe {
-        //             exit_status_ptr.write_volatile((exit_code.unwrap() &
-        // 0xff) << 8);             info!(
-        //                 "[sys_waitpid]: write pid to exit_code_ptr after,
-        // exit code {:#x}",                 (*exit_status_ptr & 0xff00)
-        // >> 8             );
-        //         };
-        //     }
-        //     // 将进程从子进程数组和全局任务管理器中删除，至此进程彻底被回收
-        //     // rust的资源回收不需要一个个手动回收资源，
-        // 只需要彻底回收资源所有者，     // 其资源通过rust机制自然回收
-        //     task.pcb()
-        //         .children
-        //         .retain(|x| x.get_taskid() != found_pid as usize);
-        //     TASK_MANAGER.remove(found_pid as usize);
-        //     return Ok(found_pid as isize);
-        // }
-        // Ok(ret)
+
+        // wait for target task
+        match target_task {
+            Some(target_task) => {
+                info!("[sys_wait4] wait for task {}", target_task.tid());
+                if !status.is_null() {
+                    info!(
+                        "[sys_wait4]: write exit_code at status_addr = {:#x}",
+                        status.addr(),
+                    );
+                    let exit_code = target_task.exit_code();
+                    status.write_volatile((exit_code & 0xff) << 8);
+                    info!("[sys_wait4]: write exit code {:#x}", exit_code);
+                }
+                let target_tid = target_task.tid();
+                target_task
+                    .pcb()
+                    .children
+                    .retain(|other| other.tid() != target_tid);
+                TASK_MANAGER.remove(target_tid);
+                Ok(target_tid as isize)
+            }
+            None => {
+                error!("unimplemented");
+                Err(Errno::ECHILD)
+                // let task = self.task;
+                // let (found_pid, exit_code) = loop {
+                //     task.set_wake_up_signal(!*task.sig_mask() |
+                // SigMask::SIGCHLD);     info!("suspend_now");
+                //     suspend_now().await; // 这里利用了无栈协程的机制
+                //     let siginfo =
+                // task.pending_signals.lock().dequeue_except(SigMask::SIGCHLD);
+                //     // 根据siginfo中传递的pid信息和status信息实现进程的退出和回收
+                //     if let Some(siginfo) = siginfo {
+                //         if let OtherInfo::Extend {
+                //             si_pid,
+                //             si_status,
+                //             si_stime: _,
+                //             si_utime: _,
+                //         } = siginfo.otherinfo
+                //         {
+                //             match target {
+                //                 PidSelection::Task(None) => break (si_pid,
+                // si_status),
+                // PidSelection::Task(target_pid) => {
+                //                     if si_pid as usize == target_pid.unwrap()
+                // {                         break (si_pid,
+                // si_status);                     }
+                //                 }
+                //                 PidSelection::Group(_) => unimplemented!(),
+                //                 PidSelection::Group(None) =>
+                // unimplemented!(),             }
+                //         }
+                //     } else {
+                //         return_errno!(Errno::EINTR);
+                //     }
+                // };
+                // if exit_status_addr != 0 {
+                //     task.check_lazy(exit_status_addr.into());
+                //     info!(
+                //         "[sys_waitpid]: write pid to exit_status_ptr {:#x}
+                // before",         exit_status_addr
+                //     );
+                //     let exit_status_ptr = exit_status_addr as *mut i32;
+                //     unsafe {
+                //         exit_status_ptr.write_volatile((exit_code.unwrap() &
+                // 0xff) << 8);         info!(
+                //             "[sys_waitpid]: write pid to exit_code_ptr after,
+                // exit code {:#x}",
+                // (*exit_status_ptr & 0xff00) >> 8         );
+                //     };
+                // }
+                // // 将进程从子进程数组和全局任务管理器中删除，
+                // 至此进程彻底被回收 //
+                // rust的资源回收不需要一个个手动回收资源，
+                // 只需要彻底回收资源所有者， // 其资源通过rust机制自然回收
+                // task.pcb()
+                //     .children
+                //     .retain(|x| x.get_taskid() != found_pid as usize);
+                // TASK_MANAGER.remove(found_pid as usize);
+                // Ok(found_pid as isize)
+            }
+        }
     }
 }
