@@ -1,10 +1,15 @@
 use alloc::{
+    boxed::Box,
     collections::btree_map::BTreeMap,
     string::{String, ToString},
     sync::{Arc, Weak},
+    vec::Vec,
 };
 
-use spin::Mutex;
+use async_trait::async_trait;
+use downcast_rs::DowncastSync;
+use ksync::mutex::LOCK_COUNT;
+type Mutex<T> = ksync::mutex::SpinLock<T>;
 
 use super::{file::File, inode::Inode, superblock::SuperBlock};
 use crate::nix::{fs::InodeMode, result::Errno};
@@ -42,13 +47,17 @@ impl DentryMeta {
     }
 }
 
-pub trait Dentry: Send + Sync {
+#[async_trait]
+pub trait Dentry: Send + Sync + DowncastSync {
     /// Get the meta of the dentry
     fn meta(&self) -> &DentryMeta;
     /// Open the file associated with the dentry
     fn open(self: Arc<Self>) -> Result<Arc<dyn File>, Errno>;
     /// Get new dentry from name
     fn from_name(self: Arc<Self>, name: &str) -> Arc<dyn Dentry>;
+    /// Create a new dentry with `name` and `mode`
+    async fn create(self: Arc<Self>, name: &str, mode: InodeMode)
+        -> Result<Arc<dyn Dentry>, Errno>;
 
     /// Get the inode of the dentry
     fn inode(&self) -> Result<Arc<dyn Inode>, Errno> {
@@ -70,6 +79,7 @@ pub trait Dentry: Send + Sync {
         }
         *self.meta().inode.lock() = Some(inode);
     }
+    async fn test3(&self) {}
 }
 
 impl dyn Dentry {
@@ -79,6 +89,12 @@ impl dyn Dentry {
         child
     }
 
+    /// Get the parent of the dentry
+    pub fn parent(self: &Arc<Self>) -> Option<Arc<dyn Dentry>> {
+        self.meta().parent.as_ref().and_then(|p| p.upgrade())
+    }
+
+    /// Add a child dentry with `name` and `child_inode`.
     pub fn add_child(self: &Arc<Self>, name: &str, child_inode: Arc<dyn Inode>) -> Arc<dyn Dentry> {
         let child = self.new_child(name);
         child.set_inode(child_inode);
@@ -88,9 +104,36 @@ impl dyn Dentry {
             .insert(name.to_string(), child.clone());
         child
     }
+
+    /// Add a child dentry with `name` and `mode`.
+    pub async fn add_dir_child(
+        self: &Arc<Self>,
+        name: &str,
+        mode: &InodeMode,
+    ) -> Result<Arc<dyn Dentry>, Errno> {
+        if self.inode().unwrap().file_type() != InodeMode::DIR {
+            return Err(Errno::ENOTDIR);
+        }
+        // let child = self.clone().create(name, *mode).await?;
+        let child = self.clone().create("test", *mode).await?;
+        self.meta()
+            .children
+            .lock()
+            .insert(name.to_string(), child.clone());
+        Ok(child)
+    }
+
+    pub async fn test(&self, name: &str, mode: &InodeMode) {}
+    pub async fn test2(&self) {
+        debug!("this is test2");
+    }
+
+    /// Get super block of the dentry
     pub fn super_block(&self) -> Arc<dyn SuperBlock> {
         self.meta().super_block.clone()
     }
+
+    /// Find the dentry with `name` in the **WHOLE** sub-tree of the dentry.
     pub fn find(self: Arc<Self>, name: &str) -> Option<Arc<dyn Dentry>> {
         if self.name() == name {
             return Some(self.clone());
@@ -110,5 +153,68 @@ impl dyn Dentry {
             }
         }
         None
+    }
+
+    /// Find the dentry with `path`, Error if not found.
+    pub fn find_path(self: Arc<Self>, path: &Vec<&str>) -> Result<Arc<dyn Dentry>, Errno> {
+        let mut idx = 0;
+        let max_idx = path.len() - 1;
+        let mut current = self.clone();
+
+        while idx <= max_idx {
+            let name = path[idx];
+            if name.is_empty() {
+                idx += 1;
+                continue;
+            }
+
+            if let Some(child) = current.clone().meta().children.lock().get(name) {
+                if idx < max_idx {
+                    let inode = child.inode()?;
+                    assert!(inode.file_type() == InodeMode::DIR);
+                }
+                current = child.clone();
+                idx += 1;
+            } else {
+                return Err(Errno::ENOENT);
+            }
+        }
+
+        Ok(current)
+    }
+
+    /// Find the dentry with `path`, create if not found.
+    pub fn find_path_or_create(self: Arc<Self>, path: &Vec<&str>) -> Arc<dyn Dentry> {
+        let mut idx = 0;
+        let max_idx = path.len() - 1;
+        let mut current = self.clone();
+
+        while idx <= max_idx {
+            let name = path[idx];
+            if name.is_empty() {
+                idx += 1;
+                continue;
+            }
+
+            let current_clone = current.clone();
+            let meta = current_clone.meta();
+            let mut children = meta.children.lock();
+
+            if let Some(child) = children.get(name) {
+                if idx < max_idx {
+                    let inode = child.inode().unwrap();
+                    assert!(inode.file_type() == InodeMode::DIR);
+                }
+                current = child.clone();
+                idx += 1;
+            } else {
+                let new_child = current.clone().new_child(name);
+                children.insert(name.to_string(), new_child.clone()); // lifetime issue! don't use self.meta().children.lock()
+                current = new_child;
+                idx += 1;
+            }
+        }
+
+        current
     }
 }

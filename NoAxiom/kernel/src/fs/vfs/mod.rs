@@ -7,7 +7,11 @@ use basic::{dentry::Dentry, filesystem::FileSystem};
 use impls::fat32::filesystem::FAT32FIleSystem;
 use ksync::Once;
 
-use crate::{config::fs::BLOCK_SIZE, device::block::BlockDevice, nix::fs::MountFlags};
+use crate::{
+    config::fs::BLOCK_SIZE,
+    device::block::BlockDevice,
+    nix::fs::{InodeMode, MountFlags},
+};
 pub mod basic;
 mod impls;
 

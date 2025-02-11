@@ -160,3 +160,7 @@ impl UserPtr<u8> {
         res
     }
 }
+
+// the userptr is safe to send and sync
+unsafe impl<T> Send for UserPtr<T> {}
+unsafe impl<T> Sync for UserPtr<T> {}

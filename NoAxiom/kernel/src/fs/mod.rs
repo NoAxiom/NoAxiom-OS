@@ -1,5 +1,5 @@
 // ignore warnings for this module
-#![allow(warnings)]
+// #![allow(warnings)]
 
 mod blockcache;
 pub mod fat32;

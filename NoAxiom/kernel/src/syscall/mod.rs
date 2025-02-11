@@ -35,6 +35,15 @@ impl<'a> Syscall<'a> {
             // fs
             SYS_READ => self.sys_read(args[0], args[1], args[2]).await,
             SYS_WRITE => self.sys_write(args[0], args[1], args[2]).await,
+            SYS_MKDIRAT => {
+                self.sys_mkdirat(args[0] as isize, args[1], args[2] as u32)
+                    .await
+            }
+            SYS_OPENAT => {
+                self.sys_openat(args[0] as isize, args[1], args[2] as u32, args[3] as u32)
+            }
+            SYS_CHDIR => self.sys_chdir(args[0]),
+            SYS_GETCWD => self.sys_getcwd(args[0] as *mut u8, args[1]),
 
             // process
             SYS_EXIT => self.sys_exit(),

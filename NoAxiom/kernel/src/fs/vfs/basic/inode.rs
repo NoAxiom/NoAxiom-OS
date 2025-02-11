@@ -1,7 +1,7 @@
 use alloc::{string::String, sync::Arc};
 
 use downcast_rs::{impl_downcast, DowncastSync};
-use spin::Mutex;
+type Mutex<T> = ksync::mutex::SpinLock<T>;
 
 use super::{file::File, superblock::SuperBlock};
 use crate::nix::{

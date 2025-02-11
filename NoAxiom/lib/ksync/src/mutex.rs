@@ -1,6 +1,6 @@
 //! spin mutex for riscv kernel
 
-use core::cell::RefMut;
+use core::{cell::RefMut, sync::atomic::AtomicUsize};
 
 use arch::interrupt::{disable_global_interrupt, enable_global_interrupt, is_interrupt_enabled};
 use kutils::get_hartid;
@@ -81,6 +81,8 @@ use spin::{Mutex, MutexGuard};
 #[derive(Default)]
 pub struct Lock<T>(pub(self) Mutex<T>);
 
+pub static LOCK_COUNT: AtomicUsize = AtomicUsize::new(0);
+
 pub struct LockGuard<'a, T> {
     guard: Option<MutexGuard<'a, T>>,
     int_record: bool,
@@ -93,6 +95,9 @@ impl<T> Lock<T> {
     pub fn lock(&self) -> LockGuard<'_, T> {
         let old = is_interrupt_enabled();
         disable_global_interrupt();
+        if get_hartid() == 0 {
+            LOCK_COUNT.fetch_add(1, core::sync::atomic::Ordering::SeqCst);
+        }
         LockGuard {
             guard: Some(self.0.lock()),
             int_record: old,
@@ -102,6 +107,9 @@ impl<T> Lock<T> {
 
 impl<'a, T> Drop for LockGuard<'a, T> {
     fn drop(&mut self) {
+        if get_hartid() == 0 {
+            LOCK_COUNT.fetch_sub(1, core::sync::atomic::Ordering::SeqCst);
+        }
         self.guard.take();
         if self.int_record {
             enable_global_interrupt();

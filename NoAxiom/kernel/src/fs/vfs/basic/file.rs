@@ -4,7 +4,7 @@ use alloc::{boxed::Box, string::String, sync::Arc, vec::Vec};
 use core::sync::atomic::AtomicUsize;
 
 use async_trait::async_trait;
-use spin::Mutex;
+type Mutex<T> = ksync::mutex::SpinLock<T>;
 
 use super::{dentry::Dentry, inode::Inode};
 use crate::{
@@ -64,6 +64,8 @@ pub trait File: Send + Sync {
     /// Load directory into memory, must be called before read/write explicitly,
     /// only for directories
     async fn load_dir(&self) -> Result<(), Errno>;
+
+    async fn test(&self) {}
 }
 
 impl dyn File {
@@ -75,5 +77,8 @@ impl dyn File {
     }
     pub fn name(&self) -> String {
         self.dentry().name()
+    }
+    pub fn set_flags(&self, flags: FileFlags) {
+        *self.meta().flags.lock() = flags;
     }
 }

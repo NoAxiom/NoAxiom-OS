@@ -30,5 +30,5 @@ pub const ROOT_FAKE_ENTRY: [u8; 32] = {
     entry
 };
 
-pub const INIT_PROC_PATH: &str = "initprocess";
+pub const INIT_PROC_PATH: &str = "/initprocess";
 pub const DL_INTERP_PATH: &str = "/lib/musl/libc.so";

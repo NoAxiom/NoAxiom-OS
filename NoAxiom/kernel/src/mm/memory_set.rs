@@ -348,8 +348,8 @@ impl MemorySet {
     }
 
     pub async fn load_from_path(path: Path) -> ElfMemoryInfo {
-        info!("[load_elf] from path: {}", &path.inner());
-        let elf_file = fs_root().find(&path.as_string()).unwrap().open().unwrap();
+        info!("[load_elf] from path: {:?}", path);
+        let elf_file = path.dentry().open().unwrap();
         info!("[load_elf] file name: {}", elf_file.name());
         MemorySet::load_from_elf(elf_file).await
     }

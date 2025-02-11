@@ -1,7 +1,7 @@
 use alloc::{boxed::Box, sync::Arc, vec::Vec};
 
 use async_trait::async_trait;
-use spin::Mutex;
+type Mutex<T> = ksync::mutex::SpinLock<T>;
 
 use super::{
     dentry::FAT32Dentry,
@@ -11,12 +11,9 @@ use crate::{
     fs::{
         fat32::{
             directory::FAT32Directory as FAT32FIleSystemDirectory,
-            file::FAT32File as FAT32FIleSystemFile, DirFile,
+            file::FAT32File as FAT32FIleSystemFile,
         },
-        vfs::basic::{
-            file::{File, FileMeta},
-            inode::Inode,
-        },
+        vfs::basic::file::{File, FileMeta},
     },
     nix::{fs::InodeMode, result::Errno},
     syscall::SyscallResult,

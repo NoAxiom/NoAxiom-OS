@@ -7,7 +7,7 @@ use super::{
 use crate::{
     constant::fs::{RLIMIT_HARD_MAX, RLIMIT_SOFT_MAX},
     nix::result::Errno,
-    syscall::{Syscall, SyscallResult},
+    syscall::SyscallResult,
 };
 
 /// Resource Limit from linux
@@ -66,6 +66,11 @@ impl FdTable {
         } else {
             None
         }
+    }
+
+    /// Set the `fd` slot
+    pub fn set(&mut self, fd: usize, file: Arc<dyn File>) {
+        self.table[fd] = Some(file);
     }
 
     /// Fill the `fd` slot with None

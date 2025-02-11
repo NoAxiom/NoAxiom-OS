@@ -20,6 +20,7 @@ impl FAT {
         type BPB = BIOSParameterBlockOffset;
         let fat_count = BPB::num_fats(sector);
         let fat1_start = BPB::reserved_sector_count(sector) as u32 + BPB::hidden_sector(sector);
+        assert_eq!(BPB::fat_size_16(sector), 0);
         let sectors_per_fat = BPB::fat_size_32(sector);
         let bytes_per_sector_id = BPB::bytes_per_sector(sector);
         Self {
@@ -39,27 +40,24 @@ impl FAT {
         (cluster_id * FAT32_BYTES_PER_CLUSTER_ID as u32) % self.bytes_per_sector_id as u32
     }
     /// find a free cluster, now is find the first free cluster  
-    pub async fn find_free_cluster_id(&self, blk: ABC) -> Option<u32> {
-        for sector_id in 0..self.sectors_per_fat {
+    pub async fn find_free_cluster_id(&self, blk: &ABC) -> Option<u32> {
+        for sector_id in 0..self.sectors_per_fat * self.fat_count as u32 {
             // read a sector
             let sector = blk
                 .read_sector((self.fat1_start + sector_id) as usize)
                 .await;
             // find a free cluster
             for (id, byte) in sector.read().data.chunks(4).enumerate() {
-                if byte.iter().all(|x| *x == 0) {
-                    return Some(
-                        sector_id * self.bytes_per_sector_id as u32
-                            / FAT32_BYTES_PER_CLUSTER_ID as u32
-                            + id as u32,
-                    );
+                let value = u32::from_le_bytes(byte.try_into().unwrap());
+                if value == 0 {
+                    return Some(sector_id * self.bytes_per_sector_id as u32 / 4 + id as u32);
                 }
             }
         }
         None
     }
     /// set `cluster_id` to `val`
-    pub async fn set_cluster_id(&self, blk: ABC, cluster_id: u32, val: u32) {
+    pub async fn set_cluster_id(&self, blk: &ABC, cluster_id: u32, val: u32) {
         let sector_id = self.sector_id(cluster_id);
         let sector_offset = self.sector_offset(cluster_id);
         let sector = blk.read_sector(sector_id as usize).await;
