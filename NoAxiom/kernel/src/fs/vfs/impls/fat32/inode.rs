@@ -1,7 +1,6 @@
 use alloc::sync::Arc;
 
-use spin::Mutex;
-
+type Mutex<T> = ksync::mutex::SpinLock<T>;
 use crate::{
     fs::{
         fat32::{

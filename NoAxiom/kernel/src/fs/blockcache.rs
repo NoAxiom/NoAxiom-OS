@@ -8,7 +8,7 @@ use core::num::NonZeroUsize;
 use arch::interrupt::{is_external_interrupt_enabled, is_interrupt_enabled};
 use ksync::mutex::RwLock;
 use lru::LruCache;
-use spin::Mutex;
+type Mutex<T> = ksync::mutex::SpinLock<T>;
 
 use crate::{
     config::fs::{BLOCK_SIZE, MAX_LRU_CACHE_SIZE},

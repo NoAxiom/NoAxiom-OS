@@ -2,6 +2,8 @@ pub const STD_IN: usize = 0;
 pub const STD_OUT: usize = 1;
 pub const STD_ERR: usize = 2;
 
+pub const AT_FDCWD: isize = -100;
+
 pub const RLIMIT_CPU: u32 = 0; // CPU 使用时间的最大量
 pub const RLIMIT_FSIZE: u32 = 1; // 可以创建的文件的最大大小
 pub const RLIMIT_DATA: u32 = 2; // 程序的数据段的最大字节长度

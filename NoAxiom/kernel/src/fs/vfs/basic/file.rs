@@ -4,7 +4,9 @@ use alloc::{boxed::Box, string::String, sync::Arc, vec::Vec};
 use core::sync::atomic::AtomicUsize;
 
 use async_trait::async_trait;
-use spin::Mutex;
+type Mutex<T> = ksync::mutex::SpinLock<T>;
+
+use core::sync::atomic::Ordering;
 
 use super::{dentry::Dentry, inode::Inode};
 use crate::{
@@ -73,7 +75,18 @@ impl dyn File {
         self.read_from(0, &mut buf).await?;
         Ok(buf)
     }
+    pub async fn read<'a>(&'a self, buf: &'a mut Vec<u8>) -> SyscallResult {
+        let offset = self.meta().pos.load(Ordering::Relaxed);
+        self.read_from(offset, buf).await
+    }
+    pub async fn write<'a>(&'a self, buf: &'a Vec<u8>) -> SyscallResult {
+        let offset = self.meta().pos.load(Ordering::Relaxed);
+        self.write_at(offset, buf).await
+    }
     pub fn name(&self) -> String {
         self.dentry().name()
+    }
+    pub fn set_flags(&self, flags: FileFlags) {
+        *self.meta().flags.lock() = flags;
     }
 }

@@ -1,5 +1,3 @@
-use core::f32::consts::E;
-
 use super::vfs::basic::file::{File, FileMeta};
 use crate::{nix::result::Errno, syscall::SyscallResult};
 
@@ -16,7 +14,7 @@ impl File for Stdin {
     fn meta(&self) -> &FileMeta {
         unreachable!()
     }
-    async fn read_from<'a>(&'a self, offset: usize, buf: &'a mut Vec<u8>) -> SyscallResult {
+    async fn read_from<'a>(&'a self, _offset: usize, buf: &'a mut Vec<u8>) -> SyscallResult {
         // mention that getchar is busy loop
         let mut c = console_getchar() as i8;
         loop {
@@ -28,7 +26,7 @@ impl File for Stdin {
         buf[0] = c as u8;
         Ok(1 as isize)
     }
-    async fn write_at<'a>(&'a self, offset: usize, buf: &'a Vec<u8>) -> SyscallResult {
+    async fn write_at<'a>(&'a self, _offset: usize, _buf: &'a Vec<u8>) -> SyscallResult {
         Err(Errno::ENOSYS)
     }
     async fn load_dir(&self) -> Result<(), Errno> {
@@ -41,7 +39,7 @@ impl File for Stdout {
     fn meta(&self) -> &FileMeta {
         unreachable!()
     }
-    async fn read_from<'a>(&'a self, offset: usize, buf: &'a mut Vec<u8>) -> SyscallResult {
+    async fn read_from<'a>(&'a self, _offset: usize, _buf: &'a mut Vec<u8>) -> SyscallResult {
         Err(Errno::ENOSYS)
     }
     async fn write_at<'a>(&'a self, _offset: usize, buf: &'a Vec<u8>) -> SyscallResult {

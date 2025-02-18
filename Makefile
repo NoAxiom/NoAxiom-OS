@@ -14,8 +14,7 @@ export SBI ?= $(ROOT)/$(PROJECT)/bootloader/rustsbi-qemu.bin
 export LOG ?= DEBUG
 
 # choose Custom or Official test samples
-# don't add comment in the 'SAMPLE' line
-SAMPLE ?= Official
+SAMPLE := Official
 MKFS_SH := mk_fat32img.sh
 
 CHOSEN_PATN := 

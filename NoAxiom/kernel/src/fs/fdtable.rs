@@ -7,7 +7,7 @@ use super::{
 use crate::{
     constant::fs::{RLIMIT_HARD_MAX, RLIMIT_SOFT_MAX},
     nix::result::Errno,
-    syscall::{Syscall, SyscallResult},
+    syscall::SyscallResult,
 };
 
 /// Resource Limit from linux
@@ -68,6 +68,11 @@ impl FdTable {
         }
     }
 
+    /// Set the `fd` slot
+    pub fn set(&mut self, fd: usize, file: Arc<dyn File>) {
+        self.table[fd] = Some(file);
+    }
+
     /// Fill the `fd` slot with None
     pub fn fill_to(&mut self, fd: usize) -> SyscallResult {
         if fd > self.rslimit() {
@@ -83,5 +88,16 @@ impl FdTable {
     pub fn copyfrom(&mut self, old_fd: usize, new_fd: usize) -> SyscallResult {
         self.table[new_fd as usize] = self.table[old_fd].clone();
         Ok(new_fd as isize)
+    }
+
+    pub fn close(&mut self, fd: usize) -> SyscallResult {
+        if fd < 3 {
+            return Ok(0);
+        }
+        if fd >= self.table.len() {
+            return Err(Errno::EBADF);
+        }
+        self.table[fd] = None;
+        Ok(0)
     }
 }

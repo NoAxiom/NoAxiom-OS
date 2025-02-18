@@ -1,7 +1,10 @@
-use alloc::{string::String, sync::Arc, vec::Vec};
+use alloc::{boxed::Box, string::String, sync::Arc, vec::Vec};
+
+use async_trait::async_trait;
 
 use super::{
     entry::{LongDirectoryEntry, ShortDirectoryEntry},
+    tree::AsNode,
     DirFile,
 };
 use crate::{
@@ -39,6 +42,9 @@ impl ShortFile {
 }
 
 impl ShortFile {
+    pub async fn content(&self) -> Vec<u8> {
+        self.entry.load(&self.blk, &self.fat, &self.bpb).await
+    }
     pub async fn part_content<'a>(&'a self, offset: usize, buf: &'a mut [u8]) -> SyscallResult {
         let len = buf.len();
         let content = self.entry.load(&self.blk, &self.fat, &self.bpb).await;
@@ -57,17 +63,25 @@ impl ShortFile {
     }
 }
 
-// #[async_trait]
-// impl FSNode<String, Vec<u8>> for ShortFile {
-//     async fn content(&self) -> Vec<u8> {
-//         let content = self.entry.load(&self.blk, &self.fat, &self.bpb).await;
-//         content[0..self.size() as usize].to_vec()
-//     }
-//     async fn part_content<'a>(&'a self, offset: usize, len: usize, buf: &'a
-// mut [u8]) {         let content = self.entry.load(&self.blk, &self.fat,
-// &self.bpb).await;         buf.copy_from_slice(&content[offset..offset +
-// len]);     }
-// }
+#[async_trait]
+impl AsNode for ShortFile {
+    type Ident = String;
+    type Content = Vec<u8>;
+    type ContentRef = Vec<u32>;
+    fn identify(&self, ident: &Self::Ident) -> bool {
+        self.ident() == *ident
+    }
+    fn ident(&self) -> Self::Ident {
+        self.ident()
+    }
+    async fn content(&self) -> Self::Content {
+        let ret = self.content().await;
+        ret[..self.size() as usize].to_vec()
+    }
+    async fn content_ref(&self) -> Self::ContentRef {
+        self.entry.clusters(&self.blk, &self.fat).await
+    }
+}
 
 /// the long file type in the file tree, but is equal to the short file?
 #[derive(Clone)]
@@ -101,16 +115,28 @@ impl LongFile {
     }
 }
 
-// #[async_trait]
-// impl FSNode<String, Vec<u8>> for LongFile {
-//     async fn content(&self) -> Vec<u8> {
-//         self.short_file.content().await
-//     }
-//     async fn part_content<'a>(&'a self, offset: usize, len: usize, buf: &'a
-// mut [u8]) {         self.short_file.part_content(offset, len, buf).await
-//     }
-//
-// }
+#[async_trait]
+impl AsNode for LongFile {
+    type Ident = String;
+    type Content = Vec<u8>;
+    type ContentRef = Vec<u32>;
+    fn identify(&self, ident: &Self::Ident) -> bool {
+        self.ident() == *ident
+    }
+    fn ident(&self) -> Self::Ident {
+        self.ident()
+    }
+    async fn content(&self) -> Self::Content {
+        let ret = self.short_file.content().await;
+        ret[..self.short_file.size() as usize].to_vec()
+    }
+    async fn content_ref(&self) -> Self::ContentRef {
+        self.short_file
+            .entry
+            .clusters(&self.short_file.blk, &self.short_file.fat)
+            .await
+    }
+}
 
 // todo: use better implementation
 #[derive(Clone)]
