@@ -2,6 +2,8 @@
 
 ### #define SYS_times 153
 
+> done
+
 * 功能：获取进程时间；
 * 输入：tms结构体指针，用于获取保存当前进程的运行时间数据；
 * 返回值：成功返回已经过去的滴答数，失败返回-1;
@@ -23,6 +25,8 @@ int ret = syscall(SYS_uname, uts);
 ```
 
 ### #define SYS_sched_yield 124
+
+> done
 
 * 功能：让出调度器；
 * 输入：系统调用ID；

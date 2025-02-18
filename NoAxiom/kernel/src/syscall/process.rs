@@ -37,6 +37,7 @@ impl Syscall<'_> {
         let flags = CloneFlags::from_bits(flags & !0xff).unwrap();
         let task = self.task.fork(flags);
         let trap_cx = task.trap_context_mut();
+        trap_cx.set_reg(A0, 0);
         if stack != 0 {
             trap_cx.set_sp(stack);
         }
@@ -133,62 +134,6 @@ impl Syscall<'_> {
             None => {
                 error!("unimplemented");
                 Err(Errno::ECHILD)
-                // let task = self.task;
-                // let (found_pid, exit_code) = loop {
-                //     task.set_wake_up_signal(!*task.sig_mask() |
-                // SigMask::SIGCHLD);     info!("suspend_now");
-                //     suspend_now().await; // 这里利用了无栈协程的机制
-                //     let siginfo =
-                // task.pending_signals.lock().dequeue_except(SigMask::SIGCHLD);
-                //     // 根据siginfo中传递的pid信息和status信息实现进程的退出和回收
-                //     if let Some(siginfo) = siginfo {
-                //         if let OtherInfo::Extend {
-                //             si_pid,
-                //             si_status,
-                //             si_stime: _,
-                //             si_utime: _,
-                //         } = siginfo.otherinfo
-                //         {
-                //             match target {
-                //                 PidSelection::Task(None) => break (si_pid,
-                // si_status),
-                // PidSelection::Task(target_pid) => {
-                //                     if si_pid as usize == target_pid.unwrap()
-                // {                         break (si_pid,
-                // si_status);                     }
-                //                 }
-                //                 PidSelection::Group(_) => unimplemented!(),
-                //                 PidSelection::Group(None) =>
-                // unimplemented!(),             }
-                //         }
-                //     } else {
-                //         return_errno!(Errno::EINTR);
-                //     }
-                // };
-                // if exit_status_addr != 0 {
-                //     task.check_lazy(exit_status_addr.into());
-                //     info!(
-                //         "[sys_waitpid]: write pid to exit_status_ptr {:#x}
-                // before",         exit_status_addr
-                //     );
-                //     let exit_status_ptr = exit_status_addr as *mut i32;
-                //     unsafe {
-                //         exit_status_ptr.write_volatile((exit_code.unwrap() &
-                // 0xff) << 8);         info!(
-                //             "[sys_waitpid]: write pid to exit_code_ptr after,
-                // exit code {:#x}",
-                // (*exit_status_ptr & 0xff00) >> 8         );
-                //     };
-                // }
-                // // 将进程从子进程数组和全局任务管理器中删除，
-                // 至此进程彻底被回收 //
-                // rust的资源回收不需要一个个手动回收资源，
-                // 只需要彻底回收资源所有者， // 其资源通过rust机制自然回收
-                // task.pcb()
-                //     .children
-                //     .retain(|x| x.get_taskid() != found_pid as usize);
-                // TASK_MANAGER.remove(found_pid as usize);
-                // Ok(found_pid as isize)
             }
         }
     }

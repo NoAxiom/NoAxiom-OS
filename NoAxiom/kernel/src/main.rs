@@ -30,6 +30,7 @@ mod device;
 mod driver;
 mod entry;
 mod fs;
+mod ipc;
 mod mm;
 mod nix;
 mod panic;

@@ -2,6 +2,8 @@
 
 ### #define SYS_clone 220
 
+> done
+
 * 功能：创建一个子进程；
 * 输入：
 	- flags: 创建的标志，如SIGCHLD；
@@ -17,6 +19,8 @@ pid_t ret = syscall(SYS_clone, flags, stack, ptid, tls, ctid)
 
 ### #define SYS_execve 221
 
+> done
+
 * 功能：执行一个指定的程序；
 * 输入：
 	- path: 待执行程序路径名称，
@@ -31,6 +35,8 @@ int ret = syscall(SYS_execve, path, argv, envp);
 
 ### #define SYS_wait4 260
 
+> wip
+
 * 功能：等待进程改变状态;
 * 输入：
 	- pid: 指定进程ID，可为-1等待任何子进程；
@@ -44,6 +50,8 @@ pid_t ret = syscall(SYS_wait4, pid, status, options);
 ```
 
 ### #define SYS_exit 93
+
+> done?
 
 * 功能：触发进程终止，无返回值；
 * 输入：终止状态值；
