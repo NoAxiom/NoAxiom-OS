@@ -4,7 +4,7 @@ use downcast_rs::{impl_downcast, DowncastSync};
 type Mutex<T> = ksync::mutex::SpinLock<T>;
 
 use super::{file::File, superblock::SuperBlock};
-use crate::nix::{
+use crate::include::{
     fs::{InodeMode, Stat},
     result::Errno,
 };

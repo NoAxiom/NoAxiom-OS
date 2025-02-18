@@ -12,7 +12,7 @@ use ksync::mutex::LOCK_COUNT;
 type Mutex<T> = ksync::mutex::SpinLock<T>;
 
 use super::{file::File, inode::Inode, superblock::SuperBlock};
-use crate::nix::{fs::InodeMode, result::Errno};
+use crate::include::{fs::InodeMode, result::Errno};
 
 pub struct DentryMeta {
     // todo: dentry states

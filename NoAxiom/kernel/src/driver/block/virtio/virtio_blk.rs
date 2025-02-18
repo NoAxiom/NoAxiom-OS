@@ -17,7 +17,7 @@ use crate::{
         probe::{ProbeInfo, PROBE},
         Driver,
     },
-    nix::result::Errno,
+    include::result::Errno,
 };
 
 pub struct VirtIOBlockDriver {

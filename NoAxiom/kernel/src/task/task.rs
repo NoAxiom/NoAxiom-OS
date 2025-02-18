@@ -20,7 +20,7 @@ use super::{
 use crate::{
     fs::{fdtable::FdTable, path::Path},
     mm::memory_set::{ElfMemoryInfo, MemorySet},
-    nix::{
+    include::{
         auxv::{AuxEntry, AT_EXECFN, AT_NULL, AT_RANDOM},
         clone_flags::CloneFlags,
     },

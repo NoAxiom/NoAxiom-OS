@@ -18,7 +18,7 @@ use ksync::Lazy;
 
 type Mutex<T> = ksync::mutex::SpinLock<T>;
 
-use crate::{device::IdTable, nix::result::Errno};
+use crate::{device::IdTable, include::result::Errno};
 /// @brief: Driver error
 #[allow(dead_code)]
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]

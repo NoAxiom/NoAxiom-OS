@@ -18,7 +18,7 @@ pub fn schedule_spawn_all_apps() {
     /// Official tests
     // fs
     // paths.push("/chdir");
-    paths.push("/pipe");
+    paths.push("/yield");
 
     for path in paths {
         schedule_spawn_new_process(Path::from(path.to_string()));

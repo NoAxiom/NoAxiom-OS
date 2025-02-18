@@ -12,7 +12,7 @@ use crate::{
             superblock,
         },
     },
-    nix::fs::InodeMode,
+    include::fs::InodeMode,
 };
 
 pub struct FAT32FileInode {
@@ -36,7 +36,7 @@ impl Inode for FAT32FileInode {
     fn meta(&self) -> &InodeMeta {
         &self.meta
     }
-    fn stat(&self) -> Result<crate::nix::fs::Stat, crate::nix::result::Errno> {
+    fn stat(&self) -> Result<crate::include::fs::Stat, crate::include::result::Errno> {
         todo!()
     }
 }
@@ -65,7 +65,7 @@ impl Inode for FAT32DirInode {
     fn meta(&self) -> &InodeMeta {
         &self.meta
     }
-    fn stat(&self) -> Result<crate::nix::fs::Stat, crate::nix::result::Errno> {
+    fn stat(&self) -> Result<crate::include::fs::Stat, crate::include::result::Errno> {
         todo!()
     }
 }

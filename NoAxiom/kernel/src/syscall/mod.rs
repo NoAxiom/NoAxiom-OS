@@ -1,6 +1,6 @@
 use core::result::Result;
 
-use crate::{constant::register::*, nix::result::Errno};
+use crate::{constant::register::*, include::result::Errno};
 
 pub mod fs;
 pub mod mm;

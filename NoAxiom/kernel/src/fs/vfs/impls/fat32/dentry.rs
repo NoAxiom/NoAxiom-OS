@@ -12,7 +12,7 @@ use crate::{
         file::File,
         superblock::SuperBlock,
     },
-    nix::{fs::InodeMode, result::Errno},
+    include::{fs::InodeMode, result::Errno},
 };
 
 pub struct FAT32Dentry {

@@ -148,8 +148,8 @@ impl DirFile for FAT32File {
     fn name(&self) -> String {
         self.ident()
     }
-    fn file_type(&self) -> crate::nix::fs::InodeMode {
-        crate::nix::fs::InodeMode::FILE
+    fn file_type(&self) -> crate::include::fs::InodeMode {
+        crate::include::fs::InodeMode::FILE
     }
 }
 

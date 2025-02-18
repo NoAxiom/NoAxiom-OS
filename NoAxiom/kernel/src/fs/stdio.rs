@@ -1,5 +1,5 @@
 use super::vfs::basic::file::{File, FileMeta};
-use crate::{nix::result::Errno, syscall::SyscallResult};
+use crate::{include::result::Errno, syscall::SyscallResult};
 
 pub struct Stdin;
 pub struct Stdout;

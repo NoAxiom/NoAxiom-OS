@@ -32,7 +32,7 @@ use crate::{
         map_area::MapAreaType,
         permission::MapType,
     },
-    nix::{auxv::*, result::Errno},
+    include::{auxv::*, result::Errno},
     syscall::SyscallResult,
 };
 

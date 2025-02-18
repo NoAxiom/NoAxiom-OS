@@ -6,7 +6,7 @@ use super::{
 };
 use crate::{
     constant::fs::{RLIMIT_HARD_MAX, RLIMIT_SOFT_MAX},
-    nix::result::Errno,
+    include::result::Errno,
     syscall::SyscallResult,
 };
 

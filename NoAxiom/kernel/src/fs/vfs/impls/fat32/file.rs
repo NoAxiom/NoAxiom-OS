@@ -15,7 +15,7 @@ use crate::{
         },
         vfs::basic::file::{File, FileMeta},
     },
-    nix::{fs::InodeMode, result::Errno},
+    include::{fs::InodeMode, result::Errno},
     syscall::SyscallResult,
 };
 

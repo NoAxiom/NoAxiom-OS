@@ -11,7 +11,7 @@ use crate::{
             superblock::SuperBlockMeta,
         },
     },
-    nix::fs::MountFlags,
+    include::fs::MountFlags,
 };
 
 pub struct FAT32FIleSystem {

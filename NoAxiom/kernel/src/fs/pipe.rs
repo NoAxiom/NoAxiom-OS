@@ -26,7 +26,7 @@ use async_trait::async_trait;
 use ksync::mutex::SpinLock;
 
 use super::vfs::basic::file::{File, FileMeta};
-use crate::{config::fs::PIPE_BUF_SIZE, nix::result::Errno, syscall::SyscallResult};
+use crate::{config::fs::PIPE_BUF_SIZE, include::result::Errno, syscall::SyscallResult};
 
 #[derive(PartialEq)]
 enum PipeBufferStatus {

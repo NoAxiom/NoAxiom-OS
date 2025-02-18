@@ -22,7 +22,7 @@ use super::blockcache::{AsyncBlockCache, CacheData};
 use crate::{
     config::fs::{FAT32_SECTOR_SIZE, FIRST_CLUSTER, ROOT_FAKE_ENTRY},
     device::block::BlockDevice,
-    nix::fs::InodeMode,
+    include::fs::InodeMode,
 };
 
 pub trait DirFile: Send + Sync + DowncastSync {

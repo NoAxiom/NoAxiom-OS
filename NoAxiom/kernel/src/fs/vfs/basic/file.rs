@@ -10,7 +10,7 @@ use core::sync::atomic::Ordering;
 
 use super::{dentry::Dentry, inode::Inode};
 use crate::{
-    nix::{fs::FileFlags, result::Errno},
+    include::{fs::FileFlags, result::Errno},
     syscall::SyscallResult,
 };
 

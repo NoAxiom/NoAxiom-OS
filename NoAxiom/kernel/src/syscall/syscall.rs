@@ -3,7 +3,7 @@ use alloc::sync::Arc;
 use super::SyscallResult;
 use crate::{
     constant::{register::*, syscall::*},
-    nix::result::Errno,
+    include::result::Errno,
     task::Task,
     trap::TrapContext,
 };

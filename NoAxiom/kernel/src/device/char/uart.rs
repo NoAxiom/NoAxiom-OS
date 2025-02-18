@@ -15,7 +15,7 @@ use super::{CharDevice, Device};
 use crate::{
     device::{ADevResult, DeviceType},
     driver::uart::UartDriver,
-    nix::result::Errno,
+    include::result::Errno,
 };
 
 pub static UART_DEVICE: Once<Arc<Serial>> = Once::new();

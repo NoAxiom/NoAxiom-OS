@@ -10,7 +10,7 @@ use ksync::Once;
 use crate::{
     config::fs::BLOCK_SIZE,
     device::block::BlockDevice,
-    nix::fs::{InodeMode, MountFlags},
+    include::fs::{InodeMode, MountFlags},
 };
 pub mod basic;
 mod impls;

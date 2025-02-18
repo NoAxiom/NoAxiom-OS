@@ -7,7 +7,7 @@ use alloc::{
 use async_trait::async_trait;
 
 use super::{dentry::Dentry, superblock::SuperBlock};
-use crate::{device::block::BlockDevice, nix::fs::MountFlags};
+use crate::{device::block::BlockDevice, include::fs::MountFlags};
 
 pub struct FileSystemMeta {
     name: String,

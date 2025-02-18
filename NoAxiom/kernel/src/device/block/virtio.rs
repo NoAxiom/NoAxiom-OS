@@ -15,7 +15,7 @@ use super::BlockDevice;
 use crate::{
     device::{Device, DeviceData, DeviceType},
     driver::Driver,
-    nix::result::Errno,
+    include::result::Errno,
 };
 
 pub struct virtio {

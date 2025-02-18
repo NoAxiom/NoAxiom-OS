@@ -16,7 +16,7 @@ use crate::{
         file::{FAT32File, LongFile, ShortFile},
         ABC,
     },
-    nix::fs::InodeMode,
+    include::fs::InodeMode,
     utils::reverse,
 };
 
@@ -146,8 +146,8 @@ impl DirFile for FAT32Directory {
     fn name(&self) -> String {
         self.inner.ident()
     }
-    fn file_type(&self) -> crate::nix::fs::InodeMode {
-        crate::nix::fs::InodeMode::DIR
+    fn file_type(&self) -> crate::include::fs::InodeMode {
+        crate::include::fs::InodeMode::DIR
     }
 }
 
