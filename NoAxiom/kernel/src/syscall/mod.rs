@@ -35,6 +35,7 @@ impl<'a> Syscall<'a> {
             // fs
             SYS_READ => self.sys_read(args[0], args[1], args[2]).await,
             SYS_WRITE => self.sys_write(args[0], args[1], args[2]).await,
+            SYS_CLOSE => self.sys_close(args[0]),
             SYS_MKDIRAT => {
                 self.sys_mkdirat(args[0] as isize, args[1], args[2] as u32)
                     .await
@@ -44,6 +45,9 @@ impl<'a> Syscall<'a> {
             }
             SYS_CHDIR => self.sys_chdir(args[0]),
             SYS_GETCWD => self.sys_getcwd(args[0] as *mut u8, args[1]),
+            SYS_DUP => self.sys_dup(args[0]),
+            SYS_DUP3 => self.sys_dup3(args[0], args[1]),
+            SYS_PIPE2 => self.sys_pipe2(args[0] as *mut i32, args[1]),
 
             // process
             SYS_EXIT => self.sys_exit(),
@@ -62,6 +66,7 @@ impl<'a> Syscall<'a> {
             // others
             SYS_TIMES => Self::sys_times(args[0]),
             SYS_SCHED_YIELD => Self::sys_yield().await,
+            SYS_WAIT4 => self.empty(), // MOVE THIS!
 
             // unsupported: return -1
             _ => {

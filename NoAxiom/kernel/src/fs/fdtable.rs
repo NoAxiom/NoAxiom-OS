@@ -89,4 +89,15 @@ impl FdTable {
         self.table[new_fd as usize] = self.table[old_fd].clone();
         Ok(new_fd as isize)
     }
+
+    pub fn close(&mut self, fd: usize) -> SyscallResult {
+        if fd < 3 {
+            return Ok(0);
+        }
+        if fd >= self.table.len() {
+            return Err(Errno::EBADF);
+        }
+        self.table[fd] = None;
+        Ok(0)
+    }
 }

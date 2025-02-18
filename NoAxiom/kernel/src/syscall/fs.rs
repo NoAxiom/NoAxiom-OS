@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 use super::{Syscall, SyscallResult};
 use crate::{
     constant::fs::{AT_FDCWD, STD_ERR, STD_IN, STD_OUT},
-    fs::{path::Path, vfs::root_dentry},
+    fs::{path::Path, pipe::PipeFile, vfs::root_dentry},
     mm::user_ptr::UserPtr,
     nix::{
         fs::{FileFlags, InodeMode},
@@ -42,8 +42,19 @@ impl Syscall<'_> {
 
     /// Create a pipe
     pub fn sys_pipe2(&self, pipe: *mut i32, flag: usize) -> SyscallResult {
-        info!("[sys_pipe2] not implemented");
-        Err(Errno::ENOSYS)
+        let (read_end, write_end) = PipeFile::new_pipe();
+
+        let mut fd_table = self.task.fd_table();
+        let read_fd = fd_table.alloc_fd()?;
+        let write_fd = fd_table.alloc_fd()?;
+        fd_table.set(read_fd as usize, read_end);
+        fd_table.set(write_fd as usize, write_end);
+
+        let buf = unsafe { core::slice::from_raw_parts_mut(pipe, 2 * core::mem::size_of::<i32>()) };
+        buf[0] = read_fd as i32;
+        buf[1] = write_fd as i32;
+        info!("[sys_pipe]: read fd {}, write fd {}", read_fd, write_fd);
+        Ok(0)
     }
 
     /// Duplicate a file descriptor
@@ -121,6 +132,14 @@ impl Syscall<'_> {
     }
 
     /// Read data from a file descriptor
+    ///
+    /// Return val:
+    /// 1. len > buf.size: ???
+    /// 2. len <= buf.size:
+    ///     - len > file_remain_size: file_remain_size
+    ///     - len <= file_remain_size: len
+    ///     - file_remain_size == 0: 0, which means EOF
+    /// 3. fd is closed: -1
     pub async fn sys_read(&self, fd: usize, buf: usize, len: usize) -> SyscallResult {
         info!("[sys_read] fd: {}, buf: {:?}, len: {}", fd, buf, len);
         let fd_table = self.task.fd_table();
@@ -194,6 +213,16 @@ impl Syscall<'_> {
         parent
             .add_dir_child(&dentry.name(), &mode.union(InodeMode::DIR))
             .await?;
+        Ok(0)
+    }
+
+    pub fn sys_close(&self, fd: usize) -> SyscallResult {
+        info!("[sys_close] fd: {}", fd);
+        let mut fd_table = self.task.fd_table();
+        fd_table.close(fd)
+    }
+
+    pub fn empty(&self) -> SyscallResult {
         Ok(0)
     }
 }
