@@ -37,6 +37,7 @@ impl<'a> Syscall<'a> {
             SYS_CLONE => self.sys_fork(args[0], args[1], args[2], args[3], args[4]),
             SYS_EXECVE => self.sys_exec(args[0], args[1], args[2]).await,
             SYS_WAIT4 => self.sys_wait4(args[0], args[1], args[2], args[3]).await,
+            SYS_GETPID => self.sys_getpid(),
 
             // mm
             SYS_BRK => todo!(),

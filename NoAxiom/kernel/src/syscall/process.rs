@@ -137,4 +137,8 @@ impl Syscall<'_> {
             }
         }
     }
+
+    pub fn sys_getpid(&self) -> SyscallResult {
+        Ok(self.task.tid() as isize)
+    }
 }
