@@ -5,7 +5,10 @@ use alloc::{
     sync::{Arc, Weak},
     vec::Vec,
 };
-use core::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
+use core::{
+    sync::atomic::{AtomicI32, AtomicUsize, Ordering},
+    task::Waker,
+};
 
 use ksync::{
     cell::SyncUnsafeCell,
@@ -131,6 +134,9 @@ pub struct Task {
 
     // signal info
     signal_info: SignalInfo,
+
+    /// waker
+    waker: SyncUnsafeCell<Option<Waker>>,
 }
 
 /// user tasks
@@ -254,6 +260,15 @@ impl Task {
         unsafe { &(*self.signal_info.sig_mask.get()) }
     }
 
+    /// get waker
+    pub fn waker(&self) -> &Option<Waker> {
+        unsafe { &(*self.waker.get()) }
+    }
+    /// set waker
+    pub fn set_waker(&self, waker: Waker) {
+        unsafe { (*self.waker.get()) = Some(waker) };
+    }
+
     /// create new process from elf
     pub async fn new_process(path: Path) -> Arc<Self> {
         trace!("[kernel] spawn new process from elf");
@@ -285,6 +300,7 @@ impl Task {
             sched_entity: SchedEntity::new_bare(),
             fd_table: Arc::new(SpinLock::new(FdTable::new())),
             signal_info: SignalInfo::new(None, None),
+            waker: SyncUnsafeCell::new(None),
         });
         add_new_process(&task);
         info!("[spawn] new task spawn complete, tid {}", task.tid.0);
@@ -457,6 +473,7 @@ impl Task {
                     Some(&self.signal_info.pending_sigs),
                     Some(&self.signal_info.sa_list),
                 ),
+                waker: SyncUnsafeCell::new(None),
             });
             self.thread_group.lock().insert(&new_thread);
             new_thread
@@ -483,6 +500,7 @@ impl Task {
                 sched_entity: self.sched_entity.data_clone(),
                 fd_table,
                 signal_info: SignalInfo::new(None, None),
+                waker: SyncUnsafeCell::new(None),
             });
             add_new_process(&new_process);
             parent_pcb.children.push(new_process.clone());

@@ -1,5 +1,5 @@
 use async_task::{Runnable, ScheduleInfo};
-use riscv::asm::sfence_vma_all;
+use riscv::asm::fence_i;
 
 use super::executor::TaskScheduleInfo;
 
@@ -14,9 +14,9 @@ pub trait Scheduler {
     fn push(&mut self, runnable: Runnable<TaskScheduleInfo>, info: ScheduleInfo);
     fn pop(&mut self) -> Option<Runnable<TaskScheduleInfo>>;
     fn load_stats(&mut self) -> SchedLoadStats;
-    fn steal(&mut self) -> Option<Runnable<TaskScheduleInfo>> {
+    fn be_stolen(&mut self) -> Option<Runnable<TaskScheduleInfo>> {
         let res = self.pop();
-        sfence_vma_all(); // inter-core synchronization
+        fence_i(); // cache flush
         res
     }
 }

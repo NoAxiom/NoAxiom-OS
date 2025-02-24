@@ -1,8 +1,8 @@
-use crate::include::signal::sig_num::SigNum;
+use crate::{include::signal::sig_num::SigNum, task::exit::terminate_all_tasks};
 
 /// terminate the process
 fn sig_default_terminate(sig: SigNum) {
-    todo!("terminate process with signal {:?}", sig);
+    terminate_all_tasks();
 }
 
 /// terminate & gen core dump

@@ -1,4 +1,4 @@
-pub mod exit_handler;
+pub mod exit;
 pub mod manager;
 mod task;
 mod taskid;

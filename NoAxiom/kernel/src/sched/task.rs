@@ -13,11 +13,12 @@ use super::{
     executor::spawn_raw,
     sched_entity::{SchedEntity, SchedTaskInfo},
     task_counter::{task_count_dec, task_count_inc},
+    utils::take_waker,
 };
 use crate::{
     cpu::current_cpu,
     fs::path::Path,
-    task::{exit_handler::exit_handler, Task},
+    task::{exit::exit_handler, Task},
     time::gettime::get_time_us,
     trap::{trap_restore, user_trap_handler},
 };
@@ -94,16 +95,14 @@ where
 
 /// user task main
 pub async fn task_main(task: Arc<Task>) {
+    task.set_waker(take_waker().await);
     while !task.is_zombie() {
         // kernel -> user
         trace!("[task_main] trap_restore");
         trap_restore(&task);
         // debug!("cx: {:?}", task.trap_context());
         if task.is_zombie() {
-            warn!(
-                "task {} is zombie before trap_handler, break",
-                task.tid()
-            );
+            warn!("task {} is zombie before trap_handler, break", task.tid());
             break;
         }
         // user -> kernel

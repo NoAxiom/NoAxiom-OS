@@ -140,7 +140,7 @@ fn max_load_hartid() -> Option<usize> {
 fn load_balance() -> Option<Runnable<TaskScheduleInfo>> {
     let current_hart = get_hartid();
     if let Some(from_hart) = max_load_hartid() {
-        let res = RUNTIME.scheduler[from_hart].lock().steal();
+        let res = RUNTIME.scheduler[from_hart].lock().be_stolen();
         if res.is_some() {
             warn!(
                 "[load_balance] move task: hart {} -> hart: {}",

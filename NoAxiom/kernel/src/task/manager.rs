@@ -35,8 +35,8 @@ impl TaskManager {
     }
 
     /// get INIT_PROC task
-    pub fn init_task(&self) -> Option<Arc<Task>> {
-        self.get(INIT_PROCESS_ID)
+    pub fn get_init_proc(&self) -> Arc<Task> {
+        self.get(INIT_PROCESS_ID).unwrap()
     }
 }
 
@@ -103,8 +103,5 @@ impl ThreadGroup {
     }
     pub fn remove(&mut self, taskid: usize) {
         self.0.remove(&taskid);
-    }
-    pub fn total_num(&self) -> usize {
-        self.0.len()
     }
 }
