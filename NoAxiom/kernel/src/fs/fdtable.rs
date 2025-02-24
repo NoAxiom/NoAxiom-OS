@@ -30,8 +30,8 @@ impl FdTable {
         Self {
             table: vec![
                 Some(Arc::new(Stdin)),
-                Some(Arc::new(Stdout)),
-                Some(Arc::new(Stdout)),
+                Some(Arc::new(Stdout::new())),
+                Some(Arc::new(Stdout::new())),
             ],
             rlimt: RLimit {
                 rlim_cur: RLIMIT_SOFT_MAX,
