@@ -1,4 +1,7 @@
-use super::sig_set::SigMask;
+use super::{
+    sig_num::{SigErrno, Signo},
+    sig_set::SigMask,
+};
 use crate::trap::TrapContext;
 
 pub struct SigContext {
@@ -7,6 +10,12 @@ pub struct SigContext {
 }
 
 impl SigContext {
+    // pub const fn empty() -> Self {
+    //     Self {
+    //         cx: TrapContext::empty(),
+    //         mask: SigMask::empty(),
+    //     }
+    // }
     pub fn from_another(cx: &TrapContext, mask: SigMask) -> Self {
         Self {
             cx: cx.clone(),
@@ -16,10 +25,10 @@ impl SigContext {
 }
 
 pub struct SigInfo {
-    pub si_signo: i32,    // Signal number
-    pub si_code: SigCode, // Signal code
-    pub si_errno: i32,    // An errno value
-    pub otherinfo: OtherInfo,
+    pub signo: Signo,             // signal number
+    pub code: SigCode,            // signal code
+    pub errno: SigErrno,          // errno value
+    pub extra_info: SigExtraInfo, // extra info
 }
 
 /// signal code
@@ -44,7 +53,7 @@ pub enum SigCode {
 }
 
 #[derive(Copy, Clone, PartialEq, Debug)]
-pub enum OtherInfo {
+pub enum SigExtraInfo {
     Basic,
     Extend {
         si_pid: u32, // Sending process ID

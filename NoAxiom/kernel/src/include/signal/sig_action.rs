@@ -1,21 +1,16 @@
 use bitflags::bitflags;
 
 use super::{sig_num::SigNum, sig_set::SigMask};
-
-// The SIG_DFL and SIG_IGN macros expand into integral expressions that are not
-// equal to an address of any function. The macros define signal handling
-// strategies for signal() function.
-pub const SIG_DFL: usize = 0; // default signal handling
-pub const SIG_IGN: usize = 1; // signal is ignored
+use crate::constant::signal::SIG_DFL;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SaHandlerType {
+pub enum SigActionHandlerType {
     Default,
     Ignore,
     Customized { addr: usize },
 }
 
-impl SaHandlerType {
+impl SigActionHandlerType {
     pub const fn default(sig: SigNum) -> Self {
         match sig {
             SigNum::SIGCHLD | SigNum::SIGURG | SigNum::SIGWINCH => Self::Ignore,
@@ -26,7 +21,7 @@ impl SaHandlerType {
 
 bitflags! {
     #[derive(Copy, Clone, Debug)]
-    pub struct SaFlags: u32 {
+    pub struct SigActionFlags: u32 {
         const SA_NOCLDSTOP = 1; /* Don't send SIGCHLD when children stop.  */
         const SA_NOCLDWAIT = 2; /* Don't create zombie on child death.  */
         const SA_SIGINFO   = 4; /* Invoke signal-catching function with
@@ -58,70 +53,46 @@ struct sigaction {
 }
 */
 
+// fixme: is this order correct?
 #[derive(Clone, Copy)]
 #[repr(C)]
 pub struct SigAction {
     pub sa_handler: usize,
-    _sa_sigaction: usize,
+    pub sa_flags: SigActionFlags,
+    pub sa_restorer: usize,
     pub sa_mask: SigMask,
-    pub sa_flags: SaFlags,
-    _sa_restorer: usize,
 }
 
 impl SigAction {
     pub fn new() -> Self {
         Self {
             sa_handler: SIG_DFL,
-            _sa_sigaction: 0,
+            sa_flags: SigActionFlags::empty(),
+            sa_restorer: 0,
             sa_mask: SigMask::empty(),
-            sa_flags: SaFlags::empty(),
-            _sa_restorer: 0,
         }
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct KernelSigAction {
-    pub handler: SaHandlerType,
+    pub handler: SigActionHandlerType,
     pub mask: SigMask,
-    pub flags: SaFlags,
+    pub flags: SigActionFlags,
 }
 
 impl KernelSigAction {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
-            handler: SaHandlerType::Default,
+            handler: SigActionHandlerType::Default,
             mask: SigMask::empty(),
-            flags: SaFlags::empty(),
+            flags: SigActionFlags::empty(),
         }
     }
 }
 
-impl From<SigAction> for KernelSigAction {
-    fn from(sa: SigAction) -> Self {
-        Self {
-            handler: match sa.sa_handler {
-                SIG_DFL => SaHandlerType::Default,
-                SIG_IGN => SaHandlerType::Ignore,
-                addr => SaHandlerType::Customized { addr },
-            },
-            mask: sa.sa_mask,
-            flags: sa.sa_flags,
-        }
-    }
-}
-
-impl From<KernelSigAction> for SigAction {
-    fn from(ksa: KernelSigAction) -> Self {
-        Self {
-            sa_handler: match ksa.handler {
-                SaHandlerType::Default => SIG_DFL,
-                SaHandlerType::Ignore => SIG_IGN,
-                SaHandlerType::Customized { addr } => addr,
-            },
-            _sa_sigaction: 0,
-            sa_mask: ksa.mask,
-            sa_flags: ksa.flags,
-            _sa_restorer: 0,
-        }
+impl Default for KernelSigAction {
+    fn default() -> Self {
+        Self::new()
     }
 }

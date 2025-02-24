@@ -1,4 +1,7 @@
-pub const MAX_SIGNUM: u32 = 64;
+use crate::constant::signal::MAX_SIGNUM;
+
+pub type Signo = i32;
+pub type SigErrno = i32;
 
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]
 #[repr(usize)]
@@ -77,6 +80,7 @@ pub enum SigNum {
     SIGRTMAX = 64,
 }
 
+// signum <> usize
 impl From<usize> for SigNum {
     fn from(value: usize) -> Self {
         if value <= MAX_SIGNUM as usize {
@@ -88,21 +92,20 @@ impl From<usize> for SigNum {
         }
     }
 }
-
 impl Into<usize> for SigNum {
     fn into(self) -> usize {
         self as usize
     }
 }
 
-impl Into<i32> for SigNum {
-    fn into(self) -> i32 {
-        self as i32
+// signum <> usize
+impl Into<Signo> for SigNum {
+    fn into(self) -> Signo {
+        self as Signo
     }
 }
-
-impl From<i32> for SigNum {
-    fn from(value: i32) -> Self {
+impl From<Signo> for SigNum {
+    fn from(value: Signo) -> Self {
         if value < 0 {
             error!("[SIGNAL] Try to convert an invalid number to Signal");
             return SigNum::INVALID;

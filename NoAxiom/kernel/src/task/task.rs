@@ -19,11 +19,13 @@ use super::{
 };
 use crate::{
     fs::{fdtable::FdTable, path::Path},
-    mm::memory_set::{ElfMemoryInfo, MemorySet},
     include::{
         auxv::{AuxEntry, AT_EXECFN, AT_NULL, AT_RANDOM},
         clone_flags::CloneFlags,
+        signal::sig_set::SigMask,
     },
+    ipc::signal::{pending_sigs::PendingSigs, sa_list::SigActionList},
+    mm::memory_set::{ElfMemoryInfo, MemorySet},
     sched::sched_entity::SchedEntity,
     syscall::SyscallResult,
     task::{manager::add_new_process, taskid::tid_alloc},
@@ -49,6 +51,41 @@ pub struct ProcessInfo {
     pub cwd: Path,
 }
 
+pub struct SignalInfo {
+    /// pending signals
+    pending_sigs: Arc<SpinLock<PendingSigs>>,
+
+    /// signal action list
+    sa_list: Arc<SpinLock<SigActionList>>,
+
+    /// signal mask
+    sig_mask: SyncUnsafeCell<SigMask>,
+    //
+    // /// signal ucontext
+    // sig_ucontext_cx: AtomicUsize,
+    //
+    // /// signal stack
+    // pub sigstack: Option<SignalStack>,
+}
+
+impl SignalInfo {
+    pub fn new(
+        pending_sigs: Option<&Arc<SpinLock<PendingSigs>>>,
+        sa_list: Option<&Arc<SpinLock<SigActionList>>>,
+    ) -> Self {
+        Self {
+            pending_sigs: pending_sigs
+                .map(|p| p.clone())
+                .unwrap_or_else(|| Arc::new(SpinLock::new(PendingSigs::new()))),
+            sa_list: sa_list
+                .map(|p| p.clone())
+                .unwrap_or_else(|| Arc::new(SpinLock::new(SigActionList::new()))),
+            sig_mask: SyncUnsafeCell::new(SigMask::empty()),
+            // sig_ucontext_cx: SyncUnsafeCell::new(SigContext::empty()),
+        }
+    }
+}
+
 /// task control block for a coroutine,
 /// a.k.a thread in current project structure
 pub struct Task {
@@ -68,9 +105,10 @@ pub struct Task {
     /// also belongs to other threads
     pcb: Arc<SpinLock<ProcessInfo>>,
 
+    // todo: is SyncUnsafeCell correct??? might cause inter-core sync bugs
     /// memory set for task
     /// explanation:
-    /// SyncUnsafeCell: allow to change memory set in immutable context
+    /// SyncUnsafeCell: allow to change memory set in immutable context (bug?)
     /// Arc: allow to share memory set between tasks, also provides refcount
     /// SpinLock: allow to lock memory set in multi-core context
     pub memory_set: SyncUnsafeCell<Arc<SpinLock<MemorySet>>>,
@@ -90,6 +128,9 @@ pub struct Task {
 
     /// file descriptor table
     fd_table: Arc<SpinLock<FdTable>>,
+
+    // signal info
+    signal_info: SignalInfo,
 }
 
 /// user tasks
@@ -200,6 +241,19 @@ impl Task {
         unsafe { &mut (*self.trap_cx.get()) }
     }
 
+    /// signal info: sigaction list
+    pub fn sa_list(&self) -> SpinLockGuard<SigActionList> {
+        self.signal_info.sa_list.lock()
+    }
+    /// signal info: pending signals
+    pub fn pending_sigs(&self) -> SpinLockGuard<PendingSigs> {
+        self.signal_info.pending_sigs.lock()
+    }
+    /// signal info: signal mask
+    pub fn sig_mask(&self) -> &SigMask {
+        unsafe { &(*self.signal_info.sig_mask.get()) }
+    }
+
     /// create new process from elf
     pub async fn new_process(path: Path) -> Arc<Self> {
         trace!("[kernel] spawn new process from elf");
@@ -230,6 +284,7 @@ impl Task {
             exit_code: AtomicI32::new(0),
             sched_entity: SchedEntity::new_bare(),
             fd_table: Arc::new(SpinLock::new(FdTable::new())),
+            signal_info: SignalInfo::new(None, None),
         });
         add_new_process(&task);
         info!("[spawn] new task spawn complete, tid {}", task.tid.0);
@@ -398,6 +453,10 @@ impl Task {
                 exit_code: AtomicI32::new(0),
                 sched_entity: self.sched_entity.data_clone(),
                 fd_table,
+                signal_info: SignalInfo::new(
+                    Some(&self.signal_info.pending_sigs),
+                    Some(&self.signal_info.sa_list),
+                ),
             });
             self.thread_group.lock().insert(&new_thread);
             new_thread
@@ -423,6 +482,7 @@ impl Task {
                 exit_code: AtomicI32::new(0),
                 sched_entity: self.sched_entity.data_clone(),
                 fd_table,
+                signal_info: SignalInfo::new(None, None),
             });
             add_new_process(&new_process);
             parent_pcb.children.push(new_process.clone());

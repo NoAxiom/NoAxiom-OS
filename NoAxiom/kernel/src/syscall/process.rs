@@ -1,15 +1,15 @@
-//! memory management system calls
 use super::{Syscall, SyscallResult};
 use crate::{
     fs::path::Path,
-    mm::user_ptr::UserPtr,
     include::{
         clone_flags::CloneFlags,
         process::{PidSel, WaitOption},
         result::Errno,
+        signal::{sig_info::SigExtraInfo, sig_set::SigMask},
     },
+    mm::user_ptr::UserPtr,
     return_errno,
-    sched::task::spawn_utask,
+    sched::{task::spawn_utask, utils::yield_now},
     syscall::A0,
     task::manager::TASK_MANAGER,
 };
@@ -111,31 +111,59 @@ impl Syscall<'_> {
         };
 
         // wait for target task
-        match target_task {
+        let (target_tid, exit_code) = match target_task {
             Some(target_task) => {
                 info!("[sys_wait4] wait for task {}", target_task.tid());
-                if !status.is_null() {
-                    info!(
-                        "[sys_wait4]: write exit_code at status_addr = {:#x}",
-                        status.addr(),
-                    );
-                    let exit_code = target_task.exit_code();
-                    status.write_volatile((exit_code & 0xff) << 8);
-                    info!("[sys_wait4]: write exit code {:#x}", exit_code);
-                }
-                let target_tid = target_task.tid();
-                target_task
-                    .pcb()
-                    .children
-                    .retain(|other| other.tid() != target_tid);
-                TASK_MANAGER.remove(target_tid);
-                Ok(target_tid as isize)
+                (target_task.tid(), target_task.exit_code())
             }
             None => {
-                error!("unimplemented");
-                Err(Errno::ECHILD)
+                let task = self.task;
+                let (found_pid, exit_code) = loop {
+                    task.set_wake_signal(!*task.sig_mask() | SigMask::SIGCHLD);
+                    debug!("[sys_wait4] yield now, waiting for SIGCHLD");
+                    // use polling instead of waker
+                    yield_now().await;
+                    let sig_info = task.pending_sigs().pop_with_mask(SigMask::SIGCHLD);
+                    if let Some(sig_info) = sig_info {
+                        if let SigExtraInfo::Extend {
+                            si_pid,
+                            si_status,
+                            si_stime: _,
+                            si_utime: _,
+                        } = sig_info.extra_info
+                        {
+                            match pid_type {
+                                PidSel::Task(None) => break (si_pid, si_status),
+                                PidSel::Task(target_pid) => {
+                                    if si_pid as usize == target_pid.unwrap() {
+                                        break (si_pid, si_status);
+                                    }
+                                }
+                                PidSel::Group(_) => unimplemented!(),
+                            }
+                        }
+                    } else {
+                        return_errno!(Errno::EINTR);
+                    }
+                };
+                (found_pid as usize, exit_code.unwrap())
             }
+        };
+        
+        if !status.is_null() {
+            info!(
+                "[sys_wait4]: write exit_code at status_addr = {:#x}",
+                status.addr(),
+            );
+            status.write_volatile((exit_code & 0xff) << 8);
+            info!("[sys_wait4]: write exit code {:#x}", exit_code);
         }
+        self.task
+            .pcb()
+            .children
+            .retain(|other| other.tid() != target_tid);
+        TASK_MANAGER.remove(target_tid);
+        Ok(target_tid as isize)
     }
 
     pub fn sys_getpid(&self) -> SyscallResult {

@@ -20,3 +20,6 @@ pub trait Scheduler {
         res
     }
 }
+
+// fixme: current sync scheme is incorrect, consider send ipi and flush cache
+// fixme: use tlb-shoot-down to update mmap info (when multi-threading mmap)

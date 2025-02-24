@@ -99,10 +99,9 @@ pub async fn task_main(task: Arc<Task>) {
         trace!("[task_main] trap_restore");
         trap_restore(&task);
         // debug!("cx: {:?}", task.trap_context());
-        // todo: is this necessary?
         if task.is_zombie() {
-            error!(
-                "task {} is set zombie before trap_handler, break",
+            warn!(
+                "task {} is zombie before trap_handler, break",
                 task.tid()
             );
             break;

@@ -96,6 +96,18 @@ pub struct TrapContext {
 }
 
 impl TrapContext {
+    // pub const fn empty() -> Self {
+    //     Self {
+    //         user_reg: [0; 32],
+    //         sstatus: Sstatus::default(),
+    //         sepc: 0,
+    //         kernel_sp: 0,
+    //         kernel_ra: 0,
+    //         kernel_reg: [0; 12],
+    //         kernel_fp: 0,
+    //         kernel_tp: 0,
+    //     }
+    // }
     pub fn app_init_cx(entry: usize, sp: usize) -> Self {
         info!("[app_init_cx] entry: {:#x}, sp: {:#x}", entry, sp);
         let mut sstatus = Sstatus::read();

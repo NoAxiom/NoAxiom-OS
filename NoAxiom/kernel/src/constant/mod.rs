@@ -4,3 +4,4 @@ pub mod register;
 pub mod sched;
 pub mod syscall;
 pub mod time;
+pub mod signal;

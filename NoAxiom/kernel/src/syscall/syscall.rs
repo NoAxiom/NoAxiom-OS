@@ -87,6 +87,7 @@ pub async fn syscall(task: &Arc<Task>, cx: &TrapContext) -> isize {
     match res {
         Ok(res) => res,
         Err(errno) => {
+            error!("syscall error: {:?}", errno);
             let errno = errno as isize;
             if errno > 0 {
                 -errno
