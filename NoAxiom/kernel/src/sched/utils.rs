@@ -1,6 +1,8 @@
 //! ## utils for async task
 //! - use [`yield_now`] to yield current async task;
 //! - use [`take_waker`] to fetch current task's context
+//! - use [`block_on`] to block on a future
+//! - use [`suspend_now`] to suspend current task (without immediate wake)
 
 #![allow(unused)]
 
@@ -83,5 +85,35 @@ pub fn block_on<T>(future: impl Future<Output = T>) -> T {
             k *= (k + i);
         }
         intermit(|| info!("[block on] val is {}", k));
+    }
+}
+
+/// suspend current task
+/// difference with yield_now: it won't wake the task immediately
+pub async fn suspend_now() {
+    SuspendFuture::new().await
+}
+
+struct SuspendFuture {
+    visited: bool,
+}
+
+impl SuspendFuture {
+    const fn new() -> Self {
+        Self { visited: false }
+    }
+}
+
+impl Future for SuspendFuture {
+    type Output = ();
+
+    fn poll(mut self: Pin<&mut Self>, _cx: &mut Context) -> Poll<Self::Output> {
+        match self.visited {
+            true => Poll::Ready(()),
+            false => {
+                self.visited = true;
+                Poll::Pending
+            }
+        }
     }
 }

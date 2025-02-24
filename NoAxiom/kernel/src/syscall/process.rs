@@ -9,7 +9,7 @@ use crate::{
     },
     mm::user_ptr::UserPtr,
     return_errno,
-    sched::{task::spawn_utask, utils::yield_now},
+    sched::{task::spawn_utask, utils::suspend_now},
     syscall::A0,
     task::manager::TASK_MANAGER,
 };
@@ -122,7 +122,7 @@ impl Syscall<'_> {
                     task.set_wake_signal(!*task.sig_mask() | SigMask::SIGCHLD);
                     debug!("[sys_wait4] yield now, waiting for SIGCHLD");
                     // use polling instead of waker
-                    yield_now().await;
+                    suspend_now().await;
                     let sig_info = task.pending_sigs().pop_with_mask(SigMask::SIGCHLD);
                     if let Some(sig_info) = sig_info {
                         if let SigExtraInfo::Extend {
@@ -149,7 +149,7 @@ impl Syscall<'_> {
                 (found_pid as usize, exit_code.unwrap())
             }
         };
-        
+
         if !status.is_null() {
             info!(
                 "[sys_wait4]: write exit_code at status_addr = {:#x}",
