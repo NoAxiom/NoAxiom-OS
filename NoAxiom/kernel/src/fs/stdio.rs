@@ -69,3 +69,12 @@ impl File for Stdout {
         Err(Errno::ENOSYS)
     }
 }
+
+impl Drop for Stdout {
+    fn drop(&mut self) {
+        let stdout_buf = self.buf.lock();
+        if !stdout_buf.is_empty() {
+            print!("{}", core::str::from_utf8(stdout_buf.as_slice()).unwrap());
+        }
+    }
+}
