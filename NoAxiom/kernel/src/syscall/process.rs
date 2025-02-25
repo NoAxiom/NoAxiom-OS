@@ -1,3 +1,5 @@
+use alloc::vec::Vec;
+
 use super::{Syscall, SyscallResult};
 use crate::{
     fs::path::Path,
@@ -57,8 +59,11 @@ impl Syscall<'_> {
             Path::from(path)
         };
         info!("[sys_exec] path: {:?}", path);
-        let args = UserPtr::<u8>::new(argv).get_string_vec();
-        let envs = UserPtr::<u8>::new(envp).get_string_vec();
+        info!("[sys_exec] argv: {:#x}, envp: {:#x}", argv, envp);
+        let args = UserPtr::<UserPtr<u8>>::new(argv).get_string_vec();
+        let envs = UserPtr::<UserPtr<u8>>::new(envp).get_string_vec();
+        // let args = Vec::new();
+        // let envs = Vec::new();
         self.task.exec(path, args, envs).await;
         // On success, execve() does not return, on error -1 is returned, and errno is
         // set to indicate the error.
@@ -176,7 +181,7 @@ impl Syscall<'_> {
     pub fn sys_getpid(&self) -> SyscallResult {
         Ok(self.task.tid() as isize)
     }
-    
+
     pub fn sys_getppid(&self) -> SyscallResult {
         let parent_process = self.task.pcb().parent.clone();
         match parent_process {

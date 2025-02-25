@@ -129,8 +129,8 @@ impl<T> UserPtr<T> {
         let mut ptr = self.ptr as usize;
         let mut res = Vec::new();
         let step = core::mem::size_of::<T>();
-        trace!("[as_vec_while] ptr: {:#x}", ptr);
         loop {
+            trace!("[as_vec_while] ptr: {:#x}", ptr);
             let value = unsafe { &*(ptr as *const T) };
             if checker(value) {
                 break;
@@ -150,20 +150,28 @@ impl UserPtr<u8> {
         res
     }
 
-    /// get user c-typed string
+    /// get user string
     pub fn get_cstr(&self) -> String {
-        let checker = |&c: &u8| c == 0;
+        let checker = |&c: &u8| c as char == '\0';
         let slice = self.as_vec_until(&checker);
+        trace!("slice: {:?}", slice);
         let res = String::from_utf8(Vec::from(slice)).unwrap();
         res
     }
+}
 
+impl UserPtr<UserPtr<u8>> {
     /// get user string vec, end with null
     pub fn get_string_vec(&self) -> Vec<String> {
         let mut ptr = self.clone();
         let mut res = Vec::new();
-        while !ptr.is_null() {
-            let data = ptr.get_cstr();
+        while !ptr.is_null() && !ptr.value().is_null() {
+            trace!(
+                "ptr_addr: {:#}, value: {:#}",
+                ptr.addr(),
+                ptr.value().addr()
+            );
+            let data = ptr.value().get_cstr();
             res.push(data);
             ptr.inc(1);
         }

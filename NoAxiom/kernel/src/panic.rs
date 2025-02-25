@@ -21,5 +21,6 @@ fn panic(info: &PanicInfo) -> ! {
             info.message().unwrap()
         );
     }
-    sbi_rt::legacy::shutdown()
+    loop {}
+    // sbi_rt::legacy::shutdown()
 }
