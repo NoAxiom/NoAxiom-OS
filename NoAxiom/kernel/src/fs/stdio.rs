@@ -1,24 +1,24 @@
+use alloc::{boxed::Box, sync::Arc, vec::Vec};
+
+use async_trait::async_trait;
+use ksync::mutex::SpinLock;
+use sbi_rt::legacy::console_getchar;
+
 use super::vfs::basic::file::{File, FileMeta};
 use crate::{include::result::Errno, syscall::SyscallResult};
 
 pub struct Stdin;
 pub struct Stdout {
-    buf: Arc<SyncUnsafeCell<Vec<u8>>>,
+    buf: Arc<SpinLock<Vec<u8>>>,
 }
 
 impl Stdout {
     pub fn new() -> Self {
         Self {
-            buf: Arc::new(SyncUnsafeCell::new(Vec::new())),
+            buf: Arc::new(SpinLock::new(Vec::new())),
         }
     }
 }
-
-use alloc::{boxed::Box, sync::Arc, vec::Vec};
-
-use async_trait::async_trait;
-use ksync::cell::SyncUnsafeCell;
-use sbi_rt::legacy::console_getchar;
 
 #[async_trait]
 impl File for Stdin {
@@ -53,20 +53,17 @@ impl File for Stdout {
     async fn read_from<'a>(&'a self, _offset: usize, _buf: &'a mut Vec<u8>) -> SyscallResult {
         Err(Errno::ENOSYS)
     }
-    async fn write_at<'a>(&'a self, _offset: usize, buf: &'a Vec<u8>) -> SyscallResult {
+    async fn write_at<'a>(&'a self, _offset: usize, user_buf: &'a Vec<u8>) -> SyscallResult {
         // print!("{}", core::str::from_utf8(buf).unwrap());
-
-        let buffer = self.buf.get();
-        for c in buf.iter() {
-            unsafe {
-                (*buffer).push(*c);
-                if c == &b'\n' {
-                    print!("{}", core::str::from_utf8(&*buffer).unwrap());
-                    (*buffer).clear();
-                }
+        let mut stdout_buf = self.buf.lock();
+        for c in user_buf.iter() {
+            stdout_buf.push(*c);
+            if *c == '\n' as u8 {
+                print!("{}", core::str::from_utf8(stdout_buf.as_slice()).unwrap());
+                stdout_buf.clear();
             }
         }
-        Ok(buf.len() as isize)
+        Ok(user_buf.len() as isize)
     }
     async fn load_dir(&self) -> Result<(), Errno> {
         Err(Errno::ENOSYS)

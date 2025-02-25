@@ -21,7 +21,12 @@ use super::{
     taskid::{TidTracer, TGID, TID},
 };
 use crate::{
-    fs::{fdtable::FdTable, path::Path},
+    constant::fs::{STD_ERR, STD_IN, STD_OUT},
+    fs::{
+        fdtable::FdTable,
+        path::Path,
+        stdio::{Stdin, Stdout},
+    },
     include::{
         auxv::{AuxEntry, AT_EXECFN, AT_NULL, AT_RANDOM},
         clone_flags::CloneFlags,
@@ -447,16 +452,23 @@ impl Task {
 
         // TODO: CloneFlags::SIGHAND
 
-        let fd_table = self.fd_table.clone();
-        let fd = if flags.contains(CloneFlags::FILES) {
+        let fd_table = if flags.contains(CloneFlags::FILES) {
             self.fd_table.clone()
         } else {
-            Arc::new(SpinLock::new(self.fd_table.lock().clone()))
+            debug!("fd table info cloned");
+            let tmp = Arc::new(SpinLock::new(self.fd_table.lock().clone()));
+            let mut guard = tmp.lock();
+            // todo: maybe needn't to realloc STD_IN
+            guard.table[STD_IN] = Some(Arc::new(Stdin));
+            guard.table[STD_OUT] = Some(Arc::new(Stdout::new()));
+            guard.table[STD_ERR] = Some(Arc::new(Stdout::new()));
+            drop(guard);
+            tmp
         };
 
         if flags.contains(CloneFlags::THREAD) {
             // fork as a new thread
-            trace!("fork new thread");
+            debug!("fork new thread");
             let new_thread = Arc::new(Self {
                 tid: tid_alloc(),
                 tgid: self.tgid.clone(),
@@ -481,7 +493,7 @@ impl Task {
             // fork as a new process
             let tid = tid_alloc();
             let tgid_val = tid.0;
-            trace!("fork new process, tgid: {}", tgid_val);
+            debug!("fork new process, tgid: {}", tgid_val);
             let mut parent_pcb = self.pcb();
             let new_process = Arc::new(Self {
                 tid,
@@ -541,5 +553,9 @@ impl Task {
             self.set_exit_code(exit_code);
         }
         self.set_status(TaskStatus::Zombie);
+    }
+
+    pub fn update_brk(self: &Arc<Self>, grow_size: isize) -> usize {
+        0
     }
 }

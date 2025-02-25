@@ -71,14 +71,17 @@ impl<T> UserPtr<T> {
         }
     }
 
+    #[inline(always)]
     pub fn is_null(&self) -> bool {
         self.ptr.is_null()
     }
 
+    #[inline(always)]
     pub fn inc(&mut self, count: usize) {
         self.ptr = unsafe { self.ptr.add(count) };
     }
 
+    #[inline(always)]
     pub fn value(&self) -> T
     where
         T: Copy,
@@ -86,20 +89,24 @@ impl<T> UserPtr<T> {
         unsafe { *self.ptr }
     }
 
+    #[inline(always)]
     pub fn addr(&self) -> usize {
         self.ptr as usize
     }
 
+    #[inline(always)]
     pub unsafe fn set(&self, value: T) {
         unsafe { *self.ptr = value };
     }
 
+    #[inline(always)]
     pub fn write_volatile(&self, value: T) {
         unsafe { self.ptr.write_volatile(value) };
     }
 
     /// convert ptr into an mutable reference
     /// please write data after memory_set.unlock
+    #[inline(always)]
     pub fn as_ref_mut(&self) -> &mut T {
         unsafe { &mut *(self.ptr as *mut T) }
     }

@@ -54,7 +54,7 @@ impl<'a> Syscall<'a> {
             SYS_GETPPID => self.sys_getppid(),
 
             // mm
-            SYS_BRK => todo!(),
+            SYS_BRK => self.sys_brk(args[0]),
             SYS_MMAP => todo!(),
             SYS_MUNMAP => todo!(),
 

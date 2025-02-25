@@ -3,6 +3,7 @@
 //! - [`run`] to run next task
 
 use alloc::sync::Arc;
+use sbi_rt::{send_ipi, HartMask};
 use core::future::Future;
 
 use arch::interrupt::{enable_external_interrupt, enable_global_interrupt, is_interrupt_enabled};
@@ -16,7 +17,7 @@ use super::{
     sched_entity::{SchedEntity, SchedTaskInfo},
     scheduler::{SchedLoadStats, Scheduler},
 };
-use crate::{config::arch::CPU_NUM, cpu::get_hartid};
+use crate::{config::arch::{CPU_NUM, FULL_HART_MASK}, cpu::get_hartid};
 
 pub struct TaskScheduleInfo {
     pub sched_entity: SchedEntity,
@@ -140,6 +141,7 @@ fn max_load_hartid() -> Option<usize> {
 fn load_balance() -> Option<Runnable<TaskScheduleInfo>> {
     let current_hart = get_hartid();
     if let Some(from_hart) = max_load_hartid() {
+        // send_ipi(HartMask::from_mask_base(!get_hartid() & FULL_HART_MASK, 0));
         let res = RUNTIME.scheduler[from_hart].lock().be_stolen();
         if res.is_some() {
             warn!(
