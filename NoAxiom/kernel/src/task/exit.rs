@@ -17,7 +17,7 @@ pub fn terminate_all_tasks() {
 pub fn exit_handler(task: &Arc<Task>) {
     let tid = task.tid();
     let exit_code = task.exit_code();
-    debug!(
+    trace!(
         "[exit_hander] task {} enter the exit_handler with code {}",
         tid, exit_code
     );

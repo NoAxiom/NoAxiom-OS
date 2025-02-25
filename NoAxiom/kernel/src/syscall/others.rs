@@ -4,7 +4,7 @@ use crate::{mm::user_ptr::UserPtr, sched::utils::yield_now, time::gettime::get_t
 impl Syscall<'_> {
     /// yield current task
     pub async fn sys_yield() -> SyscallResult {
-        debug!("sys_yield");
+        trace!("sys_yield");
         yield_now().await;
         Ok(0)
     }

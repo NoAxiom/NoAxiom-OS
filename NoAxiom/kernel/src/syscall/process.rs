@@ -127,7 +127,7 @@ impl Syscall<'_> {
                 let task = self.task;
                 let (found_pid, exit_code) = loop {
                     task.set_wake_signal(!*task.sig_mask() | SigMask::SIGCHLD);
-                    debug!("[sys_wait4] yield now, waiting for SIGCHLD");
+                    info!("[sys_wait4] yield now, waiting for SIGCHLD");
                     // use polling instead of waker
                     suspend_now().await;
                     let sig_info = task.pending_sigs().pop_with_mask(SigMask::SIGCHLD);
@@ -175,5 +175,13 @@ impl Syscall<'_> {
 
     pub fn sys_getpid(&self) -> SyscallResult {
         Ok(self.task.tid() as isize)
+    }
+    
+    pub fn sys_getppid(&self) -> SyscallResult {
+        let parent_process = self.task.pcb().parent.clone();
+        match parent_process {
+            None => Err(Errno::ESRCH),
+            Some(parent_process) => Ok(parent_process.upgrade().unwrap().tid() as isize),
+        }
     }
 }
