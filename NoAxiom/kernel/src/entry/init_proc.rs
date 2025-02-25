@@ -18,7 +18,7 @@ pub fn schedule_spawn_all_apps() {
     /// Official tests
     // fs
     // paths.push("/chdir");
-    // paths.push("/yield");
+    paths.push("/yield");
     paths.push("/execve");
 
     for path in paths {
