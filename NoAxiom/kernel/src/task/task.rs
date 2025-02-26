@@ -1,7 +1,7 @@
 //! # Task
 
 use alloc::{
-    string::{String, ToString},
+    string::String,
     sync::{Arc, Weak},
     vec::Vec,
 };
@@ -30,13 +30,17 @@ use crate::{
     include::{
         auxv::{AuxEntry, AT_EXECFN, AT_NULL, AT_RANDOM},
         mm::{MmapFlags, MmapProts},
+        result::Errno,
         sched::CloneFlags,
         signal::sig_set::SigMask,
     },
     ipc::signal::{pending_sigs::PendingSigs, sa_list::SigActionList},
-    mm::memory_set::{ElfMemoryInfo, MemorySet},
+    mm::{
+        address::VirtAddr,
+        memory_set::{ElfMemoryInfo, MemorySet},
+    },
     sched::sched_entity::SchedEntity,
-    syscall::SyscallResult,
+    syscall::{SysResult, SyscallResult},
     task::{manager::add_new_process, taskid::tid_alloc},
     trap::TrapContext,
 };
@@ -522,7 +526,12 @@ impl Task {
     }
 
     /// execute
-    pub async fn exec(self: &Arc<Self>, path: Path, mut args: Vec<String>, mut envs: Vec<String>) {
+    pub async fn exec(
+        self: &Arc<Self>,
+        path: Path,
+        mut args: Vec<String>,
+        mut envs: Vec<String>,
+    ) -> SysResult<()> {
         let ElfMemoryInfo {
             memory_set,
             elf_entry,
@@ -546,6 +555,7 @@ impl Task {
             self.trap_context().user_reg[12],
         );
         // TODO: close fd table, reset sigactions
+        Ok(())
     }
 
     /// exit current task
@@ -568,8 +578,39 @@ impl Task {
         flags: MmapFlags,
         fd: isize,
         offset: usize,
-    ) -> usize {
-        // todo
-        0
+    ) -> SysResult<usize> {
+        // fetch file from fd_table and check validity
+        let fd_table = self.fd_table();
+        if !flags.contains(MmapFlags::MAP_ANONYMOUS)
+            && (fd as usize >= fd_table.table.len() || fd_table.table[fd as usize].is_none())
+        {
+            return Err(Errno::EBADF);
+        }
+        let fd_table = fd_table.table.clone();
+
+        let mut memory_set = self.memory_set().lock();
+        let mut start_va = VirtAddr::from(0);
+        if addr == 0 {
+            start_va = memory_set.mmap_manager.mmap_top;
+        }
+        if flags.contains(MmapFlags::MAP_FIXED) {
+            start_va = VirtAddr::from(addr);
+            memory_set.mmap_manager.remove(start_va, length);
+        }
+        let file = if flags.contains(MmapFlags::MAP_ANONYMOUS) {
+            None
+        } else {
+            fd_table[fd as usize].clone()
+        };
+        info!(
+            "mmap_manager push start va :{:#x} , length {:#x}",
+            start_va.0, length
+        );
+
+        memory_set
+            .mmap_manager
+            .push(start_va, length, prot, flags, offset, file);
+        drop(memory_set);
+        Ok(start_va.0)
     }
 }

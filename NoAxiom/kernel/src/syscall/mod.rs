@@ -13,5 +13,5 @@ pub mod macros;
 
 pub use syscall::{syscall, Syscall};
 
-pub type SyscallResult = Result<isize, Errno>;
-
+pub type SysResult<T> = Result<T, Errno>;
+pub type SyscallResult = SysResult<isize>;
