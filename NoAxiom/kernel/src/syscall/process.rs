@@ -4,9 +4,9 @@ use super::{Syscall, SyscallResult};
 use crate::{
     fs::path::Path,
     include::{
-        clone_flags::CloneFlags,
         process::{PidSel, WaitOption},
         result::Errno,
+        sched::CloneFlags,
         signal::{sig_info::SigExtraInfo, sig_set::SigMask},
     },
     mm::user_ptr::UserPtr,
@@ -129,6 +129,9 @@ impl Syscall<'_> {
                 (target_task.tid(), target_task.exit_code())
             }
             None => {
+                if options.contains(WaitOption::WNOHANG) {
+                    return Ok(0);
+                }
                 let task = self.task;
                 let (found_pid, exit_code) = loop {
                     task.set_wake_signal(!*task.sig_mask() | SigMask::SIGCHLD);

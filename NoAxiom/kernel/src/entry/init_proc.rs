@@ -18,8 +18,8 @@ pub fn schedule_spawn_all_apps() {
     /// Official tests
     // fs
     // paths.push("/chdir");
-    paths.push("/yield");
-    // paths.push("/execve");
+    // paths.push("/yield");
+    paths.push("/mmap");
 
     for path in paths {
         schedule_spawn_new_process(Path::from(path.to_string()));

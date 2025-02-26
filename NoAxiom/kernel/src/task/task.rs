@@ -29,7 +29,8 @@ use crate::{
     },
     include::{
         auxv::{AuxEntry, AT_EXECFN, AT_NULL, AT_RANDOM},
-        clone_flags::CloneFlags,
+        mm::{MmapFlags, MmapProts},
+        sched::CloneFlags,
         signal::sig_set::SigMask,
     },
     ipc::signal::{pending_sigs::PendingSigs, sa_list::SigActionList},
@@ -556,6 +557,19 @@ impl Task {
     }
 
     pub fn update_brk(self: &Arc<Self>, grow_size: isize) -> usize {
+        0
+    }
+
+    pub fn mmap(
+        &self,
+        addr: usize,
+        length: usize,
+        prot: MmapProts,
+        flags: MmapFlags,
+        fd: isize,
+        offset: usize,
+    ) -> usize {
+        // todo
         0
     }
 }

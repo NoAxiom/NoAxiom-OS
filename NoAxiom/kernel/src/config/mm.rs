@@ -24,6 +24,9 @@ pub const KERNEL_ADDR_OFFSET: usize = 0xffff_ffc0_0000_0000;
 /// kernle pagenum offset from phys to virt
 pub const KERNEL_PAGENUM_MASK: usize = 0xffff_ffff_fc00_0000;
 
+/// mmap start address
+pub const MMAP_BASE_ADDR: usize = 0x6000_0000;
+
 // /// kernel phys memory start address
 // pub const KERNEL_PHYS_ENTRY: usize = 0x8020_0000;
 // /// kernel virt memory start address

@@ -55,8 +55,15 @@ impl<'a> Syscall<'a> {
 
             // mm
             SYS_BRK => self.sys_brk(args[0]),
-            SYS_MMAP => todo!(),
-            SYS_MUNMAP => todo!(),
+            SYS_MMAP => self.sys_mmap(
+                args[0],
+                args[1],
+                args[2],
+                args[3],
+                args[4] as isize,
+                args[5],
+            ),
+            SYS_MUNMAP => self.sys_munmap(),
 
             // others
             SYS_TIMES => Self::sys_times(args[0]),

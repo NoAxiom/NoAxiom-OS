@@ -16,23 +16,24 @@ use super::{
     address::PhysAddr,
     frame::{frame_alloc, frame_refcount, FrameTracker},
     map_area::MapArea,
+    mmap_manager::MmapManager,
     page_table::PageTable,
     pte::PageTableEntry,
 };
 use crate::{
     config::mm::{
-        KERNEL_ADDR_OFFSET, KERNEL_VIRT_MEMORY_END, MMIO, PAGE_SIZE, PAGE_WIDTH, USER_HEAP_SIZE,
-        USER_STACK_SIZE,
+        KERNEL_ADDR_OFFSET, KERNEL_VIRT_MEMORY_END, MMAP_BASE_ADDR, MMIO, PAGE_SIZE, PAGE_WIDTH,
+        USER_HEAP_SIZE, USER_STACK_SIZE,
     },
     constant::time::CLOCK_FREQ,
     fs::{fs_root, path::Path, vfs::basic::file::File},
+    include::{auxv::*, result::Errno},
     map_permission,
     mm::{
         address::{VirtAddr, VirtPageNum},
         map_area::MapAreaType,
         permission::MapType,
     },
-    include::{auxv::*, result::Errno},
     syscall::SyscallResult,
 };
 
@@ -90,6 +91,9 @@ pub struct MemorySet {
 
     /// user heap base address, used brk
     pub user_heap_base: usize,
+
+    /// mmap manager
+    pub mmap_manager: MmapManager,
 }
 
 impl MemorySet {
@@ -106,6 +110,7 @@ impl MemorySet {
             user_heap_area: MapArea::new_bare(),
             user_stack_base: 0,
             user_heap_base: 0,
+            mmap_manager: MmapManager::new(VirtAddr(MMAP_BASE_ADDR), VirtAddr(MMAP_BASE_ADDR)),
         }
     }
 
