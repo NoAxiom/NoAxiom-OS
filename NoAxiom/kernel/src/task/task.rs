@@ -118,13 +118,14 @@ pub struct Task {
     /// also belongs to other threads
     pcb: Arc<SpinLock<ProcessInfo>>,
 
-    // todo: is SyncUnsafeCell correct??? might cause inter-core sync bugs
     /// memory set for task
     /// explanation:
     /// SyncUnsafeCell: allow to change memory set in immutable context (bug?)
+    /// todo: is SyncUnsafeCell correct??? might cause inter-core sync bugs
     /// Arc: allow to share memory set between tasks, also provides refcount
     /// SpinLock: allow to lock memory set in multi-core context
-    pub memory_set: SyncUnsafeCell<Arc<SpinLock<MemorySet>>>,
+    // pub memory_set: SyncUnsafeCell<Arc<SpinLock<MemorySet>>>,
+    pub memory_set: Arc<SpinLock<MemorySet>>,
 
     /// trap context,
     /// contains stack ptr, registers, etc.
@@ -208,7 +209,8 @@ impl Task {
     /// memory set
     #[inline(always)]
     pub fn memory_set(&self) -> &Arc<SpinLock<MemorySet>> {
-        unsafe { &(*self.memory_set.get()) }
+        // unsafe { &(*self.memory_set.get()) }
+        &self.memory_set
     }
     #[inline(always)]
     pub unsafe fn memory_activate(&self) {
@@ -221,9 +223,9 @@ impl Task {
     }
     /// change current memory set
     pub fn change_memory_set(&self, memory_set: MemorySet) {
-        unsafe {
-            (*self.memory_set.get()) = Arc::new(SpinLock::new(memory_set));
-        }
+        // unsafe { (*self.memory_set.get()) = Arc::new(SpinLock::new(memory_set)) };
+        let mut ms = self.memory_set.lock();
+        *ms = memory_set;
     }
 
     pub fn memory_validate(
@@ -303,7 +305,7 @@ impl Task {
                 parent: None,
                 cwd: path,
             })),
-            memory_set: SyncUnsafeCell::new(Arc::new(SpinLock::new(memory_set))),
+            memory_set: Arc::new(SpinLock::new(memory_set)),
             trap_cx: SyncUnsafeCell::new(TrapContext::app_init_cx(elf_entry, user_sp)),
             status: SyncUnsafeCell::new(TaskStatus::Ready),
             exit_code: AtomicI32::new(0),
@@ -449,11 +451,11 @@ impl Task {
 
     /// fork
     pub fn fork(self: &Arc<Task>, flags: CloneFlags) -> Arc<Self> {
-        let memory_set = SyncUnsafeCell::new(if flags.contains(CloneFlags::VM) {
+        let memory_set = if flags.contains(CloneFlags::VM) {
             self.memory_set().clone()
         } else {
             Arc::new(SpinLock::new(self.memory_set().lock().clone_cow()))
-        });
+        };
 
         // TODO: CloneFlags::SIGHAND
 
