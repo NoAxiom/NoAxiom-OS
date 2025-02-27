@@ -1,4 +1,3 @@
-// todo: rename this folder to `include`
 pub mod auxv;
 pub mod fs;
 pub mod mm;

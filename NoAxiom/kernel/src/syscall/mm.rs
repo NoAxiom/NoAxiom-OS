@@ -33,10 +33,7 @@ impl Syscall<'_> {
         let length = align_up(length, PAGE_SIZE);
         let prot = MmapProts::from_bits(prot).unwrap();
         let flags = MmapFlags::from_bits(flags).unwrap();
-        if addr % PAGE_SIZE != 0 {
-            return Err(Errno::EINVAL);
-        }
-        if length == 0 {
+        if addr % PAGE_SIZE != 0 || length == 0 {
             return Err(Errno::EINVAL);
         }
         self.task

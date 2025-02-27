@@ -10,23 +10,30 @@ use crate::{
     include::mm::{MmapFlags, MmapProts},
 };
 
+/// single mmap page struct
 #[derive(Clone)]
 pub struct MmapPage {
-    /// Starting virtual address of mmap space
+    /// base va of mmap space
     pub vpn: VirtPageNum,
-    /// Mmap space validity
+
+    /// validity
     pub valid: bool,
-    /// Mmap space permissions
+
+    /// mmap protection
     pub prot: MmapProts,
-    /// Mapping flags
+
+    /// mmap flags
     pub flags: MmapFlags,
-    /// File descriptor
+
+    /// mmapped file
     pub file: Option<Arc<dyn File>>,
-    /// Mapped file offset address
+
+    /// offset in file
     pub offset: usize,
 }
 
 impl MmapPage {
+    /// register a new mmap page without immediate mapping
     pub fn new(
         vpn: VirtPageNum,
         prot: MmapProts,
@@ -44,6 +51,24 @@ impl MmapPage {
             offset,
         }
     }
+
+    // pub async fn lazy_map_page(&mut self, token: usize) {
+    //     if self.flags.contains(MmapFlags::MAP_ANONYMOUS) {
+    //         self.read_from_zero(token);
+    //     } else {
+    //         self.read_from_file(token).await;
+    //     }
+    //     self.valid = true;
+    // }
+
+    // fn read_from_zero(&mut self, token: usize) {
+    //     UserBuffer::wrap(translated_bytes_buffer(
+    //         token,
+    //         VirtAddr::from(self.vpn).0 as *const u8,
+    //         PAGE_SIZE,
+    //     ))
+    //     .write_zeros();
+    // }
 }
 
 pub struct MmapManager {
@@ -62,32 +87,34 @@ impl MmapManager {
             frame_trackers: BTreeMap::new(),
         }
     }
+
+    /// push a mmap range in mmap space (not actually mapped)
     pub fn push(
         &mut self,
         start_va: VirtAddr,
-        len: usize,
+        length: usize,
         prot: MmapProts,
         flags: MmapFlags,
-        offset: usize,
+        st_offset: usize,
         file: Option<Arc<dyn File>>,
     ) -> usize {
-        let end_va = VirtAddr(start_va.0 + len);
-        // use lazy map
-        let mut offset = offset;
+        let end_va = VirtAddr(start_va.0 + length);
+        let mut cur_offset = st_offset;
         for vpn in VpnRange::new_from_va(start_va, end_va) {
-            debug!("[DEBUG] mmap map vpn:{:x?}", vpn);
-            let mmap_page = MmapPage::new(vpn, prot, flags, false, file.clone(), offset);
+            // created a mmap page without mapping
+            let mmap_page = MmapPage::new(vpn, prot, flags, false, file.clone(), cur_offset);
             self.mmap_map.insert(vpn, mmap_page);
-            offset += PAGE_SIZE;
+            cur_offset += PAGE_SIZE;
         }
-        // update mmap_top
         if self.mmap_top <= start_va {
-            self.mmap_top = (start_va.0 + len).into();
+            self.mmap_top = (start_va.0 + length).into();
         }
         start_va.0
     }
-    pub fn remove(&mut self, start_va: VirtAddr, len: usize) {
-        let end_va = VirtAddr(start_va.0 + len);
+
+    /// remove a mmap range in mmap space
+    pub fn remove(&mut self, start_va: VirtAddr, length: usize) {
+        let end_va = VirtAddr(start_va.0 + length);
         for vpn in VpnRange::new_from_va(start_va, end_va) {
             self.mmap_map.remove(&vpn);
             self.frame_trackers.remove(&vpn);
