@@ -1,4 +1,4 @@
-use arch::interrupt::enable_user_memory_access;
+use arch::interrupt::{disable_global_interrupt, enable_user_memory_access, is_interrupt_enabled};
 use sbi_rt::hart_start;
 
 use crate::{
@@ -93,6 +93,8 @@ pub fn boot_hart_init(_: usize, dtb: usize) {
         get_hartid(),
         dtb as usize,
     );
+    // ipi test, only for debug
+    crate::utils::trigger_ipi(if get_hartid() == 0 { 1 } else { 0 });
     rust_main();
     unreachable!();
 }

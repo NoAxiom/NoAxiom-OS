@@ -7,6 +7,7 @@ use riscv::register::{
     scause::{self, Exception, Interrupt, Trap},
     sepc, stval,
 };
+use sbi_rt::legacy::clear_ipi;
 
 use super::trap::set_kernel_trap_entry;
 use crate::{
@@ -129,6 +130,10 @@ pub fn kernel_trap_handler() {
                 trace!("[SupervisorTimer] kernel Timer");
                 // fixme: now is just reset timer
                 crate::time::timer::set_next_trigger();
+            }
+            Interrupt::SupervisorSoft => {
+                warn!("IPI recieved, but not supported!!!");
+                clear_ipi();
             }
             _ => kernel_panic("unsupported interrupt"),
         },

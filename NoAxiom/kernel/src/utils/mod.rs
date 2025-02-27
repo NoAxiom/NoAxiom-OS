@@ -5,9 +5,11 @@ mod crossover;
 use alloc::{string::String, vec::Vec};
 
 use crossover::{Crossover, CrossoverManager};
+use sbi_rt::{send_ipi, HartMask};
 
 use crate::{
     config::mm::{KERNEL_ADDR_OFFSET, KERNEL_PAGENUM_MASK},
+    cpu::get_hartid,
     mm::user_ptr::UserPtr,
 };
 
@@ -81,4 +83,9 @@ pub fn intermit(f: impl FnOnce()) {
     if crossover.trigger() {
         f();
     }
+}
+
+pub fn trigger_ipi(hart_id: usize) {
+    warn!("send IPI from hart {} to hart {}", get_hartid(), hart_id);
+    send_ipi(HartMask::from_mask_base(1 << hart_id, 0));
 }
