@@ -3,7 +3,7 @@
 use alloc::vec::Vec;
 use core::arch::asm;
 
-use arch::register::satp;
+use arch::{Arch, VirtArch};
 
 use super::{
     address::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum},
@@ -175,11 +175,8 @@ impl PageTable {
     /// PLEASE make sure context around is mapped into both page tables
     #[inline(always)]
     pub unsafe fn activate(&self) {
-        let satp: usize = self.token();
-        unsafe {
-            satp::write(satp);
-            asm!("sfence.vma");
-        }
+        Arch::update_pagetable(self.token());
+        Arch::tlb_flush();
     }
 
     /// remap a cow page

@@ -1,4 +1,4 @@
-use sbi_rt::set_timer;
+use arch::{Arch, VirtArch};
 
 use super::gettime::get_time;
 use crate::config::sched::TIME_SLICE_TICKS;
@@ -14,5 +14,5 @@ pub fn set_next_trigger() {
     //     get_time(),
     //     (get_time() + TIME_SLICE_TICKS) as u64
     // );
-    set_timer((get_time() + TIME_SLICE_TICKS) as u64);
+    Arch::set_timer((get_time() + TIME_SLICE_TICKS) as u64);
 }

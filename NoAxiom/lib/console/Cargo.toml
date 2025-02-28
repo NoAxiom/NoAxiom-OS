@@ -4,5 +4,5 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-sbi-rt = { version = "0.0.3", features = ["legacy"] }
+arch = { path = "../arch" }
 ksync = { path = "../ksync" }

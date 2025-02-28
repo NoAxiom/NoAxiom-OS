@@ -1,8 +1,9 @@
+use arch::TrapContext;
+
 use super::{
     sig_num::{SigErrno, Signo},
     sig_set::SigMask,
 };
-use crate::trap::TrapContext;
 
 pub struct SigContext {
     pub cx: TrapContext,

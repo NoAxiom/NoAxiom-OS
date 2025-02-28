@@ -3,8 +3,8 @@
 
 use core::fmt::{self, Write};
 
+use arch::{Arch, VirtArch};
 use ksync::mutex::SpinLock;
-use sbi_rt::legacy::console_putchar;
 
 static PRINT_MUTEX: SpinLock<()> = SpinLock::new(());
 struct Stdout;
@@ -12,7 +12,7 @@ struct Stdout;
 impl Write for Stdout {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         for c in s.chars() {
-            console_putchar(c as usize);
+            Arch::console_putchar(c as usize);
         }
         Ok(())
     }

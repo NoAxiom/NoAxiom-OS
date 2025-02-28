@@ -5,11 +5,13 @@ use alloc::borrow::ToOwned;
 use riscv::{asm::sfence_vma_all, register::satp};
 
 /// check if interrupt is enabled
+#[inline(always)]
 pub fn is_interrupt_enabled() -> bool {
     riscv::register::sstatus::read().sie()
 }
 
 /// set int disabled
+#[inline(always)]
 pub fn disable_global_interrupt() {
     unsafe {
         riscv::register::sstatus::clear_sie();
@@ -17,6 +19,7 @@ pub fn disable_global_interrupt() {
 }
 
 /// set int enabled
+#[inline(always)]
 pub fn enable_global_interrupt() {
     unsafe {
         riscv::register::sstatus::set_sie();
@@ -24,6 +27,7 @@ pub fn enable_global_interrupt() {
 }
 
 /// set external int enabled
+#[inline(always)]
 pub fn enable_external_interrupt() {
     unsafe {
         riscv::register::sie::set_sext();
@@ -31,11 +35,13 @@ pub fn enable_external_interrupt() {
 }
 
 /// check if external interrupt is enabled
+#[inline(always)]
 pub fn is_external_interrupt_enabled() -> bool {
     riscv::register::sie::read().sext() && is_interrupt_enabled()
 }
 
 /// set external int disabled
+#[inline(always)]
 pub fn disable_external_interrupt() {
     unsafe {
         riscv::register::sie::clear_sext();
@@ -43,6 +49,7 @@ pub fn disable_external_interrupt() {
 }
 
 /// set soft int enabled
+#[inline(always)]
 pub fn enable_software_interrupt() {
     unsafe {
         riscv::register::sie::set_ssoft();
@@ -50,6 +57,7 @@ pub fn enable_software_interrupt() {
 }
 
 /// set supervisor timer int enabled
+#[inline(always)]
 pub fn enable_stimer_interrupt() {
     unsafe {
         riscv::register::sie::set_stimer();
@@ -57,6 +65,7 @@ pub fn enable_stimer_interrupt() {
 }
 
 /// permit supervisor user memory access
+#[inline(always)]
 pub fn enable_user_memory_access() {
     unsafe {
         riscv::register::sstatus::set_sum();
@@ -64,6 +73,7 @@ pub fn enable_user_memory_access() {
 }
 
 /// clear supervisor user memory access
+#[inline(always)]
 pub fn disable_user_memory_access() {
     unsafe {
         riscv::register::sstatus::clear_sum();

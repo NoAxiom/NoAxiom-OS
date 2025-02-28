@@ -1,5 +1,6 @@
 use alloc::sync::Arc;
 
+use arch::{Arch, VirtArch};
 use ksync::cell::SyncUnsafeCell;
 
 use crate::{
@@ -9,9 +10,7 @@ use crate::{
 
 #[inline(always)]
 pub fn get_hartid() -> usize {
-    let hartid: usize;
-    unsafe { core::arch::asm!("mv {}, tp", out(reg) hartid) }
-    hartid
+    Arch::get_hartid()
 }
 
 pub struct Cpu {

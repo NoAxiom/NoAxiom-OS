@@ -1,12 +1,9 @@
 use alloc::sync::Arc;
 
+use arch::{Arch, TrapContext, VirtArch};
+
 use super::SyscallResult;
-use crate::{
-    constant::{register::*, syscall::*},
-    include::result::Errno,
-    task::Task,
-    trap::TrapContext,
-};
+use crate::{constant::syscall::*, include::result::Errno, task::Task};
 
 /// system call tracer for a task
 pub struct Syscall<'a> {
@@ -24,8 +21,8 @@ impl<'a> Syscall<'a> {
             // fixme: turn on the interrupt. When call trap_handler, cpu would turn off
             // the interrupt until cpu ertn. But if we switch to another task, the whole
             // life time is in the interrupt off state until previous task ertn.
-            assert!(!arch::interrupt::is_interrupt_enabled());
-            arch::interrupt::enable_global_interrupt();
+            assert!(!Arch::is_interrupt_enabled());
+            Arch::enable_global_interrupt();
         }
         match id {
             // fs
@@ -80,17 +77,7 @@ impl<'a> Syscall<'a> {
 
 pub async fn syscall(task: &Arc<Task>, cx: &TrapContext) -> isize {
     let res = Syscall::new(task)
-        .syscall(
-            cx.user_reg[A7],
-            [
-                cx.user_reg[A0],
-                cx.user_reg[A1],
-                cx.user_reg[A2],
-                cx.user_reg[A3],
-                cx.user_reg[A4],
-                cx.user_reg[A5],
-            ],
-        )
+        .syscall(cx.get_syscall_id(), cx.get_syscall_args())
         .await;
     match res {
         Ok(res) => res,

@@ -26,6 +26,7 @@ version = "0.1.0"
 dependencies = [
  "loongArch64",
  "riscv",
+ "sbi-rt",
 ]
 
 [[package]]
@@ -100,8 +101,8 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 name = "console"
 version = "0.1.0"
 dependencies = [
+ "arch",
  "ksync",
- "sbi-rt",
 ]
 
 [[package]]
@@ -276,7 +277,6 @@ dependencies = [
  "plic",
  "rand_core",
  "ringbuffer",
- "sbi-rt",
  "smoltcp",
  "spin 0.7.1",
  "thiserror-core",

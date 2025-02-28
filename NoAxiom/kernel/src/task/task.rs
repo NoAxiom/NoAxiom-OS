@@ -5,12 +5,12 @@ use alloc::{
     sync::{Arc, Weak},
     vec::Vec,
 };
+use arch::{Exception, TrapContext};
 use core::{
     sync::atomic::{AtomicI32, AtomicUsize, Ordering},
     task::Waker,
 };
 
-use arch::register::scause::Exception;
 use ksync::{
     cell::SyncUnsafeCell,
     mutex::{SpinLock, SpinLockGuard},
@@ -42,7 +42,6 @@ use crate::{
     sched::sched_entity::SchedEntity,
     syscall::{SysResult, SyscallResult},
     task::{manager::add_new_process, taskid::tid_alloc},
-    trap::TrapContext,
 };
 
 #[derive(Debug, PartialEq, Clone, Copy)]

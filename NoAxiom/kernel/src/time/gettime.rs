@@ -4,15 +4,16 @@
 
 use core::time::Duration;
 
-use arch::register::time;
+use arch::{Arch, VirtArch};
 
 use super::timeval::TimeVal;
 use crate::constant::time::*;
 
 /// fetch time from `mtime` counter,
 /// which records the number of clock cycles since the system booted
+#[inline(always)]
 pub fn get_time() -> usize {
-    time::read()
+    Arch::get_time()
 }
 
 pub fn get_time_s() -> usize {

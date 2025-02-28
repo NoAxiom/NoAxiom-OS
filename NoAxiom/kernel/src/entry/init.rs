@@ -1,5 +1,4 @@
-use arch::interrupt::{disable_global_interrupt, enable_user_memory_access, is_interrupt_enabled};
-use sbi_rt::hart_start;
+use arch::{Arch, VirtArch};
 
 use crate::{
     config::{arch::CPU_NUM, mm::KERNEL_ADDR_OFFSET},
@@ -30,22 +29,23 @@ pub fn wake_other_hart(forbid_hart_id: usize) {
     );
     for i in 0..CPU_NUM {
         if i != forbid_hart_id {
-            let result = hart_start(i, entry, 0);
-            if result.error == 0 {
-                info!("[awake_other_hart] hart {:x} start successfully", i);
-            } else {
-                error!(
-                    "[awake_other_hart] error when waking {}, error code: {:?}",
-                    i, result
-                );
-            }
+            Arch::hart_start(i, entry, 0);
+            // let result = hart_start(i, entry, 0);
+            // if result.error == 0 {
+            //     info!("[awake_other_hart] hart {:x} start successfully", i);
+            // } else {
+            //     error!(
+            //         "[awake_other_hart] error when waking {}, error code:
+            // {:?}",         i, result
+            //     );
+            // }
         }
     }
 }
 
 #[no_mangle]
 pub fn other_hart_init(hart_id: usize, dtb: usize) {
-    enable_user_memory_access();
+    Arch::enable_user_memory_access();
     hart_mm_init();
     trap_init();
     // register_to_hart(); // todo: add multipule devices interrupt support
@@ -67,7 +67,7 @@ pub fn boot_hart_init(_: usize, dtb: usize) {
     heap_init();
     log_init();
     frame_init();
-    enable_user_memory_access();
+    Arch::enable_user_memory_access();
 
     // hart resources init
     hart_mm_init();
@@ -93,8 +93,6 @@ pub fn boot_hart_init(_: usize, dtb: usize) {
         get_hartid(),
         dtb as usize,
     );
-    // ipi test, only for debug
-    crate::utils::trigger_ipi(if get_hartid() == 0 { 1 } else { 0 });
     rust_main();
     unreachable!();
 }

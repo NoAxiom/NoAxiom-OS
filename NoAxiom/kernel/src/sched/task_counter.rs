@@ -2,6 +2,8 @@
 
 use core::sync::atomic::{AtomicUsize, Ordering};
 
+use arch::{Arch, VirtArch};
+
 pub static mut TASK_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 pub fn task_count_inc() {
@@ -14,6 +16,6 @@ pub fn task_count_dec() {
     if unsafe { TASK_COUNTER.fetch_sub(1, Ordering::SeqCst) } == 1 {
         info!("[kernel] all tasks are done, shutdown");
         // error!("shutdown is off, please shutdown the terminal manually");
-        sbi_rt::legacy::shutdown();
+        Arch::shutdown();
     }
 }

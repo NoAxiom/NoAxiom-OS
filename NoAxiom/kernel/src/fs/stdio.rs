@@ -1,8 +1,8 @@
 use alloc::{boxed::Box, sync::Arc, vec::Vec};
 
+use arch::{Arch, VirtArch};
 use async_trait::async_trait;
 use ksync::mutex::SpinLock;
-use sbi_rt::legacy::console_getchar;
 
 use super::vfs::basic::file::{File, FileMeta};
 use crate::{include::result::Errno, syscall::SyscallResult};
@@ -27,12 +27,12 @@ impl File for Stdin {
     }
     async fn read_from<'a>(&'a self, _offset: usize, buf: &'a mut Vec<u8>) -> SyscallResult {
         // mention that getchar is busy loop
-        let mut c = console_getchar() as i8;
+        let mut c = Arch::console_getchar() as i8;
         loop {
             if c != -1 {
                 break;
             }
-            c = console_getchar() as i8;
+            c = Arch::console_getchar() as i8;
         }
         buf[0] = c as u8;
         Ok(1 as isize)

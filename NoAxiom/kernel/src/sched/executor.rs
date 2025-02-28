@@ -3,10 +3,9 @@
 //! - [`run`] to run next task
 
 use alloc::sync::Arc;
-use sbi_rt::{send_ipi, HartMask};
 use core::future::Future;
 
-use arch::interrupt::{enable_external_interrupt, enable_global_interrupt, is_interrupt_enabled};
+use arch::{Arch, VirtArch};
 use array_init::array_init;
 use async_task::{Builder, Runnable, ScheduleInfo, WithInfo};
 use ksync::mutex::SpinLock;
@@ -17,7 +16,7 @@ use super::{
     sched_entity::{SchedEntity, SchedTaskInfo},
     scheduler::{SchedLoadStats, Scheduler},
 };
-use crate::{config::arch::{CPU_NUM, FULL_HART_MASK}, cpu::get_hartid};
+use crate::{config::arch::CPU_NUM, cpu::get_hartid};
 
 pub struct TaskScheduleInfo {
     pub sched_entity: SchedEntity,
@@ -162,7 +161,7 @@ pub fn run() {
     if let Some(runnable) = runnable {
         #[cfg(feature = "async_fs")]
         {
-            assert!(arch::interrupt::is_interrupt_enabled());
+            assert!(Arch::is_interrupt_enabled());
         }
         runnable.run();
     } else {
@@ -171,7 +170,7 @@ pub fn run() {
         if let Some(runnable) = load_balance() {
             #[cfg(feature = "async_fs")]
             {
-                assert!(arch::interrupt::is_interrupt_enabled());
+                assert!(Arch::is_interrupt_enabled());
             }
             runnable.run();
         }
@@ -179,7 +178,7 @@ pub fn run() {
     #[cfg(feature = "async_fs")]
     {
         // FIXME!! we should think carefully about this
-        enable_global_interrupt();
-        assert!(arch::interrupt::is_interrupt_enabled());
+        Arch::enable_global_interrupt();
+        assert!(Arch::is_interrupt_enabled());
     }
 }

@@ -4,10 +4,7 @@ use core::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
-use arch::{
-    asm::tlb_flush,
-    register::{address_translation_update, scause::Exception},
-};
+use arch::{Arch, Exception, VirtArch};
 use ksync::{cell::SyncUnsafeCell, mutex::SpinLock};
 use lazy_static::lazy_static;
 
@@ -59,7 +56,7 @@ pub static KERNEL_SPACE_TOKEN: AtomicUsize = AtomicUsize::new(0);
 
 pub unsafe fn kernel_space_activate() {
     unsafe {
-        address_translation_update(KERNEL_SPACE_TOKEN.load(Ordering::Relaxed));
+        Arch::update_pagetable(KERNEL_SPACE_TOKEN.load(Ordering::Relaxed));
         asm!("sfence.vma");
     }
 }
@@ -439,13 +436,13 @@ impl MemorySet {
     pub fn realloc_stack(&mut self, vpn: VirtPageNum) {
         self.user_stack_area
             .map_one(vpn, unsafe { &mut (*self.page_table.get()) });
-        tlb_flush();
+        Arch::tlb_flush();
     }
 
     pub fn realloc_heap(&mut self, vpn: VirtPageNum) {
         self.user_heap_area
             .map_one(vpn, unsafe { &mut (*self.page_table.get()) });
-        tlb_flush();
+        Arch::tlb_flush();
     }
 
     pub fn realloc_cow(&mut self, vpn: VirtPageNum, pte: PageTableEntry) {
@@ -477,7 +474,7 @@ impl MemorySet {
             }
             self.page_table()
                 .remap_cow(vpn, new_ppn, old_ppn, new_flags);
-            tlb_flush();
+            Arch::tlb_flush();
             trace!(
                 "[realloc_cow] done!!! refcount: old: [{:#x}: {:#x}], new: [{:#x}: {:#x}]",
                 old_ppn.0,

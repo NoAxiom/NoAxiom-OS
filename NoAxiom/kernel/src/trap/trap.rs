@@ -1,18 +1,8 @@
 use alloc::sync::Arc;
 use core::arch::global_asm;
 
-use arch::{
-    interrupt::{
-        enable_external_interrupt, enable_global_interrupt, enable_software_interrupt,
-        enable_stimer_interrupt, is_interrupt_enabled,
-    },
-    register::{
-        sstatus,
-        stvec::{self, TrapMode},
-    },
-};
+use arch::{Arch, TrapContext, VirtArch};
 
-use super::context::TrapContext;
 use crate::{task::Task, utils::current_pc};
 
 global_asm!(include_str!("./trap.S"));
@@ -24,26 +14,26 @@ extern "C" {
 
 /// set trap entry in supervisor mode
 pub fn set_kernel_trap_entry() {
-    unsafe { stvec::write(trap_from_kernel as usize, TrapMode::Direct) }
+    Arch::set_trap_entry(trap_from_kernel as usize);
 }
 
 /// set trap entry in user mode
 pub fn set_user_trap_entry() {
-    unsafe { stvec::write(user_trapvec as usize, TrapMode::Direct) }
+    Arch::set_trap_entry(user_trapvec as usize);
 }
 
 /// trap init of current hart
 pub fn trap_init() {
     set_kernel_trap_entry();
     assert!(
-        !is_interrupt_enabled(),
+        !Arch::is_interrupt_enabled(),
         "kernel don't support global interrupt"
     );
     // disable_global_interrupt();
-    enable_external_interrupt();
-    enable_global_interrupt();
-    enable_software_interrupt();
-    enable_stimer_interrupt();
+    Arch::enable_external_interrupt();
+    Arch::enable_global_interrupt();
+    Arch::enable_software_interrupt();
+    Arch::enable_stimer_interrupt();
 }
 
 #[no_mangle]
@@ -71,15 +61,4 @@ pub fn trap_restore(task: &Arc<Task>) {
         current_pc(),
         unsafe { *(current_pc() as *const u32) },
     );
-}
-
-/// debug: show sstatus
-#[allow(unused)]
-pub fn show_sstatus() {
-    println!("show sstatus");
-    let sstatus = sstatus::read();
-    let spie = sstatus.spie(); // previous sie value
-    let sie = sstatus.sie();
-    println!("spie:{:?}", spie);
-    println!("sie:{:?}", sie);
 }

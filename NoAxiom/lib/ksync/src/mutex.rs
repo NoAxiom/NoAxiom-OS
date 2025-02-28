@@ -2,10 +2,7 @@
 
 use core::{cell::RefMut, sync::atomic::AtomicUsize};
 
-use arch::{
-    hart::_get_hartid,
-    interrupt::{disable_global_interrupt, enable_global_interrupt, is_interrupt_enabled},
-};
+use arch::{Arch, VirtArch};
 
 use super::cell::SyncRefCell;
 
@@ -41,7 +38,7 @@ const CPU_NUM: usize = 8; // FIXME: use extern const to config cpu_num
 const DEFAULT_CPU: SyncRefCell<MutexTracer> = SyncRefCell::new(MutexTracer::new());
 static HART_MUTEX_TRACERS: [SyncRefCell<MutexTracer>; CPU_NUM] = [DEFAULT_CPU; CPU_NUM];
 fn current_mutex_tracer() -> RefMut<'static, MutexTracer> {
-    HART_MUTEX_TRACERS[_get_hartid()].borrow_mut()
+    HART_MUTEX_TRACERS[Arch::get_hartid()].borrow_mut()
 }
 
 /// maintain riscv arch interrupt behavior for lock action
@@ -71,10 +68,10 @@ impl LockAction for NoIrqLockAction {
 pub struct IrqOffLockAction;
 impl LockAction for IrqOffLockAction {
     fn before_lock() {
-        assert!(!is_interrupt_enabled());
+        assert!(!Arch::is_interrupt_enabled());
     }
     fn after_lock() {
-        assert!(!is_interrupt_enabled());
+        assert!(!Arch::is_interrupt_enabled());
     }
 }
 
@@ -94,9 +91,9 @@ impl<T> Lock<T> {
         Self(Mutex::new(obj))
     }
     pub fn lock(&self) -> LockGuard<'_, T> {
-        let old = is_interrupt_enabled();
-        disable_global_interrupt();
-        if _get_hartid() == 0 {
+        let old = Arch::is_interrupt_enabled();
+        Arch::disable_global_interrupt();
+        if Arch::get_hartid() == 0 {
             LOCK_COUNT.fetch_add(1, core::sync::atomic::Ordering::SeqCst);
         }
         LockGuard {
@@ -108,12 +105,12 @@ impl<T> Lock<T> {
 
 impl<'a, T> Drop for LockGuard<'a, T> {
     fn drop(&mut self) {
-        if _get_hartid() == 0 {
+        if Arch::get_hartid() == 0 {
             LOCK_COUNT.fetch_sub(1, core::sync::atomic::Ordering::SeqCst);
         }
         self.guard.take();
         if self.int_record {
-            enable_global_interrupt();
+            Arch::enable_global_interrupt();
         }
     }
 }

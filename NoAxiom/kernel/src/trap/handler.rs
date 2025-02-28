@@ -2,18 +2,11 @@
 
 use alloc::sync::Arc;
 
-use arch::{
-    interrupt::is_interrupt_enabled,
-    register::{
-        scause::{self, Exception, Interrupt, Trap},
-        sepc, stval,
-    },
-};
-use sbi_rt::legacy::clear_ipi;
+use arch::{Arch, Exception, Interrupt, Trap, VirtArch};
 
 use super::trap::set_kernel_trap_entry;
 use crate::{
-    constant::register::A0,
+    // constant::register::A0,
     cpu::{current_cpu, get_hartid},
     sched::utils::yield_now,
     syscall::syscall,
@@ -38,7 +31,7 @@ fn ext_int_handler() {
                 .0
                 .handle_interrupt()
                 .expect("virtio handle interrupt error!");
-            assert!(!is_interrupt_enabled());
+            assert!(!Arch::is_interrupt_enabled());
             // debug!("virtio handle interrupt done!  Notify begin...");
             VIRTIO_BLOCK.0.wake_ops.notify(WAKE_NUM);
         };
@@ -48,9 +41,9 @@ fn ext_int_handler() {
     }
     #[cfg(not(feature = "async_fs"))]
     {
-        let scause = scause::read();
-        let stval = stval::read();
-        let sepc = sepc::read();
+        let scause = Arch::read_trap_cause(); // scause::read();
+        let stval = Arch::read_trap_value(); // stval::read();
+        let sepc = Arch::read_trap_pc(); // sepc::read();
         panic!(
             "hart: {}, kernel SupervisorExternal interrupt is unsupported, stval = {:#x}, sepc = {:#x}",
             get_hartid(),
@@ -63,19 +56,16 @@ fn ext_int_handler() {
 /// kernel trap handler
 #[no_mangle]
 pub fn kernel_trap_handler() {
-    let scause = scause::read();
-    let stval = stval::read();
-    let sepc = sepc::read();
+    let scause = Arch::read_trap_cause(); // scause::read();
+    let stval = Arch::read_trap_value(); // stval::read();
+    let sepc = Arch::read_trap_pc(); // sepc::read();
     let kernel_panic = |msg: &str| {
         panic!(
             "kernel trap!!! msg: {}, trap {:?} is unsupported, stval = {:#x}, error pc = {:#x}",
-            msg,
-            scause.cause(),
-            stval,
-            sepc
+            msg, scause, stval, sepc
         );
     };
-    match scause.cause() {
+    match scause {
         Trap::Exception(exception) => match exception {
             Exception::LoadPageFault
             | Exception::StorePageFault
@@ -110,7 +100,7 @@ pub fn kernel_trap_handler() {
                             .0
                             .handle_interrupt()
                             .expect("virtio handle interrupt error!");
-                        assert!(!is_interrupt_enabled());
+                        assert!(!Arch::is_interrupt_enabled());
                         // debug!("virtio handle interrupt done!  Notify begin...");
                         VIRTIO_BLOCK.0.wake_ops.notify(WAKE_NUM);
                     };
@@ -134,8 +124,8 @@ pub fn kernel_trap_handler() {
                 crate::time::timer::set_next_trigger();
             }
             Interrupt::SupervisorSoft => {
-                warn!("IPI recieved, but not supported!!!");
-                clear_ipi();
+                // warning: currently don't use any lock here, it may cause deadlock
+                Arch::clear_ipi();
             }
             _ => kernel_panic("unsupported interrupt"),
         },
@@ -148,11 +138,11 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
     trace!("[trap_handler] call trap handler");
     set_kernel_trap_entry();
     let cx = task.trap_context_mut();
-    let scause = scause::read();
-    let stval = stval::read();
+    let scause = Arch::read_trap_cause(); // scause::read();
+    let stval = Arch::read_trap_value(); // stval::read();
     trace!(
         "[user_trap_handler] handle begin, scause: {:?}, stval: {:#x}",
-        scause.cause(),
+        scause,
         stval
     );
     // for debug, print current error message and exit the task
@@ -161,13 +151,13 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
             msg,
             task.tid(),
             get_hartid(),
-            scause.cause(),
+            scause,
             stval,
             cx.sepc
         );
         task.exit(-1);
     };
-    match scause.cause() {
+    match scause {
         // syscall
         Trap::Exception(exception) => match exception {
             Exception::UserEnvCall => {
@@ -175,7 +165,7 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
                 trace!("[syscall] doing syscall");
                 let result = syscall(task, cx).await;
                 trace!("[syscall] done! result {:#x}", result);
-                task.trap_context_mut().user_reg[A0] = result as usize;
+                task.trap_context_mut().set_result(result as usize);
             }
             // page fault: try to handle copy-on-write, or exit the task
             Exception::LoadPageFault

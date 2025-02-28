@@ -21,9 +21,6 @@ use core::{
     usize,
 };
 
-use arch::interrupt::{
-    disable_global_interrupt, enable_global_interrupt, is_external_interrupt_enabled,
-};
 use ksync::mutex::LockAction;
 #[cfg(feature = "kernel")]
 use rv_lock::{Lock, LockGuard};

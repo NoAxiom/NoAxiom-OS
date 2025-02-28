@@ -5,7 +5,6 @@
 use alloc::sync::Arc;
 use core::num::NonZeroUsize;
 
-use arch::interrupt::{is_external_interrupt_enabled, is_interrupt_enabled};
 use ksync::mutex::RwLock;
 use lru::LruCache;
 type Mutex<T> = ksync::mutex::SpinLock<T>;

@@ -1,5 +1,3 @@
-use alloc::vec::Vec;
-
 use super::{Syscall, SyscallResult};
 use crate::{
     fs::path::Path,
@@ -12,7 +10,6 @@ use crate::{
     mm::user_ptr::UserPtr,
     return_errno,
     sched::{task::spawn_utask, utils::suspend_now},
-    syscall::A0,
     task::manager::TASK_MANAGER,
 };
 
@@ -39,7 +36,7 @@ impl Syscall<'_> {
         let flags = CloneFlags::from_bits(flags & !0xff).unwrap();
         let task = self.task.fork(flags);
         let trap_cx = task.trap_context_mut();
-        trap_cx.set_reg(A0, 0);
+        trap_cx.set_result(0);
         if stack != 0 {
             trap_cx.set_sp(stack);
         }
@@ -67,7 +64,7 @@ impl Syscall<'_> {
         self.task.exec(path, args, envs).await;
         // On success, execve() does not return, on error -1 is returned, and errno is
         // set to indicate the error.
-        Ok(self.task.trap_context().user_reg[A0] as isize)
+        Ok(self.task.trap_context().result_value() as isize)
     }
 
     pub async fn sys_wait4(

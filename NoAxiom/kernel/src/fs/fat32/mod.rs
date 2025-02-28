@@ -12,6 +12,7 @@ mod tree;
 
 use alloc::{string::String, sync::Arc, vec::Vec};
 
+use arch::{Arch, VirtArch};
 use bpb::{cluster_offset_sectors, BIOSParameterBlockOffset};
 use directory::{FAT32Directory, ShortDirectory};
 use downcast_rs::{impl_downcast, DowncastSync};
@@ -47,9 +48,8 @@ impl FAT32FIleSystem {
     pub async fn load_root(device: Arc<dyn BlockDevice>) -> FAT32Directory {
         #[cfg(feature = "async_fs")]
         {
-            use arch::interrupt::{is_external_interrupt_enabled, is_interrupt_enabled};
-            assert!(is_interrupt_enabled());
-            assert!(is_external_interrupt_enabled());
+            assert!(Arch::is_interrupt_enabled());
+            assert!(Arch::is_external_interrupt_enabled());
         }
 
         let mut bpb = [0u8; FAT32_SECTOR_SIZE];
