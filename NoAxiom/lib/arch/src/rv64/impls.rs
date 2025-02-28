@@ -5,14 +5,14 @@ use sbi_rt::{
     send_ipi,
 };
 
-use super::{hart::*, interrupt::*, register::*, sbi::*, trap_cx::TrapContext, Riscv64};
+use super::{hart::*, interrupt::*, register::*, sbi::*, Riscv64};
 use crate::VirtArch;
 
 impl VirtArch for Riscv64 {
     type Trap = riscv::register::scause::Trap;
     type Interrupt = riscv::register::scause::Interrupt;
     type Exception = riscv::register::scause::Exception;
-    type TrapContext = TrapContext;
+    type TrapContext = super::trap_cx::TrapContext;
 
     // check if global interrupt is enabled
     #[inline(always)]
