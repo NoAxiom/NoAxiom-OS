@@ -5,7 +5,7 @@
 use alloc::sync::Arc;
 use core::future::Future;
 
-use arch::{Arch, VirtArch};
+use arch::{Arch, ArchInt};
 use array_init::array_init;
 use async_task::{Builder, Runnable, ScheduleInfo, WithInfo};
 use ksync::mutex::SpinLock;

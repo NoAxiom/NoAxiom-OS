@@ -1,6 +1,6 @@
 use alloc::sync::Arc;
 
-use arch::{Arch, TrapContext, VirtArch};
+use arch::{Arch, ArchInt, TrapContext};
 
 use super::SyscallResult;
 use crate::{constant::syscall::*, include::result::Errno, task::Task};

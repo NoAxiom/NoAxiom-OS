@@ -2,7 +2,7 @@
 
 use core::{cell::RefMut, sync::atomic::AtomicUsize};
 
-use arch::{Arch, VirtArch};
+use arch::{Arch, ArchHart, ArchInt};
 
 use super::cell::SyncRefCell;
 
@@ -45,22 +45,22 @@ fn current_mutex_tracer() -> RefMut<'static, MutexTracer> {
 pub struct NoIrqLockAction;
 impl LockAction for NoIrqLockAction {
     fn before_lock() {
-        // let old = is_interrupt_enabled();
-        // disable_global_interrupt();
-        // let mut cpu = current_mutex_tracer();
-        // if cpu.depth == 0 {
-        //     cpu.int_record = old;
-        // }
-        // cpu.depth += 1;
+        let old = Arch::is_interrupt_enabled();
+        Arch::disable_global_interrupt();
+        let mut cpu = current_mutex_tracer();
+        if cpu.depth == 0 {
+            cpu.int_record = old;
+        }
+        cpu.depth += 1;
     }
     fn after_lock() {
-        // let mut cpu = current_mutex_tracer();
-        // cpu.depth -= 1;
-        // let should_enable = cpu.depth == 0 && cpu.int_record;
-        // drop(cpu); // drop before int_en
-        // if should_enable {
-        //     enable_global_interrupt();
-        // }
+        let mut cpu = current_mutex_tracer();
+        cpu.depth -= 1;
+        let should_enable = cpu.depth == 0 && cpu.int_record;
+        drop(cpu); // drop before int_en
+        if should_enable {
+            Arch::enable_global_interrupt();
+        }
     }
 }
 

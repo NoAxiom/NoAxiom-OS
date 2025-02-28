@@ -1,7 +1,7 @@
 use alloc::sync::Arc;
 use core::arch::global_asm;
 
-use arch::{Arch, TrapContext, VirtArch};
+use arch::{Arch, ArchInt, ArchTrap, TrapContext};
 
 use crate::{task::Task, utils::current_pc};
 

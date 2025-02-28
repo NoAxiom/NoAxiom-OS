@@ -2,7 +2,7 @@
 
 use core::sync::atomic::{AtomicUsize, Ordering};
 
-use arch::{Arch, VirtArch};
+use arch::{Arch, ArchSbi};
 
 pub static mut TASK_COUNTER: AtomicUsize = AtomicUsize::new(0);
 

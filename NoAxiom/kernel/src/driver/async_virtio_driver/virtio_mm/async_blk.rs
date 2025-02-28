@@ -2,7 +2,7 @@
 
 use alloc::boxed::Box;
 
-use arch::{Arch, VirtArch};
+use arch::{Arch, ArchInt};
 use async_trait::async_trait;
 
 use crate::{

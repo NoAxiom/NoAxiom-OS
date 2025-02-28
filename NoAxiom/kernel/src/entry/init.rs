@@ -1,4 +1,4 @@
-use arch::{Arch, VirtArch};
+use arch::{Arch, ArchInt, ArchSbi};
 
 use crate::{
     config::{arch::CPU_NUM, mm::KERNEL_ADDR_OFFSET},

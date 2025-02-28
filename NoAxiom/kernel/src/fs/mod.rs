@@ -11,7 +11,7 @@ pub mod vfs;
 
 use alloc::sync::Arc;
 
-use arch::{Arch, VirtArch};
+use arch::{Arch, ArchInt};
 use vfs::basic::dentry::Dentry;
 
 pub async fn fs_init() {

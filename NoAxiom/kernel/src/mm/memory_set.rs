@@ -4,7 +4,7 @@ use core::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
-use arch::{Arch, Exception, VirtArch};
+use arch::{Arch, ArchMemory, Exception};
 use ksync::{cell::SyncUnsafeCell, mutex::SpinLock};
 use lazy_static::lazy_static;
 

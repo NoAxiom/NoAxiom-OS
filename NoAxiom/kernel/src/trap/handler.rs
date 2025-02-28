@@ -2,7 +2,7 @@
 
 use alloc::sync::Arc;
 
-use arch::{Arch, Exception, Interrupt, Trap, VirtArch};
+use arch::{Arch, ArchInt, ArchSbi, ArchTrap, Exception, Interrupt, Trap};
 
 use super::trap::set_kernel_trap_entry;
 use crate::{

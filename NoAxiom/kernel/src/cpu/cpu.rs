@@ -1,6 +1,6 @@
 use alloc::sync::Arc;
 
-use arch::{Arch, VirtArch};
+use arch::{Arch, ArchHart};
 use ksync::cell::SyncUnsafeCell;
 
 use crate::{

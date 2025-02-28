@@ -4,7 +4,7 @@
 
 use core::time::Duration;
 
-use arch::{Arch, VirtArch};
+use arch::{Arch, ArchTime};
 
 use super::timeval::TimeVal;
 use crate::constant::time::*;

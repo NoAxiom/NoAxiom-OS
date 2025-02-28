@@ -3,7 +3,7 @@
 use alloc::vec::Vec;
 use core::arch::asm;
 
-use arch::{Arch, VirtArch};
+use arch::{Arch, ArchMemory};
 
 use super::{
     address::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum},

@@ -1,6 +1,6 @@
 use alloc::{boxed::Box, sync::Arc, vec::Vec};
 
-use arch::{Arch, VirtArch};
+use arch::{Arch, ArchSbi};
 use async_trait::async_trait;
 use ksync::mutex::SpinLock;
 

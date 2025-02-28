@@ -12,7 +12,7 @@ mod tree;
 
 use alloc::{string::String, sync::Arc, vec::Vec};
 
-use arch::{Arch, VirtArch};
+use arch::{Arch, ArchInt};
 use bpb::{cluster_offset_sectors, BIOSParameterBlockOffset};
 use directory::{FAT32Directory, ShortDirectory};
 use downcast_rs::{impl_downcast, DowncastSync};

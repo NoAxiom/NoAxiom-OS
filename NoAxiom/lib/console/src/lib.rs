@@ -3,7 +3,7 @@
 
 use core::fmt::{self, Write};
 
-use arch::{Arch, VirtArch};
+use arch::{Arch, ArchSbi};
 use ksync::mutex::SpinLock;
 
 static PRINT_MUTEX: SpinLock<()> = SpinLock::new(());

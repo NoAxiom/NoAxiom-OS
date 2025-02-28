@@ -1,4 +1,4 @@
-use arch::{Arch, VirtArch};
+use arch::{Arch, ArchTime};
 
 use super::gettime::get_time;
 use crate::config::sched::TIME_SLICE_TICKS;
