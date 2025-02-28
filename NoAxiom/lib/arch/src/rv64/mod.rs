@@ -1,3 +1,9 @@
+mod hart;
+mod interrupt;
+mod register;
+mod sbi;
+mod trap_cx;
+
 use hart::*;
 use interrupt::*;
 use register::*;
@@ -10,12 +16,6 @@ use sbi_rt::{
 };
 
 use crate::{ArchHart, ArchInt, ArchMemory, ArchSbi, ArchTime, ArchTrap, ArchType, FullVirtArch};
-
-mod hart;
-mod interrupt;
-mod register;
-mod sbi;
-mod trap_cx;
 
 pub struct RV64;
 
