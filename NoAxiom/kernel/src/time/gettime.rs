@@ -4,7 +4,7 @@
 
 use core::time::Duration;
 
-use riscv::register::time;
+use arch::register::time;
 
 use super::timeval::TimeVal;
 use crate::constant::time::*;

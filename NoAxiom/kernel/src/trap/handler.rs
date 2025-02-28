@@ -2,10 +2,12 @@
 
 use alloc::sync::Arc;
 
-use arch::interrupt::is_interrupt_enabled;
-use riscv::register::{
-    scause::{self, Exception, Interrupt, Trap},
-    sepc, stval,
+use arch::{
+    interrupt::is_interrupt_enabled,
+    register::{
+        scause::{self, Exception, Interrupt, Trap},
+        sepc, stval,
+    },
 };
 use sbi_rt::legacy::clear_ipi;
 

@@ -10,11 +10,11 @@ use core::{
     task::Waker,
 };
 
+use arch::register::scause::Exception;
 use ksync::{
     cell::SyncUnsafeCell,
     mutex::{SpinLock, SpinLockGuard},
 };
-use riscv::register::scause::Exception;
 
 use super::{
     manager::ThreadGroup,

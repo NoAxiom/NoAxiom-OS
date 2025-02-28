@@ -1,13 +1,15 @@
 use alloc::sync::Arc;
 use core::arch::global_asm;
 
-use arch::interrupt::{
-    enable_external_interrupt, enable_global_interrupt, enable_software_interrupt,
-    enable_stimer_interrupt, is_interrupt_enabled,
-};
-use riscv::register::{
-    sstatus,
-    stvec::{self, TrapMode},
+use arch::{
+    interrupt::{
+        enable_external_interrupt, enable_global_interrupt, enable_software_interrupt,
+        enable_stimer_interrupt, is_interrupt_enabled,
+    },
+    register::{
+        sstatus,
+        stvec::{self, TrapMode},
+    },
 };
 
 use super::context::TrapContext;

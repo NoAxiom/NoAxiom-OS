@@ -15,7 +15,7 @@
 
 use core::arch::asm;
 
-use riscv::register::sstatus::SPP;
+use arch::register::sstatus::SPP;
 
 use crate::constant::register::*;
 
