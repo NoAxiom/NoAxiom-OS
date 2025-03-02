@@ -26,11 +26,11 @@ pub enum InodeState {
 
 pub struct InodeMeta {
     /// The inode id, unique in the file system
-    id: usize,
+    pub id: usize,
     /// The inner data of the inode, maybe modified by multiple tasks
-    inner: Mutex<InodeMetaInner>,
+    pub inner: Mutex<InodeMetaInner>,
     /// The mode of file
-    inode_mode: InodeMode,
+    pub inode_mode: InodeMode,
     /// The super block of the inode
     super_block: Arc<dyn SuperBlock>,
 }
@@ -43,6 +43,12 @@ impl InodeMeta {
                 nlink: 1,
                 size,
                 state: InodeState::UnInit,
+                atime_sec: 0,
+                atime_nsec: 0,
+                mtime_sec: 0,
+                mtime_nsec: 0,
+                ctime_sec: 0,
+                ctime_nsec: 0,
             }),
             inode_mode,
             super_block,
@@ -54,9 +60,18 @@ pub struct InodeMetaInner {
     /// The number of links to the inode
     nlink: usize,
     /// The size of the file
-    size: usize,
+    pub size: usize,
     /// The state of the file
     state: InodeState,
+    /// Last access time.
+    pub atime_sec: usize,
+    pub atime_nsec: usize,
+    /// Last modification time.
+    pub mtime_sec: usize,
+    pub mtime_nsec: usize,
+    /// Last status change time.
+    pub ctime_sec: usize,
+    pub ctime_nsec: usize,
 }
 
 pub trait Inode: Send + Sync + DowncastSync {
@@ -73,6 +88,9 @@ impl dyn Inode {
     }
     pub fn file_type(&self) -> InodeMode {
         self.meta().inode_mode
+    }
+    pub fn set_size(&self, size: usize) {
+        self.meta().inner.lock().size = size;
     }
 }
 

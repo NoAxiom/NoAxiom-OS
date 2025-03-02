@@ -15,6 +15,7 @@ pub use virt_arch::*;
 
 #[cfg(target_arch = "loongarch64")]
 pub type Arch = la64::LoongArch64;
+
 #[cfg(target_arch = "riscv64")]
 pub type Arch = rv64::RV64;
 

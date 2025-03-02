@@ -24,6 +24,7 @@ pub async fn fs_init() {
     Arch::enable_global_interrupt();
     Arch::enable_external_interrupt();
     vfs::fs_init().await;
+    info!("[fs] fs init done");
     if !interrupt {
         // info!("disable global interrupt");
         // interrupt::disable_global_interrupt();

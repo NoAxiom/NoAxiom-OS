@@ -1,6 +1,10 @@
 use alloc::{string::ToString, vec::Vec};
 
-use crate::{config::fs::INIT_PROC_PATH, fs::path::Path, sched::task::schedule_spawn_new_process};
+use crate::{
+    config::fs::INIT_PROC_PATH,
+    fs::path::{self, Path},
+    sched::task::schedule_spawn_new_process,
+};
 
 /// spawn all apps, only used in debug
 #[allow(unused)]
@@ -18,8 +22,9 @@ pub fn schedule_spawn_all_apps() {
     /// Official tests
     // fs
     // paths.push("/chdir");
-    // paths.push("/yield");
-    paths.push("/yield");
+    //
+    // process
+    paths.push("/mmap");
 
     for path in paths {
         schedule_spawn_new_process(Path::from(path.to_string()));

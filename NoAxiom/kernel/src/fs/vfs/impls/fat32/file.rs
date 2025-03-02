@@ -38,7 +38,7 @@ impl File for FAT32File {
     fn meta(&self) -> &FileMeta {
         &self.meta
     }
-    async fn read_from<'a>(&'a self, offset: usize, buf: &'a mut Vec<u8>) -> SyscallResult {
+    async fn base_read(&self, offset: usize, buf: &mut [u8]) -> SyscallResult {
         let file_size = self.size();
 
         if offset >= file_size {
@@ -47,12 +47,12 @@ impl File for FAT32File {
 
         if offset + buf.len() > file_size {
             warn!("Read buffer is too large, resize it to fit the file size");
-            buf.resize(file_size - offset, 0);
+            // buf.resize(file_size - offset, 0);
         }
 
         self.file.lock().read_from(offset, buf).await
     }
-    async fn write_at<'a>(&'a self, offset: usize, buf: &'a Vec<u8>) -> SyscallResult {
+    async fn base_write(&self, offset: usize, buf: &[u8]) -> SyscallResult {
         let file_size = self.size();
 
         if offset >= file_size {
@@ -89,12 +89,12 @@ impl File for FAT32Directory {
     fn meta(&self) -> &FileMeta {
         &self.meta
     }
-    async fn read_from<'a>(&'a self, offset: usize, buf: &'a mut Vec<u8>) -> SyscallResult {
+    async fn base_read(&self, offset: usize, buf: &mut [u8]) -> SyscallResult {
         let _ = offset;
         let _ = buf;
         Err(Errno::ENOSYS)
     }
-    async fn write_at<'a>(&'a self, offset: usize, buf: &'a Vec<u8>) -> SyscallResult {
+    async fn base_write(&self, offset: usize, buf: &[u8]) -> SyscallResult {
         let _ = offset;
         let _ = buf;
         Err(Errno::ENOSYS)

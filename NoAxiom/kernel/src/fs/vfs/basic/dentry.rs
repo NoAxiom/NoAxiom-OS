@@ -8,7 +8,6 @@ use alloc::{
 
 use async_trait::async_trait;
 use downcast_rs::DowncastSync;
-use ksync::mutex::LOCK_COUNT;
 type Mutex<T> = ksync::mutex::SpinLock<T>;
 
 use super::{file::File, inode::Inode, superblock::SuperBlock};
@@ -79,10 +78,14 @@ pub trait Dentry: Send + Sync + DowncastSync {
         }
         *self.meta().inode.lock() = Some(inode);
     }
-    async fn test3(&self) {}
 }
 
 impl dyn Dentry {
+    /// Check if the dentry is negative
+    pub fn is_negetive(&self) -> bool {
+        self.inode().is_err()
+    }
+
     /// Create a negetive child dentry with `name`.
     pub fn new_child(self: &Arc<Self>, name: &str) -> Arc<dyn Dentry> {
         let child = self.clone().from_name(name);
@@ -115,17 +118,13 @@ impl dyn Dentry {
             return Err(Errno::ENOTDIR);
         }
         // let child = self.clone().create(name, *mode).await?;
+        // todo: map long name to short name
         let child = self.clone().create("test", *mode).await?;
         self.meta()
             .children
             .lock()
             .insert(name.to_string(), child.clone());
         Ok(child)
-    }
-
-    pub async fn test(&self, name: &str, mode: &InodeMode) {}
-    pub async fn test2(&self) {
-        debug!("this is test2");
     }
 
     /// Get super block of the dentry

@@ -22,7 +22,7 @@ pub struct FileMeta {
     /// Pointer to the Dentry
     dentry: Arc<dyn Dentry>,
     /// Pointer to the Inode
-    inode: Arc<dyn Inode>,
+    pub inode: Arc<dyn Inode>,
 }
 
 impl FileMeta {
@@ -60,9 +60,9 @@ pub trait File: Send + Sync {
     /// Get the meta of the file
     fn meta(&self) -> &FileMeta;
     /// Read data from file at `offset` to `buf`
-    async fn read_from<'a>(&'a self, offset: usize, buf: &'a mut Vec<u8>) -> SyscallResult;
+    async fn base_read(&self, offset: usize, buf: &mut [u8]) -> SyscallResult;
     /// Write data to file at `offset` from `buf`
-    async fn write_at<'a>(&'a self, offset: usize, buf: &'a Vec<u8>) -> SyscallResult;
+    async fn base_write(&self, offset: usize, buf: &[u8]) -> SyscallResult;
     /// Load directory into memory, must be called before read/write explicitly,
     /// only for directories
     async fn load_dir(&self) -> Result<(), Errno>;
@@ -72,21 +72,28 @@ impl dyn File {
     pub async fn read_all(&self) -> Result<Vec<u8>, Errno> {
         let len = self.meta().inode.size();
         let mut buf = vec![0; len];
-        self.read_from(0, &mut buf).await?;
+        self.base_read(0, &mut buf).await?;
         Ok(buf)
     }
-    pub async fn read<'a>(&'a self, buf: &'a mut Vec<u8>) -> SyscallResult {
+    pub async fn read(&self, buf: &mut [u8]) -> SyscallResult {
         let offset = self.meta().pos.load(Ordering::Relaxed);
-        self.read_from(offset, buf).await
+        let len = self.base_read(offset, buf).await?;
+        self.meta().pos.fetch_add(len as usize, Ordering::Relaxed);
+        Ok(len)
     }
-    pub async fn write<'a>(&'a self, buf: &'a Vec<u8>) -> SyscallResult {
+    pub async fn write(&self, buf: &mut [u8]) -> SyscallResult {
         let offset = self.meta().pos.load(Ordering::Relaxed);
-        self.write_at(offset, buf).await
+        let len = self.base_write(offset, buf).await?;
+        self.meta().pos.fetch_add(len as usize, Ordering::Relaxed);
+        Ok(len)
     }
     pub fn name(&self) -> String {
         self.dentry().name()
     }
     pub fn set_flags(&self, flags: FileFlags) {
         *self.meta().flags.lock() = flags;
+    }
+    pub fn inode(&self) -> Arc<dyn Inode> {
+        self.meta().inode.clone()
     }
 }

@@ -1,45 +1,41 @@
 use alloc::sync::Arc;
 
-type Mutex<T> = ksync::mutex::SpinLock<T>;
+use ksync::mutex::SpinLock;
+
+use super::{IFatFileDir, IFatFileFile};
 use crate::{
-    fs::{
-        fat32::{
-            directory::FAT32Directory as FAT32FIleSystemDirectory,
-            file::FAT32File as FAT32FIleSystemFile,
-        },
-        vfs::basic::{
-            inode::{Inode, InodeMeta},
-            superblock,
-        },
+    config::fs::BLOCK_SIZE,
+    fs::vfs::basic::{
+        inode::{Inode, InodeMeta},
+        superblock,
     },
     include::fs::{InodeMode, Stat},
 };
 
-pub struct FAT32FileInode {
+pub struct Fat32FileInode {
     meta: InodeMeta,
-    pub file: Arc<Mutex<FAT32FIleSystemFile>>,
+    pub file: Arc<SpinLock<IFatFileFile>>,
 }
 
-impl FAT32FileInode {
-    pub fn new(superblock: Arc<dyn superblock::SuperBlock>, file: FAT32FIleSystemFile) -> Self {
+impl Fat32FileInode {
+    pub fn new(superblock: Arc<dyn superblock::SuperBlock>, file: IFatFileFile) -> Self {
         Self {
-            meta: InodeMeta::new(superblock, InodeMode::FILE, file.size()),
-            file: Arc::new(Mutex::new(file)),
+            meta: InodeMeta::new(superblock, InodeMode::FILE, file.size().unwrap() as usize),
+            file: Arc::new(SpinLock::new(file)),
         }
     }
-    pub fn get_file(&self) -> Arc<Mutex<FAT32FIleSystemFile>> {
+    pub fn get_file(&self) -> Arc<SpinLock<IFatFileFile>> {
         self.file.clone()
     }
 }
 
-impl Inode for FAT32FileInode {
+impl Inode for Fat32FileInode {
     fn meta(&self) -> &InodeMeta {
         &self.meta
     }
     fn stat(&self) -> Result<crate::include::fs::Stat, crate::include::result::Errno> {
         let inner = self.meta.inner.lock();
         let mode = self.meta.inode_mode.bits();
-        let len = inner.size;
         Ok(Stat {
             st_dev: 0,
             st_ino: self.meta.id as u64,
@@ -49,10 +45,10 @@ impl Inode for FAT32FileInode {
             st_gid: 0,
             st_rdev: 0,
             __pad: 0,
-            st_size: len as u64,
-            st_blksize: 512,
+            st_size: inner.size as u64,
+            st_blksize: BLOCK_SIZE as u32,
             __pad2: 0,
-            st_blocks: (len as u64 / 512) as u64,
+            st_blocks: (inner.size / 512) as u64,
             st_atime_sec: inner.atime_sec as u64,
             st_atime_nsec: inner.atime_nsec as u64,
             st_mtime_sec: inner.mtime_sec as u64,
@@ -64,27 +60,24 @@ impl Inode for FAT32FileInode {
     }
 }
 
-pub struct FAT32DirInode {
+pub struct Fat32DirInode {
     meta: InodeMeta,
-    pub file: Arc<Mutex<FAT32FIleSystemDirectory>>,
+    pub file: Arc<SpinLock<IFatFileDir>>,
 }
 
-impl FAT32DirInode {
-    pub fn new(
-        superblock: Arc<dyn superblock::SuperBlock>,
-        directory: FAT32FIleSystemDirectory,
-    ) -> Self {
+impl Fat32DirInode {
+    pub fn new(superblock: Arc<dyn superblock::SuperBlock>, file: IFatFileDir) -> Self {
         Self {
             meta: InodeMeta::new(superblock, InodeMode::DIR, 0),
-            file: Arc::new(Mutex::new(directory)),
+            file: Arc::new(SpinLock::new(file)),
         }
     }
-    pub fn get_dir(&self) -> Arc<Mutex<FAT32FIleSystemDirectory>> {
+    pub fn get_dir(&self) -> Arc<SpinLock<IFatFileDir>> {
         self.file.clone()
     }
 }
 
-impl Inode for FAT32DirInode {
+impl Inode for Fat32DirInode {
     fn meta(&self) -> &InodeMeta {
         &self.meta
     }
@@ -100,10 +93,10 @@ impl Inode for FAT32DirInode {
             st_gid: 0,
             st_rdev: 0,
             __pad: 0,
-            st_size: 0,
-            st_blksize: 512,
+            st_size: inner.size as u64,
+            st_blksize: BLOCK_SIZE as u32,
             __pad2: 0,
-            st_blocks: 0,
+            st_blocks: (inner.size / BLOCK_SIZE) as u64,
             st_atime_sec: inner.atime_sec as u64,
             st_atime_nsec: inner.atime_nsec as u64,
             st_mtime_sec: inner.mtime_sec as u64,

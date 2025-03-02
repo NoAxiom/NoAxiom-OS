@@ -3,9 +3,9 @@ use alloc::vec::Vec;
 use super::{Syscall, SyscallResult};
 use crate::{
     constant::fs::{AT_FDCWD, STD_ERR, STD_IN, STD_OUT},
-    fs::{path::Path, pipe::PipeFile, vfs::root_dentry},
+    fs::{path::Path, pipe::PipeFile, stdio, vfs::root_dentry},
     include::{
-        fs::{FileFlags, InodeMode},
+        fs::{FileFlags, InodeMode, Kstat},
         result::Errno,
     },
     mm::user_ptr::UserPtr,
@@ -101,7 +101,13 @@ impl Syscall<'_> {
     }
 
     /// Open or create a file
-    pub fn sys_openat(&self, fd: isize, filename: usize, flags: u32, mode: u32) -> SyscallResult {
+    pub async fn sys_openat(
+        &self,
+        fd: isize,
+        filename: usize,
+        flags: u32,
+        mode: u32,
+    ) -> SyscallResult {
         let ptr = UserPtr::<u8>::new(filename);
         let path = get_string_from_ptr(&ptr);
         info!(
@@ -109,25 +115,40 @@ impl Syscall<'_> {
             fd, flags, path, mode
         );
 
-        let cwd = self.task.pcb().cwd.clone();
+        let cwd = self.task.pcb().cwd.clone().from_cd(&"..");
+        debug!("[sys_openat] cwd: {:?}", cwd);
         let mut fd_table = self.task.fd_table();
         let flags = FileFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
         let mode = InodeMode::from_bits_truncate(mode);
         let path = if fd == AT_FDCWD {
-            cwd.from_cd(&path)
+            cwd.from_cd_or_create(&path)
         } else {
             cwd
         };
 
-        // todo: CHECK flags!
-
         let dentry = path.dentry();
+
+        if flags.contains(FileFlags::O_CREATE) {
+            if flags.contains(FileFlags::O_EXCL) && !dentry.is_negetive() {
+                return Err(Errno::EEXIST);
+            }
+            let parent = dentry.parent().unwrap();
+            parent
+                .create(&dentry.name(), InodeMode::FILE | mode)
+                .await?;
+        }
+
+        let inode = dentry.inode()?;
+        if flags.contains(FileFlags::O_DIRECTROY) && !inode.file_type() == InodeMode::DIR {
+            return Err(Errno::ENOTDIR);
+        }
 
         let file = dentry.open()?;
         file.set_flags(flags);
         let fd = fd_table.alloc_fd()?;
         fd_table.set(fd as usize, file);
 
+        debug!("[sys_openat] succeed fd: {}", fd);
         Ok(fd)
     }
 
@@ -148,18 +169,22 @@ impl Syscall<'_> {
 
         // todo: INTERRUPT_BY_SIGNAL FUTURE
 
-        if not_stdio(fd) && !file.meta().readable() {
+        let buf_slice: &mut [u8] = unsafe { core::slice::from_raw_parts_mut(buf as *mut u8, len) };
+
+        if is_stdio(fd) {
+            let read_size = file.base_read(0, buf_slice).await?;
+            return Ok(read_size as isize);
+        }
+
+        if !file.meta().readable() {
             return Err(Errno::EINVAL);
         }
 
         // todo: check lazy?
         // check_mut_slice(buf as *mut u8, len);
-        let buf_slice: &mut [u8] = unsafe { core::slice::from_raw_parts_mut(buf as *mut u8, len) };
-        let content = file.read_all().await?;
-        buf_slice.copy_from_slice(&content[..len]);
+        let read_size = file.read(buf_slice).await?;
 
-        // todo: len or readsize?
-        Ok(len as isize)
+        Ok(read_size as isize)
     }
 
     /// Write data to a file descriptor
@@ -169,17 +194,21 @@ impl Syscall<'_> {
         let file = fd_table.get(fd).ok_or(Errno::EBADF)?;
         drop(fd_table);
 
-        if not_stdio(fd) && !file.meta().writable() {
+        let buf_slice: &mut [u8] = unsafe { core::slice::from_raw_parts_mut(buf as *mut u8, len) };
+
+        if is_stdio(fd) {
+            let write_size = file.base_write(0, buf_slice).await?;
+            return Ok(write_size as isize);
+        }
+
+        if !file.meta().writable() {
             return Err(Errno::EINVAL);
         }
 
         // check_mut_slice(buf as *mut u8, len);
-        let buf_slice: &mut [u8] = unsafe { core::slice::from_raw_parts_mut(buf as *mut u8, len) };
-        let buf = buf_slice.to_vec();
-        file.write_at(0, &buf).await?;
+        let write_size = file.write(buf_slice).await?;
 
-        // todo: len or writesize?
-        Ok(len as isize)
+        Ok(write_size as isize)
     }
 
     /// Create a directory
@@ -222,11 +251,17 @@ impl Syscall<'_> {
         fd_table.close(fd)
     }
 
-    pub fn empty(&self) -> SyscallResult {
+    pub fn sys_fstat(&self, fd: usize, stat_buf: usize) -> SyscallResult {
+        debug!("[sys_fstat]: fd: {}, stat_buf: {:#x}", fd, stat_buf);
+        let fd_table = self.task.fd_table();
+        let file = fd_table.get(fd).ok_or(Errno::EBADF)?;
+        let kstat = Kstat::from_stat(file.inode().stat()?);
+        let ptr = UserPtr::<Kstat>::new(stat_buf as usize);
+        ptr.write_volatile(kstat);
         Ok(0)
     }
 }
 
-fn not_stdio(fd: usize) -> bool {
-    fd != STD_IN && fd != STD_OUT && fd != STD_ERR
+fn is_stdio(fd: usize) -> bool {
+    fd == STD_IN || fd == STD_OUT || fd == STD_ERR
 }

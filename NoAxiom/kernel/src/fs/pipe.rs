@@ -131,7 +131,7 @@ impl PipeBuffer {
     }
     /// Read `len` bytes as much as possible from the buffer, make sure buffer's
     /// size >= len, return the number of bytes read
-    fn read(&mut self, buf: &mut Vec<u8>, len: usize) -> usize {
+    fn read(&mut self, buf: &mut [u8], len: usize) -> usize {
         assert!(len <= buf.len());
         let res = match self.status {
             PipeBufferStatus::Empty => 0,
@@ -242,7 +242,7 @@ impl File for PipeFile {
     fn meta(&self) -> &FileMeta {
         todo!()
     }
-    async fn read_from<'a>(&'a self, _offset: usize, buf: &'a mut Vec<u8>) -> SyscallResult {
+    async fn base_read(&self, _offset: usize, buf: &mut [u8]) -> SyscallResult {
         assert!(self.is_read_end());
         let len = buf.len();
         PipeReadFuture::new(self.buffer.clone(), len).await?;
@@ -251,7 +251,7 @@ impl File for PipeFile {
         buffer.notify_write_wakers();
         Ok(ret as isize)
     }
-    async fn write_at<'a>(&'a self, _offset: usize, buf: &'a Vec<u8>) -> SyscallResult {
+    async fn base_write(&self, offset: usize, buf: &[u8]) -> SyscallResult {
         assert!(self.is_write_end());
         let len = buf.len();
         PipeWriteFuture::new(self.buffer.clone(), len).await?;

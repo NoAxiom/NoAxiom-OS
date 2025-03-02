@@ -5,12 +5,12 @@ use alloc::{
     sync::{Arc, Weak},
     vec::Vec,
 };
-use arch::{Exception, TrapContext};
 use core::{
     sync::atomic::{AtomicI32, AtomicUsize, Ordering},
     task::Waker,
 };
 
+use arch::{Exception, TrapContext};
 use ksync::{
     cell::SyncUnsafeCell,
     mutex::{SpinLock, SpinLockGuard},
