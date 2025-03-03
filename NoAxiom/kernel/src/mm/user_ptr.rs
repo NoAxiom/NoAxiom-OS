@@ -61,7 +61,7 @@ pub struct UserPtr<T> {
 }
 
 impl<T> UserPtr<T> {
-    pub fn new(addr: usize) -> Self {
+    pub fn new(addr: u8) -> Self {
         assert!(
             addr & KERNEL_ADDR_OFFSET == 0,
             "shouldn't pass kernel address"

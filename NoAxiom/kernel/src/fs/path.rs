@@ -17,6 +17,7 @@ impl Path {
     /// Get the path from absolute path, the path should exist
     pub fn from(abs_path: String) -> Self {
         assert!(abs_path.starts_with('/'));
+        debug!("Path::from: {}", abs_path);
         let split_path = abs_path.split('/').collect::<Vec<&str>>();
         let dentry = root_dentry().find_path(&split_path).unwrap();
         Self {
@@ -28,7 +29,7 @@ impl Path {
     /// Get the path from absolute path, create the path if not exist
     pub fn from_or_create(abs_path: String) -> Self {
         assert!(abs_path.starts_with('/'));
-        trace!("Path::from_or_create: {}", abs_path);
+        debug!("Path::from_or_create: {}", abs_path);
         let split_path = abs_path.split('/').collect::<Vec<&str>>();
         let dentry = root_dentry().find_path_or_create(&split_path); // todo: don't walk from root
         Self {

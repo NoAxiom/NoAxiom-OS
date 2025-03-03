@@ -111,7 +111,7 @@ impl Syscall<'_> {
         let ptr = UserPtr::<u8>::new(filename);
         let path = get_string_from_ptr(&ptr);
         info!(
-            "[sys_openat] dirfd {}, flags {:?}, filename {}, mode {}",
+            "[sys_openat] dirfd {}, flags {:#x}, filename {}, mode {}",
             fd, flags, path, mode
         );
 
@@ -121,7 +121,8 @@ impl Syscall<'_> {
         let flags = FileFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
         let mode = InodeMode::from_bits_truncate(mode);
         let path = if fd == AT_FDCWD {
-            cwd.from_cd_or_create(&path)
+            let res = cwd.from_cd_or_create(&path);
+            res
         } else {
             cwd
         };
@@ -139,7 +140,7 @@ impl Syscall<'_> {
         }
 
         let inode = dentry.inode()?;
-        if flags.contains(FileFlags::O_DIRECTROY) && !inode.file_type() == InodeMode::DIR {
+        if flags.contains(FileFlags::O_DIRECTORY) && !inode.file_type() == InodeMode::DIR {
             return Err(Errno::ENOTDIR);
         }
 

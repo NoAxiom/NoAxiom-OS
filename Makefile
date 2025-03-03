@@ -70,13 +70,20 @@ TEST_FLAGS :=
 TEST_FLAGS += all
 TEST_FLAGS += CHAPTER=7
 
-$(TEST_DIR)/build: 
-	@cd $(TEST_DIR) && make $(TEST_FLAGS)
-
-test: $(TEST_DIR)/build
-	@$(MKFS_SH)
+test:
+	@rm -f $(TEST_DIR)/src/oscomp/init_proc.c
+	@rm -f $(TEST_DIR)/src/oscomp/init_proc.h
+	@cp $(PROJECT)/init_proc/init_proc.c $(TEST_DIR)/src/oscomp/init_proc.c
+	@cp $(PROJECT)/init_proc/init_proc.h $(TEST_DIR)/src/oscomp/init_proc.h
+	@cd $(TEST_DIR) && make clean
+	-@cd $(TEST_DIR) && make $(TEST_FLAGS)
+	$(MKFS_SH);
 
 build_kernel:
+	@if [ $(PROJECT)/init_proc/init_proc.c -nt $(TEST_DIR)/src/oscomp/init_proc.c ] \
+	|| [ $(PROJECT)/init_proc/init_proc.h -nt $(TEST_DIR)/src/oscomp/init_proc.h ]; then \
+		make test; \
+	fi
 	@cd $(PROJECT)/kernel && make build
 
 build: $(FS_IMG) build_kernel

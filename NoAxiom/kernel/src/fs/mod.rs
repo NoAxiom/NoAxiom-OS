@@ -9,10 +9,7 @@ pub mod pipe;
 pub mod stdio;
 pub mod vfs;
 
-use alloc::sync::Arc;
-
 use arch::{Arch, ArchInt};
-use vfs::basic::dentry::Dentry;
 
 pub async fn fs_init() {
     let interrupt = Arch::is_interrupt_enabled();
@@ -33,8 +30,4 @@ pub async fn fs_init() {
         // info!("disable external interrupt");
         // interrupt::disable_external_interrupt();
     }
-}
-
-pub fn fs_root() -> Arc<dyn Dentry> {
-    vfs::root_dentry()
 }
