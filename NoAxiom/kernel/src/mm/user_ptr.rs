@@ -1,13 +1,11 @@
-#![allow(unused)]
-
 use alloc::{string::String, vec::Vec};
 
 use ksync::mutex::LockGuard;
 
 use super::{
-    address::{StepOne, VirtAddr},
+    address::VirtAddr,
     memory_set::MemorySet,
-    page_table::{current_root_ppn, current_token, translate_vpn_into_pte, PageTable},
+    page_table::{current_token, PageTable},
 };
 use crate::{
     config::mm::KERNEL_ADDR_OFFSET,
@@ -187,10 +185,9 @@ impl UserPtr<u8> {
         ) {
             if page_table.translate_vpn(vpn).is_none() {
                 if guard.is_none() {
-                    let mut g = current_cpu().task.as_ref().unwrap().memory_set().lock();
-                    guard = Some(g)
+                    guard = Some(current_cpu().task.as_ref().unwrap().memory_set().lock())
                 }
-                guard.as_mut().unwrap().validate(vpn, None, None);
+                guard.as_mut().unwrap().validate(vpn, None, None).await?;
             };
         }
         drop(guard);
