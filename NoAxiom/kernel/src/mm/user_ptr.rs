@@ -185,24 +185,13 @@ impl UserPtr<u8> {
             VirtAddr::from(self.addr_usize()),
             VirtAddr::from(self.addr_usize() + len),
         ) {
-            let ppn = match page_table.translate_vpn(vpn) {
-                Some(pte) => pte.ppn(),
-                None => {
-                    match guard.as_mut() {
-                        Some(g) => g.validate(vpn, None, None).await?,
-                        None => {
-                            let mut g = current_cpu().task.as_ref().unwrap().memory_set().lock();
-                            let res = g.validate(vpn, None, None).await?;
-                            guard = Some(g);
-                            res
-                        }
-                    };
-                    page_table.translate_vpn(vpn).unwrap().ppn()
+            if page_table.translate_vpn(vpn).is_none() {
+                if guard.is_none() {
+                    let mut g = current_cpu().task.as_ref().unwrap().memory_set().lock();
+                    guard = Some(g)
                 }
+                guard.as_mut().unwrap().validate(vpn, None, None);
             };
-        }
-        if let Some(g) = guard {
-            drop(g);
         }
         Ok(unsafe { core::slice::from_raw_parts_mut(self.ptr, len) })
     }
