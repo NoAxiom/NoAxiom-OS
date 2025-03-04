@@ -26,6 +26,10 @@ pub const KERNEL_PAGENUM_MASK: usize = 0xffff_ffff_fc00_0000;
 
 /// mmap start address
 pub const MMAP_BASE_ADDR: usize = 0x6000_0000;
+/// mmap area max size
+pub const MMAP_MAX_SIZE: usize = 0x1000_0000;
+/// mmap max_end address
+pub const MMAP_MAX_END_ADDR: usize = MMAP_BASE_ADDR + MMAP_MAX_SIZE;
 
 // /// kernel phys memory start address
 // pub const KERNEL_PHYS_ENTRY: usize = 0x8020_0000;
@@ -48,6 +52,8 @@ mod sv39 {
 
     /// physical page number width
     pub const PPN_WIDTH: usize = PA_WIDTH - PAGE_WIDTH; // 44
+    /// ppn mask
+    pub const PPN_MASK: usize = (1 << PPN_WIDTH) - 1;
     /// virtual page number width
     pub const VPN_WIDTH: usize = VA_WIDTH - PAGE_WIDTH; // 27
 

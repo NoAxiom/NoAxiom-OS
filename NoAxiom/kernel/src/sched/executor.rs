@@ -54,7 +54,7 @@ where
             let mut hart = get_hartid();
             if !info.woken_while_running {
                 if let Some(info) = runnable.metadata().task_info.as_ref() {
-                    if Arc::strong_count(&info.task.memory_set()) <= 1 {
+                    if Arc::strong_count(&info.task.upgrade().unwrap().memory_set()) <= 1 {
                         hart = min_load_hartid();
                     }
                 }

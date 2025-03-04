@@ -90,28 +90,22 @@ impl ArchSbi for RV64 {
     fn console_putchar(c: usize) {
         console_putchar(c);
     }
-
     // read in console
     fn console_getchar() -> usize {
         console_getchar()
     }
     // send ipi
-    #[inline(always)]
     fn send_ipi(hartid: usize) {
         trigger_ipi(hartid);
     }
-
     // clear ipi
-    #[inline(always)]
     fn clear_ipi() {
         clear_ipi();
     }
-
     // shutdown
     fn shutdown() -> ! {
         shutdown()
     }
-
     // hart start
     fn hart_start(hartid: usize, start_addr: usize, opaque: usize) {
         let x = hart_start(hartid, start_addr, opaque);
@@ -127,43 +121,34 @@ impl ArchMemory for RV64 {
     fn tlb_flush() {
         sfence_vma_all();
     }
-
     // update page table base address
+    #[inline(always)]
     fn update_pagetable(bits: usize) {
         update_pagetable(bits);
     }
 }
 
 impl ArchTrap for RV64 {
-    // set trap entry
+    #[inline(always)]
     fn set_trap_entry(addr: usize) {
         set_trap_entry(addr);
     }
-
-    // read trap cause
     fn read_trap_cause() -> Self::Trap {
         scause::read().cause()
     }
-
-    // read trap addr
     fn read_trap_value() -> usize {
         stval::read()
     }
-
-    // read trap pc
     fn read_trap_pc() -> usize {
         sepc::read()
     }
 }
 
 impl ArchTime for RV64 {
-    // get time
     #[inline(always)]
     fn get_time() -> usize {
         time::read()
     }
-
-    // set timer
     fn set_timer(time_value: u64) -> usize {
         set_timer(time_value)
     }

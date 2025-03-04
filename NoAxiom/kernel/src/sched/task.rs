@@ -62,7 +62,7 @@ fn inner_spawn(task: Arc<Task>) {
     spawn_raw(
         UserTaskFuture::new(task.clone(), task_main(task.clone())),
         task.sched_entity.ref_clone(),
-        Some(SchedTaskInfo { task }),
+        Some(SchedTaskInfo { task: Arc::downgrade(&task) }),
     );
 }
 

@@ -6,7 +6,6 @@ pub mod fs;
 pub mod mm;
 pub mod others;
 pub mod process;
-pub mod sys_args;
 pub mod syscall;
 
 #[macro_use]

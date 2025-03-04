@@ -59,9 +59,7 @@ impl Syscall<'_> {
         info!("[sys_exec] argv: {:#x}, envp: {:#x}", argv, envp);
         let args = UserPtr::<UserPtr<u8>>::new(argv).get_string_vec();
         let envs = UserPtr::<UserPtr<u8>>::new(envp).get_string_vec();
-        // let args = Vec::new();
-        // let envs = Vec::new();
-        self.task.exec(path, args, envs).await;
+        self.task.exec(path, args, envs).await?;
         // On success, execve() does not return, on error -1 is returned, and errno is
         // set to indicate the error.
         Ok(self.task.trap_context().result_value() as isize)
@@ -165,7 +163,7 @@ impl Syscall<'_> {
         if !status.is_null() {
             info!(
                 "[sys_wait4]: write exit_code at status_addr = {:#x}",
-                status.addr(),
+                status.addr().0,
             );
             status.write_volatile((exit_code & 0xff) << 8);
             info!("[sys_wait4]: write exit code {:#x}", exit_code);

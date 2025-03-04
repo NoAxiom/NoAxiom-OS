@@ -8,7 +8,7 @@ use super::trap::set_kernel_trap_entry;
 use crate::{
     // constant::register::A0,
     cpu::{current_cpu, get_hartid},
-    sched::utils::yield_now,
+    sched::utils::{block_on, yield_now},
     syscall::syscall,
     task::Task,
 };
@@ -71,7 +71,8 @@ pub fn kernel_trap_handler() {
             | Exception::StorePageFault
             | Exception::InstructionPageFault => {
                 if let Some(task) = current_cpu().task.as_mut() {
-                    match task.memory_validate(stval, Some(exception)) {
+                    // fixme: currently this block_on cannot be canceled
+                    match block_on(task.memory_validate(stval, Some(exception))) {
                         Ok(_) => trace!("[memory_validate] success in kernel_trap_handler"),
                         Err(_) => kernel_panic("memory_validate failed"),
                     }
@@ -170,18 +171,19 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
             // page fault: try to handle copy-on-write, or exit the task
             Exception::LoadPageFault
             | Exception::StorePageFault
-            | Exception::InstructionPageFault => match task.memory_validate(stval, Some(exception))
-            {
-                Ok(_) => trace!("[memory_validate] success in user_trap_handler"),
-                Err(_) => {
-                    error!(
-                        "[user_trap] page fault at hart: {}, tid: {}",
-                        get_hartid(),
-                        task.tid()
-                    );
-                    user_exit("memory_validate failed");
+            | Exception::InstructionPageFault => {
+                match task.memory_validate(stval, Some(exception)).await {
+                    Ok(_) => trace!("[memory_validate] success in user_trap_handler"),
+                    Err(_) => {
+                        error!(
+                            "[user_trap] page fault at hart: {}, tid: {}",
+                            get_hartid(),
+                            task.tid()
+                        );
+                        user_exit("memory_validate failed");
+                    }
                 }
-            },
+            }
             _ => {
                 user_exit("unsupported exception");
             }

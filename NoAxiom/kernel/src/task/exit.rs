@@ -13,13 +13,13 @@ use crate::{
 pub fn terminate_all_tasks() {
     todo!()
 }
-
 pub fn exit_handler(task: &Arc<Task>) {
     let tid = task.tid();
     let exit_code = task.exit_code();
     trace!(
         "[exit_hander] task {} enter the exit_handler with code {}",
-        tid, exit_code
+        tid,
+        exit_code
     );
     assert!(task.tid() != INIT_PROCESS_ID);
     if !task.is_group_leader() {
@@ -61,8 +61,9 @@ pub fn exit_handler(task: &Arc<Task>) {
         drop(pcb);
     }
     info!(
-        "[exit_hander] task {} exited successfully, exit_code: {}",
+        "[exit_hander] task {} exited successfully, exit_code: {}, strong_count: {}",
         task.tid(),
-        task.exit_code()
+        task.exit_code(),
+        Arc::strong_count(task)
     );
 }
