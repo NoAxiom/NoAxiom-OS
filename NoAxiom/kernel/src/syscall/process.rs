@@ -50,7 +50,7 @@ impl Syscall<'_> {
         let path = UserPtr::new(path).get_cstr();
         let path = if !path.starts_with('/') {
             let cwd = self.task.pcb().cwd.clone().from_cd(&"..");
-            debug!("[sys_exec] cwd: {:?}", cwd);
+            trace!("[sys_exec] cwd: {:?}", cwd);
             cwd.from_cd(&path)
         } else {
             Path::from(path)

@@ -75,14 +75,14 @@ impl dyn File {
         self.base_read(0, &mut buf).await?;
         Ok(buf)
     }
-    pub async fn read(&self, buf: &mut [u8], offset: Option<usize>) -> SyscallResult {
-        let offset = offset.unwrap_or(self.meta().pos.load(Ordering::Relaxed));
+    pub async fn read(&self, buf: &mut [u8]) -> SyscallResult {
+        let offset = self.meta().pos.load(Ordering::Relaxed);
         let len = self.base_read(offset, buf).await?;
         self.meta().pos.fetch_add(len as usize, Ordering::Relaxed);
         Ok(len)
     }
-    pub async fn write(&self, buf: &mut [u8], offset: Option<usize>) -> SyscallResult {
-        let offset = offset.unwrap_or(self.meta().pos.load(Ordering::Relaxed));
+    pub async fn write(&self, buf: &mut [u8]) -> SyscallResult {
+        let offset = self.meta().pos.load(Ordering::Relaxed);
         let len = self.base_write(offset, buf).await?;
         self.meta().pos.fetch_add(len as usize, Ordering::Relaxed);
         Ok(len)

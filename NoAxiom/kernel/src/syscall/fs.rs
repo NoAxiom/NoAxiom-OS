@@ -2,13 +2,8 @@ use alloc::vec::Vec;
 
 use super::{Syscall, SyscallResult};
 use crate::{
-    config::task,
     constant::fs::{AT_FDCWD, STD_ERR, STD_IN, STD_OUT},
-    fs::{
-        path::Path,
-        pipe::PipeFile,
-        vfs::{basic::dentry, root_dentry},
-    },
+    fs::{path::Path, pipe::PipeFile, vfs::root_dentry},
     include::{
         fs::{FileFlags, InodeMode, Kstat},
         result::Errno,
@@ -198,7 +193,7 @@ impl Syscall<'_> {
 
         // todo: check lazy?
         // check_mut_slice(buf as *mut u8, len);
-        let read_size = file.read(buf_slice, None).await?;
+        let read_size = file.read(buf_slice).await?;
 
         Ok(read_size as isize)
     }
@@ -222,7 +217,7 @@ impl Syscall<'_> {
         }
 
         // check_mut_slice(buf as *mut u8, len);
-        let write_size = file.write(buf_slice, None).await?;
+        let write_size = file.write(buf_slice).await?;
 
         Ok(write_size as isize)
     }

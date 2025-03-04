@@ -61,7 +61,7 @@ impl MmapPage {
             let buf_slice: &mut [u8] = unsafe {
                 core::slice::from_raw_parts_mut(self.vpn.as_va_usize() as *mut u8, PAGE_SIZE)
             };
-            file.read(buf_slice, Some(self.offset)).await?;
+            file.base_read(self.offset, buf_slice).await?;
         }
         self.valid = true;
         Ok(())
