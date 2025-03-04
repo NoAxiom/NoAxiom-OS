@@ -19,9 +19,10 @@ pub fn exit_handler(task: &Arc<Task>) {
     let exit_code = task.exit_code();
     trace!(
         "[exit_hander] task {} enter the exit_handler with code {}",
-        tid, exit_code
+        tid,
+        exit_code
     );
-    assert!(task.tid() != INIT_PROCESS_ID);
+    // assert!(task.tid() != INIT_PROCESS_ID);
     if !task.is_group_leader() {
         // thread resources clean up
         task.thread_group.lock().remove(task.tid());

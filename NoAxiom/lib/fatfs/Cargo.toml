@@ -35,7 +35,7 @@ log_level_debug = ["log_level_info"]
 log_level_trace = ["log_level_debug"]
 
 # Default features
-default = ["chrono", "alloc", "lfn", "unicode", "log_level_trace"]
+default = ["alloc", "lfn", "unicode", "log_level_trace"]
 
 [dependencies]
 bitflags = { version = "2", default-features = false }

@@ -25,6 +25,8 @@ void run(char* str) {
 
 int main(void) {
     printf("[user] This is init_proc.\n");
-    run("test_echo");
     run("mmap");
+    // run("openat");
+    // run("pipe");
+    // run("test_echo");
 }

@@ -88,9 +88,7 @@ impl Dentry for Fat32Dentry {
                 .await
                 .map_err(fs_err)?;
             let new_inode = Fat32FileInode::new(super_block.clone(), new_file);
-            let new_dentry = self.into_dyn().new_child(name);
-            new_dentry.set_inode(Arc::new(new_inode));
-            Ok(new_dentry)
+            Ok(self.into_dyn().add_child(name, Arc::new(new_inode)))
         } else if mode.contains(InodeMode::DIR) {
             let dir = inode
                 .downcast_arc::<Fat32DirInode>()
@@ -102,9 +100,7 @@ impl Dentry for Fat32Dentry {
                 .await
                 .map_err(fs_err)?;
             let new_inode = Fat32DirInode::new(super_block.clone(), new_dir);
-            let new_dentry = self.into_dyn().new_child(name);
-            new_dentry.set_inode(Arc::new(new_inode));
-            Ok(new_dentry)
+            Ok(self.into_dyn().add_child(name, Arc::new(new_inode)))
         } else {
             Err(Errno::EINVAL)
         }
