@@ -622,7 +622,7 @@ impl Task {
 
 impl Drop for Task {
     fn drop(&mut self) {
-        warn!(
+        info!(
             "task {} dropped, exit_code: {}",
             self.tid(),
             self.exit_code()

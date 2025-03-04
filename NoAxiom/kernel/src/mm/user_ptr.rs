@@ -193,6 +193,7 @@ impl UserPtr<u8> {
                 guard.as_mut().unwrap().validate(vpn, None, None);
             };
         }
+        drop(guard);
         Ok(unsafe { core::slice::from_raw_parts_mut(self.ptr, len) })
     }
 }
