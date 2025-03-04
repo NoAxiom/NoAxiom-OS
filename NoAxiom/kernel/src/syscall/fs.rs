@@ -2,8 +2,13 @@ use alloc::vec::Vec;
 
 use super::{Syscall, SyscallResult};
 use crate::{
+    config::task,
     constant::fs::{AT_FDCWD, STD_ERR, STD_IN, STD_OUT},
-    fs::{path::Path, pipe::PipeFile, stdio, vfs::root_dentry},
+    fs::{
+        path::Path,
+        pipe::PipeFile,
+        vfs::{basic::dentry, root_dentry},
+    },
     include::{
         fs::{FileFlags, InodeMode, Kstat},
         result::Errno,
@@ -109,22 +114,31 @@ impl Syscall<'_> {
         mode: u32,
     ) -> SyscallResult {
         let ptr = UserPtr::<u8>::new(filename);
-        let path = get_string_from_ptr(&ptr);
+        let path_str = get_string_from_ptr(&ptr);
         info!(
             "[sys_openat] dirfd {}, flags {:#x}, filename {}, mode {}",
-            fd, flags, path, mode
+            fd, flags, path_str, mode
         );
 
-        let cwd = self.task.pcb().cwd.clone().from_cd(&"..");
-        debug!("[sys_openat] cwd: {:?}", cwd);
         let mut fd_table = self.task.fd_table();
         let flags = FileFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
         let mode = InodeMode::from_bits_truncate(mode);
-        let path = if fd == AT_FDCWD {
-            let res = cwd.from_cd_or_create(&path);
-            res
+        let path = if !path_str.starts_with('/') {
+            if fd == AT_FDCWD {
+                let cwd = self.task.pcb().cwd.clone().from_cd(&"..");
+                trace!("[sys_openat] cwd: {:?}", cwd);
+                cwd.from_cd_or_create(&path_str)
+            } else {
+                let cwd = fd_table
+                    .get(fd as usize)
+                    .ok_or(Errno::EBADF)?
+                    .dentry()
+                    .path();
+                trace!("[sys_openat] cwd: {:?}", cwd);
+                cwd.from_cd_or_create(&path_str)
+            }
         } else {
-            cwd
+            Path::from(path_str)
         };
 
         let dentry = path.dentry();
@@ -145,11 +159,12 @@ impl Syscall<'_> {
         }
 
         let file = dentry.open()?;
+        let file_path = file.dentry().path();
         file.set_flags(flags);
         let fd = fd_table.alloc_fd()?;
         fd_table.set(fd as usize, file);
 
-        debug!("[sys_openat] succeed fd: {}", fd);
+        trace!("[sys_openat] succeed fd: {}, path: {:?}", fd, file_path);
         Ok(fd)
     }
 

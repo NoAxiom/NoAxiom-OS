@@ -11,7 +11,10 @@ use downcast_rs::DowncastSync;
 type Mutex<T> = ksync::mutex::SpinLock<T>;
 
 use super::{file::File, inode::Inode, superblock::SuperBlock};
-use crate::include::{fs::InodeMode, result::Errno};
+use crate::{
+    fs::path::Path,
+    include::{fs::InodeMode, result::Errno},
+};
 
 pub struct DentryMeta {
     // todo: dentry states
@@ -99,16 +102,20 @@ impl dyn Dentry {
 
     /// Add a child dentry with `name` and `child_inode`.
     pub fn add_child(self: &Arc<Self>, name: &str, child_inode: Arc<dyn Inode>) -> Arc<dyn Dentry> {
-        let child = self.new_child(name);
-        child.set_inode(child_inode);
-        self.meta()
-            .children
-            .lock()
-            .insert(name.to_string(), child.clone());
-        child
+        let mut children = self.meta().children.lock();
+
+        if let Some(child) = children.get(name) {
+            child.set_inode(child_inode);
+            child.clone()
+        } else {
+            let child = self.new_child(name);
+            child.set_inode(child_inode);
+            children.insert(name.to_string(), child.clone());
+            child
+        }
     }
 
-    /// Add a child dentry with `name` and `mode`.
+    /// Add a child to directory dentry with `name` and `mode`.
     pub async fn add_dir_child(
         self: &Arc<Self>,
         name: &str,
@@ -117,9 +124,7 @@ impl dyn Dentry {
         if self.inode().unwrap().file_type() != InodeMode::DIR {
             return Err(Errno::ENOTDIR);
         }
-        // let child = self.clone().create(name, *mode).await?;
-        // todo: map long name to short name
-        let child = self.clone().create("test", *mode).await?;
+        let child = self.clone().create(name, *mode).await?;
         self.meta()
             .children
             .lock()
@@ -130,6 +135,18 @@ impl dyn Dentry {
     /// Get super block of the dentry
     pub fn super_block(&self) -> Arc<dyn SuperBlock> {
         self.meta().super_block.clone()
+    }
+
+    /// Get the path of the dentry
+    pub fn path(self: Arc<Self>) -> Path {
+        let mut path = self.name();
+        let mut current = self.clone();
+        while let Some(parent) = current.parent() {
+            path = format!("{}/{}", parent.name(), path);
+            current = parent;
+        }
+        path.remove(0);
+        Path::from(path)
     }
 
     /// Find the dentry with `name` in the **WHOLE** sub-tree of the dentry.
@@ -182,7 +199,7 @@ impl dyn Dentry {
         Ok(current)
     }
 
-    /// Find the dentry with `path`, create if not found.
+    /// Find the dentry with `path`, create negative dentry if not found.
     pub fn find_path_or_create(self: Arc<Self>, path: &Vec<&str>) -> Arc<dyn Dentry> {
         let mut idx = 0;
         let max_idx = path.len() - 1;
@@ -208,7 +225,7 @@ impl dyn Dentry {
                 idx += 1;
             } else {
                 let new_child = current.clone().new_child(name);
-                children.insert(name.to_string(), new_child.clone()); // lifetime issue! don't use self.meta().children.lock()
+                children.insert(name.to_string(), new_child.clone());
                 current = new_child;
                 idx += 1;
             }

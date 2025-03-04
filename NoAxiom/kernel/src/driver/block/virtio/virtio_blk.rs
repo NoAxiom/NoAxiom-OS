@@ -24,8 +24,6 @@ pub struct VirtIOBlockDriver {
     driver: SpinLock<VirtIOBlk<HalImpl, MmioTransport>>,
 }
 
-unsafe impl Send for VirtIOBlockDriver {}
-unsafe impl Sync for VirtIOBlockDriver {}
 pub fn probe() -> Option<Vec<ProbeInfo>> {
     if cfg!(any(feature = "qemu_riscv")) {
         return None;
