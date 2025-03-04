@@ -137,7 +137,7 @@ impl MmapManager {
 
 impl MemorySet {
     /// actual mmap when pagefault is triggered
-    pub async fn lazy_alloc_mmap(&mut self, vpn: VirtPageNum) {
+    pub async fn lazy_alloc_mmap(&mut self, vpn: VirtPageNum) -> SysResult<()> {
         let frame = frame_alloc();
         let ppn = frame.ppn();
         self.mmap_manager.frame_trackers.insert(vpn, frame);
@@ -145,7 +145,8 @@ impl MemorySet {
         let pte_flags: PTEFlags = PTEFlags::from(mmap_page.prot) | PTEFlags::U;
         let page_table = unsafe { &mut (*self.page_table.get()) };
         page_table.map(vpn, ppn, pte_flags);
-        mmap_page.lazy_map_page().await;
+        mmap_page.lazy_map_page().await?;
+        Ok(())
     }
 }
 

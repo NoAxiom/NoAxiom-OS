@@ -534,7 +534,10 @@ impl MemorySet {
                 Ok(())
             } else if self.mmap_manager.is_in_space(vpn) {
                 info!("[memory_validate] realloc mmap");
-                self.lazy_alloc_mmap(vpn).await;
+                let res = self.lazy_alloc_mmap(vpn).await;
+                if let Err(res) = res {
+                    warn!("[memory_validate] error when realloc mmap: {}", res);
+                }
                 Ok(())
             } else {
                 error!("[memory_validate] not in any alloc area");
