@@ -32,6 +32,8 @@ bitflags! {
         const D = 1 << 7;
         /// copy-on-write
         const COW = 1 << 8;
+        /// lazy-mmap file (unallocated areas)
+        const MMAP_FILE = 1 << 9;
     }
 }
 
@@ -71,6 +73,9 @@ impl PTEFlags {
     #[inline(always)]
     pub fn is_cow(&self) -> bool {
         self.contains(Self::COW)
+    }
+    pub fn is_mmap_file(&self) -> bool {
+        self.contains(Self::MMAP_FILE)
     }
     #[inline(always)]
     pub fn switch_to_cow(&self) -> Self {

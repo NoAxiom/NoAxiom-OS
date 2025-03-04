@@ -1,8 +1,5 @@
 use alloc::{sync::Arc, vec::Vec};
-use core::{
-    arch::asm,
-    sync::atomic::{AtomicUsize, Ordering},
-};
+use core::sync::atomic::{AtomicUsize, Ordering};
 
 use arch::{Arch, ArchMemory, Exception};
 use ksync::{cell::SyncUnsafeCell, mutex::SpinLock};
@@ -18,8 +15,8 @@ use super::{
 };
 use crate::{
     config::mm::{
-        KERNEL_ADDR_OFFSET, KERNEL_VIRT_MEMORY_END, MMAP_BASE_ADDR, MMIO, PAGE_SIZE, PAGE_WIDTH,
-        USER_HEAP_SIZE, USER_STACK_SIZE,
+        KERNEL_ADDR_OFFSET, KERNEL_VIRT_MEMORY_END, MMIO, PAGE_SIZE, PAGE_WIDTH, USER_HEAP_SIZE,
+        USER_STACK_SIZE,
     },
     constant::time::CLOCK_FREQ,
     fs::{path::Path, vfs::basic::file::File},
@@ -30,7 +27,7 @@ use crate::{
         map_area::MapAreaType,
         permission::MapType,
     },
-    syscall::SyscallResult,
+    syscall::SysResult,
 };
 
 extern "C" {
@@ -55,10 +52,8 @@ lazy_static! {
 pub static KERNEL_SPACE_TOKEN: AtomicUsize = AtomicUsize::new(0);
 
 pub unsafe fn kernel_space_activate() {
-    unsafe {
-        Arch::update_pagetable(KERNEL_SPACE_TOKEN.load(Ordering::Relaxed));
-        asm!("sfence.vma");
-    }
+    Arch::update_pagetable(KERNEL_SPACE_TOKEN.load(Ordering::Relaxed));
+    Arch::tlb_flush();
 }
 
 /// elf load result
@@ -106,7 +101,7 @@ impl MemorySet {
             user_heap_area: MapArea::new_bare(),
             user_stack_base: 0,
             user_heap_base: 0,
-            mmap_manager: MmapManager::new(VirtAddr(MMAP_BASE_ADDR), VirtAddr(MMAP_BASE_ADDR)),
+            mmap_manager: MmapManager::new_bare(),
         }
     }
 
@@ -433,13 +428,13 @@ impl MemorySet {
         new_set
     }
 
-    pub fn realloc_stack(&mut self, vpn: VirtPageNum) {
+    pub fn lazy_alloc_stack(&mut self, vpn: VirtPageNum) {
         self.user_stack_area
             .map_one(vpn, unsafe { &mut (*self.page_table.get()) });
         Arch::tlb_flush();
     }
 
-    pub fn realloc_heap(&mut self, vpn: VirtPageNum) {
+    pub fn lazy_alloc_heap(&mut self, vpn: VirtPageNum) {
         self.user_heap_area
             .map_one(vpn, unsafe { &mut (*self.page_table.get()) });
         Arch::tlb_flush();
@@ -501,39 +496,48 @@ impl MemorySet {
     ///
     /// usages: when any kernel allocation in user_space happens, call this fn;
     /// when user pagefault happens, call this func to check allocation.
-    pub fn validate(&mut self, addr: usize, exception: Option<Exception>) -> SyscallResult {
-        let vpn = VirtAddr::from(addr).floor();
-        if let Some(pte) = self.page_table().translate_vpn(vpn) {
+    pub async fn validate(
+        &mut self,
+        vpn: VirtPageNum,
+        exception: Option<Exception>,
+        pte: Option<PageTableEntry>,
+    ) -> SysResult<()> {
+        if let Some(pte) = pte {
             let flags = pte.flags();
             if flags.is_cow() {
                 trace!(
-                    "[memory_validate] realloc COW at va: {:#x}, pte: {:#x}, flags: {:?}",
-                    addr,
+                    "[memory_validate] realloc COW at vpn: {:#x}, pte: {:#x}, flags: {:?}",
+                    vpn.0,
                     pte.0,
                     pte.flags()
                 );
                 self.realloc_cow(vpn, pte);
-                Ok(0)
+                Ok(())
             } else if exception.is_some() && exception.unwrap() == Exception::StorePageFault {
                 error!(
-                    "page fault at addr: {:#x}, store at invalid area, flags: {:?}",
-                    addr, flags
+                    "[memory_validate] store at invalid area, flags: {:?}",
+                    flags
                 );
                 Err(Errno::EFAULT)
             } else {
-                Ok(0)
+                error!("unknown error in memory validate");
+                Ok(())
             }
         } else {
             if self.user_stack_area.vpn_range.is_in_range(vpn) {
                 info!("[memory_validate] realloc stack");
-                self.realloc_stack(vpn);
-                Ok(0)
+                self.lazy_alloc_stack(vpn);
+                Ok(())
             } else if self.user_heap_area.vpn_range.is_in_range(vpn) {
                 info!("[memory_validate] realloc heap");
-                self.realloc_heap(vpn);
-                Ok(0)
+                self.lazy_alloc_heap(vpn);
+                Ok(())
+            } else if self.mmap_manager.is_in_space(vpn) {
+                info!("[memory_validate] realloc mmap");
+                self.lazy_alloc_mmap(vpn).await;
+                Ok(())
             } else {
-                error!("page fault at addr: {:#x}, not in any alloc area", addr);
+                error!("[memory_validate] not in any alloc area");
                 Err(Errno::EFAULT)
             }
         }

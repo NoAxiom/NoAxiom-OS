@@ -10,7 +10,7 @@ use super::{
     frame::{frame_alloc, FrameTracker},
     pte::{PTEFlags, PageTableEntry},
 };
-use crate::pte_flags;
+use crate::{config::mm::PPN_MASK, pte_flags};
 
 #[derive(Debug)]
 pub struct PageTable {
@@ -50,7 +50,7 @@ impl PageTable {
     /// so do assure that it's already wrapped in tcb
     pub fn from_token(satp: usize) -> Self {
         Self {
-            root_ppn: PhysPageNum::from(satp & ((1usize << 44) - 1)),
+            root_ppn: PhysPageNum::from(satp & PPN_MASK),
             frames: Vec::new(),
         }
     }
@@ -198,6 +198,10 @@ pub fn current_token() -> usize {
     let satp: usize;
     unsafe { asm!("csrr {}, satp", out(reg) satp) }
     satp
+}
+
+pub fn current_root_ppn() -> PhysPageNum {
+    PhysPageNum::from(current_token() & PPN_MASK)
 }
 
 /// translate the vpn into PTE entry (sv39)

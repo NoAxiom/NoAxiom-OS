@@ -1,6 +1,6 @@
 //! CFS(completly fair schedule) scheduler entity
 
-use alloc::sync::Arc;
+use alloc::sync::{Arc, Weak};
 use core::cmp::Ordering;
 
 use ksync::cell::SyncUnsafeCell;
@@ -122,5 +122,5 @@ impl SchedEntity {
 }
 
 pub struct SchedTaskInfo {
-    pub task: Arc<Task>,
+    pub task: Weak<Task>,
 }

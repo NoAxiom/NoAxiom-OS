@@ -227,13 +227,16 @@ impl Task {
         *ms = memory_set;
     }
 
-    pub fn memory_validate(
+    pub async fn memory_validate(
         self: &Arc<Self>,
         addr: usize,
         exception: Option<Exception>,
-    ) -> SyscallResult {
+    ) -> SysResult<()> {
         trace!("[memory_validate] check at addr: {:#x}", addr);
-        self.memory_set().lock().validate(addr, exception)
+        let vpn = VirtAddr::from(addr).floor();
+        let mut ms = self.memory_set().lock();
+        let pte = ms.page_table().translate_vpn(vpn);
+        ms.validate(vpn, exception, pte).await
     }
 
     /// get pcb
@@ -612,7 +615,17 @@ impl Task {
         // push mmap range (without immediate mapping)
         memory_set
             .mmap_manager
-            .push(start_va, length, prot, flags, offset, file);
+            .insert(start_va, length, prot, flags, offset, file);
         Ok(start_va.0)
+    }
+}
+
+impl Drop for Task {
+    fn drop(&mut self) {
+        info!(
+            "task {} dropped, exit_code: {}",
+            self.tid(),
+            self.exit_code()
+        )
     }
 }

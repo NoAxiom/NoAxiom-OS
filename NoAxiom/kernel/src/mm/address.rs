@@ -85,6 +85,9 @@ impl VirtAddr {
         let pa = kernel_va_to_pa(self.0);
         PhysAddr::from(pa)
     }
+    pub fn is_in_mmap_range(&self) -> bool {
+        MMAP_BASE_ADDR <= self.0 && self.0 <= MMAP_MAX_END_ADDR
+    }
 }
 
 /// virtual page number

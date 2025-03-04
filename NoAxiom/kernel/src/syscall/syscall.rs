@@ -62,7 +62,7 @@ impl<'a> Syscall<'a> {
                 args[4] as isize,
                 args[5],
             ),
-            SYS_MUNMAP => self.sys_munmap(),
+            SYS_MUNMAP => self.sys_munmap(args[0], args[1]),
 
             // others
             SYS_TIMES => Self::sys_times(args[0]),

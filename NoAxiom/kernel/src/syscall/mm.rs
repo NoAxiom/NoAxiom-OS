@@ -5,6 +5,7 @@ use crate::{
         mm::{MmapFlags, MmapProts},
         result::Errno,
     },
+    mm::address::VirtAddr,
     syscall::Syscall,
     utils::align_up,
 };
@@ -41,7 +42,12 @@ impl Syscall<'_> {
             .map(|addr| addr as isize)
     }
 
-    pub fn sys_munmap(&self) -> SyscallResult {
-        todo!()
+    pub fn sys_munmap(&self, start: usize, length: usize) -> SyscallResult {
+        self.task
+            .memory_set()
+            .lock()
+            .mmap_manager
+            .remove(VirtAddr(start), length);
+        Ok(0)
     }
 }

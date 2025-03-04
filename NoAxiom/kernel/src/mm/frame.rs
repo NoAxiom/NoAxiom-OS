@@ -24,12 +24,15 @@ pub struct FrameTrackerInner {
     pub ppn: PhysPageNum,
 }
 impl FrameTrackerInner {
-    pub fn new(ppn: PhysPageNum) -> Self {
+    pub fn new_zero(ppn: PhysPageNum) -> Self {
         // page cleaning
         let bytes_array = ppn.get_bytes_array();
         for i in bytes_array {
             *i = 0;
         }
+        Self { ppn }
+    }
+    pub fn new_uninit(ppn: PhysPageNum) -> Self {
         Self { ppn }
     }
 }
@@ -134,7 +137,16 @@ lazy_static! {
 pub fn frame_alloc() -> FrameTracker {
     let mut guard = FRAME_ALLOCATOR.lock();
     let ppn = guard.alloc().unwrap();
-    let frame = FrameTracker::new(FrameTrackerInner::new(ppn));
+    let frame = FrameTracker::new(FrameTrackerInner::new_zero(ppn));
+    guard.frame_map.insert(ppn.0, Arc::downgrade(&frame.inner));
+    frame
+}
+
+#[allow(unused)]
+pub fn frame_alloc_uninit() -> FrameTracker {
+    let mut guard = FRAME_ALLOCATOR.lock();
+    let ppn = guard.alloc().unwrap();
+    let frame = FrameTracker::new(FrameTrackerInner::new_uninit(ppn));
     guard.frame_map.insert(ppn.0, Arc::downgrade(&frame.inner));
     frame
 }

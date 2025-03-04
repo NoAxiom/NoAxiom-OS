@@ -7,7 +7,7 @@ use alloc::{string::String, vec::Vec};
 use crossover::{Crossover, CrossoverManager};
 
 use crate::{
-    config::mm::{KERNEL_ADDR_OFFSET, KERNEL_PAGENUM_MASK},
+    config::mm::{KERNEL_ADDR_OFFSET, KERNEL_PAGENUM_MASK, MMAP_BASE_ADDR, MMAP_MAX_END_ADDR},
     mm::user_ptr::UserPtr,
 };
 
@@ -65,7 +65,7 @@ pub fn align_up(addr: usize, align: usize) -> usize {
 
 pub fn get_string_from_ptr(ptr: &UserPtr<u8>) -> String {
     let checker = |&c: &u8| c == 0;
-    let slice = ptr.as_vec_until(&checker);
+    let slice = ptr.clone_as_vec_until(&checker);
     let res = String::from_utf8(Vec::from(slice)).unwrap();
     trace!("get_string_from_ptr: {}", res);
     res

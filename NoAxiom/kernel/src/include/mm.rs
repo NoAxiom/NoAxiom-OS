@@ -1,5 +1,7 @@
 use bitflags::bitflags;
 
+use crate::mm::pte::PTEFlags;
+
 bitflags! {
 #[derive(Clone, Copy, Debug)]
     /// see [man mmap](https://man7.org/linux/man-pages/man2/mmap.2.html)
@@ -8,12 +10,28 @@ bitflags! {
     /// It is either PROT_NONE or the bitwise OR of one or more of the
     /// following flags:
     pub struct MmapProts: usize {
-        const PROT_NONE = 0; // Pages may not be accessed. Used for guard pages.
-        const PROT_READ = 1 << 0; // Pages may be read.
+        const PROT_NONE = 0;       // Pages may not be accessed. Used for guard pages.
+        const PROT_READ = 1 << 0;  // Pages may be read.
         const PROT_WRITE = 1 << 1; // Pages may be written.
         const PROT_EXEC  = 1 << 2; // Pages may be executed.
         const PROT_GROWSDOWN = 0x01000000;
         const PROT_GROWSUP = 0x02000000;
+    }
+}
+
+impl From<MmapProts> for PTEFlags {
+    fn from(prots: MmapProts) -> Self {
+        let mut flags = PTEFlags::empty();
+        if prots.contains(MmapProts::PROT_READ) {
+            flags |= PTEFlags::R;
+        }
+        if prots.contains(MmapProts::PROT_WRITE) {
+            flags |= PTEFlags::W;
+        }
+        if prots.contains(MmapProts::PROT_EXEC) {
+            flags |= PTEFlags::X;
+        }
+        flags
     }
 }
 
