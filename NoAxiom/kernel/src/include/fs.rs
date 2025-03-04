@@ -5,18 +5,23 @@ bitflags! {
     pub struct FileFlags: u32 {
         // TODO do not use 0
         // NOTE: bitflags do not encourage zero bit flag, we should not directly check `O_RDONLY`
+        const O_RDONLY = 0x000;
+        const O_WRONLY = 0x001;
+        const O_RDWR = 0x002 ;// 可读可写
+        const O_CREATE = 0x40;
+        const O_DIRECTORY= 0x0200000;
         // const O_RDONLY    = 0;
-        const O_WRONLY    = 1 << 0;
-        const O_RDWR      = 1 << 1;
-        const O_CREATE    = 1 << 6;
+        // const O_WRONLY    = 1 << 0;
+        // const O_RDWR      = 1 << 1;
+        // const O_CREATE    = 1 << 6;
         const O_EXCL      = 1 << 7;
-        const O_TRUNC     = 1 << 9;
-        const O_APPEND    = 1 << 10;
-        const O_NONBLOCK  = 1 << 11;
-        const O_LARGEFILE = 1 << 15;
-        const O_DIRECTROY = 1 << 16;
-        const O_NOFOLLOW  = 1 << 17;
-        const O_CLOEXEC   = 1 << 19;
+        // const O_TRUNC     = 1 << 9;
+        // const O_APPEND    = 1 << 10;
+        // const O_NONBLOCK  = 1 << 11;
+        // const O_LARGEFILE = 1 << 15;
+        // const O_DIRECTROY = 1 << 16;
+        // const O_NOFOLLOW  = 1 << 17;
+        // const O_CLOEXEC   = 1 << 19;
     }
 
     /// User group read and write permissions

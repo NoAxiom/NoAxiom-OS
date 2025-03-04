@@ -71,6 +71,7 @@
   "files.associations": {
     "*.log": "ansi",
     "unistd.h": "c",
-    "stdio.h": "c"
+    "stdio.h": "c",
+    "stdlib.h": "c"
   }
 }

@@ -29,6 +29,14 @@ do
     fi
 done
 
+# 复制 mnt 文件夹到 fs 目录
+if [ -d "$elf_path/mnt" ]; then
+    sudo cp -r "$elf_path/mnt" "$img_dir/"
+    echo -e $NORMAL "\t load: $elf_path/mnt"$RESET
+else
+    echo -e $WARN "\t Warning: mnt folder not found in $elf_path"$RESET
+fi
+
 echo -e $NORMAL"Making file system completed. "$RESET
 
 sleep 0.1 # what?

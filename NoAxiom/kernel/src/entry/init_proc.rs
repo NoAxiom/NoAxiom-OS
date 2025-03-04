@@ -24,7 +24,8 @@ pub fn schedule_spawn_all_apps() {
     // paths.push("/chdir");
     //
     // process
-    paths.push("/mmap");
+    // paths.push("/mmap");
+    paths.push("/openat");
 
     for path in paths {
         schedule_spawn_new_process(Path::from(path.to_string()));

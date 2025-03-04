@@ -136,10 +136,11 @@ impl File for Fat32Dir {
             let Ok(entry) = entry else {
                 return Err(Errno::EIO);
             };
-            debug!("load_file: {:?}", entry.file_name());
             let child_inode: Arc<dyn Inode> = if entry.is_dir() {
+                debug!("load_dir: {:?}", entry.file_name());
                 Arc::new(Fat32DirInode::new(super_block.clone(), entry.to_dir()))
             } else if entry.is_file() {
+                debug!("load_file: {:?}", entry.file_name());
                 Arc::new(Fat32FileInode::new(super_block.clone(), entry.to_file()))
             } else {
                 unreachable!();
