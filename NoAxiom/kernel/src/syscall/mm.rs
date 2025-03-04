@@ -42,6 +42,7 @@ impl Syscall<'_> {
     }
 
     pub fn sys_munmap(&self) -> SyscallResult {
-        todo!()
+        warn!("[sys_munmap] unimplemented");
+        Ok(0)
     }
 }

@@ -183,7 +183,7 @@ impl Syscall<'_> {
 
         // todo: check lazy?
         // check_mut_slice(buf as *mut u8, len);
-        let read_size = file.read(buf_slice).await?;
+        let read_size = file.read(buf_slice, None).await?;
 
         Ok(read_size as isize)
     }
@@ -207,7 +207,7 @@ impl Syscall<'_> {
         }
 
         // check_mut_slice(buf as *mut u8, len);
-        let write_size = file.write(buf_slice).await?;
+        let write_size = file.write(buf_slice, None).await?;
 
         Ok(write_size as isize)
     }

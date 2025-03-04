@@ -10,6 +10,7 @@ use crate::{
     config::mm::{MMAP_BASE_ADDR, PAGE_SIZE},
     fs::vfs::basic::file::File,
     include::mm::{MmapFlags, MmapProts},
+    syscall::SysResult,
 };
 
 /// single mmap page struct
@@ -54,29 +55,16 @@ impl MmapPage {
         }
     }
 
-    // /// file mmap
-    // async fn lazy_alloc_from_file(&mut self) {
-    // let f = self.file.clone().unwrap();
-    // let old_offset = f.offset();
-    // let _ = f.lseek(SeekFrom::SeekSet(self.offset.try_into().unwrap()));
-    // if !f.readable() {
-    //     return;
-    // }
-    // let file_size = f.file_size();
-    // let len = PAGE_SIZE.min(file_size - self.offset);
-    // let buf = translated_bytes_buffer(token, VirtAddr::from(self.vpn).0
-    // as *const u8, len); for b in buf.into_iter() {
-    //     f.read(b.len(), b).await;
-    // }
-    // f.lseek(SeekFrom::SeekSet(old_offset.try_into().unwrap()));
-    // }
-
     /// mmap alloc
-    pub async fn lazy_map_page(&mut self) {
+    pub async fn lazy_map_page(&mut self) -> SysResult<()> {
         if let Some(file) = self.file.clone() {
-            todo!("read_from_file")
+            let buf_slice: &mut [u8] = unsafe {
+                core::slice::from_raw_parts_mut(self.vpn.as_va_usize() as *mut u8, PAGE_SIZE)
+            };
+            file.read(buf_slice, Some(self.offset)).await?;
         }
         self.valid = true;
+        Ok(())
     }
 }
 
