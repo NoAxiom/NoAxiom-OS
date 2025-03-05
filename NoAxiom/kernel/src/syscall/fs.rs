@@ -136,6 +136,7 @@ impl Syscall<'_> {
         let dentry = path.dentry();
 
         if flags.contains(FileFlags::O_CREATE) {
+            info!("[sys_openat] O_CREATE");
             if flags.contains(FileFlags::O_EXCL) && !dentry.is_negetive() {
                 return Err(Errno::EEXIST);
             }
@@ -286,7 +287,6 @@ impl Syscall<'_> {
         let file = self.task.fd_table().get(fd).ok_or(Errno::EBADF)?;
         let user_ptr = UserPtr::<u8>::new(buf);
         let buf_slice = user_ptr.as_slice_mut_checked(len).await?;
-        // file.read_dir(&mut buf);
-        Ok(0)
+        file.read_dir(buf_slice).await
     }
 }

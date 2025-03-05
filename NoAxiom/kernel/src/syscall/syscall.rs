@@ -43,6 +43,7 @@ impl<'a> Syscall<'a> {
             SYS_DUP3 => self.sys_dup3(args[0], args[1]),
             SYS_PIPE2 => self.sys_pipe2(args[0], args[1]).await,
             SYS_FSTAT => self.sys_fstat(args[0], args[1]),
+            SYS_GETDENTS64 => self.sys_getdents64(args[0], args[1], args[2]).await,
 
             // process
             SYS_EXIT => self.sys_exit(args[0]),

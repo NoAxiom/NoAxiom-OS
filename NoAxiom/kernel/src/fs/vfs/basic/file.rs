@@ -4,6 +4,8 @@ use alloc::{boxed::Box, string::String, sync::Arc, vec::Vec};
 use core::sync::atomic::AtomicUsize;
 
 use async_trait::async_trait;
+use bitflags::Flags;
+use fatfs::SeekFrom;
 type Mutex<T> = ksync::mutex::SpinLock<T>;
 
 use core::sync::atomic::Ordering;
@@ -13,7 +15,11 @@ use super::{
     inode::{self, Inode},
 };
 use crate::{
-    include::{fs::FileFlags, result::Errno},
+    constant::fs::LEN_BEFORE_NAME,
+    include::{
+        fs::{FileFlags, LinuxDirent64},
+        result::Errno,
+    },
     syscall::{Syscall, SyscallResult},
 };
 
@@ -76,6 +82,46 @@ pub trait File: Send + Sync {
 }
 
 impl dyn File {
+    fn pos(&self) -> usize {
+        self.meta().pos.load(Ordering::Relaxed)
+    }
+
+    fn set_pos(&self, pos: usize) {
+        self.meta().pos.store(pos, Ordering::Relaxed);
+    }
+
+    /// Called when the VFS needs to move the file position index.
+    ///
+    /// Return the result offset.
+    fn seek(&self, pos: SeekFrom) -> SyscallResult {
+        let mut res_pos = self.pos();
+        match pos {
+            SeekFrom::Current(offset) => {
+                if offset < 0 {
+                    if res_pos as i64 - offset.abs() < 0 {
+                        return Err(Errno::EINVAL);
+                    }
+                    res_pos -= offset.abs() as usize;
+                } else {
+                    res_pos += offset as usize;
+                }
+            }
+            SeekFrom::Start(offset) => {
+                res_pos = offset as usize;
+            }
+            SeekFrom::End(offset) => {
+                let size = self.size();
+                if offset < 0 {
+                    res_pos = size - offset.abs() as usize;
+                } else {
+                    res_pos = size + offset as usize;
+                }
+            }
+        }
+        self.set_pos(res_pos);
+        Ok(res_pos as isize)
+    }
+
     pub async fn read_all(&self) -> Result<Vec<u8>, Errno> {
         let len = self.meta().inode.size();
         let mut buf = vec![0; len];
@@ -83,7 +129,7 @@ impl dyn File {
         Ok(buf)
     }
     pub async fn read(&self, buf: &mut [u8]) -> SyscallResult {
-        let offset = self.meta().pos.load(Ordering::Relaxed);
+        let offset = self.pos();
         let file_size = self.meta().inode.size();
         if offset + buf.len() > file_size {
             warn!("read beyond file size, truncate the buffer!!");
@@ -99,7 +145,7 @@ impl dyn File {
         }
     }
     pub async fn write(&self, buf: &mut [u8]) -> SyscallResult {
-        let offset = self.meta().pos.load(Ordering::Relaxed);
+        let offset = self.pos();
         let len = self.base_write(offset, buf).await?;
         self.meta().pos.fetch_add(len as usize, Ordering::Relaxed);
         Ok(len)
@@ -113,16 +159,50 @@ impl dyn File {
     pub fn inode(&self) -> Arc<dyn Inode> {
         self.meta().inode.clone()
     }
-    pub fn read_dir(&self) -> SyscallResult {
-        // let inode = self.meta().inode.clone();
-        // let inode = inode.lock();
-        // let inode = inode.as_any().downcast_ref::<inode::DirInode>().unwrap();
-        // let mut entries = Vec::new();
-        // for (name, child) in inode.children() {
-        //     entries.push(child.dentry());
-        // }
-        // Ok(entries)
-        unreachable!()
+
+    /// Reference: Phoenix  
+    /// Read directory entries from the directory file.
+    pub async fn read_dir(&self, buf: &mut [u8]) -> SyscallResult {
+        self.load_dir().await?;
+
+        let buf_len = buf.len();
+        let mut writen_len = 0;
+        let mut buf_it = buf;
+        let children = self.dentry().children();
+        let offset = self.pos();
+        for dentry in children.values().skip(offset) {
+            if dentry.is_negetive() {
+                self.seek(SeekFrom::Current(1))?;
+                continue;
+            }
+            // align to 8 bytes
+            let c_name_len = dentry.name().len() + 1;
+            let rec_len = (LEN_BEFORE_NAME + c_name_len + 7) & !0x7;
+            let inode = dentry.inode()?;
+            let linux_dirent = LinuxDirent64::new(
+                inode.id() as u64,
+                offset as u64,
+                rec_len as u16,
+                inode.file_type().bits() as u8,
+            );
+
+            debug!("[sys_getdents64] linux dirent {linux_dirent:?}");
+            if writen_len + rec_len > buf_len {
+                break;
+            }
+
+            self.seek(SeekFrom::Current(1))?;
+            let ptr = buf_it.as_mut_ptr() as *mut LinuxDirent64;
+            unsafe {
+                ptr.copy_from_nonoverlapping(&linux_dirent, 1);
+            }
+            buf_it[LEN_BEFORE_NAME..LEN_BEFORE_NAME + c_name_len - 1]
+                .copy_from_slice(dentry.name().as_bytes());
+            buf_it[LEN_BEFORE_NAME + c_name_len - 1] = b'\0';
+            buf_it = &mut buf_it[rec_len..];
+            writen_len += rec_len;
+        }
+        Ok(writen_len as isize)
     }
 }
 

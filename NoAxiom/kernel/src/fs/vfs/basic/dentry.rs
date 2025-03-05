@@ -104,6 +104,11 @@ impl dyn Dentry {
         self.meta().parent.as_ref().and_then(|p| p.upgrade())
     }
 
+    /// Get the children of the dentry
+    pub fn children(&self) -> BTreeMap<String, Arc<dyn Dentry>> {
+        self.meta().children.lock().clone()
+    }
+
     /// Add a child dentry with `name` and `child_inode`.
     pub fn add_child(self: &Arc<Self>, name: &str, child_inode: Arc<dyn Inode>) -> Arc<dyn Dentry> {
         let mut children = self.meta().children.lock();
@@ -149,7 +154,9 @@ impl dyn Dentry {
             path = format!("{}/{}", parent.name(), path);
             current = parent;
         }
-        path.remove(0);
+        if path.len() > 1 {
+            path.remove(0);
+        }
         Path::from(path)
     }
 
@@ -208,7 +215,6 @@ impl dyn Dentry {
         let mut idx = 0;
         let max_idx = path.len() - 1;
         let mut current = self.clone();
-
         while idx <= max_idx {
             let name = path[idx];
             if name.is_empty() {
@@ -234,7 +240,6 @@ impl dyn Dentry {
                 idx += 1;
             }
         }
-
         current
     }
 }

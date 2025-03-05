@@ -25,3 +25,5 @@ pub const RLIMIT_NLIMITS: u32 = 16; // 限制的总数
 pub const MAX_FD_COUNT: usize = 1024;
 pub const RLIMIT_SOFT_MAX: usize = MAX_FD_COUNT;
 pub const RLIMIT_HARD_MAX: usize = usize::MAX; // unlimited
+
+pub const LEN_BEFORE_NAME: usize = 19;

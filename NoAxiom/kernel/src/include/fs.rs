@@ -248,10 +248,23 @@ impl Kstat {
     }
 }
 
-struct LinuxDirent64 {
+#[derive(Debug, Clone, Default)]
+#[allow(unused)]
+pub struct LinuxDirent64 {
     d_ino: u64,
     d_off: u64,
     d_reclen: u16,
     d_type: u8,
     // d_name follows here, which will be written later
+}
+
+impl LinuxDirent64 {
+    pub fn new(d_ino: u64, d_off: u64, d_reclen: u16, d_type: u8) -> Self {
+        Self {
+            d_ino,
+            d_off,
+            d_reclen,
+            d_type,
+        }
+    }
 }
