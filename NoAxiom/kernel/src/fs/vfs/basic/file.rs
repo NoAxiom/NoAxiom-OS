@@ -10,6 +10,7 @@ use core::sync::atomic::Ordering;
 
 use super::{dentry::Dentry, inode::Inode};
 use crate::{
+    fs::vfs::root_dentry,
     include::{fs::FileFlags, result::Errno},
     syscall::SyscallResult,
 };
@@ -26,11 +27,11 @@ pub struct FileMeta {
 }
 
 impl FileMeta {
-    pub fn new(dent: Arc<dyn Dentry>, inode: Arc<dyn Inode>) -> Self {
+    pub fn new(dentry: Arc<dyn Dentry>, inode: Arc<dyn Inode>) -> Self {
         Self {
             flags: Mutex::new(FileFlags::empty()),
             pos: AtomicUsize::new(0),
-            dentry: dent,
+            dentry,
             inode,
         }
     }
@@ -56,6 +57,10 @@ pub trait File: Send + Sync {
     /// Get the dentry of the file
     fn dentry(&self) -> Arc<dyn Dentry> {
         self.meta().dentry.clone()
+    }
+    /// Is STD_IN or STD_OUT or STD_ERR
+    fn is_stdio(&self) -> bool {
+        false
     }
     /// Get the meta of the file
     fn meta(&self) -> &FileMeta;

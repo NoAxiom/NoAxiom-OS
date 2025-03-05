@@ -38,6 +38,7 @@ export ELF_PATH ?= $(CHOSEN_PATN)
 KERNEL_O_PATH := ./target/$(TARGET)/$(MODE)
 KERNEL_ELF := $(KERNEL_O_PATH)/$(KERNEL)
 KERNEL_BIN := $(KERNEL_ELF).bin
+KERNEL_SYMBOL_TABLE := $(KERNEL_ELF).txt
 
 # TFTPBOOT := /work/tftpboot/
 
@@ -126,6 +127,7 @@ sbi-qemu:
 	@cp $(SBI) sbi-qemu
 
 run: sbi-qemu
+	python3 generate_symbol_table.py
 	@cp $(KERNEL_BIN) kernel-qemu
 	qemu-system-riscv64 $(QFLAGS)
 # rm -f $(SDCARD_BAK)

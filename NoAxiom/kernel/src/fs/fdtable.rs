@@ -78,7 +78,7 @@ impl FdTable {
         if fd > self.rslimit() {
             return Err(Errno::EBADF);
         }
-        for _ in self.table.len()..fd {
+        for _ in self.table.len()..fd + 1 {
             self.table.push(None);
         }
         Ok(fd as isize)

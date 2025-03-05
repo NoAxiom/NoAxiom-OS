@@ -14,7 +14,7 @@ use crate::{
 
 impl Syscall<'_> {
     /// Get current working directory
-    pub fn sys_getcwd(&self, buf: *mut u8, size: usize) -> SyscallResult {
+    pub async fn sys_getcwd(&self, buf: usize, size: usize) -> SyscallResult {
         info!("[sys_getcwd] buf: {:?}, size: {}", buf, size);
         if buf as usize == 0 {
             return Err(Errno::EFAULT);
@@ -23,25 +23,19 @@ impl Syscall<'_> {
             return Err(Errno::EINVAL);
         }
 
-        let pcb_gaurd = self.task.pcb();
-        let cwd = pcb_gaurd.cwd.clone();
+        let cwd = self.task.pcb().cwd.clone();
+        let cwd_str = cwd.as_string();
+        let cwd_bytes = cwd_str.as_bytes();
 
-        // fixme: size??
-        // todo : encapsulate the following write steps
-        // let ptr = UserPtr::<&[u8]>::new(buf as usize);
-        // let data_cloned = ptr.as_ref_mut(); // this might trigger pagefault
-        // *data_cloned = cwd.as_string().as_bytes();
-
-        let buf_slice: &mut [u8] = unsafe { core::slice::from_raw_parts_mut(buf as *mut u8, size) };
-        let binding = cwd.as_string();
-        let cwd_bytes = binding.as_bytes();
+        let user_ptr = UserPtr::<u8>::new(buf);
+        let buf_slice = user_ptr.as_slice_mut_checked(size).await?;
         buf_slice[..cwd_bytes.len()].copy_from_slice(cwd_bytes);
 
         Ok(buf as isize)
     }
 
     /// Create a pipe
-    pub fn sys_pipe2(&self, pipe: *mut i32, flag: usize) -> SyscallResult {
+    pub async fn sys_pipe2(&self, pipe: usize, _flag: usize) -> SyscallResult {
         let (read_end, write_end) = PipeFile::new_pipe();
 
         let mut fd_table = self.task.fd_table();
@@ -50,9 +44,11 @@ impl Syscall<'_> {
         fd_table.set(read_fd as usize, read_end);
         fd_table.set(write_fd as usize, write_end);
 
-        let buf = unsafe { core::slice::from_raw_parts_mut(pipe, 2 * core::mem::size_of::<i32>()) };
-        buf[0] = read_fd as i32;
-        buf[1] = write_fd as i32;
+        let user_ptr = UserPtr::<u8>::new(pipe);
+        let buf_slice = user_ptr.as_slice_mut_checked(2).await?;
+        //? fd as u8 is right?
+        buf_slice[0] = read_fd as u8;
+        buf_slice[1] = write_fd as u8;
         info!("[sys_pipe]: read fd {}, write fd {}", read_fd, write_fd);
         Ok(0)
     }
@@ -79,7 +75,7 @@ impl Syscall<'_> {
             return Err(Errno::EBADF);
         }
 
-        fd_table.fill_to(new_fd);
+        fd_table.fill_to(new_fd)?;
         fd_table.copyfrom(old_fd, new_fd as usize)
     }
 
@@ -89,11 +85,11 @@ impl Syscall<'_> {
         let path = get_string_from_ptr(&ptr);
         info!("[sys_chdir] path: {}", path);
 
+        // check if the path is valid
         let split_path = path.split('/').collect::<Vec<&str>>();
         root_dentry().find_path(&split_path)?;
 
         let cwd = self.task.pcb().cwd.clone().from_cd(&"..");
-        debug!("[sys_chdir] cwd: {:?}", cwd);
 
         let mut pcb_guard = self.task.pcb();
         pcb_guard.cwd = cwd.from_cd(&path);
@@ -180,9 +176,10 @@ impl Syscall<'_> {
 
         // todo: INTERRUPT_BY_SIGNAL FUTURE
 
-        let buf_slice: &mut [u8] = unsafe { core::slice::from_raw_parts_mut(buf as *mut u8, len) };
+        let user_ptr = UserPtr::<u8>::new(buf);
+        let buf_slice = user_ptr.as_slice_mut_checked(len).await?;
 
-        if is_stdio(fd) {
+        if file.is_stdio() {
             let read_size = file.base_read(0, buf_slice).await?;
             return Ok(read_size as isize);
         }
@@ -191,8 +188,6 @@ impl Syscall<'_> {
             return Err(Errno::EINVAL);
         }
 
-        // todo: check lazy?
-        // check_mut_slice(buf as *mut u8, len);
         let read_size = file.read(buf_slice).await?;
 
         Ok(read_size as isize)
@@ -205,9 +200,10 @@ impl Syscall<'_> {
         let file = fd_table.get(fd).ok_or(Errno::EBADF)?;
         drop(fd_table);
 
-        let buf_slice: &mut [u8] = unsafe { core::slice::from_raw_parts_mut(buf as *mut u8, len) };
+        let user_ptr = UserPtr::<u8>::new(buf);
+        let buf_slice = user_ptr.as_slice_mut_checked(len).await?;
 
-        if is_stdio(fd) {
+        if file.is_stdio() {
             let write_size = file.base_write(0, buf_slice).await?;
             return Ok(write_size as isize);
         }
@@ -216,7 +212,6 @@ impl Syscall<'_> {
             return Err(Errno::EINVAL);
         }
 
-        // check_mut_slice(buf as *mut u8, len);
         let write_size = file.write(buf_slice).await?;
 
         Ok(write_size as isize)
@@ -271,8 +266,4 @@ impl Syscall<'_> {
         ptr.write_volatile(kstat);
         Ok(0)
     }
-}
-
-fn is_stdio(fd: usize) -> bool {
-    fd == STD_IN || fd == STD_OUT || fd == STD_ERR
 }

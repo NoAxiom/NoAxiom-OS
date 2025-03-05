@@ -38,10 +38,10 @@ impl<'a> Syscall<'a> {
                     .await
             }
             SYS_CHDIR => self.sys_chdir(args[0]),
-            SYS_GETCWD => self.sys_getcwd(args[0] as *mut u8, args[1]),
+            SYS_GETCWD => self.sys_getcwd(args[0], args[1]).await,
             SYS_DUP => self.sys_dup(args[0]),
             SYS_DUP3 => self.sys_dup3(args[0], args[1]),
-            SYS_PIPE2 => self.sys_pipe2(args[0] as *mut i32, args[1]),
+            SYS_PIPE2 => self.sys_pipe2(args[0], args[1]).await,
             SYS_FSTAT => self.sys_fstat(args[0], args[1]),
 
             // process

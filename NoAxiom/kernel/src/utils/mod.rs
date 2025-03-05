@@ -1,6 +1,7 @@
 //! utility functions
 
 mod crossover;
+pub mod symbol_table;
 
 use alloc::{string::String, vec::Vec};
 

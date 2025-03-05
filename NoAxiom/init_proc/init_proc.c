@@ -37,8 +37,13 @@ int run(char* str) {
 int main(void) {
     // test points def
     char* test_points[] = {
-        "test_echo",
-        "openat",
+        // "test_echo",
+        // "openat",
+        // "chdir",
+        // "close",
+        // "dup",
+        // "dup2",
+        "fstat",
     };
     int test_num = sizeof(test_points) / sizeof(char*);
     int cnt = 0, i;

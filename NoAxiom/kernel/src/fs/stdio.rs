@@ -22,6 +22,9 @@ impl Stdout {
 
 #[async_trait]
 impl File for Stdin {
+    fn is_stdio(&self) -> bool {
+        true
+    }
     fn meta(&self) -> &FileMeta {
         unreachable!()
     }
@@ -47,6 +50,9 @@ impl File for Stdin {
 
 #[async_trait]
 impl File for Stdout {
+    fn is_stdio(&self) -> bool {
+        true
+    }
     fn meta(&self) -> &FileMeta {
         unreachable!()
     }
