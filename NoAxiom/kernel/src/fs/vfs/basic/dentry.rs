@@ -10,7 +10,11 @@ use async_trait::async_trait;
 use downcast_rs::DowncastSync;
 type Mutex<T> = ksync::mutex::SpinLock<T>;
 
-use super::{file::File, inode::Inode, superblock::SuperBlock};
+use super::{
+    file::File,
+    inode::Inode,
+    superblock::{EmptySuperBlock, SuperBlock},
+};
 use crate::{
     fs::path::Path,
     include::{fs::InodeMode, result::Errno},
@@ -232,5 +236,41 @@ impl dyn Dentry {
         }
 
         current
+    }
+}
+
+pub struct EmptyDentry {
+    meta: DentryMeta,
+}
+
+impl EmptyDentry {
+    pub fn new() -> Self {
+        let super_block = Arc::new(EmptySuperBlock::new());
+        Self {
+            meta: DentryMeta::new(None, "", super_block),
+        }
+    }
+}
+
+#[async_trait]
+impl Dentry for EmptyDentry {
+    fn meta(&self) -> &DentryMeta {
+        &self.meta
+    }
+
+    fn open(self: Arc<Self>) -> Result<Arc<dyn File>, Errno> {
+        unreachable!()
+    }
+
+    fn from_name(self: Arc<Self>, _name: &str) -> Arc<dyn Dentry> {
+        unreachable!()
+    }
+
+    async fn create(
+        self: Arc<Self>,
+        _name: &str,
+        _mode: InodeMode,
+    ) -> Result<Arc<dyn Dentry>, Errno> {
+        unreachable!()
     }
 }

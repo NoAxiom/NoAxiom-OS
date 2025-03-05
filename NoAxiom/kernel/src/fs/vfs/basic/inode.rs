@@ -3,7 +3,10 @@ use alloc::{string::String, sync::Arc};
 use downcast_rs::{impl_downcast, DowncastSync};
 type Mutex<T> = ksync::mutex::SpinLock<T>;
 
-use super::{file::File, superblock::SuperBlock};
+use super::{
+    file::File,
+    superblock::{EmptySuperBlock, SuperBlock},
+};
 use crate::include::{
     fs::{InodeMode, Stat},
     result::Errno,
@@ -95,3 +98,27 @@ impl dyn Inode {
 }
 
 impl_downcast!(sync Inode);
+
+pub struct EmptyInode {
+    meta: InodeMeta,
+}
+
+impl EmptyInode {
+    pub fn new() -> Self {
+        let super_block = Arc::new(EmptySuperBlock::new());
+        let inode_mode = InodeMode::empty();
+        Self {
+            meta: InodeMeta::new(super_block, inode_mode, 0),
+        }
+    }
+}
+
+impl Inode for EmptyInode {
+    fn meta(&self) -> &InodeMeta {
+        &self.meta
+    }
+
+    fn stat(&self) -> Result<Stat, Errno> {
+        Ok(Stat::default())
+    }
+}

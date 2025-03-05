@@ -34,3 +34,32 @@ pub trait FileSystem: Send + Sync {
         device: Option<Arc<dyn BlockDevice>>,
     ) -> Arc<dyn Dentry>;
 }
+
+pub struct EmptyFileSystem {
+    meta: FileSystemMeta,
+}
+
+impl EmptyFileSystem {
+    pub fn new() -> Self {
+        Self {
+            meta: FileSystemMeta::new("EmptyFS"),
+        }
+    }
+}
+
+#[async_trait]
+impl FileSystem for EmptyFileSystem {
+    fn meta(&self) -> &FileSystemMeta {
+        &self.meta
+    }
+
+    async fn root(
+        self: Arc<Self>,
+        _parent: Option<Arc<dyn Dentry>>,
+        _flags: MountFlags,
+        _name: &str,
+        _device: Option<Arc<dyn BlockDevice>>,
+    ) -> Arc<dyn Dentry> {
+        unreachable!()
+    }
+}

@@ -45,7 +45,8 @@ impl FdTable {
         self.rlimt.rlim_cur
     }
 
-    /// Allocate a new fd slot
+    /// Allocate a new fd slot, if has empty slot, return the first empty slot,
+    /// you should use tht fd after alloc immediately
     pub fn alloc_fd(&mut self) -> SyscallResult {
         if let Some(fd) = self.table.iter().position(|x| x.is_none()) {
             return Ok(fd as isize);

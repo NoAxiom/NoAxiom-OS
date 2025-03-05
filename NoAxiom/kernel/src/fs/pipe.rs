@@ -25,8 +25,21 @@ use core::{
 use async_trait::async_trait;
 use ksync::mutex::SpinLock;
 
-use super::vfs::basic::file::{File, FileMeta};
-use crate::{config::fs::PIPE_BUF_SIZE, include::result::Errno, syscall::SyscallResult};
+use super::vfs::basic::{
+    dentry::EmptyDentry,
+    file::{File, FileMeta},
+    inode::InodeMeta,
+    superblock::EmptySuperBlock,
+};
+use crate::{
+    config::fs::PIPE_BUF_SIZE,
+    fs::vfs::basic::inode::Inode,
+    include::{
+        fs::{FileFlags, InodeMode, Stat},
+        result::Errno,
+    },
+    syscall::SyscallResult,
+};
 
 #[derive(PartialEq)]
 enum PipeBufferStatus {
@@ -165,12 +178,17 @@ impl PipeBuffer {
     /// Write `len` bytes as much as possible to the buffer, make sure
     /// buffer's size >= len, return the number of bytes read
     fn write(&mut self, buf: &[u8]) -> usize {
+        trace!(
+            "[PipeBuffer] write buf as string: {}",
+            alloc::string::String::from_utf8_lossy(buf)
+        );
         let len = buf.len();
         let res = match self.status {
-            PipeBufferStatus::Empty => 0,
+            PipeBufferStatus::Full => 0,
             _ => {
                 if self.head <= self.tail {
                     // maybe empty
+                    trace!("[PipeBuffer] write maybe empty");
                     let res = core::cmp::min(len, self.head + PIPE_BUF_SIZE - self.tail);
                     if res <= PIPE_BUF_SIZE - self.tail {
                         self.data[self.tail..self.tail + res].copy_from_slice(&buf[..res]);
@@ -181,6 +199,7 @@ impl PipeBuffer {
                     }
                     res
                 } else {
+                    debug!("[PipeBuffer] write normal");
                     let res = core::cmp::min(len, self.head - self.tail);
                     self.data[self.tail..self.tail + res].copy_from_slice(&buf[..res]);
                     res
@@ -197,38 +216,84 @@ impl PipeBuffer {
     }
 }
 
+pub struct PipeInode {
+    meta: InodeMeta,
+}
+
+impl PipeInode {
+    pub fn new() -> Self {
+        Self {
+            meta: InodeMeta::new(
+                Arc::new(EmptySuperBlock::new()),
+                InodeMode::FIFO,
+                PIPE_BUF_SIZE,
+            ),
+        }
+    }
+}
+
+impl Inode for PipeInode {
+    fn meta(&self) -> &InodeMeta {
+        &self.meta
+    }
+    fn stat(&self) -> Result<Stat, Errno> {
+        let inner = self.meta.inner.lock();
+        Ok(Stat {
+            st_dev: 0,
+            st_ino: self.meta.id as u64,
+            st_mode: self.meta.inode_mode.bits(),
+            st_nlink: 1,
+            st_uid: 0,
+            st_gid: 0,
+            st_rdev: 0,
+            __pad: 0,
+            st_size: inner.size as u64,
+            st_blksize: 0,
+            __pad2: 0,
+            st_blocks: 0 as u64,
+            st_atime_sec: inner.atime_sec as u64,
+            st_atime_nsec: inner.atime_nsec as u64,
+            st_mtime_sec: inner.mtime_sec as u64,
+            st_mtime_nsec: inner.mtime_nsec as u64,
+            st_ctime_sec: inner.ctime_sec as u64,
+            st_ctime_nsec: inner.ctime_nsec as u64,
+            unused: 0,
+        })
+    }
+}
+
 pub struct PipeFile {
-    read_end: bool,
-    write_end: bool,
     buffer: Arc<SpinLock<PipeBuffer>>,
+    meta: FileMeta,
 }
 
 impl PipeFile {
-    fn new_read_end(buffer: Arc<SpinLock<PipeBuffer>>) -> Self {
-        Self {
-            read_end: true,
-            write_end: false,
-            buffer,
-        }
+    pub fn into_dyn(self: Arc<Self>) -> Arc<dyn File> {
+        self.clone()
     }
-    fn new_write_end(buffer: Arc<SpinLock<PipeBuffer>>) -> Self {
-        Self {
-            read_end: false,
-            write_end: true,
-            buffer,
-        }
+    fn new_read_end(buffer: Arc<SpinLock<PipeBuffer>>) -> Arc<Self> {
+        let meta = FileMeta::new(Arc::new(EmptyDentry::new()), Arc::new(PipeInode::new()));
+        let res = Arc::new(Self { buffer, meta });
+        res.clone().into_dyn().set_flags(FileFlags::O_RDONLY);
+        res
+    }
+    fn new_write_end(buffer: Arc<SpinLock<PipeBuffer>>) -> Arc<Self> {
+        let meta = FileMeta::new(Arc::new(EmptyDentry::new()), Arc::new(PipeInode::new()));
+        let res = Arc::new(Self { buffer, meta });
+        res.clone().into_dyn().set_flags(FileFlags::O_WRONLY);
+        res
     }
     fn is_read_end(&self) -> bool {
-        self.read_end
+        self.meta.readable()
     }
     fn is_write_end(&self) -> bool {
-        self.write_end
+        self.meta.writable()
     }
     /// Create a new pipe, return (read end, write end)
     pub fn new_pipe() -> (Arc<Self>, Arc<Self>) {
         let buffer = Arc::new(SpinLock::new(PipeBuffer::new()));
-        let read_end = Arc::new(Self::new_read_end(buffer.clone()));
-        let write_end = Arc::new(Self::new_write_end(buffer.clone()));
+        let read_end = Self::new_read_end(buffer.clone());
+        let write_end = Self::new_write_end(buffer.clone());
         let read_end_weak = Arc::downgrade(&read_end);
         let write_end_weak = Arc::downgrade(&write_end);
         buffer.lock().set_read_end(read_end_weak);
@@ -240,7 +305,7 @@ impl PipeFile {
 #[async_trait]
 impl File for PipeFile {
     fn meta(&self) -> &FileMeta {
-        todo!()
+        &self.meta
     }
     async fn base_read(&self, _offset: usize, buf: &mut [u8]) -> SyscallResult {
         assert!(self.is_read_end());
@@ -251,11 +316,19 @@ impl File for PipeFile {
         buffer.notify_write_wakers();
         Ok(ret as isize)
     }
-    async fn base_write(&self, offset: usize, buf: &[u8]) -> SyscallResult {
+    async fn base_write(&self, _offset: usize, buf: &[u8]) -> SyscallResult {
         assert!(self.is_write_end());
         let len = buf.len();
+        trace!(
+            "[PipeWriteFile] buf as string: {}",
+            alloc::string::String::from_utf8_lossy(buf)
+        );
         PipeWriteFuture::new(self.buffer.clone(), len).await?;
-        Ok(self.buffer.lock().write(buf) as isize)
+        let mut buffer = self.buffer.lock();
+        let ret = buffer.write(buf);
+        trace!("[PipeWriteFile] write {} bytes", ret);
+        buffer.notify_read_wakers();
+        Ok(ret as isize)
     }
     async fn load_dir(&self) -> Result<(), Errno> {
         unreachable!()
@@ -314,10 +387,13 @@ impl Future for PipeWriteFuture {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut buffer = self.pipe_buffer.lock();
         if buffer.has_readend() {
+            trace!("[PipeWriteFile] has read end");
             // only continue if it can be written
             if self.len <= buffer.write_available() {
+                trace!("[PipeWriteFile] write available");
                 Poll::Ready(Ok(0))
             } else {
+                trace!("[PipeWriteFile] write pending, save waker");
                 // ? will add multiple wakers?
                 buffer.add_write_event(self.len, cx.waker().clone());
                 Poll::Pending

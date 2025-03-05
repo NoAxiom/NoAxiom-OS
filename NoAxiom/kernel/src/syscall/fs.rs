@@ -1,8 +1,8 @@
-use alloc::vec::Vec;
+use alloc::{string::String, vec::Vec};
 
 use super::{Syscall, SyscallResult};
 use crate::{
-    constant::fs::{AT_FDCWD, STD_ERR, STD_IN, STD_OUT},
+    constant::fs::AT_FDCWD,
     fs::{path::Path, pipe::PipeFile, vfs::root_dentry},
     include::{
         fs::{FileFlags, InodeMode, Kstat},
@@ -38,18 +38,23 @@ impl Syscall<'_> {
     pub async fn sys_pipe2(&self, pipe: usize, _flag: usize) -> SyscallResult {
         let (read_end, write_end) = PipeFile::new_pipe();
 
+        let user_ptr = UserPtr::<u8>::new(pipe);
+        // let buf_slice = user_ptr.as_slice_mut_checked(8).await?;
+        let buf_slice = unsafe {
+            core::slice::from_raw_parts_mut(pipe as *mut i32, 2 * core::mem::size_of::<i32>())
+        };
+
+        //? fd as u8 is right?
         let mut fd_table = self.task.fd_table();
         let read_fd = fd_table.alloc_fd()?;
-        let write_fd = fd_table.alloc_fd()?;
         fd_table.set(read_fd as usize, read_end);
-        fd_table.set(write_fd as usize, write_end);
+        buf_slice[0] = read_fd as i32;
 
-        let user_ptr = UserPtr::<u8>::new(pipe);
-        let buf_slice = user_ptr.as_slice_mut_checked(2).await?;
-        //? fd as u8 is right?
-        buf_slice[0] = read_fd as u8;
-        buf_slice[1] = write_fd as u8;
-        info!("[sys_pipe]: read fd {}, write fd {}", read_fd, write_fd);
+        let write_fd = fd_table.alloc_fd()?;
+        fd_table.set(write_fd as usize, write_end);
+        buf_slice[1] = write_fd as i32;
+
+        debug!("[sys_pipe]: read fd {}, write fd {}", read_fd, write_fd);
         Ok(0)
     }
 
@@ -169,29 +174,32 @@ impl Syscall<'_> {
     ///     - file_remain_size == 0: 0, which means EOF
     /// 3. fd is closed: -1
     pub async fn sys_read(&self, fd: usize, buf: usize, len: usize) -> SyscallResult {
-        info!("[sys_read] fd: {}, buf: {:?}, len: {}", fd, buf, len);
+        trace!("[sys_read] fd: {}, buf: {:?}, len: {}", fd, buf, len);
         let fd_table = self.task.fd_table();
         let file = fd_table.get(fd).ok_or(Errno::EBADF)?;
         drop(fd_table);
 
         // todo: INTERRUPT_BY_SIGNAL FUTURE
 
+        // debug!("HERE1");
         let user_ptr = UserPtr::<u8>::new(buf);
         let buf_slice = user_ptr.as_slice_mut_checked(len).await?;
 
+        // debug!("HERE2");
         if file.is_stdio() {
             let read_size = file.base_read(0, buf_slice).await?;
             return Ok(read_size as isize);
         }
 
+        // debug!("HERE3");
         if !file.meta().readable() {
             return Err(Errno::EINVAL);
         }
 
-        debug!("HERE1");
+        // debug!("HERE4");
         let read_size = file.read(buf_slice).await?;
-        debug!("HERE2");
 
+        // debug!("HERE5");
         Ok(read_size as isize)
     }
 
@@ -205,15 +213,22 @@ impl Syscall<'_> {
         let user_ptr = UserPtr::<u8>::new(buf);
         let buf_slice = user_ptr.as_slice_mut_checked(len).await?;
 
+        // debug!(
+        //     "[sys_write] buf as string: {}",
+        //     String::from_utf8_lossy(buf_slice)
+        // );
+
         if file.is_stdio() {
             let write_size = file.base_write(0, buf_slice).await?;
             return Ok(write_size as isize);
         }
 
+        // debug!("write HERE1");
         if !file.meta().writable() {
             return Err(Errno::EINVAL);
         }
 
+        // debug!("write HERE2");
         let write_size = file.write(buf_slice).await?;
 
         Ok(write_size as isize)

@@ -8,7 +8,10 @@ type Mutex<T> = ksync::mutex::SpinLock<T>;
 
 use core::sync::atomic::Ordering;
 
-use super::{dentry::Dentry, inode::Inode};
+use super::{
+    dentry::{self, Dentry},
+    inode::{self, Inode},
+};
 use crate::{
     include::{fs::FileFlags, result::Errno},
     syscall::SyscallResult,
@@ -109,5 +112,35 @@ impl dyn File {
     }
     pub fn inode(&self) -> Arc<dyn Inode> {
         self.meta().inode.clone()
+    }
+}
+
+pub struct EmptyFile {
+    meta: FileMeta,
+}
+
+impl EmptyFile {
+    pub fn new() -> Self {
+        let dentry = Arc::new(dentry::EmptyDentry::new());
+        let inode = Arc::new(inode::EmptyInode::new());
+        Self {
+            meta: FileMeta::new(dentry, inode),
+        }
+    }
+}
+
+#[async_trait]
+impl File for EmptyFile {
+    fn meta(&self) -> &FileMeta {
+        &self.meta
+    }
+    async fn base_read(&self, _offset: usize, _buf: &mut [u8]) -> SyscallResult {
+        unreachable!()
+    }
+    async fn base_write(&self, _offset: usize, _buf: &[u8]) -> SyscallResult {
+        unreachable!()
+    }
+    async fn load_dir(&self) -> Result<(), Errno> {
+        unreachable!()
     }
 }

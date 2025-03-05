@@ -2,7 +2,10 @@ use alloc::sync::{Arc, Weak};
 
 use ksync::Once;
 
-use super::{dentry::Dentry, filesystem::FileSystem};
+use super::{
+    dentry::Dentry,
+    filesystem::{EmptyFileSystem, FileSystem},
+};
 use crate::device::block::BlockDevice;
 
 /// stand for file system
@@ -27,4 +30,26 @@ impl SuperBlockMeta {
 
 pub trait SuperBlock: Send + Sync {
     fn meta(&self) -> &SuperBlockMeta;
+}
+
+pub struct EmptySuperBlock {
+    meta: SuperBlockMeta,
+}
+
+impl EmptySuperBlock {
+    pub fn new() -> Self {
+        Self {
+            meta: SuperBlockMeta {
+                device: None,
+                file_system: Arc::new(EmptyFileSystem::new()),
+                root: Once::new(),
+            },
+        }
+    }
+}
+
+impl SuperBlock for EmptySuperBlock {
+    fn meta(&self) -> &SuperBlockMeta {
+        &self.meta
+    }
 }
