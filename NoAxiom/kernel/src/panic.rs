@@ -14,7 +14,7 @@ lazy_static::lazy_static! {
 fn panic(info: &PanicInfo) -> ! {
     if let Some(location) = info.location() {
         println!(
-            "[panic, HART {}] panicked at {}:{} {}",
+            "[panic, HART{}] panicked at {}:{} {}",
             get_hartid(),
             location.file(),
             location.line(),
@@ -22,7 +22,7 @@ fn panic(info: &PanicInfo) -> ! {
         );
     } else {
         println!(
-            "[panic (no_detail), HART {}] panicked: {}",
+            "[panic (no_detail), HART{}] panicked: {}",
             get_hartid(),
             info.message().unwrap()
         );

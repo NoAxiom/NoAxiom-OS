@@ -103,10 +103,7 @@ impl Syscall<'_> {
             }
             PidSel::Task(Some(pid)) => {
                 if let Some(task) = children.iter().find(|task| task.tid() == pid).cloned() {
-                    task.is_zombie().then(|| task).or_else(|| {
-                        error!("[sys_wait4] task {} not found", pid);
-                        None
-                    })
+                    task.is_zombie().then(|| task).or_else(|| None)
                 } else {
                     return_errno!(Errno::ECHILD);
                 }
