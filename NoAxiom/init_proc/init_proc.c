@@ -2,6 +2,7 @@
 #include "stdio.h"
 #include "stdlib.h"
 #include "string.h"
+#include "test_points.h"
 #include "unistd.h"
 
 void run_existed_tests() {
@@ -35,20 +36,6 @@ int run(char* str) {
 }
 
 int main(void) {
-    // test points def
-    char* test_points[] = {
-        // ----- fs syscall -----
-        // "test_echo",
-        // "open",
-        // "openat",
-        // "chdir",
-        // "close",
-        // "dup",
-        // "dup2",
-        "fstat",
-        // "mkdir_",
-        // "getcwd",
-    };
     int test_num = sizeof(test_points) / sizeof(char*);
     int cnt = 0, i;
     // start test

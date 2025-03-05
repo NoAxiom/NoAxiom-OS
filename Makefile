@@ -73,9 +73,11 @@ TEST_FLAGS += CHAPTER=7
 
 test:
 	@rm -f $(TEST_DIR)/src/oscomp/init_proc.c
+	@rm -f $(TEST_DIR)/src/oscomp/test_points.h
 	@rm -f $(TEST_DIR)/src/oscomp/init_proc.h
 	@cp $(PROJECT)/init_proc/init_proc.c $(TEST_DIR)/src/oscomp/init_proc.c
 	@cp $(PROJECT)/init_proc/init_proc.h $(TEST_DIR)/src/oscomp/init_proc.h
+	@cp $(PROJECT)/init_proc/test_points.h $(TEST_DIR)/src/oscomp/test_points.h
 	@cd $(TEST_DIR) && make clean
 	-@cd $(TEST_DIR) && make $(TEST_FLAGS)
 	$(MKFS_SH);
@@ -127,7 +129,6 @@ sbi-qemu:
 	@cp $(SBI) sbi-qemu
 
 run: sbi-qemu
-	python3 generate_symbol_table.py
 	@cp $(KERNEL_BIN) kernel-qemu
 	qemu-system-riscv64 $(QFLAGS)
 # rm -f $(SDCARD_BAK)

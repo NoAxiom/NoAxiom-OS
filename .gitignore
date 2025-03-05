@@ -11,3 +11,4 @@ log/
 .vscode-ctags
 NoAxiom/user/bin/
 test/
+NoAxiom/init_proc/test_points.h
