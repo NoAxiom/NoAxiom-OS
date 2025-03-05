@@ -1,10 +1,6 @@
 use alloc::{string::ToString, vec::Vec};
 
-use crate::{
-    config::fs::INIT_PROC_PATH,
-    fs::path::{self, Path},
-    sched::task::schedule_spawn_new_process,
-};
+use crate::{config::fs::INIT_PROC_PATH, fs::path::Path, sched::spawn::schedule_spawn_new_process};
 
 /// spawn all apps, only used in debug
 #[allow(unused)]

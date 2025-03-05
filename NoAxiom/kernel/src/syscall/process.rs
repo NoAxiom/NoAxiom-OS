@@ -9,7 +9,7 @@ use crate::{
     },
     mm::user_ptr::UserPtr,
     return_errno,
-    sched::{task::spawn_utask, utils::suspend_now},
+    sched::{spawn::spawn_utask, utils::suspend_now},
     task::manager::TASK_MANAGER,
 };
 

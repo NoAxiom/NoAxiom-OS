@@ -1,7 +1,3 @@
-//! ## task future
-//! [`UserTaskFuture`] represents a user task future,
-//! use [`spawn_utask`] to spawn user tasks
-
 use alloc::sync::Arc;
 use core::{
     future::Future,
@@ -9,23 +5,17 @@ use core::{
     task::{Context, Poll},
 };
 
-use super::{
-    executor::spawn_raw,
-    sched_entity::{SchedEntity, SchedTaskInfo},
-    task_counter::{task_count_dec, task_count_inc},
-    utils::take_waker,
-};
 use crate::{
     cpu::current_cpu,
-    fs::path::Path,
+    sched::{task_counter::task_count_dec, utils::take_waker},
     task::{exit::exit_handler, Task},
     time::gettime::get_time_us,
     trap::{trap_restore, user_trap_handler},
 };
 
 pub struct UserTaskFuture<F: Future + Send + 'static> {
-    task: Arc<Task>,
-    future: F,
+    pub task: Arc<Task>,
+    pub future: F,
 }
 
 impl<F: Future + Send + 'static> UserTaskFuture<F> {
@@ -55,42 +45,6 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
         );
         ret
     }
-}
-
-/// inner spawn: spawn a new user task
-fn inner_spawn(task: Arc<Task>) {
-    spawn_raw(
-        UserTaskFuture::new(task.clone(), task_main(task.clone())),
-        task.sched_entity.ref_clone(),
-        Some(SchedTaskInfo { task: Arc::downgrade(&task) }),
-    );
-}
-
-/// schedule to allocate resouces and spawn task
-pub fn schedule_spawn_new_process(path: Path) {
-    task_count_inc();
-    spawn_raw(
-        async move {
-            let task = Task::new_process(path).await;
-            inner_spawn(task);
-        },
-        SchedEntity::new_bare(),
-        None,
-    );
-}
-
-pub fn spawn_utask(task: Arc<Task>) {
-    task_count_inc();
-    inner_spawn(task);
-}
-
-#[allow(unused)]
-pub fn spawn_ktask<F, R>(future: F)
-where
-    F: Future<Output = R> + Send + 'static,
-    R: Send + 'static,
-{
-    spawn_raw(future, SchedEntity::new_bare(), None);
 }
 
 /// user task main

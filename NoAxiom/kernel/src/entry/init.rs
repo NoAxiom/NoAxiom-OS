@@ -6,10 +6,7 @@ use crate::{
     cpu::get_hartid,
     device::init::device_init,
     driver::log::log_init,
-    entry::{
-        boot::_entry_other_hart,
-        init_proc::{schedule_spawn_all_apps, schedule_spawn_initproc},
-    },
+    entry::{boot::_entry_other_hart, init_proc::schedule_spawn_initproc},
     fs::fs_init,
     mm::{bss::bss_init, frame::frame_init, hart_mm_init, heap::heap_init},
     platform::{
@@ -86,7 +83,7 @@ pub fn boot_hart_init(_: usize, dtb: usize) {
     block_on(fs_init());
 
     // spawn init_proc and wake other harts
-    // schedule_spawn_all_apps();
+    // entry::init_proc::schedule_spawn_all_apps();
     schedule_spawn_initproc();
     wake_other_hart(get_hartid());
 
