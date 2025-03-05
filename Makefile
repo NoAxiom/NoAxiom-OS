@@ -84,7 +84,8 @@ test:
 
 build_kernel:
 	@if [ $(PROJECT)/init_proc/init_proc.c -nt $(TEST_DIR)/src/oscomp/init_proc.c ] \
-	|| [ $(PROJECT)/init_proc/init_proc.h -nt $(TEST_DIR)/src/oscomp/init_proc.h ]; then \
+	|| [ $(PROJECT)/init_proc/init_proc.h -nt $(TEST_DIR)/src/oscomp/init_proc.h ] \
+	|| [ $(PROJECT)/init_proc/test_points.h -nt $(TEST_DIR)/src/oscomp/test_points.h ]; then \
 		make test; \
 	fi
 	@cd $(PROJECT)/kernel && make build
