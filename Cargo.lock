@@ -431,7 +431,6 @@ dependencies = [
  "rand_core",
  "ringbuffer",
  "riscv",
- "sbi-rt",
  "smoltcp",
  "spin 0.7.1",
  "thiserror-core",

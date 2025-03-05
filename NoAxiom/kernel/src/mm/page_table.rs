@@ -118,11 +118,9 @@ impl PageTable {
     /// unmap a vpn
     pub fn unmap(&mut self, vpn: VirtPageNum) {
         let pte = self.find_pte(vpn).unwrap();
-        assert!(
-            pte.flags().is_valid(),
-            "{:?} is invalid before unmapping",
-            vpn
-        );
+        if !pte.flags().is_valid() {
+            error!("{:?} is invalid before unmapping", vpn);
+        }
         pte.reset();
     }
 
@@ -198,10 +196,6 @@ pub fn current_token() -> usize {
     let satp: usize;
     unsafe { asm!("csrr {}, satp", out(reg) satp) }
     satp
-}
-
-pub fn current_root_ppn() -> PhysPageNum {
-    PhysPageNum::from(current_token() & PPN_MASK)
 }
 
 /// translate the vpn into PTE entry (sv39)

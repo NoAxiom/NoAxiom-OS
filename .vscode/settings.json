@@ -73,6 +73,7 @@
     "unistd.h": "c",
     "stdio.h": "c",
     "stdlib.h": "c",
-    "init_proc.h": "c"
+    "init_proc.h": "c",
+    "string.h": "c"
   }
 }

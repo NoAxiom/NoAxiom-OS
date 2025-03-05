@@ -7,7 +7,7 @@ use alloc::{string::String, vec::Vec};
 use crossover::{Crossover, CrossoverManager};
 
 use crate::{
-    config::mm::{KERNEL_ADDR_OFFSET, KERNEL_PAGENUM_MASK, MMAP_BASE_ADDR, MMAP_MAX_END_ADDR},
+    config::mm::{KERNEL_ADDR_OFFSET, KERNEL_PAGENUM_MASK},
     mm::user_ptr::UserPtr,
 };
 

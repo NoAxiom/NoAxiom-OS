@@ -1,6 +1,8 @@
 //! panic for no_std
 
-use core::{arch::asm, panic::PanicInfo, ptr};
+use core::panic::PanicInfo;
+
+use arch::{Arch, ArchSbi};
 
 use crate::cpu::get_hartid;
 
@@ -25,5 +27,5 @@ fn panic(info: &PanicInfo) -> ! {
             info.message().unwrap()
         );
     }
-    sbi_rt::legacy::shutdown()
+    Arch::shutdown()
 }

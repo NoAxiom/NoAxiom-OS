@@ -1,37 +1,53 @@
 {
-    "version": "0.2.0",
-    "configurations": [
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "cppdbg",
+      "request": "launch",
+      "name": "Debug RISC-V",
+      "program": "${workspaceFolder}/target/riscv64gc-unknown-none-elf/release/kernel",
+      "cwd": "${workspaceFolder}/NoAxiom/kernel",
+      "stopAtEntry": true,
+      "environment": [],
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "setupCommands": [
         {
-            "type": "cppdbg",
-            "request": "launch",
-            "name": "Debug RISC-V",
-            "program": "${workspaceFolder}/target/riscv64gc-unknown-none-elf/release/kernel",
-            "cwd": "${workspaceFolder}/NoAxiom/kernel",
-            "stopAtEntry": true,
-            "environment": [],
-            "externalConsole": false,
-            "MIMode": "gdb",
-            "setupCommands": [
-                {
-                    "description": "Enable pretty-printing for gdb",
-                    "text": "-enable-pretty-printing",
-                    "ignoreFailures": true
-                },
-                {
-                    "description": "Set architecture to riscv:rv64",
-                    "text": "set arch riscv:rv64",
-                    "ignoreFailures": false
-                },
-                // {
-                //     "description": "Set remote working directory",
-                //     "text": "file ${workspaceFolder}/target/riscv64gc-unknown-none-elf/release/kernel.bin",
-                //     "ignoreFailures": false
-                // },
-            ],
-            "miDebuggerServerAddress": "localhost:1234",
-            "miDebuggerPath": "${workspaceFolder}/NoAxiom/toolchain/riscv64-unknown-elf-gdb",
-            "args": ["-ex 'file target/riscv64gc-unknown-none-elf/release/kernel.bin'"], 
-            "preLaunchTask": "qemu",
+          "description": "Enable pretty-printing for gdb",
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": true
+        },
+        {
+          "description": "Set architecture to riscv:rv64",
+          "text": "set arch riscv:rv64",
+          "ignoreFailures": false
         }
-    ]
+      ],
+      "miDebuggerServerAddress": "localhost:1234",
+      "miDebuggerPath": "${workspaceFolder}/NoAxiom/toolchain/riscv64-unknown-elf-gdb",
+      "args": [
+        "-ex 'file target/riscv64gc-unknown-none-elf/release/kernel.bin'"
+      ],
+      "preLaunchTask": "qemu"
+    },
+    {
+      "name": "C/C++ Runner: Debug Session",
+      "type": "cppdbg",
+      "request": "launch",
+      "args": [],
+      "stopAtEntry": false,
+      "externalConsole": false,
+      "cwd": "/home/crpboy/os/NoAxiom-OS/NoAxiom/init_proc",
+      "program": "/home/crpboy/os/NoAxiom-OS/NoAxiom/init_proc/build/Debug/outDebug",
+      "MIMode": "gdb",
+      "miDebuggerPath": "gdb",
+      "setupCommands": [
+        {
+          "description": "Enable pretty-printing for gdb",
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": true
+        }
+      ]
+    }
+  ]
 }
