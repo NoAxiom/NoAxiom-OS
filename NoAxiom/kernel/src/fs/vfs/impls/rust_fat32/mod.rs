@@ -1,7 +1,7 @@
 use disk_cursor::DiskCursor;
 use fatfs::{DefaultTimeProvider, Dir, Error, File, FileSystem, LossyOemCpConverter};
 
-use crate::include::result::Errno;
+use crate::{include::result::Errno, syscall::SyscallResult};
 
 pub mod dentry;
 mod disk_cursor;

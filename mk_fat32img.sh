@@ -37,6 +37,14 @@ else
     echo -e $WARN "\t Warning: mnt folder not found in $elf_path"$RESET
 fi
 
+# 复制 text.txt 文件到 fs 目录
+if [ -f "$elf_path/text.txt" ]; then
+    sudo cp "$elf_path/text.txt" "$img_dir/"
+    echo -e $NORMAL "\t load: $elf_path/text.txt"$RESET
+else
+    echo -e $WARN "\t Warning: text.txt not found in $elf_path"$RESET
+fi
+
 echo -e $NORMAL"Making file system completed. "$RESET
 
 sleep 0.1 # what?

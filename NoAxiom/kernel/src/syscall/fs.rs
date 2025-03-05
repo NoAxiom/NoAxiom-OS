@@ -188,7 +188,9 @@ impl Syscall<'_> {
             return Err(Errno::EINVAL);
         }
 
+        debug!("HERE1");
         let read_size = file.read(buf_slice).await?;
+        debug!("HERE2");
 
         Ok(read_size as isize)
     }
