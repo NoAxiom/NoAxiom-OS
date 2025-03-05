@@ -3,17 +3,20 @@ use alloc::{boxed::Box, sync::Arc};
 use async_trait::async_trait;
 use fatfs::*;
 
-use crate::{config::fs::BLOCK_SIZE, device::block::BlockDevice};
+use crate::{
+    config::fs::BLOCK_SIZE,
+    fs::blockcache::{AsyncBlockCache, CacheData},
+};
 
 #[derive(Clone)]
 pub struct DiskCursor {
-    blk: Arc<dyn BlockDevice>,
+    blk: Arc<AsyncBlockCache<CacheData>>,
     blk_id: usize,
     offset: usize,
 }
 
 impl DiskCursor {
-    pub fn new(blk: Arc<dyn BlockDevice>, blk_id: usize, offset: usize) -> Self {
+    pub fn new(blk: Arc<AsyncBlockCache<CacheData>>, blk_id: usize, offset: usize) -> Self {
         Self {
             blk,
             blk_id,
@@ -72,8 +75,7 @@ impl Read for DiskCursor {
     /// `IoError::is_interrupted` returns true is non-fatal and the read
     /// operation should be retried if there is nothing else to do.
     async fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
-        let mut data = [0; BLOCK_SIZE];
-        self.blk.read(self.blk_id, &mut data).await;
+        let data = self.blk.read_sector(self.blk_id).await.read().data;
         let read_size = (BLOCK_SIZE - self.offset).min(buf.len());
         buf[..read_size].copy_from_slice(&data[self.offset..self.offset + read_size]);
         self.move_cursor(read_size);
@@ -96,11 +98,10 @@ impl Write for DiskCursor {
     /// It is not considered an error if the entire buffer could not be written
     /// to this writer.
     async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
-        let mut data = [0; BLOCK_SIZE];
-        self.blk.read(self.blk_id as usize, &mut data).await;
+        let mut data = self.blk.read_sector(self.blk_id).await.read().data;
         let write_size = (BLOCK_SIZE - self.offset).min(buf.len());
         data[self.offset..self.offset + write_size].copy_from_slice(&buf[..write_size]);
-        self.blk.write(self.blk_id as usize, &data).await;
+        self.blk.write_sector(self.blk_id as usize, &data).await;
         self.move_cursor(write_size);
         Ok(write_size)
     }

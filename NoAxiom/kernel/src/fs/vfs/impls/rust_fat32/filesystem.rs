@@ -8,10 +8,13 @@ use super::{
 };
 use crate::{
     device::block::BlockDevice,
-    fs::vfs::basic::{
-        dentry::Dentry,
-        filesystem::{FileSystem, FileSystemMeta},
-        superblock::SuperBlockMeta,
+    fs::{
+        blockcache::AsyncBlockCache,
+        vfs::basic::{
+            dentry::Dentry,
+            filesystem::{FileSystem, FileSystemMeta},
+            superblock::SuperBlockMeta,
+        },
     },
     include::fs::MountFlags,
 };
@@ -42,9 +45,10 @@ impl FileSystem for AsyncSmpFat32 {
         device: Option<Arc<dyn BlockDevice>>,
     ) -> Arc<dyn Dentry> {
         let super_block_meta = SuperBlockMeta::new(device.clone(), self.clone());
+        let blk = AsyncBlockCache::from(device.unwrap());
         let unbooted_fs = Arc::new(
             IFatFs::new(
-                DiskCursor::new(device.unwrap(), 0, 0),
+                DiskCursor::new(Arc::new(blk), 0, 0),
                 fatfs::FsOptions::new(),
             )
             .await
