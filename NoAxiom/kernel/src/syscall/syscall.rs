@@ -72,6 +72,7 @@ impl<'a> Syscall<'a> {
             // unsupported: return -1
             _ => {
                 error!("unsupported syscall id: {}, args: {:?}", id, args);
+                let _ = self.sys_exit(Errno::ENOSYS as usize);
                 Err(Errno::ENOSYS)
             }
         }
