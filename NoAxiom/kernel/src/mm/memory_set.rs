@@ -70,18 +70,17 @@ pub struct MemorySet {
 
     /// map_areas tracks user data
     pub areas: Vec<MapArea>,
-
     /// user stack area, lazily allocated
     pub user_stack_area: MapArea,
-
     /// user heap area, lazily allocated
-    pub user_heap_area: MapArea,
+    pub user_brk_area: MapArea,
 
     /// user stack base address
     pub user_stack_base: usize,
-
-    /// user heap base address, used brk
-    pub user_heap_base: usize,
+    /// user heap base address
+    pub user_brk_start: usize,
+    /// user heap end address
+    pub user_brk: usize,
 
     /// mmap manager
     pub mmap_manager: MmapManager,
@@ -98,9 +97,10 @@ impl MemorySet {
             page_table: SyncUnsafeCell::new(page_table),
             areas: Vec::new(),
             user_stack_area: MapArea::new_bare(),
-            user_heap_area: MapArea::new_bare(),
+            user_brk_area: MapArea::new_bare(),
             user_stack_base: 0,
-            user_heap_base: 0,
+            user_brk_start: 0,
+            user_brk: 0,
             mmap_manager: MmapManager::new_bare(),
         }
     }
@@ -220,13 +220,14 @@ impl MemorySet {
             map_permission!(U, R, W),
             MapAreaType::UserStack,
         );
-        map_area.map_each(self.page_table());
+        // map_area.map_each(self.page_table());
         self.user_stack_area = map_area;
     }
 
     /// map user_heap_area lazily
     pub fn map_user_heap(&mut self, start: usize, end: usize) {
-        self.user_heap_base = start;
+        self.user_brk_start = start;
+        self.user_brk = end;
         let map_area = MapArea::new(
             start.into(),
             end.into(),
@@ -234,8 +235,7 @@ impl MemorySet {
             map_permission!(U, R, W),
             MapAreaType::UserHeap,
         );
-        // map_area.map_each(self.page_table());
-        self.user_heap_area = map_area;
+        self.user_brk_area = map_area;
     }
 
     pub fn load_dl_interp(&mut self, elf: &Arc<dyn File>) -> Option<usize> {
@@ -304,7 +304,7 @@ impl MemorySet {
 
         // user heap
         let user_heap_base: usize = user_stack_end + PAGE_SIZE;
-        let user_heap_end: usize = user_heap_base + USER_HEAP_SIZE; // TODO: inc size
+        let user_heap_end: usize = user_heap_base;
         memory_set.map_user_heap(user_heap_base, user_heap_end);
         info!(
             "[memory_set] user heap mapped! [{:#x}, {:#x})",
@@ -404,10 +404,10 @@ impl MemorySet {
         // heap
         trace!(
             "mapping heap as cow, range: [{:#x}, {:#x})",
-            self.user_heap_base,
-            self.user_heap_base + USER_HEAP_SIZE,
+            self.user_brk_start,
+            self.user_brk_start + USER_HEAP_SIZE,
         );
-        let area = &self.user_heap_area;
+        let area = &self.user_brk_area;
         let mut new_area = MapArea::from_another(area);
         for vpn in area.vpn_range {
             trace!(
@@ -423,7 +423,7 @@ impl MemorySet {
                 remap_cow(vpn, &mut new_set, &mut new_area, frame_tracker);
             }
         }
-        new_set.user_heap_area = new_area;
+        new_set.user_brk_area = new_area;
 
         new_set
     }
@@ -434,10 +434,16 @@ impl MemorySet {
         Arch::tlb_flush();
     }
 
-    pub fn lazy_alloc_heap(&mut self, vpn: VirtPageNum) {
-        self.user_heap_area
+    pub fn lazy_alloc_brk(&mut self, vpn: VirtPageNum) {
+        self.user_brk_area
             .map_one(vpn, unsafe { &mut (*self.page_table.get()) });
         Arch::tlb_flush();
+    }
+
+    pub fn brk_grow(&mut self, new_brk_vpn: VirtPageNum) {
+        self.user_brk_area
+            .change_end_vpn(new_brk_vpn, unsafe { &mut (*self.page_table.get()) });
+        // tlb is already flushed in `modify_end`
     }
 
     pub fn realloc_cow(&mut self, vpn: VirtPageNum, pte: PageTableEntry) {
@@ -461,8 +467,8 @@ impl MemorySet {
             if !flag {
                 if self.user_stack_area.vpn_range.is_in_range(vpn) {
                     self.user_stack_area.frame_map.insert(vpn, frame.clone());
-                } else if self.user_heap_area.vpn_range.is_in_range(vpn) {
-                    self.user_heap_area.frame_map.insert(vpn, frame.clone());
+                } else if self.user_brk_area.vpn_range.is_in_range(vpn) {
+                    self.user_brk_area.frame_map.insert(vpn, frame.clone());
                 } else {
                     panic!("[realloc_cow] vpn is not in any area!!!");
                 }
@@ -528,9 +534,9 @@ impl MemorySet {
                 info!("[memory_validate] realloc stack");
                 self.lazy_alloc_stack(vpn);
                 Ok(())
-            } else if self.user_heap_area.vpn_range.is_in_range(vpn) {
+            } else if self.user_brk_area.vpn_range.is_in_range(vpn) {
                 info!("[memory_validate] realloc heap");
-                self.lazy_alloc_heap(vpn);
+                self.lazy_alloc_brk(vpn);
                 Ok(())
             } else if self.mmap_manager.is_in_space(vpn) {
                 info!("[memory_validate] realloc mmap");

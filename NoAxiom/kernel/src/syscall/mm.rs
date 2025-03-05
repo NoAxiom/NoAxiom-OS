@@ -12,13 +12,12 @@ use crate::{
 
 impl Syscall<'_> {
     pub fn sys_brk(&self, brk: usize) -> SyscallResult {
-        let task = self.task;
-        let former_addr = task.update_brk(0);
+        debug!("[sys_brk] brk: {:#x}", brk);
         if brk == 0 {
-            return Ok(former_addr as isize);
+            Ok(self.task.memory_set().lock().user_brk as isize)
+        } else {
+            self.task.grow_brk(brk)
         }
-        let grow_size: isize = (brk - former_addr) as isize;
-        Ok(self.task.update_brk(grow_size) as isize)
     }
 
     pub fn sys_mmap(

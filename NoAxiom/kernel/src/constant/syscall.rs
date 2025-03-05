@@ -1,4 +1,3 @@
-#![allow(unused)]
 pub const SYS_GETCWD: usize = 17;
 pub const SYS_DUP: usize = 23;
 pub const SYS_DUP3: usize = 24;
