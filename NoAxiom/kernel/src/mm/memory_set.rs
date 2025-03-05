@@ -20,7 +20,7 @@ use crate::{
     },
     constant::time::CLOCK_FREQ,
     fs::{path::Path, vfs::basic::file::File},
-    include::{auxv::*, result::Errno},
+    include::{process::auxv::*, result::Errno},
     map_permission,
     mm::{
         address::{VirtAddr, VirtPageNum},

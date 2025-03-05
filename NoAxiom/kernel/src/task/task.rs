@@ -6,13 +6,11 @@ use alloc::{
     vec::Vec,
 };
 use core::{
-    ops::DerefMut,
     sync::atomic::{AtomicI32, AtomicUsize, Ordering},
     task::Waker,
 };
 
 use arch::{Exception, TrapContext};
-use downcast_rs::Downcast;
 use ksync::{
     cell::SyncUnsafeCell,
     mutex::{LockGuard, SpinLock, SpinLockGuard},
@@ -31,8 +29,8 @@ use crate::{
         stdio::{Stdin, Stdout},
     },
     include::{
-        auxv::{AuxEntry, AT_EXECFN, AT_NULL, AT_RANDOM},
         mm::{MmapFlags, MmapProts},
+        process::auxv::{AuxEntry, AT_EXECFN, AT_NULL, AT_RANDOM},
         result::Errno,
         sched::CloneFlags,
         signal::sig_set::SigMask,
