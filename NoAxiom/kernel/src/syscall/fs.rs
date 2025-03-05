@@ -1,4 +1,4 @@
-use alloc::{string::String, vec::Vec};
+use alloc::vec::Vec;
 
 use super::{Syscall, SyscallResult};
 use crate::{
@@ -38,13 +38,9 @@ impl Syscall<'_> {
     pub async fn sys_pipe2(&self, pipe: usize, _flag: usize) -> SyscallResult {
         let (read_end, write_end) = PipeFile::new_pipe();
 
-        let user_ptr = UserPtr::<u8>::new(pipe);
-        // let buf_slice = user_ptr.as_slice_mut_checked(8).await?;
-        let buf_slice = unsafe {
-            core::slice::from_raw_parts_mut(pipe as *mut i32, 2 * core::mem::size_of::<i32>())
-        };
+        let user_ptr = UserPtr::<i32>::new(pipe);
+        let buf_slice = user_ptr.as_slice_mut_checked(2).await?;
 
-        //? fd as u8 is right?
         let mut fd_table = self.task.fd_table();
         let read_fd = fd_table.alloc_fd()?;
         fd_table.set(read_fd as usize, read_end);
@@ -268,12 +264,14 @@ impl Syscall<'_> {
         Ok(0)
     }
 
+    /// Close a file
     pub fn sys_close(&self, fd: usize) -> SyscallResult {
         info!("[sys_close] fd: {}", fd);
         let mut fd_table = self.task.fd_table();
         fd_table.close(fd)
     }
 
+    /// Get file status
     pub fn sys_fstat(&self, fd: usize, stat_buf: usize) -> SyscallResult {
         debug!("[sys_fstat]: fd: {}, stat_buf: {:#x}", fd, stat_buf);
         let fd_table = self.task.fd_table();
@@ -281,6 +279,14 @@ impl Syscall<'_> {
         let kstat = Kstat::from_stat(file.inode().stat()?);
         let ptr = UserPtr::<Kstat>::new(stat_buf as usize);
         ptr.write_volatile(kstat);
+        Ok(0)
+    }
+
+    pub async fn sys_getdents64(&self, fd: usize, buf: usize, len: usize) -> SyscallResult {
+        let file = self.task.fd_table().get(fd).ok_or(Errno::EBADF)?;
+        let user_ptr = UserPtr::<u8>::new(buf);
+        let buf_slice = user_ptr.as_slice_mut_checked(len).await?;
+        // file.read_dir(&mut buf);
         Ok(0)
     }
 }

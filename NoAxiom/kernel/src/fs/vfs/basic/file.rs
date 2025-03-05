@@ -14,7 +14,7 @@ use super::{
 };
 use crate::{
     include::{fs::FileFlags, result::Errno},
-    syscall::SyscallResult,
+    syscall::{Syscall, SyscallResult},
 };
 
 pub struct FileMeta {
@@ -89,9 +89,9 @@ impl dyn File {
             warn!("read beyond file size, truncate the buffer!!");
             let len = file_size - offset;
             let mut new_buf = vec![0; len];
-            let len = self.base_read(offset, &mut new_buf).await?;
+            let res_len = self.base_read(offset, &mut new_buf).await?;
             buf[..len as usize].copy_from_slice(&new_buf);
-            Ok(len)
+            Ok(res_len)
         } else {
             let len = self.base_read(offset, buf).await?;
             self.meta().pos.fetch_add(len as usize, Ordering::Relaxed);
@@ -112,6 +112,17 @@ impl dyn File {
     }
     pub fn inode(&self) -> Arc<dyn Inode> {
         self.meta().inode.clone()
+    }
+    pub fn read_dir(&self) -> SyscallResult {
+        // let inode = self.meta().inode.clone();
+        // let inode = inode.lock();
+        // let inode = inode.as_any().downcast_ref::<inode::DirInode>().unwrap();
+        // let mut entries = Vec::new();
+        // for (name, child) in inode.children() {
+        //     entries.push(child.dentry());
+        // }
+        // Ok(entries)
+        unreachable!()
     }
 }
 
