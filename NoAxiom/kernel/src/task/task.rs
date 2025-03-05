@@ -6,14 +6,16 @@ use alloc::{
     vec::Vec,
 };
 use core::{
+    ops::DerefMut,
     sync::atomic::{AtomicI32, AtomicUsize, Ordering},
     task::Waker,
 };
 
 use arch::{Exception, TrapContext};
+use downcast_rs::Downcast;
 use ksync::{
     cell::SyncUnsafeCell,
-    mutex::{SpinLock, SpinLockGuard},
+    mutex::{LockGuard, SpinLock, SpinLockGuard},
 };
 
 use super::{
@@ -21,6 +23,7 @@ use super::{
     taskid::{TidTracer, TGID, TID},
 };
 use crate::{
+    config::mm::USER_HEAP_SIZE,
     constant::fs::{STD_ERR, STD_IN, STD_OUT},
     fs::{
         fdtable::FdTable,
@@ -39,6 +42,7 @@ use crate::{
         address::VirtAddr,
         memory_set::{ElfMemoryInfo, MemorySet},
     },
+    return_errno,
     sched::sched_entity::SchedEntity,
     syscall::{SysResult, SyscallResult},
     task::{manager::add_new_process, taskid::tid_alloc},
@@ -570,8 +574,30 @@ impl Task {
         self.set_status(TaskStatus::Zombie);
     }
 
-    pub fn update_brk(self: &Arc<Self>, grow_size: isize) -> usize {
-        0
+    pub fn grow_brk(self: &Arc<Self>, new_brk: usize) -> SyscallResult {
+        let mut memory_set: LockGuard<'_, MemorySet> = self.memory_set.lock();
+        let grow_size = new_brk - memory_set.user_brk;
+        debug!(
+            "[grow_brk] start: {:#x}, old_brk: {:#x}, new_brk: {:#x}",
+            memory_set.user_brk_start, memory_set.user_brk, new_brk
+        );
+        if grow_size > 0 {
+            debug!("[grow_brk] expanded");
+            let growed_addr: usize = memory_set.user_brk + grow_size as usize;
+            let limit = memory_set.user_brk_start + USER_HEAP_SIZE;
+            if growed_addr > limit {
+                return_errno!(Errno::ENOMEM);
+            }
+            memory_set.user_brk = growed_addr;
+        } else {
+            debug!("[grow_brk] shrinked");
+            if new_brk < memory_set.user_brk_start {
+                return_errno!(Errno::EINVAL);
+            }
+            memory_set.user_brk = new_brk;
+        }
+        memory_set.brk_grow(VirtAddr(new_brk).ceil());
+        Ok(memory_set.user_brk as isize)
     }
 
     pub fn mmap(

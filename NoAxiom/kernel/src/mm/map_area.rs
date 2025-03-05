@@ -2,6 +2,8 @@
 
 use alloc::{collections::btree_map::BTreeMap, sync::Arc};
 
+use arch::{Arch, ArchMemory};
+
 use super::{
     address::{VirtAddr, VirtPageNum, VpnRange},
     frame::{frame_alloc, FrameTracker},
@@ -100,6 +102,7 @@ impl MapArea {
         self.vpn_range.clone()
     }
 
+    /// map one page at `vpn`
     pub fn map_one(&mut self, vpn: VirtPageNum, page_table: &mut PageTable) {
         trace!("map_one: vpn = {:?}", vpn);
         match self.map_type {
@@ -127,8 +130,7 @@ impl MapArea {
         }
     }
 
-    /// for each vpn in the range,
-    /// map the vpn to ppn
+    /// for each vpn in the range, map the vpn to ppn
     /// pte will be saved into page_table
     /// and data frame will be saved by self
     pub fn map_each(&mut self, page_table: &mut PageTable) {
@@ -136,35 +138,38 @@ impl MapArea {
         for vpn in self.vpn_range.into_iter() {
             self.map_one(vpn, page_table);
         }
-        // match self.map_type {
-        //     MapType::Identical => {
-        //         panic!("kernel don't support identical memory mapping");
-        //     }
-        //     // framed: user space
-        //     MapType::Framed => {
-        //         for vpn in self.vpn_range.into_iter() {
-        //             let frame = frame_alloc().unwrap();
-        //             let ppn = frame.ppn;
-        //             if self.frame_map.contains_key(&vpn) {
-        //                 panic!("vm area overlap");
-        //             }
-        //             self.frame_map.insert(vpn, Arc::from(frame));
-        //             let flags =
-        // PTEFlags::from_bits(self.map_permission.bits()).unwrap();
-        //             page_table.map(vpn, ppn, flags);
-        //             assert!(page_table.find_pte(vpn).is_some());
-        //         }
-        //     }
-        //     // direct: kernel space
-        //     MapType::Direct => {
-        //         for vpn in self.vpn_range.into_iter() {
-        //             let ppn = vpn.kernel_translate_into_ppn();
-        //             let flags =
-        // PTEFlags::from_bits(self.map_permission.bits()).unwrap();
-        //             page_table.map(vpn, ppn, flags);
-        //         }
-        //     }
-        // }
+    }
+
+    /// unmap one page at `vpn`
+    pub fn unmap_one(&mut self, vpn: VirtPageNum, page_table: &mut PageTable) {
+        trace!("unmap_one: vpn = {:?}", vpn);
+        match self.map_type {
+            MapType::Identical => {
+                panic!("kernel don't support identical memory mapping");
+            }
+            MapType::Framed => {
+                self.frame_map.remove(&vpn);
+                page_table.unmap(vpn);
+            }
+            MapType::Direct => {
+                page_table.unmap(vpn);
+            }
+        }
+    }
+
+    /// modify end vpn of current map area
+    pub fn change_end_vpn(&mut self, new_end_vpn: VirtPageNum, page_table: &mut PageTable) {
+        let old_end_vpn = self.vpn_range.end();
+        self.vpn_range = VpnRange::new(self.vpn_range.start(), new_end_vpn);
+        debug!("[change_end_vpn]: old: {:#x}, new: {:#x}", old_end_vpn.0, new_end_vpn.0);
+        if new_end_vpn < old_end_vpn {
+            debug!("[change_end_vpn] remove pages in [{:#x}, {:#x})", new_end_vpn.0, old_end_vpn.0);
+            for vpn in VpnRange::new(new_end_vpn, old_end_vpn).into_iter() {
+                self.frame_map.remove(&vpn);
+                self.unmap_one(vpn, page_table);
+            }
+            Arch::tlb_flush();
+        }
     }
 
     // TODO: offset

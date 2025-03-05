@@ -14,10 +14,10 @@ pub const KERNEL_HEAP_SIZE: usize = 0x200_0000;
 
 /// user app's stack size: 8KB
 pub const USER_STACK_SIZE: usize = 4096 * 2;
-// /// user app's heap size: 120MB
-// pub const USER_HEAP_SIZE: usize = 4096 * 30000;
-/// user app's heap size: 8KB
-pub const USER_HEAP_SIZE: usize = 4096 * 2;
+/// user app's heap size: 120MB
+pub const USER_HEAP_SIZE: usize = 4096 * 30000;
+// /// user app's heap size: 8KB
+// pub const USER_HEAP_SIZE: usize = 4096 * 2;
 
 /// kernel address offset from phys to virt
 pub const KERNEL_ADDR_OFFSET: usize = 0xffff_ffc0_0000_0000;
