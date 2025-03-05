@@ -156,6 +156,13 @@ impl<T> UserPtr<T> {
         }
         res
     }
+
+    pub async fn as_slice_mut_checked<'a>(&self, len: usize) -> SysResult<&mut [T]> {
+        let ptr_u8 = UserPtr::<u8>::new(self.ptr as usize);
+        let len_u8 = len * core::mem::size_of::<T>();
+        let slice = ptr_u8.as_slice_mut_checked_raw(len_u8).await?;
+        Ok(unsafe { core::slice::from_raw_parts_mut(slice.as_ptr() as *mut T, len) })
+    }
 }
 
 impl UserPtr<u8> {
@@ -176,7 +183,7 @@ impl UserPtr<u8> {
     }
 
     /// convert ptr into an slice
-    pub async fn as_slice_mut_checked<'a>(&self, len: usize) -> SysResult<&mut [u8]> {
+    pub async fn as_slice_mut_checked_raw<'a>(&self, len: usize) -> SysResult<&mut [u8]> {
         let page_table = PageTable::from_token(current_token());
         let mut guard: Option<LockGuard<'a, MemorySet>> = None;
         for vpn in VpnRange::new_from_va(

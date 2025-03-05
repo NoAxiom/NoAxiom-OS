@@ -74,6 +74,7 @@
     "stdio.h": "c",
     "stdlib.h": "c",
     "init_proc.h": "c",
-    "string.h": "c"
+    "string.h": "c",
+    "test_points.h": "c"
   }
 }
