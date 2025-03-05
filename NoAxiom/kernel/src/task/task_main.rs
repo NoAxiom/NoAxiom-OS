@@ -63,6 +63,6 @@ pub async fn task_main(task: Arc<Task>) {
         trace!("[task_main] user_trap_handler");
         user_trap_handler(&task).await;
     }
-    task_count_dec();
     exit_handler(&task);
+    task_count_dec();
 }

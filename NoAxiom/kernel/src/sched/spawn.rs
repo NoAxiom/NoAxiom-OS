@@ -29,29 +29,26 @@ fn inner_spawn(task: Arc<Task>) {
     );
 }
 
-/// schedule to allocate resouces and spawn task
-pub fn schedule_spawn_new_process(path: Path) {
-    task_count_inc();
-    spawn_raw(
-        async move {
-            let task = Task::new_process(path).await;
-            inner_spawn(task);
-        },
-        SchedEntity::new_bare(),
-        None,
-    );
-}
-
+/// spawn a new user task
 pub fn spawn_utask(task: Arc<Task>) {
     task_count_inc();
     inner_spawn(task);
 }
 
-#[allow(unused)]
+/// spawn a new kernel task
 pub fn spawn_ktask<F, R>(future: F)
 where
     F: Future<Output = R> + Send + 'static,
     R: Send + 'static,
 {
     spawn_raw(future, SchedEntity::new_bare(), None);
+}
+
+/// schedule a kernel_task to spawn a new task
+pub fn schedule_spawn_new_process(path: Path) {
+    task_count_inc();
+    spawn_ktask(async move {
+        let task = Task::new_process(path).await;
+        inner_spawn(task);
+    });
 }

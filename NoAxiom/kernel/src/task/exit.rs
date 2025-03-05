@@ -13,6 +13,7 @@ use crate::{
 pub fn terminate_all_tasks() {
     todo!()
 }
+
 pub fn exit_handler(task: &Arc<Task>) {
     let tid = task.tid();
     let exit_code = task.exit_code();
@@ -22,9 +23,14 @@ pub fn exit_handler(task: &Arc<Task>) {
         exit_code
     );
     if task.tid() == INIT_PROCESS_ID {
-        error!("init_proc exited before its children!!!");
-        let ch_tid: Vec<usize> = task.pcb().children.iter().map(|it| it.tid()).collect();
-        error!("child info: {:?}", ch_tid)
+        if task.pcb().children.is_empty() {
+            info!("init_proc exited successfully, exit_code: {}", exit_code);
+            return;
+        } else {
+            error!("init_proc exited before its children!!!");
+            let ch_tid: Vec<usize> = task.pcb().children.iter().map(|it| it.tid()).collect();
+            error!("child info: {:?}", ch_tid)
+        }
     }
     if !task.is_group_leader() {
         // thread resources clean up
