@@ -333,6 +333,9 @@ impl File for PipeFile {
     async fn load_dir(&self) -> Result<(), Errno> {
         unreachable!()
     }
+    async fn delete_child(&self, _name: &str) -> Result<(), Errno> {
+        Err(Errno::ENOSYS)
+    }
 }
 
 /// Pipe read future, only continue if it can be read

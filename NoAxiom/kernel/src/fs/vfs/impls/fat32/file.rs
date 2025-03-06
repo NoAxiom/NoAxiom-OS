@@ -68,6 +68,9 @@ impl File for FAT32File {
     async fn load_dir(&self) -> Result<(), Errno> {
         Err(Errno::ENOSYS)
     }
+    async fn delete_child(&self, _name: &str) -> Result<(), Errno> {
+        Err(Errno::ENOSYS)
+    }
 }
 
 pub struct FAT32Directory {
@@ -127,5 +130,8 @@ impl File for FAT32Directory {
             };
         }
         Ok(())
+    }
+    async fn delete_child(&self, _name: &str) -> Result<(), Errno> {
+        todo!()
     }
 }

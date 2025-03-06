@@ -4,7 +4,6 @@ use alloc::{boxed::Box, string::String, sync::Arc, vec::Vec};
 use core::sync::atomic::AtomicUsize;
 
 use async_trait::async_trait;
-use bitflags::Flags;
 use fatfs::SeekFrom;
 type Mutex<T> = ksync::mutex::SpinLock<T>;
 
@@ -20,7 +19,7 @@ use crate::{
         fs::{FileFlags, LinuxDirent64},
         result::Errno,
     },
-    syscall::{Syscall, SyscallResult},
+    syscall::SyscallResult,
 };
 
 pub struct FileMeta {
@@ -79,6 +78,8 @@ pub trait File: Send + Sync {
     /// Load directory into memory, must be called before read/write explicitly,
     /// only for directories
     async fn load_dir(&self) -> Result<(), Errno>;
+    /// Delete dentry, only for directories
+    async fn delete_child(&self, name: &str) -> Result<(), Errno>;
 }
 
 impl dyn File {
@@ -232,6 +233,9 @@ impl File for EmptyFile {
         unreachable!()
     }
     async fn load_dir(&self) -> Result<(), Errno> {
+        unreachable!()
+    }
+    async fn delete_child(&self, _name: &str) -> Result<(), Errno> {
         unreachable!()
     }
 }

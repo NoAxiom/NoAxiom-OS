@@ -1,6 +1,6 @@
 use alloc::sync::Arc;
 
-use basic::{dentry::Dentry, filesystem::FileSystem};
+use basic::dentry::Dentry;
 use impls::rust_fat32::filesystem::AsyncSmpFat32;
 use ksync::Once;
 

@@ -1,11 +1,12 @@
-use alloc::vec::Vec;
+use alloc::{string::String, sync::Arc, vec::Vec};
 
-use virtio_drivers::device;
+use ksync::mutex::LockGuard;
 
 use super::{Syscall, SyscallResult};
 use crate::{
     constant::fs::AT_FDCWD,
     fs::{
+        fdtable,
         manager::FS_MANAGER,
         path::Path,
         pipe::PipeFile,
@@ -16,6 +17,7 @@ use crate::{
         result::Errno,
     },
     mm::user_ptr::UserPtr,
+    task::Task,
     utils::get_string_from_ptr,
 };
 
@@ -185,25 +187,20 @@ impl Syscall<'_> {
 
         // todo: INTERRUPT_BY_SIGNAL FUTURE
 
-        // debug!("HERE1");
         let user_ptr = UserPtr::<u8>::new(buf);
         let buf_slice = user_ptr.as_slice_mut_checked(len).await?;
 
-        // debug!("HERE2");
         if file.is_stdio() {
             let read_size = file.base_read(0, buf_slice).await?;
             return Ok(read_size as isize);
         }
 
-        // debug!("HERE3");
         if !file.meta().readable() {
             return Err(Errno::EINVAL);
         }
 
-        // debug!("HERE4");
         let read_size = file.read(buf_slice).await?;
 
-        // debug!("HERE5");
         Ok(read_size as isize)
     }
 
@@ -243,13 +240,20 @@ impl Syscall<'_> {
         let mode = InodeMode::from_bits_truncate(mode);
         let ptr = UserPtr::<u8>::new(path);
         let path_str = get_string_from_ptr(&ptr);
+        let fd_table = self.task.fd_table();
         let path = if !path_str.starts_with('/') {
             if dirfd == AT_FDCWD {
                 let cwd = self.task.pcb().cwd.clone().from_cd(&"..");
-                debug!("[sys_mkdirat] cwd: {:?}", cwd);
+                trace!("[sys_mkdirat] cwd: {:?}", cwd);
                 cwd.from_cd_or_create(&path_str)
             } else {
-                todo!()
+                let cwd = fd_table
+                    .get(dirfd as usize)
+                    .ok_or(Errno::EBADF)?
+                    .dentry()
+                    .path();
+                trace!("[sys_mkdirat] cwd: {:?}", cwd);
+                cwd.from_cd_or_create(&path_str)
             }
         } else {
             Path::from(path_str)
@@ -328,6 +332,7 @@ impl Syscall<'_> {
         let mut split_path = dir.split('/').collect::<Vec<&str>>();
         let name = split_path.pop().unwrap();
         let parent = root_dentry().find_path(&split_path)?;
+        debug!("[sys_mount] parent: {:?}, name: {}", parent.name(), name);
         fs.root(Some(parent), flags, name, Some(device)).await;
         Ok(0)
     }
@@ -343,8 +348,69 @@ impl Syscall<'_> {
         let mut split_path = dir.split('/').collect::<Vec<&str>>();
         let name = split_path.pop().unwrap();
         let parent = root_dentry().find_path(&split_path)?;
-        parent.remove_child(name);
+        parent.remove_child(name).unwrap();
 
         Ok(0)
+    }
+
+    /// Create a hard link
+    pub fn sys_linkat(
+        &self,
+        olddirfd: usize,
+        oldpath: usize,
+        newdirfd: usize,
+        newpath: usize,
+        _flags: usize,
+    ) -> SyscallResult {
+        debug!("[sys_linkat]");
+        let task = self.task;
+        let old_path = get_path(task.clone(), oldpath, olddirfd as isize, "sys_linkat")?;
+        let new_path = get_path(task.clone(), newpath, newdirfd as isize, "sys_linkat")?;
+        let old_dentry = old_path.dentry();
+        let new_dentry = new_path.dentry();
+        new_dentry.link_to(old_dentry)?;
+        Ok(0)
+    }
+
+    /// Unlink a file, also delete the file if nlink is 0
+    pub async fn sys_unlinkat(&self, dirfd: usize, path: usize, _flags: usize) -> SyscallResult {
+        debug!(
+            "[sys_unlinkat] dirfd: {}, path: {}",
+            dirfd as isize,
+            get_string_from_ptr(&UserPtr::<u8>::new(path))
+        );
+        let task = self.task;
+        let path = get_path(task.clone(), path, dirfd as isize, "sys_unlinkat")?;
+        let dentry = path.dentry();
+        dentry.unlink().await?;
+        Ok(0)
+    }
+}
+
+fn get_path(
+    task: Arc<Task>,
+    rawpath: usize,
+    fd: isize,
+    debug_syscall_name: &str,
+) -> Result<Path, Errno> {
+    let path_str = get_string_from_ptr(&UserPtr::<u8>::new(rawpath));
+
+    if !path_str.starts_with('/') {
+        if fd == AT_FDCWD {
+            let cwd = task.pcb().cwd.clone().from_cd(&"..");
+            debug!("[{debug_syscall_name}] cwd: {:?}", cwd);
+            Ok(cwd.from_cd_or_create(&path_str))
+        } else {
+            let cwd = task
+                .fd_table()
+                .get(fd as usize)
+                .ok_or(Errno::EBADF)?
+                .dentry()
+                .path();
+            debug!("[{debug_syscall_name}] cwd: {:?}", cwd);
+            Ok(cwd.from_cd_or_create(&path_str))
+        }
+    } else {
+        Ok(Path::from(path_str))
     }
 }

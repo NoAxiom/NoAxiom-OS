@@ -49,6 +49,8 @@ impl<'a> Syscall<'a> {
                     .await
             }
             SYS_UMOUNT2 => self.sys_umount2(args[0], args[1]),
+            SYS_LINKAT => self.sys_linkat(args[0], args[1], args[2], args[3], args[4]),
+            SYS_UNLINKAT => self.sys_unlinkat(args[0], args[1], args[2]).await,
 
             // process
             SYS_EXIT => self.sys_exit(args[0]),

@@ -46,6 +46,9 @@ impl File for Stdin {
     async fn load_dir(&self) -> Result<(), Errno> {
         Err(Errno::ENOSYS)
     }
+    async fn delete_child(&self, _name: &str) -> Result<(), Errno> {
+        Err(Errno::ENOSYS)
+    }
 }
 
 #[async_trait]
@@ -72,6 +75,9 @@ impl File for Stdout {
         Ok(buf.len() as isize)
     }
     async fn load_dir(&self) -> Result<(), Errno> {
+        Err(Errno::ENOSYS)
+    }
+    async fn delete_child(&self, _name: &str) -> Result<(), Errno> {
         Err(Errno::ENOSYS)
     }
 }

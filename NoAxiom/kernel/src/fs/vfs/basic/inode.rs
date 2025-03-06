@@ -61,7 +61,7 @@ impl InodeMeta {
 
 pub struct InodeMetaInner {
     /// The number of links to the inode
-    nlink: usize,
+    pub nlink: usize,
     /// The size of the file
     pub size: usize,
     /// The state of the file

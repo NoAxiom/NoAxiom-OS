@@ -38,6 +38,7 @@ int run(char* str)
     return 0;
 }
 
+int failed_test[100] = { 0 };
 int main(void)
 {
     int test_num = sizeof(test_points) / sizeof(char*);
@@ -47,13 +48,17 @@ int main(void)
         test_num);
     for (i = 0; i < test_num; i++) {
         int tmp_res = run(test_points[i]);
-        if (tmp_res == 0) {
-            printf("[init_proc] test %s FAILED!!!\n", test_points[i]);
-        }
+        failed_test[i] = tmp_res != 0;
         cnt += tmp_res;
     }
     // test done!
     printf("========== [ init_proc ] all tests are done!! ==========\n");
     printf("========== [ init_proc ] passed points: %d/%d ==========\n", cnt,
         test_num);
+
+    for (i = 0; i < test_num; i++) {
+        if (failed_test[i] == 0) {
+            printf("[init_proc] test %s FAILED!!!\n", test_points[i]);
+        }
+    }
 }

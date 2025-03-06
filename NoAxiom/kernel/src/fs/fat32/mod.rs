@@ -1,7 +1,7 @@
 //! reference: https://d1.amobbs.com/bbs_upload782111/files_7/armok01151038.pdf
 
 // ignore warnings for this module
-// #![allow(warnings)]
+#![allow(warnings)]
 
 mod bpb;
 pub mod directory;

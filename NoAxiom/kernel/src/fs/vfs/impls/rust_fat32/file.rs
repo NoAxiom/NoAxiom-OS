@@ -96,7 +96,10 @@ impl File for Fat32File {
         }
     }
     async fn load_dir(&self) -> Result<(), Errno> {
-        unreachable!()
+        Err(Errno::ENOSYS)
+    }
+    async fn delete_child(&self, _name: &str) -> Result<(), Errno> {
+        Err(Errno::ENOSYS)
     }
 }
 
@@ -147,6 +150,12 @@ impl File for Fat32Dir {
             };
             self.dentry().add_child(&entry.file_name(), child_inode);
         }
+        Ok(())
+    }
+
+    async fn delete_child(&self, name: &str) -> Result<(), Errno> {
+        let inner = self.inner.lock();
+        inner.remove(name).await.map_err(fs_err)?;
         Ok(())
     }
 }

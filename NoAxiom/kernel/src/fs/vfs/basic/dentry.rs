@@ -18,6 +18,7 @@ use super::{
 use crate::{
     fs::path::Path,
     include::{fs::InodeMode, result::Errno},
+    syscall::{SysResult, SyscallResult},
 };
 
 pub struct DentryMeta {
@@ -33,6 +34,7 @@ pub struct DentryMeta {
     /// The children of the dentry
     children: Mutex<BTreeMap<String, Arc<dyn Dentry>>>,
     /// The inode of the dentry, None if it is negative
+    /// Now it holds the inode of the file the whole life time
     inode: Mutex<Option<Arc<dyn Inode>>>,
 }
 
@@ -124,9 +126,20 @@ impl dyn Dentry {
         }
     }
 
+    // pub fn delete_self(self: &Arc<Self>) {
+    //     if let Some(parent) = self.parent() {
+    //         parent.remove_child(&self.name());
+    //     }
+    //     let mut inode = self.meta().inode.lock();
+    //     if let Some(inode_arc) = inode.take() {
+    //         drop(inode_arc);
+    //         *inode = None;
+    //     }
+    // }
+
     /// Remove a child dentry with `name`.
-    pub fn remove_child(self: &Arc<Self>, name: &str) {
-        self.meta().children.lock().remove(name);
+    pub fn remove_child(self: &Arc<Self>, name: &str) -> Option<Arc<dyn Dentry>> {
+        self.meta().children.lock().remove(name)
     }
 
     /// Add a child to directory dentry with `name` and `mode`, for syscall
@@ -247,6 +260,33 @@ impl dyn Dentry {
             }
         }
         current
+    }
+
+    /// Hard link, link self to `target`.
+    pub fn link_to(self: Arc<Self>, target: Arc<dyn Dentry>) -> Result<Arc<dyn Dentry>, Errno> {
+        if !self.is_negetive() {
+            return Err(Errno::EEXIST);
+        }
+        let inode = target.inode()?;
+        inode.meta().inner.lock().nlink += 1;
+        self.set_inode(inode);
+        Ok(self)
+    }
+
+    /// Unlink, unlink self and delete the inner file if nlink is 0.
+    pub async fn unlink(self: Arc<Self>) -> SyscallResult {
+        let inode = self.inode()?;
+        let mut nlink = inode.meta().inner.lock().nlink;
+        nlink -= 1;
+        if nlink == 0 {
+            let parent = self.parent().unwrap();
+            if parent.inode()?.file_type() != InodeMode::DIR {
+                return Err(Errno::ENOTDIR);
+            }
+            parent.remove_child(&self.name()).unwrap();
+            parent.open().unwrap().delete_child(&self.name()).await?;
+        }
+        Ok(0)
     }
 }
 
