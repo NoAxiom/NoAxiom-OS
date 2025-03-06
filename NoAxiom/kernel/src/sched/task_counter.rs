@@ -1,21 +1,21 @@
 //! task counter, kernel shutdown when TASK_COUNTER decrease to 0
 
-use core::sync::atomic::{AtomicUsize, Ordering};
+// use core::sync::atomic::{AtomicUsize, Ordering};
 
-use arch::{Arch, ArchSbi};
+// use arch::{Arch, ArchSbi};
 
-pub static mut TASK_COUNTER: AtomicUsize = AtomicUsize::new(0);
+// pub static mut TASK_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 pub fn task_count_inc() {
-    unsafe {
-        TASK_COUNTER.fetch_add(1, Ordering::SeqCst);
-    }
+    // unsafe {
+    //     TASK_COUNTER.fetch_add(1, Ordering::SeqCst);
+    // }
 }
 
 pub fn task_count_dec() {
-    if unsafe { TASK_COUNTER.fetch_sub(1, Ordering::SeqCst) } == 1 {
-        info!("[kernel] all tasks are done, shutdown");
-        // error!("shutdown is off, please shutdown the terminal manually");
-        Arch::shutdown();
-    }
+    // if unsafe { TASK_COUNTER.fetch_sub(1, Ordering::SeqCst) } == 1 {
+    //     info!("[kernel] all tasks are done, shutdown");
+    //     // error!("shutdown is off, please shutdown the terminal manually");
+    //     Arch::shutdown();
+    // }
 }

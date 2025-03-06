@@ -11,12 +11,12 @@ use super::{
 
 struct CfsTreeNode {
     pub vruntime: SchedVruntime,
+    pub tid: usize,
     pub runnable: Runnable<TaskScheduleInfo>,
 }
 impl PartialEq for CfsTreeNode {
-    fn eq(&self, _others: &Self) -> bool {
-        // always return false to convert it into multiset
-        false
+    fn eq(&self, other: &Self) -> bool {
+        self.tid == other.tid
     }
 }
 impl Eq for CfsTreeNode {}
@@ -24,7 +24,7 @@ impl PartialOrd for CfsTreeNode {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         let res = self.vruntime.partial_cmp(&other.vruntime);
         match res {
-            Some(Ordering::Equal) => Some(Ordering::Less),
+            Some(Ordering::Equal) => self.tid.partial_cmp(&other.tid),
             _ => res,
         }
     }
@@ -33,8 +33,7 @@ impl Ord for CfsTreeNode {
     fn cmp(&self, other: &Self) -> Ordering {
         let res = self.vruntime.cmp(&other.vruntime);
         match res {
-            // never return equal to convert it into multiset
-            Ordering::Equal => Ordering::Less,
+            Ordering::Equal => self.tid.cmp(&other.tid),
             _ => res,
         }
     }
@@ -65,9 +64,12 @@ impl CFS {
         self.load += runnable.metadata().sched_entity.get_load();
         self.task_count += 1;
         let vruntime = runnable.metadata().sched_entity.inner().vruntime;
-        // hack: use multiset to avoid vruntime conflict
-        // let vruntime = SchedVruntime::new(0);
-        self.normal.insert(CfsTreeNode { vruntime, runnable });
+        let tid = runnable.metadata().sched_entity.tid;
+        self.normal.insert(CfsTreeNode {
+            vruntime,
+            tid,
+            runnable,
+        });
     }
     fn push_urgent(&mut self, runnable: Runnable<TaskScheduleInfo>) {
         self.load += runnable.metadata().sched_entity.get_load();

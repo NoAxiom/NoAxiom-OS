@@ -41,7 +41,7 @@ where
     F: Future<Output = R> + Send + 'static,
     R: Send + 'static,
 {
-    spawn_raw(future, SchedEntity::new_bare(), None);
+    spawn_raw(future, SchedEntity::new_bare(0), None);
 }
 
 /// schedule a kernel_task to spawn a new task

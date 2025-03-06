@@ -21,7 +21,7 @@ use super::{
     taskid::{TidTracer, TGID, TID},
 };
 use crate::{
-    config::mm::USER_HEAP_SIZE,
+    config::{mm::USER_HEAP_SIZE, task::INIT_PROCESS_ID},
     constant::fs::{STD_ERR, STD_IN, STD_OUT},
     fs::{
         fdtable::FdTable,
@@ -313,7 +313,7 @@ impl Task {
             trap_cx: SyncUnsafeCell::new(TrapContext::app_init_cx(elf_entry, user_sp)),
             status: SyncUnsafeCell::new(TaskStatus::Ready),
             exit_code: AtomicI32::new(0),
-            sched_entity: SchedEntity::new_bare(),
+            sched_entity: SchedEntity::new_bare(INIT_PROCESS_ID),
             fd_table: Arc::new(SpinLock::new(FdTable::new())),
             signal_info: SignalInfo::new(None, None),
             waker: SyncUnsafeCell::new(None),
@@ -480,8 +480,10 @@ impl Task {
         if flags.contains(CloneFlags::THREAD) {
             // fork as a new thread
             debug!("fork new thread");
+            let new_tid = tid_alloc();
+            let tid_val = new_tid.0;
             let new_thread = Arc::new(Self {
-                tid: tid_alloc(),
+                tid: new_tid,
                 tgid: self.tgid.clone(),
                 pgid: self.pgid.clone(),
                 thread_group: self.thread_group.clone(),
@@ -490,7 +492,7 @@ impl Task {
                 trap_cx: SyncUnsafeCell::new(self.trap_context().clone()),
                 status: SyncUnsafeCell::new(TaskStatus::Ready),
                 exit_code: AtomicI32::new(0),
-                sched_entity: self.sched_entity.data_clone(),
+                sched_entity: self.sched_entity.data_clone(tid_val),
                 fd_table,
                 signal_info: SignalInfo::new(
                     Some(&self.signal_info.pending_sigs),
@@ -502,13 +504,13 @@ impl Task {
             new_thread
         } else {
             // fork as a new process
-            let tid = tid_alloc();
-            let tgid_val = tid.0;
-            debug!("fork new process, tgid: {}", tgid_val);
+            let new_tid = tid_alloc();
+            let tid_val = new_tid.0;
+            debug!("fork new process, tgid: {}", tid_val);
             let mut parent_pcb = self.pcb();
             let new_process = Arc::new(Self {
-                tid,
-                tgid: Arc::new(AtomicUsize::new(tgid_val)),
+                tid: new_tid,
+                tgid: Arc::new(AtomicUsize::new(tid_val)),
                 pgid: self.pgid.clone(),
                 thread_group: self.thread_group.clone(),
                 pcb: Arc::new(SpinLock::new(ProcessInfo {
@@ -520,7 +522,7 @@ impl Task {
                 trap_cx: SyncUnsafeCell::new(self.trap_context().clone()),
                 status: SyncUnsafeCell::new(TaskStatus::Ready),
                 exit_code: AtomicI32::new(0),
-                sched_entity: self.sched_entity.data_clone(),
+                sched_entity: self.sched_entity.data_clone(tid_val),
                 fd_table,
                 signal_info: SignalInfo::new(None, None),
                 waker: SyncUnsafeCell::new(None),

@@ -6,6 +6,7 @@ use core::cmp::Ordering;
 use ksync::cell::SyncUnsafeCell;
 
 use crate::{
+    config::task::INIT_PROCESS_ID,
     constant::sched::{NICE_0_LOAD, SCHED_PRIO_TO_WEIGHT, SCHED_PRIO_TO_WMULT},
     task::Task,
 };
@@ -79,14 +80,16 @@ impl SchedEntityInner {
 
 pub struct SchedEntity {
     inner: Arc<SyncUnsafeCell<SchedEntityInner>>,
+    pub tid: usize,
 }
 
 impl SchedEntity {
-    pub fn new_bare() -> Self {
+    pub fn new_bare(tid: usize) -> Self {
         Self {
             inner: Arc::new(SyncUnsafeCell::new(SchedEntityInner::new(
                 SchedVruntime::new(0),
             ))),
+            tid,
         }
     }
     #[inline(always)]
@@ -106,17 +109,19 @@ impl SchedEntity {
         self.inner().prio.to_load_weight()
     }
 
-    pub fn data_clone(&self) -> Self {
+    pub fn data_clone(&self, tid: usize) -> Self {
         Self {
             inner: Arc::new(SyncUnsafeCell::new(SchedEntityInner {
                 vruntime: SchedVruntime::new(self.inner().vruntime.0),
                 prio: SchedPrio(self.inner().prio.0),
             })),
+            tid,
         }
     }
     pub fn ref_clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
+            tid: self.tid,
         }
     }
 }

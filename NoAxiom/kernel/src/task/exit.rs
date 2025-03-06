@@ -1,5 +1,7 @@
 use alloc::{sync::Arc, vec::Vec};
 
+use arch::{Arch, ArchSbi};
+
 use super::Task;
 use crate::{
     config::task::INIT_PROCESS_ID,
@@ -7,6 +9,7 @@ use crate::{
         sig_info::{SigCode, SigExtraInfo, SigInfo},
         sig_num::SigNum,
     },
+    syscall::Syscall,
     task::manager::TASK_MANAGER,
 };
 
@@ -14,23 +17,35 @@ pub fn terminate_all_tasks() {
     todo!()
 }
 
-pub fn exit_handler(task: &Arc<Task>) {
+pub async fn exit_handler(task: &Arc<Task>) {
     let tid = task.tid();
     let exit_code = task.exit_code();
-    trace!(
+    info!(
         "[exit_hander] task {} enter the exit_handler with code {}",
-        tid,
-        exit_code
+        tid, exit_code
     );
     if task.tid() == INIT_PROCESS_ID {
         if task.pcb().children.is_empty() {
-            info!("init_proc exited successfully, exit_code: {}", exit_code);
-            return;
+            info!(
+                "[exit_handler] init_proc exited successfully, exit_code: {}",
+                exit_code
+            );
         } else {
-            error!("init_proc exited before its children!!!");
+            warn!("[exit_handler] init_proc try to exited before its children!!!");
             let ch_tid: Vec<usize> = task.pcb().children.iter().map(|it| it.tid()).collect();
-            error!("child info: {:?}", ch_tid)
+            warn!("[exit_handler] child info: {:?}", ch_tid);
+            while !task.pcb().children.is_empty() {
+                let pid = Syscall::new(task).sys_wait4(-1, 0, 0, 0).await;
+                if let Ok(pid) = pid {
+                    info!("[exit_handler] child finally exited: {:?}", pid);
+                }
+            }
+            info!(
+                "[exit_handler] init_proc exited successfully, exit_code: {}",
+                exit_code
+            );
         }
+        Arch::shutdown();
     }
     if !task.is_group_leader() {
         // thread resources clean up
@@ -70,7 +85,7 @@ pub fn exit_handler(task: &Arc<Task>) {
         }
         drop(pcb);
     }
-    trace!(
+    info!(
         "[exit_hander] task {} exited successfully, exit_code: {}, strong_count: {}",
         task.tid(),
         task.exit_code(),

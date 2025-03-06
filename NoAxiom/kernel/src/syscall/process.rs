@@ -73,7 +73,7 @@ impl Syscall<'_> {
 
     pub async fn sys_wait4(
         &self,
-        pid: usize,
+        pid: isize,
         status_addr: usize,
         options: usize,
         _rusage: usize,
@@ -84,7 +84,6 @@ impl Syscall<'_> {
             status_addr,
             options
         );
-        let pid = pid as isize;
         let options = WaitOption::from_bits(options as i32).ok_or(Errno::EINVAL)?;
         let status: UserPtr<i32> = UserPtr::new(status_addr);
 
