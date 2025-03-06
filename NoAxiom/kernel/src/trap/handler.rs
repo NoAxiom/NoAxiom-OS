@@ -2,9 +2,9 @@
 
 use alloc::sync::Arc;
 
-use arch::{Arch, ArchInt, ArchSbi, ArchTrap, Exception, Interrupt, Trap};
+use arch::{Arch, ArchInt, ArchTrap, Exception, Interrupt, Trap};
 
-use super::trap::set_kernel_trap_entry;
+use super::{ipi::ipi_handler, trap::set_kernel_trap_entry};
 use crate::{
     // constant::register::A0,
     cpu::{current_cpu, get_hartid},
@@ -92,8 +92,7 @@ pub fn kernel_trap_handler() {
                 crate::time::timer::set_next_trigger();
             }
             Interrupt::SupervisorSoft => {
-                // warning: currently don't use any lock here, it may cause deadlock
-                Arch::clear_ipi();
+                ipi_handler();
             }
             _ => kernel_panic("unsupported interrupt"),
         },

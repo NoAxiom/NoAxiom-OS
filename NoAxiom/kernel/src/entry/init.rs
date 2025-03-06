@@ -1,4 +1,7 @@
+use core::sync::atomic::AtomicUsize;
+
 use arch::{Arch, ArchInt, ArchSbi};
+use lazy_static::lazy_static;
 
 use crate::{
     config::{arch::CPU_NUM, mm::KERNEL_ADDR_OFFSET},
@@ -57,6 +60,8 @@ pub fn other_hart_init(hart_id: usize, dtb: usize) {
     unreachable!();
 }
 
+pub static BOOT_HART_ID: AtomicUsize = AtomicUsize::new(0);
+
 // TODO: dtb, init_proc
 /// init bss, mm, console, and other drivers, then jump to rust_main,
 /// called by [`super::boot`]
@@ -67,6 +72,7 @@ pub fn boot_hart_init(_: usize, dtb: usize) {
     heap_init();
     log_init();
     frame_init();
+    BOOT_HART_ID.store(get_hartid(), core::sync::atomic::Ordering::SeqCst);
     Arch::enable_user_memory_access();
 
     // hart resources init
