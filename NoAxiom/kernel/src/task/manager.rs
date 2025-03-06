@@ -105,3 +105,37 @@ impl ThreadGroup {
         self.0.remove(&taskid);
     }
 }
+
+impl Task {
+    #[allow(unused)]
+    pub unsafe fn delete_from_parent(&self) {
+        if let Some(parent) = self.pcb().parent.clone() {
+            let ch_tid = self.tid();
+            let parent = parent.upgrade().unwrap();
+            let mut p_pcb = parent.pcb();
+            p_pcb.children.retain(|x| x.tid() != ch_tid);
+            debug!(
+                "[delete_from_parent] child: {}, parent: {}",
+                ch_tid,
+                parent.tid()
+            );
+        }
+    }
+    pub fn delete_children(&self) {
+        if self.is_group_leader() {
+            // process resources clean up
+            let mut pcb = self.pcb();
+            // clear all children
+            if !pcb.children.is_empty() {
+                for child in pcb.children.iter() {
+                    // let init_proc take over the child
+                    let init_proc = TASK_MANAGER.get_init_proc();
+                    child.pcb().parent = Some(Arc::downgrade(&init_proc));
+                    init_proc.pcb().children.push(child.clone());
+                }
+                pcb.children.clear();
+            }
+            debug!("[delete_children] task {} delete all children", self.tid());
+        }
+    }
+}

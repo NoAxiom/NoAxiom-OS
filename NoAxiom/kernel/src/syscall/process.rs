@@ -1,3 +1,8 @@
+use alloc::{
+    sync::{Arc, Weak},
+    vec::Vec,
+};
+
 use super::{Syscall, SyscallResult};
 use crate::{
     fs::path::Path,
@@ -10,7 +15,7 @@ use crate::{
     mm::user_ptr::UserPtr,
     return_errno,
     sched::{spawn::spawn_utask, utils::suspend_now},
-    task::manager::TASK_MANAGER,
+    task::{manager::TASK_MANAGER, Task},
 };
 
 impl Syscall<'_> {
@@ -87,12 +92,6 @@ impl Syscall<'_> {
         let options = WaitOption::from_bits(options as i32).ok_or(Errno::EINVAL)?;
         let status: UserPtr<i32> = UserPtr::new(status_addr);
 
-        // clone children info
-        let children = self.task.pcb().children.clone();
-        if children.is_empty() {
-            return_errno!(Errno::ECHILD);
-        }
-
         // pid type
         // -1: all children, >0: specific pid, other: group unimplemented
         let pid_type = match pid {
@@ -102,6 +101,12 @@ impl Syscall<'_> {
             pid => PidSel::Group(Some(pid as usize)),
         };
 
+        // clone children info
+        let children = self.task.pcb().children.clone();
+        if children.is_empty() {
+            return_errno!(Errno::ECHILD);
+        }
+
         // work out target tasks
         let target_task = match pid_type {
             PidSel::Task(None) => {
@@ -109,7 +114,7 @@ impl Syscall<'_> {
                 children.into_iter().find(|task| task.is_zombie())
             }
             PidSel::Task(Some(pid)) => {
-                if let Some(task) = children.iter().find(|task| task.tid() == pid).cloned() {
+                if let Some(task) = children.into_iter().find(|task| task.tid() == pid) {
                     task.is_zombie().then(|| task).or_else(|| None)
                 } else {
                     return_errno!(Errno::ECHILD);

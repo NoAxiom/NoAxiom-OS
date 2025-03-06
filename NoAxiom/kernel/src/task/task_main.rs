@@ -7,8 +7,8 @@ use core::{
 
 use crate::{
     cpu::current_cpu,
-    sched::{task_counter::task_count_dec, utils::take_waker},
-    task::{exit::exit_handler, Task},
+    sched::utils::take_waker,
+    task::Task,
     time::gettime::get_time_us,
     trap::{trap_restore, user_trap_handler},
 };
@@ -63,6 +63,5 @@ pub async fn task_main(task: Arc<Task>) {
         trace!("[task_main] user_trap_handler");
         user_trap_handler(&task).await;
     }
-    exit_handler(&task).await;
-    task_count_dec();
+    task.exit_handler().await;
 }

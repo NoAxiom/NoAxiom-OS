@@ -1,8 +1,8 @@
-use crate::{include::signal::sig_num::SigNum, task::exit::terminate_all_tasks};
+use crate::include::signal::sig_num::SigNum;
 
 /// terminate the process
 fn sig_default_terminate(sig: SigNum) {
-    terminate_all_tasks();
+    unimplemented!()
 }
 
 /// terminate & gen core dump

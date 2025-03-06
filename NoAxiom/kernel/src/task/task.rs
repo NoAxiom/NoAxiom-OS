@@ -546,7 +546,7 @@ impl Task {
             user_sp,
             mut auxs,
         } = MemorySet::load_from_path(path).await;
-        // TODO: delete child
+        self.delete_children();
         unsafe { memory_set.activate() };
         self.change_memory_set(memory_set);
         trace!("init usatck");
@@ -645,15 +645,5 @@ impl Task {
             .mmap_manager
             .insert(start_va, length, prot, flags, offset, file);
         Ok(start_va.0)
-    }
-}
-
-impl Drop for Task {
-    fn drop(&mut self) {
-        info!(
-            "task {} dropped, exit_code: {}",
-            self.tid(),
-            self.exit_code()
-        )
     }
 }

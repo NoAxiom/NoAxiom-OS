@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use ksync::mutex::SpinLock;
 
 use super::vfs::basic::file::{File, FileMeta};
-use crate::{include::result::Errno, syscall::SyscallResult};
+use crate::{cpu::get_hartid, include::result::Errno, syscall::SyscallResult};
 
 pub struct Stdin;
 pub struct Stdout {
@@ -68,7 +68,11 @@ impl File for Stdout {
         for c in buf.iter() {
             stdout_buf.push(*c);
             if *c == '\n' as u8 {
-                print!("{}", core::str::from_utf8(stdout_buf.as_slice()).unwrap());
+                print!(
+                    "[PRINT, HART{}] {}",
+                    get_hartid(),
+                    core::str::from_utf8(stdout_buf.as_slice()).unwrap()
+                );
                 stdout_buf.clear();
             }
         }

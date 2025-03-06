@@ -10,5 +10,4 @@ pub mod executor;
 pub mod sched_entity;
 pub mod scheduler;
 pub mod spawn;
-pub mod task_counter;
 pub mod utils;
