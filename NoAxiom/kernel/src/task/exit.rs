@@ -70,7 +70,7 @@ pub fn exit_handler(task: &Arc<Task>) {
         }
         drop(pcb);
     }
-    info!(
+    trace!(
         "[exit_hander] task {} exited successfully, exit_code: {}, strong_count: {}",
         task.tid(),
         task.exit_code(),

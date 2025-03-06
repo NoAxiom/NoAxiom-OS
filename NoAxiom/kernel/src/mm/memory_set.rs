@@ -19,6 +19,7 @@ use crate::{
         USER_STACK_SIZE,
     },
     constant::time::CLOCK_FREQ,
+    cpu::current_cpu,
     fs::{path::Path, vfs::basic::file::File},
     include::{process::auxv::*, result::Errno},
     map_permission,
@@ -131,7 +132,7 @@ impl MemorySet {
     /// push a map area into current memory set
     /// load data if provided
     pub fn push_area(&mut self, mut map_area: MapArea, data: Option<&[u8]>) {
-        info!(
+        trace!(
             "push_area: [{:#X}, {:#X})",
             map_area.vpn_range().start().0 << PAGE_WIDTH,
             map_area.vpn_range().end().0 << PAGE_WIDTH
@@ -291,24 +292,26 @@ impl MemorySet {
         }
         let end_va: VirtAddr = end_vpn.unwrap().into();
         let elf_entry = elf.header.pt2.entry_point() as usize;
-        info!("[load_elf] raw_entry: {:#x}", elf_entry);
+        trace!("[load_elf] raw_entry: {:#x}", elf_entry);
 
         // user stack
         let user_stack_base: usize = usize::from(end_va) + PAGE_SIZE; // stack bottom
         let user_stack_end = user_stack_base + USER_STACK_SIZE; // stack top
         memory_set.map_user_stack(user_stack_base, user_stack_end);
-        info!(
+        trace!(
             "[memory_set] user stack mapped! [{:#x}, {:#x})",
-            user_stack_base, user_stack_end
+            user_stack_base,
+            user_stack_end
         );
 
         // user heap
         let user_heap_base: usize = user_stack_end + PAGE_SIZE;
         let user_heap_end: usize = user_heap_base;
         memory_set.map_user_heap(user_heap_base, user_heap_end);
-        info!(
+        trace!(
             "[memory_set] user heap mapped! [{:#x}, {:#x})",
-            user_heap_base, user_heap_end
+            user_heap_base,
+            user_heap_end
         );
 
         // aux vector
@@ -344,9 +347,9 @@ impl MemorySet {
     }
 
     pub async fn load_from_path(path: Path) -> ElfMemoryInfo {
-        info!("[load_elf] from path: {:?}", path);
+        trace!("[load_elf] from path: {:?}", path);
         let elf_file = path.dentry().open().unwrap();
-        info!("[load_elf] file name: {}", elf_file.name());
+        trace!("[load_elf] file name: {}", elf_file.name());
         MemorySet::load_from_elf(elf_file).await
     }
 
@@ -512,17 +515,19 @@ impl MemorySet {
             let flags = pte.flags();
             if flags.is_cow() {
                 trace!(
-                    "[memory_validate] realloc COW at vpn: {:#x}, pte: {:#x}, flags: {:?}",
+                    "[memory_validate] realloc COW at vpn: {:#x}, pte: {:#x}, flags: {:?}, tid: {}",
                     vpn.0,
                     pte.0,
-                    pte.flags()
+                    pte.flags(),
+                    current_cpu().task.as_ref().unwrap().tid()
                 );
                 self.realloc_cow(vpn, pte);
                 Ok(())
             } else if exception.is_some() && exception.unwrap() == Exception::StorePageFault {
                 error!(
-                    "[memory_validate] store at invalid area, flags: {:?}",
-                    flags
+                    "[memory_validate] store at invalid area, flags: {:?}, tid: {}",
+                    flags,
+                    current_cpu().task.as_ref().unwrap().tid()
                 );
                 Err(Errno::EFAULT)
             } else {
@@ -531,15 +536,24 @@ impl MemorySet {
             }
         } else {
             if self.user_stack_area.vpn_range.is_in_range(vpn) {
-                info!("[memory_validate] realloc stack");
+                info!(
+                    "[memory_validate] realloc stack, tid: {}",
+                    current_cpu().task.as_ref().unwrap().tid()
+                );
                 self.lazy_alloc_stack(vpn);
                 Ok(())
             } else if self.user_brk_area.vpn_range.is_in_range(vpn) {
-                info!("[memory_validate] realloc heap");
+                info!(
+                    "[memory_validate] realloc heap, tid: {}",
+                    current_cpu().task.as_ref().unwrap().tid()
+                );
                 self.lazy_alloc_brk(vpn);
                 Ok(())
             } else if self.mmap_manager.is_in_space(vpn) {
-                info!("[memory_validate] realloc mmap");
+                info!(
+                    "[memory_validate] realloc mmap, tid: {}",
+                    current_cpu().task.as_ref().unwrap().tid()
+                );
                 let res = self.lazy_alloc_mmap(vpn).await;
                 if let Err(res) = res {
                     warn!("[memory_validate] error when realloc mmap: {}", res);

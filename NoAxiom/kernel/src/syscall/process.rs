@@ -29,9 +29,13 @@ impl Syscall<'_> {
         tls: usize,   // TLS线程本地存储描述符
         ctid: usize,  // 子线程ID, addr
     ) -> SyscallResult {
-        debug!(
+        trace!(
             "[sys_fork] flags: {:x} stack: {:?} ptid: {:?} tls: {:?} ctid: {:?}",
-            flags, stack, ptid, tls, ctid
+            flags,
+            stack,
+            ptid,
+            tls,
+            ctid
         );
         let flags = CloneFlags::from_bits(flags & !0xff).unwrap();
         let task = self.task.fork(flags);
@@ -55,8 +59,10 @@ impl Syscall<'_> {
         } else {
             Path::from(path)
         };
-        info!("[sys_exec] path: {:?}", path);
-        info!("[sys_exec] argv: {:#x}, envp: {:#x}", argv, envp);
+        info!(
+            "[sys_exec] path: {:?} argv: {:#x}, envp: {:#x}",
+            path, argv, envp
+        );
         let args = UserPtr::<UserPtr<u8>>::new(argv).get_string_vec();
         let envs = UserPtr::<UserPtr<u8>>::new(envp).get_string_vec();
         self.task.exec(path, args, envs).await?;
@@ -72,9 +78,11 @@ impl Syscall<'_> {
         options: usize,
         _rusage: usize,
     ) -> SyscallResult {
-        info!(
+        trace!(
             "[sys_wait4] pid: {:?}, status_addr: {:?}, options: {:?}",
-            pid, status_addr, options
+            pid,
+            status_addr,
+            options
         );
         let pid = pid as isize;
         let options = WaitOption::from_bits(options as i32).ok_or(Errno::EINVAL)?;
@@ -98,7 +106,7 @@ impl Syscall<'_> {
         // work out target tasks
         let target_task = match pid_type {
             PidSel::Task(None) => {
-                info!("[sys_wait4] task {} wait for all children", self.task.tid());
+                trace!("[sys_wait4] task {} wait for all children", self.task.tid());
                 children.into_iter().find(|task| task.is_zombie())
             }
             PidSel::Task(Some(pid)) => {
@@ -117,7 +125,7 @@ impl Syscall<'_> {
         // wait for target task
         let (target_tid, exit_code) = match target_task {
             Some(target_task) => {
-                info!("[sys_wait4] wait for task {}", target_task.tid());
+                trace!("[sys_wait4] wait for task {}", target_task.tid());
                 (target_task.tid(), target_task.exit_code())
             }
             None => {
@@ -127,7 +135,7 @@ impl Syscall<'_> {
                 let task = self.task;
                 let (found_pid, exit_code) = loop {
                     task.set_wake_signal(!*task.sig_mask() | SigMask::SIGCHLD);
-                    info!("[sys_wait4] yield now, waiting for SIGCHLD");
+                    trace!("[sys_wait4] yield now, waiting for SIGCHLD");
                     // use polling instead of waker
                     suspend_now().await;
                     let sig_info = task.pending_sigs().pop_with_mask(SigMask::SIGCHLD);
@@ -158,12 +166,12 @@ impl Syscall<'_> {
         };
 
         if !status.is_null() {
-            info!(
+            trace!(
                 "[sys_wait4]: write exit_code at status_addr = {:#x}",
                 status.addr().0,
             );
             status.write_volatile((exit_code & 0xff) << 8);
-            info!("[sys_wait4]: write exit code {:#x}", exit_code);
+            trace!("[sys_wait4]: write exit code {:#x}", exit_code);
         }
         self.task
             .pcb()

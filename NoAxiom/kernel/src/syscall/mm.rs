@@ -12,7 +12,7 @@ use crate::{
 
 impl Syscall<'_> {
     pub fn sys_brk(&self, brk: usize) -> SyscallResult {
-        debug!("[sys_brk] brk: {:#x}", brk);
+        trace!("[sys_brk] brk: {:#x}", brk);
         if brk == 0 {
             Ok(self.task.memory_set().lock().user_brk as isize)
         } else {

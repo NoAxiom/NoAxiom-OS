@@ -372,14 +372,14 @@ impl Task {
 
         // user stack pointer
         let mut user_sp = user_sp;
-        info!("user_sp: {:#x}", user_sp);
+        trace!("user_sp: {:#x}", user_sp);
         // argument vector
         let mut argv = vec![0; args.len() + 1];
         // environment pointer, end with NULL
         let mut envp = vec![0; envs.len() + 1];
 
         // === push args ===
-        info!("[init_user_stack] push args: {:?}", args);
+        trace!("[init_user_stack] push args: {:?}", args);
         for (i, s) in args.iter().enumerate() {
             let len = s.len();
             user_sp -= len + 1;
@@ -393,7 +393,7 @@ impl Task {
         user_sp -= user_sp % core::mem::size_of::<usize>();
 
         // === push env ===
-        info!("[init_user_stack] push envs: {:?}", envs);
+        trace!("[init_user_stack] push envs: {:?}", envs);
         for (i, s) in envs.iter().enumerate() {
             let len = s.len();
             user_sp -= len + 1;
@@ -420,7 +420,7 @@ impl Task {
         }
         // terminator: auxv end with AT_NULL
         auxs.push(AuxEntry(AT_NULL, 0 as usize)); // end
-        info!("[init_user_stack] auxs: {:?}", auxs);
+        trace!("[init_user_stack] auxs: {:?}", auxs);
 
         // construct auxv
         trace!("[init_user_stack] construct auxv");
@@ -575,12 +575,14 @@ impl Task {
     pub fn grow_brk(self: &Arc<Self>, new_brk: usize) -> SyscallResult {
         let mut memory_set: LockGuard<'_, MemorySet> = self.memory_set.lock();
         let grow_size = new_brk - memory_set.user_brk;
-        debug!(
+        trace!(
             "[grow_brk] start: {:#x}, old_brk: {:#x}, new_brk: {:#x}",
-            memory_set.user_brk_start, memory_set.user_brk, new_brk
+            memory_set.user_brk_start,
+            memory_set.user_brk,
+            new_brk
         );
         if grow_size > 0 {
-            debug!("[grow_brk] expanded");
+            trace!("[grow_brk] expanded");
             let growed_addr: usize = memory_set.user_brk + grow_size as usize;
             let limit = memory_set.user_brk_start + USER_HEAP_SIZE;
             if growed_addr > limit {
@@ -588,7 +590,7 @@ impl Task {
             }
             memory_set.user_brk = growed_addr;
         } else {
-            debug!("[grow_brk] shrinked");
+            trace!("[grow_brk] shrinked");
             if new_brk < memory_set.user_brk_start {
                 return_errno!(Errno::EINVAL);
             }

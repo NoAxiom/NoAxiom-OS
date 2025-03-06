@@ -33,3 +33,5 @@ Basic information is listed as below.
 [DragonOS](https://github.com/DragonOS-Community/DragonOS)
 
 [Titanix](https://gitlab.eduxiji.net/202318123101314/oskernel2023-Titanix)
+
+[Phoenix](https://gitlab.eduxiji.net/educg-group-22026-2376550/T202418123993075-1053)
