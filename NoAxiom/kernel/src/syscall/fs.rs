@@ -59,7 +59,7 @@ impl Syscall<'_> {
         fd_table.set(write_fd as usize, write_end);
         buf_slice[1] = write_fd as i32;
 
-        debug!("[sys_pipe]: read fd {}, write fd {}", read_fd, write_fd);
+        info!("[sys_pipe]: read fd {}, write fd {}", read_fd, write_fd);
         Ok(0)
     }
 
@@ -318,7 +318,7 @@ impl Syscall<'_> {
         let ptr = UserPtr::<u8>::new(fstype);
         let fstype = get_string_from_ptr(&ptr);
         let flags = MountFlags::from_bits(flags as u32).ok_or(Errno::EINVAL)?;
-        debug!(
+        info!(
             "[sys_mount] special: {}, dir: {}, fstype: {}, flags: {:?}",
             special, dir, fstype, flags
         );
@@ -332,7 +332,7 @@ impl Syscall<'_> {
         let mut split_path = dir.split('/').collect::<Vec<&str>>();
         let name = split_path.pop().unwrap();
         let parent = root_dentry().find_path(&split_path)?;
-        debug!("[sys_mount] parent: {:?}, name: {}", parent.name(), name);
+        trace!("[sys_mount] parent: {:?}, name: {}", parent.name(), name);
         fs.root(Some(parent), flags, name, Some(device)).await;
         Ok(0)
     }
@@ -374,7 +374,7 @@ impl Syscall<'_> {
 
     /// Unlink a file, also delete the file if nlink is 0
     pub async fn sys_unlinkat(&self, dirfd: usize, path: usize, _flags: usize) -> SyscallResult {
-        debug!(
+        info!(
             "[sys_unlinkat] dirfd: {}, path: {}",
             dirfd as isize,
             get_string_from_ptr(&UserPtr::<u8>::new(path))
@@ -398,7 +398,7 @@ fn get_path(
     if !path_str.starts_with('/') {
         if fd == AT_FDCWD {
             let cwd = task.pcb().cwd.clone().from_cd(&"..");
-            debug!("[{debug_syscall_name}] cwd: {:?}", cwd);
+            trace!("[{debug_syscall_name}] cwd: {:?}", cwd);
             Ok(cwd.from_cd_or_create(&path_str))
         } else {
             let cwd = task
@@ -407,7 +407,7 @@ fn get_path(
                 .ok_or(Errno::EBADF)?
                 .dentry()
                 .path();
-            debug!("[{debug_syscall_name}] cwd: {:?}", cwd);
+            trace!("[{debug_syscall_name}] cwd: {:?}", cwd);
             Ok(cwd.from_cd_or_create(&path_str))
         }
     } else {
