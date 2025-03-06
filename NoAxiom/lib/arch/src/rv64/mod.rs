@@ -15,7 +15,9 @@ use sbi_rt::{
     send_ipi,
 };
 
-use crate::{ArchHart, ArchInt, ArchMemory, ArchSbi, ArchTime, ArchTrap, ArchType, FullVirtArch};
+use crate::{
+    ArchHart, ArchInfo, ArchInt, ArchMemory, ArchSbi, ArchTime, ArchTrap, ArchType, FullVirtArch,
+};
 
 pub struct RV64;
 
@@ -152,6 +154,10 @@ impl ArchTime for RV64 {
     fn set_timer(time_value: u64) -> usize {
         set_timer(time_value)
     }
+}
+
+impl ArchInfo for RV64 {
+    const ARCH_NAME: &'static str = "riscv64";
 }
 
 impl FullVirtArch for RV64 {}
