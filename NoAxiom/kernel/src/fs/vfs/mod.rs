@@ -1,13 +1,12 @@
 use alloc::sync::Arc;
 
 use basic::{dentry::Dentry, filesystem::FileSystem};
-use impls::{fat32::filesystem::FAT32FIleSystem, rust_fat32::filesystem::AsyncSmpFat32};
+use impls::rust_fat32::filesystem::AsyncSmpFat32;
 use ksync::Once;
 
 use crate::{
-    config::fs::BLOCK_SIZE,
-    device::block::BlockDevice,
-    include::fs::{InodeMode, MountFlags},
+    config::fs::BLOCK_SIZE, device::block::BlockDevice, fs::manager::FS_MANAGER,
+    include::fs::MountFlags,
 };
 pub mod basic;
 mod impls;
@@ -47,16 +46,18 @@ pub async fn device_test(device: Arc<dyn BlockDevice>) {
 
 /// Create the root dentry, mount multiple fs
 pub async fn fs_init() {
-    info!("[vfs] fs initial, mounting real fs");
+    info!("[vfs] fs initial, register file systems");
+    FS_MANAGER.register(Arc::new(RealFs::new("vfat")));
+    // todo: virtual fs support
+
+    info!("[vfs] fs initial, mounting the inital real fs");
     let device = chosen_device();
     device_test(device.clone()).await;
-    let disk_fs = Arc::new(RealFs::new("FAT32"));
+    let disk_fs = FS_MANAGER.get("vfat").unwrap();
     let root = disk_fs
         .root(None, MountFlags::empty(), "/", Some(device))
         .await; // the root also the vfs root
     ROOT_DENTRY.call_once(|| root);
-
-    // todo: virtual fs support
 
     // Load the root dentry
     root_dentry().open().unwrap().load_dir().await.unwrap();

@@ -1,11 +1,18 @@
 use alloc::vec::Vec;
 
+use virtio_drivers::device;
+
 use super::{Syscall, SyscallResult};
 use crate::{
     constant::fs::AT_FDCWD,
-    fs::{path::Path, pipe::PipeFile, vfs::root_dentry},
+    fs::{
+        manager::FS_MANAGER,
+        path::Path,
+        pipe::PipeFile,
+        vfs::{chosen_device, root_dentry},
+    },
     include::{
-        fs::{FileFlags, InodeMode, Kstat},
+        fs::{FileFlags, InodeMode, Kstat, MountFlags},
         result::Errno,
     },
     mm::user_ptr::UserPtr,
@@ -283,10 +290,61 @@ impl Syscall<'_> {
         Ok(0)
     }
 
+    /// Get dentries in a directory
     pub async fn sys_getdents64(&self, fd: usize, buf: usize, len: usize) -> SyscallResult {
         let file = self.task.fd_table().get(fd).ok_or(Errno::EBADF)?;
         let user_ptr = UserPtr::<u8>::new(buf);
         let buf_slice = user_ptr.as_slice_mut_checked(len).await?;
         file.read_dir(buf_slice).await
+    }
+
+    /// Mount a file system
+    pub async fn sys_mount(
+        &self,
+        special: usize,
+        dir: usize,
+        fstype: usize,
+        flags: usize,
+        _data: usize,
+    ) -> SyscallResult {
+        let ptr = UserPtr::<u8>::new(special);
+        let special = get_string_from_ptr(&ptr);
+        let ptr = UserPtr::<u8>::new(dir);
+        let dir = get_string_from_ptr(&ptr);
+        let ptr = UserPtr::<u8>::new(fstype);
+        let fstype = get_string_from_ptr(&ptr);
+        let flags = MountFlags::from_bits(flags as u32).ok_or(Errno::EINVAL)?;
+        debug!(
+            "[sys_mount] special: {}, dir: {}, fstype: {}, flags: {:?}",
+            special, dir, fstype, flags
+        );
+
+        let fs = FS_MANAGER.get(&fstype).ok_or(Errno::EINVAL)?;
+
+        // normally, we should choose the device by special
+        // but now we just use the default device
+        let device = chosen_device();
+
+        let mut split_path = dir.split('/').collect::<Vec<&str>>();
+        let name = split_path.pop().unwrap();
+        let parent = root_dentry().find_path(&split_path)?;
+        fs.root(Some(parent), flags, name, Some(device)).await;
+        Ok(0)
+    }
+
+    /// Unmount a file system
+    pub fn sys_umount2(&self, dir: usize, flags: usize) -> SyscallResult {
+        let ptr = UserPtr::<u8>::new(dir);
+        let dir = get_string_from_ptr(&ptr);
+        debug!("[sys_umount] target: {}", dir);
+
+        let _flags = MountFlags::from_bits(flags as u32).ok_or(Errno::EINVAL)?;
+
+        let mut split_path = dir.split('/').collect::<Vec<&str>>();
+        let name = split_path.pop().unwrap();
+        let parent = root_dentry().find_path(&split_path)?;
+        parent.remove_child(name);
+
+        Ok(0)
     }
 }

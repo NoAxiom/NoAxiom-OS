@@ -10,7 +10,7 @@ use super::{dentry::Dentry, superblock::SuperBlock};
 use crate::{device::block::BlockDevice, include::fs::MountFlags};
 
 pub struct FileSystemMeta {
-    name: String,
+    pub name: String,
     super_block: Option<Arc<dyn SuperBlock>>,
 }
 

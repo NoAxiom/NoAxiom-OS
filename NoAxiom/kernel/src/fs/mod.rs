@@ -4,6 +4,7 @@
 mod blockcache;
 pub mod fat32;
 pub mod fdtable;
+pub mod manager;
 pub mod path;
 pub mod pipe;
 pub mod stdio;

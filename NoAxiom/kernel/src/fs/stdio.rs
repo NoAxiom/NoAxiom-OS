@@ -40,7 +40,7 @@ impl File for Stdin {
         buf[0] = c as u8;
         Ok(1 as isize)
     }
-    async fn base_write(&self, offset: usize, buf: &[u8]) -> SyscallResult {
+    async fn base_write(&self, _offset: usize, _buf: &[u8]) -> SyscallResult {
         Err(Errno::ENOSYS)
     }
     async fn load_dir(&self) -> Result<(), Errno> {

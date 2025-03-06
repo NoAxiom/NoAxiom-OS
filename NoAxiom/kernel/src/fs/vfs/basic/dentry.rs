@@ -109,7 +109,7 @@ impl dyn Dentry {
         self.meta().children.lock().clone()
     }
 
-    /// Add a child dentry with `name` and `child_inode`.
+    /// Add a child dentry with `name` and `child_inode`, for realfs only.
     pub fn add_child(self: &Arc<Self>, name: &str, child_inode: Arc<dyn Inode>) -> Arc<dyn Dentry> {
         let mut children = self.meta().children.lock();
 
@@ -124,7 +124,13 @@ impl dyn Dentry {
         }
     }
 
-    /// Add a child to directory dentry with `name` and `mode`.
+    /// Remove a child dentry with `name`.
+    pub fn remove_child(self: &Arc<Self>, name: &str) {
+        self.meta().children.lock().remove(name);
+    }
+
+    /// Add a child to directory dentry with `name` and `mode`, for syscall
+    /// only.
     pub async fn add_dir_child(
         self: &Arc<Self>,
         name: &str,
@@ -190,7 +196,7 @@ impl dyn Dentry {
 
         while idx <= max_idx {
             let name = path[idx];
-            if name.is_empty() {
+            if name.is_empty() || name == "." {
                 idx += 1;
                 continue;
             }
