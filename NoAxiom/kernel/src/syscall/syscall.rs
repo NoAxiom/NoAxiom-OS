@@ -73,6 +73,8 @@ impl<'a> Syscall<'a> {
             // others
             SYS_TIMES => Self::sys_times(args[0]),
             SYS_SCHED_YIELD => Self::sys_yield().await,
+            SYS_UNAME => Self::sys_uname(args[0]),
+            SYS_GETTIMEOFDAY => Self::sys_gettimeofday(args[0]),
 
             // unsupported: return -1
             _ => {

@@ -63,5 +63,14 @@ pub trait ArchTime {
     fn set_timer(time_value: u64) -> usize;
 }
 
+/// arch info
+pub trait ArchInfo {
+    const ARCH_NAME: &'static str = "unknown";
+}
+
 /// full arch trait
-pub trait FullVirtArch: ArchInt + ArchHart + ArchSbi + ArchType + ArchTrap + ArchTime {}
+pub trait FullVirtArch:
+    ArchInt + ArchHart + ArchSbi + ArchType + ArchTrap + ArchTime + ArchInfo
+{
+    // should impl all traits above
+}

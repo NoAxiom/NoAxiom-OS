@@ -1,6 +1,12 @@
 use super::{Syscall, SyscallResult};
 use crate::{
-    include::time::TMS, mm::user_ptr::UserPtr, sched::utils::yield_now, time::gettime::get_time_us,
+    include::{info::Utsname, time::TMS},
+    mm::user_ptr::UserPtr,
+    sched::utils::yield_now,
+    time::{
+        gettime::{get_time_ms, get_time_us, get_timeval},
+        timeval::TimeVal,
+    },
 };
 
 impl Syscall<'_> {
@@ -20,7 +26,24 @@ impl Syscall<'_> {
             tms_cutime: sec,
             tms_cstime: sec,
         };
-        unsafe { tms.set(res) };
+        tms.write_volatile(res);
+        Ok(0)
+    }
+
+    pub fn sys_uname(buf: usize) -> SyscallResult {
+        let buf = UserPtr::<Utsname>::new(buf);
+        let res = Utsname::get();
+        buf.write_volatile(res);
+        Ok(0)
+    }
+
+    pub fn sys_gettimeofday(buf: usize) -> SyscallResult {
+        if buf == 0 {
+            return Ok(get_time_ms() as isize);
+        }
+        let buf = UserPtr::<TimeVal>::new(buf);
+        let timeval = get_timeval();
+        buf.write_volatile(timeval);
         Ok(0)
     }
 }
