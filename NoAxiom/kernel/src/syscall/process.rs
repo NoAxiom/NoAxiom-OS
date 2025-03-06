@@ -1,8 +1,3 @@
-use alloc::{
-    sync::{Arc, Weak},
-    vec::Vec,
-};
-
 use super::{Syscall, SyscallResult};
 use crate::{
     fs::path::Path,
@@ -15,7 +10,7 @@ use crate::{
     mm::user_ptr::UserPtr,
     return_errno,
     sched::{spawn::spawn_utask, utils::suspend_now},
-    task::{manager::TASK_MANAGER, Task},
+    task::manager::TASK_MANAGER,
 };
 
 impl Syscall<'_> {

@@ -6,7 +6,6 @@ use core::cmp::Ordering;
 use ksync::cell::SyncUnsafeCell;
 
 use crate::{
-    config::task::INIT_PROCESS_ID,
     constant::sched::{NICE_0_LOAD, SCHED_PRIO_TO_WEIGHT, SCHED_PRIO_TO_WMULT},
     task::Task,
 };

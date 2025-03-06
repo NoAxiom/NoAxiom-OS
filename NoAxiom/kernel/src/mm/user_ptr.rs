@@ -113,13 +113,6 @@ impl<T> UserPtr<T> {
         unsafe { self.ptr.write_volatile(value) };
     }
 
-    /// convert ptr into an mutable reference
-    /// please write data after memory_set.unlock
-    #[inline(always)]
-    pub fn as_ref_mut(&self) -> &mut T {
-        unsafe { &mut *(self.ptr as *mut T) }
-    }
-
     /// clone a slice as vec from user space
     pub fn clone_as_vec(&self, len: usize) -> Vec<T>
     where
