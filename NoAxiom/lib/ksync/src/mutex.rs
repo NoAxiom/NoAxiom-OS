@@ -2,7 +2,7 @@
 
 use core::{cell::RefMut, sync::atomic::AtomicUsize};
 
-use arch::{Arch, ArchHart, ArchInt};
+use arch::{Arch, ArchAsm, ArchInt};
 
 use super::cell::SyncRefCell;
 

@@ -10,7 +10,7 @@ use core::{
     task::Waker,
 };
 
-use arch::{Exception, TrapContext};
+use arch::{Arch, ArchInt, Exception, TrapContext};
 use ksync::{
     cell::SyncUnsafeCell,
     mutex::{LockGuard, SpinLock, SpinLockGuard},
@@ -477,7 +477,7 @@ impl Task {
             tmp
         };
 
-        if flags.contains(CloneFlags::THREAD) {
+        let res = if flags.contains(CloneFlags::THREAD) {
             // fork as a new thread
             debug!("fork new thread");
             let new_tid = tid_alloc();
@@ -530,7 +530,8 @@ impl Task {
             add_new_process(&new_process);
             parent_pcb.children.push(new_process.clone());
             new_process
-        }
+        };
+        res
     }
 
     /// execute

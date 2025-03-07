@@ -102,6 +102,7 @@ pub fn kernel_trap_handler() {
 /// user trap handler
 #[no_mangle]
 pub async fn user_trap_handler(task: &Arc<Task>) {
+    assert!(!Arch::is_interrupt_enabled());
     trace!("[trap_handler] call trap handler");
     set_kernel_trap_entry();
     let cx = task.trap_context_mut();
@@ -171,6 +172,14 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
                     task.tid(),
                 );
                 ext_int_handler();
+            }
+            Interrupt::SupervisorSoft => {
+                trace!(
+                    "[SupervisorSoft] interrupted at hart: {}, tid: {}",
+                    get_hartid(),
+                    task.tid(),
+                );
+                ipi_handler();
             }
             _ => {
                 user_exit("unsupported interrupt");

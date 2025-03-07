@@ -1,10 +1,10 @@
-mod hart;
+mod asm;
 mod interrupt;
 mod register;
 mod sbi;
 mod trap_cx;
 
-use hart::*;
+use asm::*;
 use interrupt::*;
 use register::*;
 use riscv::asm::sfence_vma_all;
@@ -16,7 +16,7 @@ use sbi_rt::{
 };
 
 use crate::{
-    ArchHart, ArchInfo, ArchInt, ArchMemory, ArchSbi, ArchTime, ArchTrap, ArchType, FullVirtArch,
+    ArchAsm, ArchInfo, ArchInt, ArchMemory, ArchSbi, ArchTime, ArchTrap, ArchType, FullVirtArch,
 };
 
 pub struct RV64;
@@ -73,10 +73,14 @@ impl ArchInt for RV64 {
     }
 }
 
-impl ArchHart for RV64 {
+impl ArchAsm for RV64 {
     #[inline(always)]
     fn get_hartid() -> usize {
         get_hartid()
+    }
+    #[inline(always)]
+    fn set_idle() {
+        set_idle();
     }
 }
 

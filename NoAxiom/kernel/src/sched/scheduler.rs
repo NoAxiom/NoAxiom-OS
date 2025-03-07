@@ -1,23 +1,13 @@
-use async_task::{Runnable, ScheduleInfo};
+use async_task::ScheduleInfo;
 
-use super::executor::TaskScheduleInfo;
-
-#[derive(Debug, Clone, Copy)]
-pub struct SchedLoadStats {
-    pub load: usize,
-    pub task_count: usize,
-}
+use super::executor::RunnableTask;
 
 pub trait Scheduler {
     fn default() -> Self;
-    fn push(&mut self, runnable: Runnable<TaskScheduleInfo>, info: ScheduleInfo);
-    fn pop(&mut self) -> Option<Runnable<TaskScheduleInfo>>;
-    fn load_stats(&mut self) -> SchedLoadStats;
-    fn be_stolen(&mut self) -> Option<Runnable<TaskScheduleInfo>> {
-        let res = self.pop();
-        // todo
-        res
-    }
+    fn push(&mut self, runnable: RunnableTask, info: ScheduleInfo);
+    fn pop(&mut self) -> Option<RunnableTask>;
+    fn is_overload(&self) -> bool;
+    fn is_underload(&self) -> bool;
 }
 
 // fixme: current sync scheme is incorrect, consider send ipi and flush cache

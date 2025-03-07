@@ -2,21 +2,26 @@
 //! - [`spawn_raw`] to add a task
 //! - [`run`] to run next task
 
-use alloc::sync::Arc;
-use core::future::Future;
+use alloc::vec::Vec;
+use core::sync::atomic::{AtomicUsize, Ordering};
 
-use arch::{Arch, ArchInt};
+use arch::{Arch, ArchAsm, ArchInt, ArchSbi};
 use array_init::array_init;
-use async_task::{Builder, Runnable, ScheduleInfo, WithInfo};
-use ksync::mutex::SpinLock;
+use async_task::{Runnable, ScheduleInfo};
+use ksync::{cell::SyncUnsafeCell, mutex::SpinLock};
 use lazy_static::lazy_static;
 
 use super::{
     cfs::CFS,
     sched_entity::{SchedEntity, SchedTaskInfo},
-    scheduler::{SchedLoadStats, Scheduler},
+    scheduler::Scheduler,
 };
-use crate::{config::arch::CPU_NUM, cpu::get_hartid};
+use crate::{
+    config::{arch::CPU_NUM, sched::LOAD_BALANCE_TICKS},
+    cpu::get_hartid,
+    time::gettime::get_time,
+    trap::ipi::{send_ipi, IpiType},
+};
 
 pub struct TaskScheduleInfo {
     pub sched_entity: SchedEntity,
@@ -31,8 +36,25 @@ impl TaskScheduleInfo {
     }
 }
 
-struct Runtime<T: Scheduler> {
-    pub scheduler: [SpinLock<T>; CPU_NUM],
+pub type RunnableTask = Runnable<TaskScheduleInfo>;
+pub struct Runtime<T: Scheduler> {
+    /// global task queue
+    global_tasks: SpinLock<Vec<RunnableTask>>,
+
+    /// use cpu mask to pass request
+    sched_req: AtomicUsize,
+
+    /// the load sum of all cores
+    all_load: AtomicUsize,
+
+    /// last contribution time
+    last_push_time: [SyncUnsafeCell<usize>; CPU_NUM],
+
+    /// last request time
+    last_req_time: [SyncUnsafeCell<usize>; CPU_NUM],
+
+    /// scheduler for each core
+    scheduler: [SyncUnsafeCell<T>; CPU_NUM],
 }
 
 impl<T> Runtime<T>
@@ -41,144 +63,131 @@ where
 {
     pub fn new() -> Self {
         Self {
-            scheduler: array_init(|_| SpinLock::new(T::default())),
+            global_tasks: SpinLock::new(Vec::new()),
+            sched_req: AtomicUsize::new(0),
+            all_load: AtomicUsize::new(0),
+            last_push_time: array_init(|_| SyncUnsafeCell::new(0)),
+            last_req_time: array_init(|_| SyncUnsafeCell::new(0)),
+            scheduler: array_init(|_| SyncUnsafeCell::new(T::default())),
         }
     }
-    pub fn schedule(&self, runnable: Runnable<TaskScheduleInfo>, info: ScheduleInfo) {
-        #[cfg(feature = "multicore")]
-        {
-            // normally we schedule task in local queue
-            // but if the task isn't shared by other thread
-            // then we can freely move it to other hart
-            // for ktask, spawn it in local hart as well
-            let mut hart = get_hartid();
-            if !info.woken_while_running {
-                if let Some(info) = runnable.metadata().task_info.as_ref() {
-                    if Arc::strong_count(&info.task.upgrade().unwrap().memory_set()) <= 1 {
-                        hart = min_load_hartid();
+
+    pub fn current_scheduler(&self) -> &mut T {
+        unsafe { &mut *self.scheduler[get_hartid()].get() }
+    }
+
+    pub fn push(&self, runnable: RunnableTask, info: ScheduleInfo) {
+        self.current_scheduler().push(runnable, info);
+    }
+    pub fn pop(&self) -> Option<RunnableTask> {
+        self.current_scheduler().pop()
+    }
+
+    pub fn set_sched_req(&self) {
+        let mask = 1 << get_hartid();
+        self.sched_req.fetch_or(mask, Ordering::SeqCst);
+        self.set_last_req_time(get_time());
+    }
+
+    pub fn get_load(&self) -> usize {
+        RUNTIME.all_load.load(core::sync::atomic::Ordering::SeqCst)
+    }
+    pub fn add_load(&self, load: usize) {
+        self.all_load.fetch_add(load, Ordering::SeqCst);
+    }
+    pub fn sub_load(&self, load: usize) {
+        self.all_load.fetch_sub(load, Ordering::SeqCst);
+    }
+
+    pub fn last_push_time(&self) -> usize {
+        unsafe { *self.last_push_time[get_hartid()].get() }
+    }
+    pub fn last_req_time(&self) -> usize {
+        unsafe { *self.last_req_time[get_hartid()].get() }
+    }
+    pub fn set_last_push_time(&self, time: usize) {
+        *&mut unsafe { *self.last_push_time[get_hartid()].get() } = time;
+    }
+    pub fn set_last_req_time(&self, time: usize) {
+        *&mut unsafe { *self.last_req_time[get_hartid()].get() } = time;
+    }
+
+    pub fn current_is_overload(&self) -> bool {
+        let is_timeup = get_time() - self.last_push_time() > LOAD_BALANCE_TICKS;
+        is_timeup && self.current_scheduler().is_overload()
+    }
+    pub fn current_is_underload(&self) -> bool {
+        get_time() - self.last_req_time() > LOAD_BALANCE_TICKS
+            && self.current_scheduler().is_underload()
+    }
+
+    pub fn try_respond_sched_req(&self) {
+        warn!("try_respond_sched_req");
+        let cur_hartid = get_hartid();
+        for i in 0..CPU_NUM {
+            if i == cur_hartid {
+                continue;
+            }
+            let mask = 1 << i;
+            let val = self.sched_req.fetch_and(!mask, Ordering::SeqCst);
+            if val & mask != 0 {
+                // request detected, now push tasks
+                while self.current_is_overload() {
+                    if let Some(runnable) = self.pop() {
+                        self.global_tasks.lock().push(runnable);
+                    } else {
+                        break;
                     }
                 }
+                warn!("load_balance done! now wake up hartid: {}", i);
+                self.set_last_push_time(get_time());
+                send_ipi(i, IpiType::LoadBalance);
+                return;
             }
-            self.scheduler[hart].lock().push(runnable, info);
         }
-        #[cfg(not(feature = "multicore"))]
-        {
-            self.scheduler[get_hartid()].lock().push(runnable, info);
-        }
-    }
-    pub fn pop_current(&self) -> Option<Runnable<TaskScheduleInfo>> {
-        self.scheduler[get_hartid()].lock().pop()
+        warn!("load_balance failed");
     }
 }
 
 // TODO: add muticore support
 lazy_static! {
-    static ref RUNTIME: Runtime<CFS> = Runtime::new();
+    pub static ref RUNTIME: Runtime<CFS> = Runtime::new();
 }
 
-/// Add a raw task into task queue
-pub fn spawn_raw<F, R>(future: F, sched_entity: SchedEntity, task_info: Option<SchedTaskInfo>)
-where
-    F: Future<Output = R> + Send + 'static,
-    R: Send + 'static,
-{
-    let (runnable, handle) = Builder::new()
-        .metadata(TaskScheduleInfo::new(sched_entity, task_info))
-        .spawn(
-            move |_: &TaskScheduleInfo| future,
-            WithInfo(move |runnable, info| RUNTIME.schedule(runnable, info)),
-        );
-    runnable.schedule();
-    handle.detach();
-}
-
-// TODO: don't calc it every time, instead calc it when push/pop happens
-/// get the hartid who holds min load
-fn min_load_hartid() -> usize {
-    #[cfg(not(feature = "multicore"))]
-    {
-        trace!("min_load_hartid: single core, return current hartid");
-        return get_hartid();
+/// when other core detect a load imbalance, it will send a IPI to this core
+/// and then the current core will enter this function to fetch global tasks
+pub fn load_balance_handler() {
+    let mut global = RUNTIME.global_tasks.lock();
+    let local = RUNTIME.current_scheduler();
+    while let Some(task) = global.pop() {
+        local.push_normal(task);
     }
-
-    let mut min_load = usize::MAX;
-    let mut min_hartid = get_hartid();
-    for (i, cfs) in RUNTIME.scheduler.iter().enumerate() {
-        let load = cfs.lock().load_stats().load;
-        if load < min_load {
-            min_load = load;
-            min_hartid = i;
-        }
-    }
-    min_hartid
-}
-
-/// get the hartid who holds max load
-/// return: (max_load, max_hartid)
-fn max_load_hartid() -> Option<usize> {
-    let mut max_load = 0;
-    let mut max_hartid = 0;
-    let mut flag = false;
-    let forbit_hart = get_hartid();
-    for (i, cfs) in RUNTIME.scheduler.iter().enumerate() {
-        if i != forbit_hart {
-            let SchedLoadStats { load, task_count } = cfs.lock().load_stats();
-            if load > max_load && task_count > 1 {
-                max_load = load;
-                max_hartid = i;
-                flag = true;
-            }
-        }
-    }
-    match flag {
-        true => Some(max_hartid),
-        false => None,
-    }
-}
-
-/// load balance, fetch the task from max load hart
-fn load_balance() -> Option<Runnable<TaskScheduleInfo>> {
-    let current_hart = get_hartid();
-    if let Some(from_hart) = max_load_hartid() {
-        // send_ipi(HartMask::from_mask_base(!get_hartid() & FULL_HART_MASK, 0));
-        let res = RUNTIME.scheduler[from_hart].lock().be_stolen();
-        if res.is_some() {
-            warn!(
-                "[load_balance] move task: hart {} -> hart: {}",
-                from_hart,    // RUNTIME.scheduler[from_hart].lock().load_stats().load,
-                current_hart, // RUNTIME.scheduler[current_hart].lock().load_stats().load
-            );
-        }
-        return res;
-    }
-    None
 }
 
 /// Pop a task and run it
 pub fn run() {
+    assert!(Arch::is_interrupt_enabled());
+    // Arch::enable_global_interrupt();
     // spin until find a valid task
-    let runnable = RUNTIME.pop_current();
+    let runnable = RUNTIME.pop();
     if let Some(runnable) = runnable {
-        #[cfg(feature = "async_fs")]
-        {
-            assert!(Arch::is_interrupt_enabled());
-        }
         runnable.run();
-    } else {
-        // TODO: 使用请求模式而不是抢占模式进行负载均衡
+    } else if RUNTIME.current_is_underload() {
         #[cfg(feature = "multicore")]
-        if let Some(runnable) = load_balance() {
-            #[cfg(feature = "async_fs")]
-            {
-                assert!(Arch::is_interrupt_enabled());
-            }
-            runnable.run();
+        {
+            // fixme: why did set_idle not work???
+            RUNTIME.set_sched_req();
+            assert!(Arch::is_interrupt_enabled());
+            return;
         }
     }
-    #[cfg(feature = "async_fs")]
+    #[cfg(feature = "multicore")]
     {
-        // FIXME!! we should think carefully about this
-        Arch::enable_global_interrupt();
-        assert!(Arch::is_interrupt_enabled());
+        if RUNTIME.current_is_overload() {
+            // if current core is overload, try to respond request from other cores
+            RUNTIME.try_respond_sched_req();
+        } else if RUNTIME.current_is_underload() {
+            RUNTIME.set_sched_req();
+        }
     }
 }

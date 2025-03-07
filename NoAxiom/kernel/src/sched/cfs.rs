@@ -1,18 +1,22 @@
 use alloc::collections::{btree_set::BTreeSet, vec_deque::VecDeque};
 use core::cmp::Ordering;
 
-use async_task::{Runnable, ScheduleInfo};
+use async_task::ScheduleInfo;
 
 use super::{
-    executor::TaskScheduleInfo,
+    executor::{RunnableTask, RUNTIME},
     sched_entity::SchedVruntime,
-    scheduler::{SchedLoadStats, Scheduler},
+    scheduler::Scheduler,
+};
+use crate::{
+    config::{arch::CPU_NUM, sched::LOAD_BALANCE_LIMIT},
+    constant::sched::NICE_0_LOAD,
 };
 
 struct CfsTreeNode {
     pub vruntime: SchedVruntime,
     pub tid: usize,
-    pub runnable: Runnable<TaskScheduleInfo>,
+    pub runnable: RunnableTask,
 }
 impl PartialEq for CfsTreeNode {
     fn eq(&self, other: &Self) -> bool {
@@ -44,7 +48,7 @@ pub struct CFS {
     /// cfs tree
     normal: BTreeSet<CfsTreeNode>,
     /// realtime / just-woken runnable queue
-    urgent: VecDeque<Runnable<TaskScheduleInfo>>,
+    urgent: VecDeque<RunnableTask>,
     /// load: sum of load_weight of tasks in scheduler
     load: usize,
     /// counter of task
@@ -52,17 +56,18 @@ pub struct CFS {
 }
 
 impl CFS {
-    pub const fn new() -> Self {
-        Self {
-            normal: BTreeSet::new(),
-            urgent: VecDeque::new(),
-            load: 0,
-            task_count: 0,
-        }
+    fn sub_load(&mut self, load: usize) {
+        RUNTIME.sub_load(load);
+        self.load -= load;
+        self.task_count -= 1;
     }
-    fn push_normal(&mut self, runnable: Runnable<TaskScheduleInfo>) {
-        self.load += runnable.metadata().sched_entity.get_load();
+    fn add_load(&mut self, load: usize) {
+        RUNTIME.add_load(load);
+        self.load += load;
         self.task_count += 1;
+    }
+    pub fn push_normal(&mut self, runnable: RunnableTask) {
+        self.add_load(runnable.metadata().sched_entity.get_load());
         let vruntime = runnable.metadata().sched_entity.inner().vruntime;
         let tid = runnable.metadata().sched_entity.tid;
         self.normal.insert(CfsTreeNode {
@@ -71,9 +76,8 @@ impl CFS {
             runnable,
         });
     }
-    fn push_urgent(&mut self, runnable: Runnable<TaskScheduleInfo>) {
-        self.load += runnable.metadata().sched_entity.get_load();
-        self.task_count += 1;
+    fn push_urgent(&mut self, runnable: RunnableTask) {
+        self.add_load(runnable.metadata().sched_entity.get_load());
         self.urgent.push_back(runnable);
     }
 }
@@ -81,11 +85,16 @@ impl CFS {
 impl Scheduler for CFS {
     /// default scheduler for init
     fn default() -> Self {
-        Self::new()
+        Self {
+            normal: BTreeSet::new(),
+            urgent: VecDeque::new(),
+            load: 0,
+            task_count: 0,
+        }
     }
 
     /// insert task into scheduler when [`core::task::Waker::wake`] get called
-    fn push(&mut self, runnable: Runnable<TaskScheduleInfo>, info: ScheduleInfo) {
+    fn push(&mut self, runnable: RunnableTask, info: ScheduleInfo) {
         trace!(
             "[sched] schedule task, sched_entity: {:?}, woken_while_running: {}",
             runnable.metadata().sched_entity.inner(),
@@ -96,35 +105,43 @@ impl Scheduler for CFS {
         } else {
             self.push_urgent(runnable);
         }
-        trace!("pushed task, load: {:?}", self.load_stats());
     }
 
     /// pop a task from scheduler
-    fn pop(&mut self) -> Option<Runnable<TaskScheduleInfo>> {
+    fn pop(&mut self) -> Option<RunnableTask> {
         let res = if let Some(runnable) = self.urgent.pop_front() {
-            self.load -= runnable.metadata().sched_entity.get_load();
-            self.task_count -= 1;
+            self.sub_load(runnable.metadata().sched_entity.get_load());
             Some(runnable)
         } else if let Some(node) = self.normal.pop_first() {
             let runnable = node.runnable;
-            self.load -= runnable.metadata().sched_entity.get_load();
-            self.task_count -= 1;
+            self.sub_load(runnable.metadata().sched_entity.get_load());
             Some(runnable)
         } else {
             None
         };
-        if res.is_some() {
-            trace!("normally poped task, load: {:?}", self.load_stats());
-        }
         res
     }
 
-    /// get load of scheduler
-    /// return: (load, task_count)
-    fn load_stats(&mut self) -> SchedLoadStats {
-        SchedLoadStats {
-            load: self.load,
-            task_count: self.task_count,
-        }
+    /// check if scheduler is overloaded
+    fn is_overload(&self) -> bool {
+        let all_load = RUNTIME.get_load();
+        let ave = all_load / CPU_NUM;
+        // if self.task_count > 1 {
+        //     warn!(
+        //         "overload: load: {}, task_count: {}, ave: {}, res: {}",
+        //         self.load,
+        //         self.task_count,
+        //         ave,
+        //         self.load > ave + ave / LOAD_BALANCE_LIMIT && self.task_count > 1
+        //     );
+        // }
+        self.load > ave + ave / LOAD_BALANCE_LIMIT && self.task_count > 1
+    }
+
+    /// check if scheduler is underloaded
+    fn is_underload(&self) -> bool {
+        let all_load = RUNTIME.get_load();
+        let ave = all_load / CPU_NUM;
+        self.load + ave / LOAD_BALANCE_LIMIT < ave && all_load > NICE_0_LOAD
     }
 }

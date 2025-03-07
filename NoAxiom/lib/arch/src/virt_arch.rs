@@ -20,9 +20,10 @@ pub trait ArchInt {
 }
 
 /// hart related arch trait
-pub trait ArchHart {
+pub trait ArchAsm {
     // get hartid
     fn get_hartid() -> usize;
+    fn set_idle();
 }
 
 /// basic arch types defination
@@ -70,7 +71,7 @@ pub trait ArchInfo {
 
 /// full arch trait
 pub trait FullVirtArch:
-    ArchInt + ArchHart + ArchSbi + ArchType + ArchTrap + ArchTime + ArchInfo
+    ArchInt + ArchAsm + ArchSbi + ArchType + ArchTrap + ArchTime + ArchInfo
 {
     // should impl all traits above
 }

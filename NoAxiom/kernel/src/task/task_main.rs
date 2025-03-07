@@ -1,4 +1,5 @@
 use alloc::sync::Arc;
+use arch::{Arch, ArchInt};
 use core::{
     future::Future,
     pin::Pin,
@@ -43,6 +44,7 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
             time_out - time_in,
             this.task.sched_entity.inner().vruntime.0
         );
+        Arch::enable_global_interrupt();
         ret
     }
 }
@@ -61,6 +63,7 @@ pub async fn task_main(task: Arc<Task>) {
         }
         // user -> kernel
         trace!("[task_main] user_trap_handler");
+        assert!(!Arch::is_interrupt_enabled());
         user_trap_handler(&task).await;
     }
     task.exit_handler().await;

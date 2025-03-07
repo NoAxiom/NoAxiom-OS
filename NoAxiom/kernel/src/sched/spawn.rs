@@ -5,8 +5,10 @@
 use alloc::sync::Arc;
 use core::future::Future;
 
+use async_task::{Builder, WithInfo};
+
 use super::{
-    executor::spawn_raw,
+    executor::{TaskScheduleInfo, RUNTIME},
     sched_entity::{SchedEntity, SchedTaskInfo},
 };
 use crate::{
@@ -16,6 +18,22 @@ use crate::{
         Task,
     },
 };
+
+/// Add a raw task into task queue
+pub fn spawn_raw<F, R>(future: F, sched_entity: SchedEntity, task_info: Option<SchedTaskInfo>)
+where
+    F: Future<Output = R> + Send + 'static,
+    R: Send + 'static,
+{
+    let (runnable, handle) = Builder::new()
+        .metadata(TaskScheduleInfo::new(sched_entity, task_info))
+        .spawn(
+            move |_: &TaskScheduleInfo| future,
+            WithInfo(move |runnable, info| RUNTIME.push(runnable, info)),
+        );
+    runnable.schedule();
+    handle.detach();
+}
 
 /// inner spawn: spawn a new user task
 pub fn spawn_utask(task: Arc<Task>) {
