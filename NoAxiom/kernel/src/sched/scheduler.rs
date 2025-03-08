@@ -11,6 +11,3 @@ pub trait Scheduler {
     fn is_overload(&self, all_load: usize) -> bool;
     fn is_underload(&self, all_load: usize) -> bool;
 }
-
-// fixme: current sync scheme is incorrect, consider send ipi and flush cache
-// fixme: use tlb-shoot-down to update mmap info (when multi-threading mmap)

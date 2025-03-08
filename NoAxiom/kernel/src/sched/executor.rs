@@ -32,10 +32,10 @@ impl TaskScheduleInfo {
         }
     }
     pub fn set_hartid(&self, hartid: usize) {
-        self.hartid.store(hartid, Ordering::SeqCst);
+        self.hartid.store(hartid, Ordering::Release);
     }
     pub fn hartid(&self) -> usize {
-        self.hartid.load(Ordering::SeqCst)
+        self.hartid.load(Ordering::Acquire)
     }
 }
 
@@ -107,18 +107,18 @@ where
 
     pub fn set_sched_req(&self) {
         let mask = 1 << get_hartid();
-        self.sched_req.fetch_or(mask, Ordering::SeqCst);
+        self.sched_req.fetch_or(mask, Ordering::AcqRel);
         self.set_last_request_time();
     }
 
     pub fn get_load(&self) -> usize {
-        RUNTIME.all_load.load(core::sync::atomic::Ordering::SeqCst)
+        RUNTIME.all_load.load(core::sync::atomic::Ordering::Relaxed)
     }
     pub fn add_load(&self, load: usize) {
-        self.all_load.fetch_add(load, Ordering::SeqCst);
+        self.all_load.fetch_add(load, Ordering::Relaxed);
     }
     pub fn sub_load(&self, load: usize) {
-        self.all_load.fetch_sub(load, Ordering::SeqCst);
+        self.all_load.fetch_sub(load, Ordering::Relaxed);
     }
 
     pub fn last_handle_time(&self) -> usize {
@@ -150,7 +150,7 @@ where
     }
 
     pub fn try_resp_sched_req(&self) {
-        if self.sched_req.load(Ordering::SeqCst) == 0 {
+        if self.sched_req.load(Ordering::Acquire) == 0 {
             return;
         }
         trace!("[try_respond_sched_req] begin!");
@@ -160,7 +160,7 @@ where
                 continue;
             }
             let mask = 1 << i;
-            let val = self.sched_req.fetch_and(!mask, Ordering::SeqCst);
+            let val = self.sched_req.fetch_and(!mask, Ordering::AcqRel);
             if val & mask != 0 {
                 // request detected, now push tasks
                 let mut mailbox = self.mailbox[i].mailbox.lock();
@@ -183,7 +183,7 @@ where
                 warn!("[load_balance] move: {} -> {}", cur_hartid, i);
                 warn!("[load_balance] tid_queue: {:?}", tid_queue);
                 self.set_last_handle_time();
-                self.mailbox[i].valid.store(true, Ordering::SeqCst);
+                self.mailbox[i].valid.store(true, Ordering::Release);
                 drop(mailbox);
                 send_ipi(i, IpiType::LoadBalance);
                 return;
@@ -196,17 +196,20 @@ where
     /// and then the current core will enter this function to fetch global tasks
     pub fn handle_mailbox(&self) {
         let hartid = get_hartid();
-        if !self.mailbox[hartid].valid.load(Ordering::SeqCst) {
+        if !self.mailbox[hartid].valid.load(Ordering::Acquire) {
             return;
         }
         debug!("[handle_mailbox] begin");
         let mut mailbox = self.mailbox[hartid].mailbox.lock();
         let local = self.current_scheduler();
         while let Some(task) = mailbox.pop() {
-            debug!("[handle_mailbox] push tid: {}", task.metadata().sched_entity.tid);
+            debug!(
+                "[handle_mailbox] push tid: {}",
+                task.metadata().sched_entity.tid
+            );
             local.push_normal(task);
         }
-        self.mailbox[hartid].valid.store(false, Ordering::SeqCst);
+        self.mailbox[hartid].valid.store(false, Ordering::Release);
         drop(mailbox);
     }
 
@@ -214,7 +217,7 @@ where
     /// this function is called when a task is woken up from other core
     pub fn push_one_to_mailbox(&self, hartid: usize, task: RunnableTask) {
         let mut mailbox = self.mailbox[hartid].mailbox.lock();
-        self.mailbox[hartid].valid.store(true, Ordering::SeqCst);
+        self.mailbox[hartid].valid.store(true, Ordering::Release);
         mailbox.push(task);
     }
 

@@ -1,7 +1,7 @@
 //! inter-process interrupt handler
 
 use alloc::sync::Arc;
-use core::{mem::swap, task::Waker};
+use core::mem::swap;
 
 use arch::{Arch, ArchMemory, ArchSbi};
 use array_init::array_init;
@@ -15,7 +15,6 @@ use crate::{
 #[derive(Clone)]
 pub enum IpiType {
     None,
-    Resched { waker: Waker },
     LoadBalance,
     TlbShootdown,
 }
@@ -76,10 +75,6 @@ pub fn ipi_handler() {
     let info = current_ipi_info();
     debug!("ipi handler, from_hartid: {}", info.from_hartid);
     match info.ipi_type {
-        IpiType::Resched { waker } => {
-            info!("[IPI] resched");
-            waker.wake();
-        }
         IpiType::TlbShootdown => {
             info!("[IPI] tlb shootdown");
             Arch::tlb_flush();

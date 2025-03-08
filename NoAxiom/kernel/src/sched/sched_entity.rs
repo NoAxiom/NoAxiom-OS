@@ -1,14 +1,11 @@
 //! CFS(completly fair schedule) scheduler entity
 
-use alloc::sync::{Arc, Weak};
+use alloc::sync::Arc;
 use core::cmp::Ordering;
 
 use ksync::cell::SyncUnsafeCell;
 
-use crate::{
-    constant::sched::{NICE_0_LOAD, SCHED_PRIO_TO_WEIGHT, SCHED_PRIO_TO_WMULT},
-    task::Task,
-};
+use crate::constant::sched::{NICE_0_LOAD, SCHED_PRIO_TO_WEIGHT, SCHED_PRIO_TO_WMULT};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Ord)]
 pub struct SchedVruntime(pub usize);
