@@ -9,9 +9,10 @@ use async_task::{Builder, WithInfo};
 
 use super::{
     executor::{TaskScheduleInfo, RUNTIME},
-    sched_entity::{SchedEntity, SchedTaskInfo},
+    sched_entity::SchedEntity,
 };
 use crate::{
+    cpu::get_hartid,
     fs::path::Path,
     task::{
         task_main::{task_main, UserTaskFuture},
@@ -20,16 +21,16 @@ use crate::{
 };
 
 /// Add a raw task into task queue
-pub fn spawn_raw<F, R>(future: F, sched_entity: SchedEntity, task_info: Option<SchedTaskInfo>)
+pub fn spawn_raw<F, R>(future: F, sched_entity: SchedEntity, hartid: usize)
 where
     F: Future<Output = R> + Send + 'static,
     R: Send + 'static,
 {
     let (runnable, handle) = Builder::new()
-        .metadata(TaskScheduleInfo::new(sched_entity, task_info))
+        .metadata(TaskScheduleInfo::new(sched_entity, hartid))
         .spawn(
             move |_: &TaskScheduleInfo| future,
-            WithInfo(move |runnable, info| RUNTIME.push_with_info(runnable, info)),
+            WithInfo(move |runnable, info| RUNTIME.schedule(runnable, info)),
         );
     runnable.schedule();
     handle.detach();
@@ -40,9 +41,7 @@ pub fn spawn_utask(task: Arc<Task>) {
     spawn_raw(
         UserTaskFuture::new(task.clone(), task_main(task.clone())),
         task.sched_entity.ref_clone(),
-        Some(SchedTaskInfo {
-            task: Arc::downgrade(&task),
-        }),
+        get_hartid(),
     );
 }
 
@@ -52,7 +51,7 @@ where
     F: Future<Output = R> + Send + 'static,
     R: Send + 'static,
 {
-    spawn_raw(future, SchedEntity::new_bare(0), None);
+    spawn_raw(future, SchedEntity::new_bare(0), get_hartid());
 }
 
 /// schedule a kernel_task to spawn a new task

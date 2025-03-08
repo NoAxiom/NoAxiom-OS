@@ -124,7 +124,3 @@ impl SchedEntity {
         }
     }
 }
-
-pub struct SchedTaskInfo {
-    pub task: Weak<Task>,
-}

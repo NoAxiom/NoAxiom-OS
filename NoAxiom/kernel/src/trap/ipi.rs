@@ -86,7 +86,7 @@ pub fn ipi_handler() {
         }
         IpiType::LoadBalance => {
             info!("[IPI] load balance");
-            RUNTIME.load_balance_handler();
+            RUNTIME.handle_mailbox();
         }
         _ => {
             info!("[IPI] unsupported ipi type");

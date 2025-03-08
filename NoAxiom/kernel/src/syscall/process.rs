@@ -78,11 +78,9 @@ impl Syscall<'_> {
         options: usize,
         _rusage: usize,
     ) -> SyscallResult {
-        trace!(
+        debug!(
             "[sys_wait4] pid: {:?}, status_addr: {:?}, options: {:?}",
-            pid,
-            status_addr,
-            options
+            pid, status_addr, options
         );
         let options = WaitOption::from_bits(options as i32).ok_or(Errno::EINVAL)?;
         let status: UserPtr<i32> = UserPtr::new(status_addr);
@@ -134,9 +132,10 @@ impl Syscall<'_> {
                 let task = self.task;
                 let (found_pid, exit_code) = loop {
                     task.set_wake_signal(!*task.sig_mask() | SigMask::SIGCHLD);
-                    trace!("[sys_wait4] yield now, waiting for SIGCHLD");
+                    debug!("[sys_wait4] yield now, waiting for SIGCHLD");
                     // use polling instead of waker
                     suspend_now().await;
+                    // debug!("[sys_wait4] resumed");
                     let sig_info = task.pending_sigs().pop_with_mask(SigMask::SIGCHLD);
                     if let Some(sig_info) = sig_info {
                         if let SigExtraInfo::Extend {
@@ -146,6 +145,10 @@ impl Syscall<'_> {
                             si_utime: _,
                         } = sig_info.extra_info
                         {
+                            debug!(
+                                "[sys_wait4] received SIGCHLD, pid: {}, status: {:?}",
+                                si_pid, si_status
+                            );
                             match pid_type {
                                 PidSel::Task(None) => break (si_pid, si_status),
                                 PidSel::Task(target_pid) => {

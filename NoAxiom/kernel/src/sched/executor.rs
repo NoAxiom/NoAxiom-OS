@@ -3,7 +3,7 @@
 //! - [`run`] to run next task
 
 use alloc::vec::Vec;
-use core::sync::atomic::{AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use arch::{Arch, ArchAsm, ArchInt};
 use array_init::array_init;
@@ -11,11 +11,7 @@ use async_task::{Runnable, ScheduleInfo};
 use ksync::{cell::SyncUnsafeCell, mutex::SpinLock};
 use lazy_static::lazy_static;
 
-use super::{
-    cfs::CFS,
-    sched_entity::{SchedEntity, SchedTaskInfo},
-    scheduler::Scheduler,
-};
+use super::{cfs::CFS, sched_entity::SchedEntity, scheduler::Scheduler};
 use crate::{
     config::{arch::CPU_NUM, sched::LOAD_BALANCE_TICKS},
     cpu::get_hartid,
@@ -25,21 +21,42 @@ use crate::{
 
 pub struct TaskScheduleInfo {
     pub sched_entity: SchedEntity,
-    pub task_info: Option<SchedTaskInfo>,
+    /// the hartid that the task should be running on
+    pub hartid: AtomicUsize,
 }
 impl TaskScheduleInfo {
-    pub fn new(sched_entity: SchedEntity, task_info: Option<SchedTaskInfo>) -> Self {
+    pub fn new(sched_entity: SchedEntity, hartid: usize) -> Self {
         Self {
             sched_entity,
-            task_info,
+            hartid: AtomicUsize::new(hartid),
         }
+    }
+    pub fn set_hartid(&self, hartid: usize) {
+        self.hartid.store(hartid, Ordering::SeqCst);
+    }
+    pub fn hartid(&self) -> usize {
+        self.hartid.load(Ordering::SeqCst)
     }
 }
 
 pub type RunnableTask = Runnable<TaskScheduleInfo>;
+
+struct RunnableMailbox {
+    pub valid: AtomicBool,
+    pub mailbox: SpinLock<Vec<RunnableTask>>,
+}
+impl RunnableMailbox {
+    pub fn new() -> Self {
+        Self {
+            valid: AtomicBool::new(false),
+            mailbox: SpinLock::new(Vec::new()),
+        }
+    }
+}
+
 pub struct Runtime<T: Scheduler> {
     /// global task queue
-    global_tasks: SpinLock<Vec<RunnableTask>>,
+    mailbox: [RunnableMailbox; CPU_NUM],
 
     /// use cpu mask to pass request
     sched_req: AtomicUsize,
@@ -63,7 +80,7 @@ where
 {
     pub fn new() -> Self {
         Self {
-            global_tasks: SpinLock::new(Vec::new()),
+            mailbox: array_init(|_| RunnableMailbox::new()),
             sched_req: AtomicUsize::new(0),
             all_load: AtomicUsize::new(0),
             last_handle_time: array_init(|_| SyncUnsafeCell::new(0)),
@@ -76,8 +93,13 @@ where
         unsafe { &mut *self.scheduler[get_hartid()].get() }
     }
 
-    pub fn push_with_info(&self, runnable: RunnableTask, info: ScheduleInfo) {
-        self.current_scheduler().push_with_info(runnable, info);
+    pub fn schedule(&self, runnable: RunnableTask, info: ScheduleInfo) {
+        let woken_hartid = runnable.metadata().hartid();
+        if woken_hartid == get_hartid() {
+            self.current_scheduler().push_with_info(runnable, info);
+        } else {
+            self.push_one_to_mailbox(woken_hartid, runnable);
+        }
     }
     pub fn pop(&self) -> Option<RunnableTask> {
         self.current_scheduler().pop()
@@ -141,26 +163,28 @@ where
             let val = self.sched_req.fetch_and(!mask, Ordering::SeqCst);
             if val & mask != 0 {
                 // request detected, now push tasks
-                let mut global = self.global_tasks.lock();
+                let mut mailbox = self.mailbox[i].mailbox.lock();
                 // the overall load will change when we pop tasks
                 // so save the previous load first
                 let all_load = RUNTIME.get_load();
                 while self.current_scheduler().is_overload(all_load) {
                     if let Some(runnable) = self.pop() {
-                        global.push(runnable);
+                        runnable.metadata().set_hartid(i);
+                        mailbox.push(runnable);
                     } else {
                         error!("[try_respond_sched_req] break from loop");
                         break;
                     }
                 }
-                let tid_queue: Vec<usize> = global
+                let tid_queue: Vec<usize> = mailbox
                     .iter()
                     .map(|task| task.metadata().sched_entity.tid)
                     .collect();
                 warn!("[load_balance] move: {} -> {}", cur_hartid, i);
                 warn!("[load_balance] tid_queue: {:?}", tid_queue);
                 self.set_last_handle_time();
-                drop(global);
+                self.mailbox[i].valid.store(true, Ordering::SeqCst);
+                drop(mailbox);
                 send_ipi(i, IpiType::LoadBalance);
                 return;
             }
@@ -170,16 +194,33 @@ where
 
     /// when other core detect a load imbalance, it will send a IPI to this core
     /// and then the current core will enter this function to fetch global tasks
-    pub fn load_balance_handler(&self) {
-        let mut global = self.global_tasks.lock();
+    pub fn handle_mailbox(&self) {
+        let hartid = get_hartid();
+        if !self.mailbox[hartid].valid.load(Ordering::SeqCst) {
+            return;
+        }
+        debug!("[handle_mailbox] begin");
+        let mut mailbox = self.mailbox[hartid].mailbox.lock();
         let local = self.current_scheduler();
-        while let Some(task) = global.pop() {
+        while let Some(task) = mailbox.pop() {
+            debug!("[handle_mailbox] push tid: {}", task.metadata().sched_entity.tid);
             local.push_normal(task);
         }
+        self.mailbox[hartid].valid.store(false, Ordering::SeqCst);
+        drop(mailbox);
+    }
+
+    /// push one task into other's mailbox
+    /// this function is called when a task is woken up from other core
+    pub fn push_one_to_mailbox(&self, hartid: usize, task: RunnableTask) {
+        let mut mailbox = self.mailbox[hartid].mailbox.lock();
+        self.mailbox[hartid].valid.store(true, Ordering::SeqCst);
+        mailbox.push(task);
     }
 
     /// Pop a task and run it
     pub fn run(&self) {
+        self.handle_mailbox();
         if let Some(runnable) = self.pop() {
             runnable.run();
             #[cfg(feature = "multicore")]
