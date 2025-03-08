@@ -33,6 +33,7 @@ impl PendingSigs {
             self.queue.push_back(sig_info);
         }
         if let Some(waker) = self.waker.as_ref() {
+            // fixme: this waker is incorrect!
             waker.wake_by_ref();
         }
     }

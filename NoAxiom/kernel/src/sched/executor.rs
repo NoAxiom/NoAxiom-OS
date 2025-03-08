@@ -41,11 +41,16 @@ impl TaskScheduleInfo {
 
 pub type RunnableTask = Runnable<TaskScheduleInfo>;
 
-struct RunnableMailbox {
-    pub valid: AtomicBool,
-    pub mailbox: SpinLock<Vec<RunnableTask>>,
+pub enum MailboxType {
+    Task(RunnableTask),
+    // Waker(Waker),
 }
-impl RunnableMailbox {
+
+struct RunnableMailbox<T> {
+    pub valid: AtomicBool,
+    pub mailbox: SpinLock<Vec<T>>,
+}
+impl<T> RunnableMailbox<T> {
     pub fn new() -> Self {
         Self {
             valid: AtomicBool::new(false),
@@ -55,8 +60,8 @@ impl RunnableMailbox {
 }
 
 pub struct Runtime<T: Scheduler> {
-    /// global task queue
-    mailbox: [RunnableMailbox; CPU_NUM],
+    /// global task mailbox
+    mailbox: [RunnableMailbox<MailboxType>; CPU_NUM],
 
     /// use cpu mask to pass request
     sched_req: AtomicUsize,
@@ -96,9 +101,17 @@ where
     pub fn schedule(&self, runnable: RunnableTask, info: ScheduleInfo) {
         let woken_hartid = runnable.metadata().hartid();
         if woken_hartid == get_hartid() {
+            debug!(
+                "[schedule] task is pushed to scheduler, tid: {}",
+                runnable.metadata().sched_entity.tid
+            );
             self.current_scheduler().push_with_info(runnable, info);
         } else {
-            self.push_one_to_mailbox(woken_hartid, runnable);
+            info!(
+                "[schedule] waker is pushed to mailbox, tid: {}",
+                runnable.metadata().sched_entity.tid
+            );
+            self.push_one_to_mailbox(woken_hartid, MailboxType::Task(runnable));
         }
     }
     pub fn pop(&self) -> Option<RunnableTask> {
@@ -170,18 +183,13 @@ where
                 while self.current_scheduler().is_overload(all_load) {
                     if let Some(runnable) = self.pop() {
                         runnable.metadata().set_hartid(i);
-                        mailbox.push(runnable);
+                        mailbox.push(MailboxType::Task(runnable));
                     } else {
                         error!("[try_respond_sched_req] break from loop");
                         break;
                     }
                 }
-                let tid_queue: Vec<usize> = mailbox
-                    .iter()
-                    .map(|task| task.metadata().sched_entity.tid)
-                    .collect();
                 warn!("[load_balance] move: {} -> {}", cur_hartid, i);
-                warn!("[load_balance] tid_queue: {:?}", tid_queue);
                 self.set_last_handle_time();
                 self.mailbox[i].valid.store(true, Ordering::Release);
                 drop(mailbox);
@@ -203,22 +211,26 @@ where
         let mut mailbox = self.mailbox[hartid].mailbox.lock();
         let local = self.current_scheduler();
         while let Some(task) = mailbox.pop() {
-            debug!(
-                "[handle_mailbox] push tid: {}",
-                task.metadata().sched_entity.tid
-            );
-            local.push_normal(task);
+            match task {
+                // MailboxType::Waker(waker) => {
+                //     debug!("[handle_mailbox] wake");
+                //     waker.wake();
+                // }
+                MailboxType::Task(runnable) => {
+                    local.push_normal(runnable);
+                }
+            }
         }
         self.mailbox[hartid].valid.store(false, Ordering::Release);
         drop(mailbox);
     }
 
-    /// push one task into other's mailbox
+    /// push one waker into other's mailbox
     /// this function is called when a task is woken up from other core
-    pub fn push_one_to_mailbox(&self, hartid: usize, task: RunnableTask) {
+    pub fn push_one_to_mailbox(&self, hartid: usize, data: MailboxType) {
         let mut mailbox = self.mailbox[hartid].mailbox.lock();
         self.mailbox[hartid].valid.store(true, Ordering::Release);
-        mailbox.push(task);
+        mailbox.push(data);
     }
 
     /// Pop a task and run it
