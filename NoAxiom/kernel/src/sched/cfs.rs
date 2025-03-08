@@ -66,20 +66,6 @@ impl CFS {
         self.load += load;
         self.task_count += 1;
     }
-    pub fn push_normal(&mut self, runnable: RunnableTask) {
-        self.add_load(runnable.metadata().sched_entity.get_load());
-        let vruntime = runnable.metadata().sched_entity.inner().vruntime;
-        let tid = runnable.metadata().sched_entity.tid;
-        self.normal.insert(CfsTreeNode {
-            vruntime,
-            tid,
-            runnable,
-        });
-    }
-    fn push_urgent(&mut self, runnable: RunnableTask) {
-        self.add_load(runnable.metadata().sched_entity.get_load());
-        self.urgent.push_back(runnable);
-    }
 }
 
 impl Scheduler for CFS {
@@ -94,7 +80,7 @@ impl Scheduler for CFS {
     }
 
     /// insert task into scheduler when [`core::task::Waker::wake`] get called
-    fn push(&mut self, runnable: RunnableTask, info: ScheduleInfo) {
+    fn push_with_info(&mut self, runnable: RunnableTask, info: ScheduleInfo) {
         trace!(
             "[sched] schedule task, sched_entity: {:?}, woken_while_running: {}",
             runnable.metadata().sched_entity.inner(),
@@ -105,6 +91,21 @@ impl Scheduler for CFS {
         } else {
             self.push_urgent(runnable);
         }
+    }
+
+    fn push_normal(&mut self, runnable: RunnableTask) {
+        self.add_load(runnable.metadata().sched_entity.get_load());
+        let vruntime = runnable.metadata().sched_entity.inner().vruntime;
+        let tid = runnable.metadata().sched_entity.tid;
+        self.normal.insert(CfsTreeNode {
+            vruntime,
+            tid,
+            runnable,
+        });
+    }
+    fn push_urgent(&mut self, runnable: RunnableTask) {
+        self.add_load(runnable.metadata().sched_entity.get_load());
+        self.urgent.push_back(runnable);
     }
 
     /// pop a task from scheduler
@@ -123,24 +124,13 @@ impl Scheduler for CFS {
     }
 
     /// check if scheduler is overloaded
-    fn is_overload(&self) -> bool {
-        let all_load = RUNTIME.get_load();
+    fn is_overload(&self, all_load: usize) -> bool {
         let ave = all_load / CPU_NUM;
-        // if self.task_count > 1 {
-        //     warn!(
-        //         "overload: load: {}, task_count: {}, ave: {}, res: {}",
-        //         self.load,
-        //         self.task_count,
-        //         ave,
-        //         self.load > ave + ave / LOAD_BALANCE_LIMIT && self.task_count > 1
-        //     );
-        // }
-        self.load > ave + ave / LOAD_BALANCE_LIMIT && self.task_count > 1
+        self.load > ave + ave / LOAD_BALANCE_LIMIT + 1 && self.task_count > 1
     }
 
     /// check if scheduler is underloaded
-    fn is_underload(&self) -> bool {
-        let all_load = RUNTIME.get_load();
+    fn is_underload(&self, all_load: usize) -> bool {
         let ave = all_load / CPU_NUM;
         self.load + ave / LOAD_BALANCE_LIMIT < ave && all_load > NICE_0_LOAD
     }

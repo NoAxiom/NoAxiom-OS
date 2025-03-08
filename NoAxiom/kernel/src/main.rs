@@ -52,6 +52,6 @@ pub fn rust_main() {
     info!("[kernel] hart id {} has been booted", cpu::get_hartid());
     trap::ipi::send_ipi_test();
     loop {
-        sched::executor::run();
+        sched::executor::RUNTIME.run();
     }
 }

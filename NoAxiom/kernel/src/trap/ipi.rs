@@ -9,8 +9,7 @@ use ksync::mutex::SpinLock;
 use lazy_static::lazy_static;
 
 use crate::{
-    config::arch::CPU_NUM, cpu::get_hartid, entry::init::BOOT_HART_ID,
-    sched::executor::load_balance_handler,
+    config::arch::CPU_NUM, cpu::get_hartid, entry::init::BOOT_HART_ID, sched::executor::RUNTIME,
 };
 
 #[derive(Clone)]
@@ -78,19 +77,19 @@ pub fn ipi_handler() {
     debug!("ipi handler, from_hartid: {}", info.from_hartid);
     match info.ipi_type {
         IpiType::Resched { waker } => {
-            warn!("[IPI] resched");
+            info!("[IPI] resched");
             waker.wake();
         }
         IpiType::TlbShootdown => {
-            warn!("[IPI] tlb shootdown");
+            info!("[IPI] tlb shootdown");
             Arch::tlb_flush();
         }
         IpiType::LoadBalance => {
-            warn!("[IPI] load balance");
-            load_balance_handler();
+            info!("[IPI] load balance");
+            RUNTIME.load_balance_handler();
         }
         _ => {
-            warn!("[IPI] unsupported ipi type");
+            info!("[IPI] unsupported ipi type");
         }
     }
     Arch::clear_ipi();

@@ -506,7 +506,7 @@ impl Task {
             // fork as a new process
             let new_tid = tid_alloc();
             let tid_val = new_tid.0;
-            debug!("fork new process, tgid: {}", tid_val);
+            trace!("fork new process, tgid: {}", tid_val);
             let mut parent_pcb = self.pcb();
             let new_process = Arc::new(Self {
                 tid: new_tid,

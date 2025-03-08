@@ -29,7 +29,7 @@ where
         .metadata(TaskScheduleInfo::new(sched_entity, task_info))
         .spawn(
             move |_: &TaskScheduleInfo| future,
-            WithInfo(move |runnable, info| RUNTIME.push(runnable, info)),
+            WithInfo(move |runnable, info| RUNTIME.push_with_info(runnable, info)),
         );
     runnable.schedule();
     handle.detach();

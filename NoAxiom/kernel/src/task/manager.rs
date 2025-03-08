@@ -135,7 +135,7 @@ impl Task {
                 }
                 pcb.children.clear();
             }
-            debug!("[delete_children] task {} delete all children", self.tid());
+            trace!("[delete_children] task {} delete all children", self.tid());
         }
     }
 }
