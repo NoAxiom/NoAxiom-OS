@@ -7,10 +7,20 @@
 //! e.g. for socket I/O
 
 use alloc::{sync::Arc, vec::Vec};
+use core::{
+    cell::UnsafeCell,
+    future::Future,
+    pin::Pin,
+    task::{Context, Poll, Waker},
+};
 
 use ksync::mutex::SpinLock;
 
-use crate::{sched::utils::yield_now, syscall::SysResult, task::Task};
+use crate::{
+    sched::utils::{suspend_now, yield_now},
+    syscall::SysResult,
+    task::Task,
+};
 
 /// for ProcessManager
 pub trait AwakenedProcessManager {
@@ -56,17 +66,64 @@ impl AwakenedProcessManager for TmpProcessManager {
 
 type Manager = TmpProcessManager;
 
+enum EventState {
+    Created,
+    Waiting,
+    Accepted,
+}
+
 /// ## The `Event`
 ///
-/// we use bit to represent the interested events
 ///
 /// ### Usage
 ///
 /// ```rust
-/// let events = Event(0o01010); // interested in the 1st and 3th events
-/// let events = Event(0o11111); // interested in all the events
+/// // some where define the event_wait_queue
+/// let async_driver_wait_queue = Arc::new(SpinLock::new(EventWaitQueue::new()));
+///
+/// // process A:
+/// let event_id = alloc();
+/// let event = Event::new(event_id, async_driver_wait_queue.clone()); // todo: too many parameters!
+/// send_read_request(event_id);
+/// event.await; // wait for the event
+/// handle_read_response(event_id);
+///
+/// // process B(like interrupt handler):
+/// async_driver_wait_queue.lock().wake_up(event_id);
 /// ```
-pub struct Event(usize);
+pub struct Event {
+    pub id: usize,
+    wait_queue: Arc<SpinLock<EventWaitQueue>>,
+    state: UnsafeCell<EventState>,
+}
+
+impl Event {
+    pub fn new(id: usize, wait_queue: Arc<SpinLock<EventWaitQueue>>) -> Self {
+        Self {
+            id,
+            wait_queue,
+            state: UnsafeCell::new(EventState::Created),
+        }
+    }
+}
+
+impl Future for Event {
+    type Output = ();
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
+        let state = unsafe { &mut *self.state.get() };
+        match *state {
+            EventState::Created => {
+                *state = EventState::Waiting;
+                let mut queue = self.wait_queue.lock();
+                queue.sleep(self.id, cx.waker().clone()).unwrap();
+                Poll::Pending
+            }
+            EventState::Waiting => Poll::Pending,
+            EventState::Accepted => Poll::Ready(()),
+        }
+    }
+}
 
 /// ## The EventWaitQueue
 ///
@@ -85,67 +142,41 @@ pub struct Event(usize);
 /// ```
 pub struct EventWaitQueue {
     /// the list of tasks waiting for this event
-    inner: SpinLock<Vec<(Event, Arc<Task>)>>,
+    inner: Vec<(usize, Waker)>,
 }
 
 impl EventWaitQueue {
     pub fn new() -> Self {
-        Self {
-            inner: SpinLock::new(Vec::new()),
-        }
+        Self { inner: Vec::new() }
     }
 
-    /// Let current process wait for the events, schedule
-    pub async fn sleep_schedule(&self, events: Event) -> SysResult<()> {
+    /// Let current process wait for the event
+    pub fn sleep(&mut self, id: usize, waker: Waker) -> SysResult<()> {
         Manager::preempt_check(0);
-        let mut wait_queue = self.inner.lock();
-        wait_queue.push((events, Manager::current_process()));
-        Manager::sleep(true)?;
-        yield_now().await;
-        Ok(())
-    }
-
-    /// Let current process wait for the events without schedule
-    pub fn sleep(&self, events: Event) -> SysResult<()> {
-        Manager::preempt_check(0);
-        let mut wait_queue = self.inner.lock();
-        wait_queue.push((events, Manager::current_process()));
+        self.inner.push((id, waker));
         Manager::sleep(true)?;
         Ok(())
     }
 
-    /// Wake up the process at **all** the events
-    pub fn wake_up(&self, events: Event) -> SysResult<usize> {
-        let mut wake_count = 0;
-        let mut wait_queue = self.inner.lock();
-        wait_queue.retain(|(event, task)| {
-            if event.0 == events.0 {
-                wake_count += 1;
-                Manager::wake_up(task.clone()).unwrap();
+    /// Wake up the process with event `id`
+    pub fn wake_up(&mut self, id: usize) -> SysResult<()> {
+        self.inner.retain(|(event_id, waker)| {
+            if *event_id == id {
+                waker.wake_by_ref();
                 false
             } else {
                 true
             }
         });
-        Ok(wake_count)
+        Ok(())
     }
 
-    pub fn wake_up_any(&self, events: Event) -> SysResult<usize> {
-        let mut wake_count = 0;
-        let mut wait_queue = self.inner.lock();
-        wait_queue.retain(|(event, task)| {
-            if event.0 & events.0 != 0 {
-                wake_count += 1;
-                Manager::wake_up(task.clone()).unwrap();
-                false
-            } else {
-                true
-            }
+    /// Wake up all process waiting for the event
+    pub fn wake_up_all(&mut self) -> SysResult<()> {
+        self.inner.retain(|(_, waker)| {
+            waker.wake_by_ref();
+            false
         });
-        Ok(wake_count)
-    }
-
-    pub fn wake_up_all(&self, events: Event) -> SysResult<usize> {
-        self.wake_up_any(Event(usize::MAX))
+        Ok(())
     }
 }
