@@ -3,7 +3,7 @@ use alloc::sync::Arc;
 use crate::{
     include::signal::{sig_info::SigInfo, sig_set::SigMask},
     syscall::SyscallResult,
-    task::Task,
+    task::{status::TaskStatus, Task},
 };
 
 extern "C" {
@@ -20,6 +20,6 @@ impl Task {
     }
     pub fn proc_recv_siginfo(self: &Arc<Self>, siginfo: SigInfo) {
         // todo: complete proc_recv_siginfo
-        self.pending_sigs().push(siginfo, self.waker().clone());
+        self.pending_sigs().push(siginfo);
     }
 }

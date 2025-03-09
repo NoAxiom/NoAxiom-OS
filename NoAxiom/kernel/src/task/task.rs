@@ -18,6 +18,7 @@ use ksync::{
 
 use super::{
     manager::ThreadGroup,
+    status::{AtomicSuspendReason, AtomicTaskStatus, SuspendReason, TaskStatus},
     taskid::{TidTracer, TGID, TID},
 };
 use crate::{
@@ -45,13 +46,6 @@ use crate::{
     syscall::{SysResult, SyscallResult},
     task::{manager::add_new_process, taskid::tid_alloc},
 };
-
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub enum TaskStatus {
-    Ready,
-    Running,
-    Zombie,
-}
 
 /// process resources info
 pub struct ProcessInfo {
@@ -133,7 +127,10 @@ pub struct Task {
     trap_cx: SyncUnsafeCell<TrapContext>,
 
     /// task status: ready / running / zombie
-    status: SyncUnsafeCell<TaskStatus>,
+    status: AtomicTaskStatus,
+
+    /// task suspend reason
+    suspend_reason: AtomicSuspendReason,
 
     /// schedule entity for schedule
     pub sched_entity: SchedEntity,
@@ -153,7 +150,6 @@ pub struct Task {
 
 /// user tasks
 /// - usage: wrap it in Arc<Task>
-#[allow(unused)]
 impl Task {
     /// tid
     #[inline(always)]
@@ -173,28 +169,37 @@ impl Task {
 
     /// status
     #[inline(always)]
-    pub fn status(&self) -> &TaskStatus {
-        unsafe { &(*self.status.get()) }
-    }
-    #[inline(always)]
-    pub fn status_mut(&self) -> &mut TaskStatus {
-        unsafe { &mut (*self.status.get()) }
+    pub fn status(&self) -> TaskStatus {
+        self.status.load(Ordering::SeqCst)
     }
     #[inline(always)]
     pub fn set_status(&self, status: TaskStatus) {
-        *self.status_mut() = status;
+        self.status.store(status, Ordering::SeqCst);
     }
     #[inline(always)]
     pub fn is_zombie(&self) -> bool {
-        *self.status() == TaskStatus::Zombie
+        self.status() == TaskStatus::Zombie
     }
     #[inline(always)]
     pub fn is_running(&self) -> bool {
-        *self.status() == TaskStatus::Running
+        self.status() == TaskStatus::Running
     }
     #[inline(always)]
     pub fn is_ready(&self) -> bool {
-        *self.status() == TaskStatus::Ready
+        self.status() == TaskStatus::Runnable
+    }
+    #[inline(always)]
+    pub fn is_suspend(&self) -> bool {
+        self.status() == TaskStatus::Suspend
+    }
+
+    // suspend reason
+    #[inline(always)]
+    pub fn suspend_reason(&self) -> SuspendReason {
+        self.suspend_reason.load(Ordering::SeqCst)
+    }
+    pub fn set_suspend_reason(&self, reason: SuspendReason) {
+        self.suspend_reason.store(reason, Ordering::SeqCst);
     }
 
     /// exit code
@@ -284,6 +289,12 @@ impl Task {
     pub fn set_waker(&self, waker: Waker) {
         unsafe { (*self.waker.get()) = Some(waker) };
     }
+    /// wake self up
+    pub fn wake_up(&self) {
+        if let Some(waker) = self.waker().as_ref() {
+            waker.wake_by_ref();
+        }
+    }
 
     /// create new process from elf
     pub async fn new_process(path: Path) -> Arc<Self> {
@@ -311,7 +322,8 @@ impl Task {
             })),
             memory_set: Arc::new(SpinLock::new(memory_set)),
             trap_cx: SyncUnsafeCell::new(TrapContext::app_init_cx(elf_entry, user_sp)),
-            status: SyncUnsafeCell::new(TaskStatus::Ready),
+            status: AtomicTaskStatus::new(TaskStatus::Runnable),
+            suspend_reason: AtomicSuspendReason::new(SuspendReason::None),
             exit_code: AtomicI32::new(0),
             sched_entity: SchedEntity::new_bare(INIT_PROCESS_ID),
             fd_table: Arc::new(SpinLock::new(FdTable::new())),
@@ -490,7 +502,8 @@ impl Task {
                 pcb: self.pcb.clone(),
                 memory_set,
                 trap_cx: SyncUnsafeCell::new(self.trap_context().clone()),
-                status: SyncUnsafeCell::new(TaskStatus::Ready),
+                status: AtomicTaskStatus::new(TaskStatus::Runnable),
+                suspend_reason: AtomicSuspendReason::new(SuspendReason::None),
                 exit_code: AtomicI32::new(0),
                 sched_entity: self.sched_entity.data_clone(tid_val),
                 fd_table,
@@ -520,7 +533,8 @@ impl Task {
                 })),
                 memory_set,
                 trap_cx: SyncUnsafeCell::new(self.trap_context().clone()),
-                status: SyncUnsafeCell::new(TaskStatus::Ready),
+                status: AtomicTaskStatus::new(TaskStatus::Runnable),
+                suspend_reason: AtomicSuspendReason::new(SuspendReason::None),
                 exit_code: AtomicI32::new(0),
                 sched_entity: self.sched_entity.data_clone(tid_val),
                 fd_table,

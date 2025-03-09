@@ -16,11 +16,7 @@ use core::{
 
 use ksync::mutex::SpinLock;
 
-use crate::{
-    sched::utils::{suspend_now, yield_now},
-    syscall::SysResult,
-    task::Task,
-};
+use crate::{syscall::SysResult, task::Task};
 
 /// for ProcessManager
 pub trait AwakenedProcessManager {

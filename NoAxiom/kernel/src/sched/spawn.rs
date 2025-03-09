@@ -2,7 +2,7 @@
 //! [`UserTaskFuture`] represents a user task future,
 //! use [`spawn_utask`] to spawn user tasks
 
-use alloc::sync::Arc;
+use alloc::sync::{Arc, Weak};
 use core::future::Future;
 
 use async_task::{Builder, WithInfo};
@@ -21,13 +21,17 @@ use crate::{
 };
 
 /// Add a raw task into task queue
-pub fn spawn_raw<F, R>(future: F, sched_entity: SchedEntity, hartid: usize)
-where
+pub fn spawn_raw<F, R>(
+    future: F,
+    sched_entity: SchedEntity,
+    hartid: usize,
+    task: Option<Weak<Task>>,
+) where
     F: Future<Output = R> + Send + 'static,
     R: Send + 'static,
 {
     let (runnable, handle) = Builder::new()
-        .metadata(TaskScheduleInfo::new(sched_entity, hartid))
+        .metadata(TaskScheduleInfo::new(sched_entity, hartid, task))
         .spawn(
             move |_: &TaskScheduleInfo| future,
             WithInfo(move |runnable, info| RUNTIME.schedule(runnable, info)),
@@ -42,6 +46,7 @@ pub fn spawn_utask(task: Arc<Task>) {
         UserTaskFuture::new(task.clone(), task_main(task.clone())),
         task.sched_entity.ref_clone(),
         get_hartid(),
+        Some(Arc::downgrade(&task)),
     );
 }
 
@@ -51,7 +56,7 @@ where
     F: Future<Output = R> + Send + 'static,
     R: Send + 'static,
 {
-    spawn_raw(future, SchedEntity::new_bare(0), get_hartid());
+    spawn_raw(future, SchedEntity::new_bare(0), get_hartid(), None);
 }
 
 /// schedule a kernel_task to spawn a new task

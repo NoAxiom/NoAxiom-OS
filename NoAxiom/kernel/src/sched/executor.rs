@@ -2,7 +2,7 @@
 //! - [`spawn_raw`] to add a task
 //! - [`run`] to run next task
 
-use alloc::vec::Vec;
+use alloc::{sync::Weak, vec::Vec};
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use arch::{Arch, ArchAsm, ArchInt};
@@ -19,6 +19,7 @@ use super::{
 use crate::{
     config::{arch::CPU_NUM, sched::LOAD_BALANCE_TICKS},
     cpu::get_hartid,
+    task::{status::TaskStatus, Task},
     time::gettime::get_time,
     trap::ipi::{send_ipi, IpiType},
 };
@@ -27,12 +28,14 @@ pub struct TaskScheduleInfo {
     pub sched_entity: SchedEntity,
     /// the hartid that the task should be running on
     pub hartid: AtomicUsize,
+    pub task: Option<Weak<Task>>,
 }
 impl TaskScheduleInfo {
-    pub fn new(sched_entity: SchedEntity, hartid: usize) -> Self {
+    pub fn new(sched_entity: SchedEntity, hartid: usize, task: Option<Weak<Task>>) -> Self {
         Self {
             sched_entity,
             hartid: AtomicUsize::new(hartid),
+            task,
         }
     }
     pub fn set_hartid(&self, hartid: usize) {
@@ -99,6 +102,11 @@ where
 
     pub fn schedule(&self, runnable: RunnableTask, info: ScheduleInfo) {
         let woken_hartid = runnable.metadata().hartid();
+        if let Some(task) = runnable.metadata().task.as_ref() {
+            if let Some(task) = task.upgrade() {
+                task.set_status(TaskStatus::Runnable);
+            }
+        }
         if woken_hartid == get_hartid() {
             debug!(
                 "[schedule] push into local scheduler, tid: {}",

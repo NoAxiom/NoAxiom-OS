@@ -9,8 +9,8 @@ use crate::{
     },
     mm::user_ptr::UserPtr,
     return_errno,
-    sched::{spawn::spawn_utask, utils::suspend_now},
-    task::manager::TASK_MANAGER,
+    sched::spawn::spawn_utask,
+    task::{manager::TASK_MANAGER, status::SuspendReason},
 };
 
 impl Syscall<'_> {
@@ -130,13 +130,11 @@ impl Syscall<'_> {
                     return Ok(0);
                 }
                 let task = self.task;
-                let (found_pid, exit_code) = loop {
+                let (found_pid, exit_code) = {
                     task.set_wake_signal(!*task.sig_mask() | SigMask::SIGCHLD);
                     debug!("[sys_wait4] yield now, waiting for SIGCHLD");
                     // use polling instead of waker
-                    // fixme: bug here
-                    suspend_now().await;
-                    // debug!("[sys_wait4] resumed");
+                    task.suspend_now(SuspendReason::WaitChildExit).await;
                     let sig_info = task.pending_sigs().pop_with_mask(SigMask::SIGCHLD);
                     if let Some(sig_info) = sig_info {
                         if let SigExtraInfo::Extend {
@@ -151,17 +149,21 @@ impl Syscall<'_> {
                                 si_pid, si_status
                             );
                             match pid_type {
-                                PidSel::Task(None) => break (si_pid, si_status),
+                                PidSel::Task(None) => (si_pid, si_status),
                                 PidSel::Task(target_pid) => {
                                     if si_pid as usize == target_pid.unwrap() {
-                                        break (si_pid, si_status);
+                                        (si_pid, si_status)
+                                    } else {
+                                        unimplemented!()
                                     }
                                 }
                                 PidSel::Group(_) => unimplemented!(),
                             }
+                        } else {
+                            return_errno!(Errno::EINTR)
                         }
                     } else {
-                        return_errno!(Errno::EINTR);
+                        return_errno!(Errno::EINTR)
                     }
                 };
                 (found_pid as usize, exit_code.unwrap())
