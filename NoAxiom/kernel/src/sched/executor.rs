@@ -43,7 +43,6 @@ pub type RunnableTask = Runnable<TaskScheduleInfo>;
 
 pub enum MailboxType {
     Task(RunnableTask),
-    // Waker(Waker),
 }
 
 struct RunnableMailbox<T> {
@@ -102,13 +101,13 @@ where
         let woken_hartid = runnable.metadata().hartid();
         if woken_hartid == get_hartid() {
             debug!(
-                "[schedule] task is pushed to scheduler, tid: {}",
+                "[schedule] push into local scheduler, tid: {}",
                 runnable.metadata().sched_entity.tid
             );
             self.current_scheduler().push_with_info(runnable, info);
         } else {
             info!(
-                "[schedule] waker is pushed to mailbox, tid: {}",
+                "[schedule] push to other's mailbox, tid: {}",
                 runnable.metadata().sched_entity.tid
             );
             self.push_one_to_mailbox(woken_hartid, MailboxType::Task(runnable));
@@ -212,12 +211,9 @@ where
         let local = self.current_scheduler();
         while let Some(task) = mailbox.pop() {
             match task {
-                // MailboxType::Waker(waker) => {
-                //     debug!("[handle_mailbox] wake");
-                //     waker.wake();
-                // }
                 MailboxType::Task(runnable) => {
-                    local.push_normal(runnable);
+                    // fixme: is urgent_queue correct?
+                    local.push_urgent(runnable);
                 }
             }
         }

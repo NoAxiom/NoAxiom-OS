@@ -80,11 +80,11 @@ pub fn block_on<T>(future: impl Future<Output = T>) -> T {
         if let Poll::Ready(res) = future.as_mut().poll(&mut cx) {
             return res;
         }
-        let mut k = get_time();
-        for i in 0..10000 {
-            k *= (k + i);
-        }
-        intermit(|| info!("[block on] val is {}", k));
+        // let mut k = get_time();
+        // for i in 0..10000 {
+        //     k *= (k + i);
+        // }
+        // intermit(|| info!("[block on] val is {}", k));
     }
 }
 

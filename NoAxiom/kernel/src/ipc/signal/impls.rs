@@ -20,8 +20,6 @@ impl Task {
     }
     pub fn proc_recv_siginfo(self: &Arc<Self>, siginfo: SigInfo) {
         // todo: complete proc_recv_siginfo
-        self.pending_sigs().push(siginfo);
-        debug!("task {} recv wake signal", self.tid());
-        self.waker().as_ref().unwrap().wake_by_ref();
+        self.pending_sigs().push(siginfo, self.waker().clone());
     }
 }

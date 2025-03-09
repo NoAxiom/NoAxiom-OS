@@ -134,6 +134,7 @@ impl Syscall<'_> {
                     task.set_wake_signal(!*task.sig_mask() | SigMask::SIGCHLD);
                     debug!("[sys_wait4] yield now, waiting for SIGCHLD");
                     // use polling instead of waker
+                    // fixme: bug here
                     suspend_now().await;
                     // debug!("[sys_wait4] resumed");
                     let sig_info = task.pending_sigs().pop_with_mask(SigMask::SIGCHLD);

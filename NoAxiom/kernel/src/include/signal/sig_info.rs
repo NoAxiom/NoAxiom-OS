@@ -1,3 +1,5 @@
+use core::task::Waker;
+
 use arch::TrapContext;
 
 use super::{

@@ -7,7 +7,6 @@ use crate::include::signal::{sig_info::SigInfo, sig_set::SigSet};
 pub struct PendingSigs {
     pub sigset: SigSet,           // pending signal set
     pub queue: VecDeque<SigInfo>, // pending signal queue
-    pub waker: Option<Waker>,     // waker of the task
     pub should_wake: SigSet,      // signals that should wake the task
 }
 
@@ -16,24 +15,18 @@ impl PendingSigs {
         Self {
             sigset: SigSet::empty(),
             queue: VecDeque::new(),
-            waker: None,
             should_wake: SigSet::empty(),
         }
     }
 
-    pub fn set_waker(&mut self, waker: Waker) {
-        self.waker = Some(waker);
-    }
-
-    pub fn push(&mut self, sig_info: SigInfo) {
+    pub fn push(&mut self, sig_info: SigInfo, waker: Option<Waker>) {
         if self.sigset.has_signum(sig_info.signo as u32) {
             return;
         } else {
             self.sigset.enable(sig_info.signo as u32);
             self.queue.push_back(sig_info);
         }
-        if let Some(waker) = self.waker.as_ref() {
-            // fixme: this waker is incorrect!
+        if let Some(waker) = waker.as_ref() {
             waker.wake_by_ref();
         }
     }
