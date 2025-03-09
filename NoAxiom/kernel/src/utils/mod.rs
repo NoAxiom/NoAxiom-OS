@@ -1,6 +1,7 @@
 //! utility functions
 
 mod crossover;
+pub mod event;
 
 use alloc::{string::String, vec::Vec};
 
