@@ -10,7 +10,7 @@ use crate::{
         sig_num::SigNum,
     },
     syscall::Syscall,
-    task::manager::TASK_MANAGER,
+    task::{manager::TASK_MANAGER, status::SuspendReason},
 };
 
 pub async fn init_proc_exit_handler(task: &Arc<Task>) {
@@ -66,6 +66,9 @@ impl Task {
                         si_stime: None,
                     },
                 };
+                if parent.is_suspend() && parent.suspend_reason() == SuspendReason::WaitChildExit {
+                    parent.wake_up();
+                }
                 parent.proc_recv_siginfo(siginfo);
             }
             drop(pcb);

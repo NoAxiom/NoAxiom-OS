@@ -19,15 +19,12 @@ impl PendingSigs {
         }
     }
 
-    pub fn push(&mut self, sig_info: SigInfo, waker: Option<Waker>) {
+    pub fn push(&mut self, sig_info: SigInfo) {
         if self.sigset.has_signum(sig_info.signo as u32) {
             return;
         } else {
             self.sigset.enable(sig_info.signo as u32);
             self.queue.push_back(sig_info);
-        }
-        if let Some(waker) = waker.as_ref() {
-            waker.wake_by_ref();
         }
     }
 

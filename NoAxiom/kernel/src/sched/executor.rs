@@ -2,7 +2,7 @@
 //! - [`spawn_raw`] to add a task
 //! - [`run`] to run next task
 
-use alloc::vec::Vec;
+use alloc::{sync::Weak, vec::Vec};
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use arch::{Arch, ArchAsm, ArchInt};
@@ -11,10 +11,15 @@ use async_task::{Runnable, ScheduleInfo};
 use ksync::{cell::SyncUnsafeCell, mutex::SpinLock};
 use lazy_static::lazy_static;
 
-use super::{cfs::CFS, sched_entity::SchedEntity, scheduler::Scheduler};
+use super::{
+    cfs::CFS,
+    sched_entity::SchedEntity,
+    scheduler::{ScheduleOrder, Scheduler},
+};
 use crate::{
     config::{arch::CPU_NUM, sched::LOAD_BALANCE_TICKS},
     cpu::get_hartid,
+    task::{status::TaskStatus, Task},
     time::gettime::get_time,
     trap::ipi::{send_ipi, IpiType},
 };
@@ -23,12 +28,14 @@ pub struct TaskScheduleInfo {
     pub sched_entity: SchedEntity,
     /// the hartid that the task should be running on
     pub hartid: AtomicUsize,
+    pub task: Option<Weak<Task>>,
 }
 impl TaskScheduleInfo {
-    pub fn new(sched_entity: SchedEntity, hartid: usize) -> Self {
+    pub fn new(sched_entity: SchedEntity, hartid: usize, task: Option<Weak<Task>>) -> Self {
         Self {
             sched_entity,
             hartid: AtomicUsize::new(hartid),
+            task,
         }
     }
     pub fn set_hartid(&self, hartid: usize) {
@@ -40,10 +47,6 @@ impl TaskScheduleInfo {
 }
 
 pub type RunnableTask = Runnable<TaskScheduleInfo>;
-
-pub enum MailboxType {
-    Task(RunnableTask),
-}
 
 struct RunnableMailbox<T> {
     pub valid: AtomicBool,
@@ -60,7 +63,7 @@ impl<T> RunnableMailbox<T> {
 
 pub struct Runtime<T: Scheduler> {
     /// global task mailbox
-    mailbox: [RunnableMailbox<MailboxType>; CPU_NUM],
+    mailbox: [RunnableMailbox<RunnableTask>; CPU_NUM],
 
     /// use cpu mask to pass request
     sched_req: AtomicUsize,
@@ -99,6 +102,11 @@ where
 
     pub fn schedule(&self, runnable: RunnableTask, info: ScheduleInfo) {
         let woken_hartid = runnable.metadata().hartid();
+        if let Some(task) = runnable.metadata().task.as_ref() {
+            if let Some(task) = task.upgrade() {
+                task.set_status(TaskStatus::Runnable);
+            }
+        }
         if woken_hartid == get_hartid() {
             debug!(
                 "[schedule] push into local scheduler, tid: {}",
@@ -110,11 +118,15 @@ where
                 "[schedule] push to other's mailbox, tid: {}",
                 runnable.metadata().sched_entity.tid
             );
-            self.push_one_to_mailbox(woken_hartid, MailboxType::Task(runnable));
+            self.push_one_to_mailbox(woken_hartid, runnable);
         }
     }
+
     pub fn pop(&self) -> Option<RunnableTask> {
-        self.current_scheduler().pop()
+        self.current_scheduler().pop(ScheduleOrder::UrgentFirst)
+    }
+    pub fn pop_normal_first(&self) -> Option<RunnableTask> {
+        self.current_scheduler().pop(ScheduleOrder::NormalFirst)
     }
 
     pub fn set_sched_req(&self) {
@@ -180,9 +192,9 @@ where
                 // so save the previous load first
                 let all_load = RUNTIME.get_load();
                 while self.current_scheduler().is_overload(all_load) {
-                    if let Some(runnable) = self.pop() {
+                    if let Some(runnable) = self.pop_normal_first() {
                         runnable.metadata().set_hartid(i);
-                        mailbox.push(MailboxType::Task(runnable));
+                        mailbox.push(runnable);
                     } else {
                         error!("[try_respond_sched_req] break from loop");
                         break;
@@ -209,13 +221,9 @@ where
         debug!("[handle_mailbox] begin");
         let mut mailbox = self.mailbox[hartid].mailbox.lock();
         let local = self.current_scheduler();
-        while let Some(task) = mailbox.pop() {
-            match task {
-                MailboxType::Task(runnable) => {
-                    // fixme: is urgent_queue correct?
-                    local.push_urgent(runnable);
-                }
-            }
+        while let Some(runnable) = mailbox.pop() {
+            // fixme: is urgent_queue correct?
+            local.push_urgent(runnable);
         }
         self.mailbox[hartid].valid.store(false, Ordering::Release);
         drop(mailbox);
@@ -223,10 +231,10 @@ where
 
     /// push one waker into other's mailbox
     /// this function is called when a task is woken up from other core
-    pub fn push_one_to_mailbox(&self, hartid: usize, data: MailboxType) {
+    pub fn push_one_to_mailbox(&self, hartid: usize, runnable: RunnableTask) {
         let mut mailbox = self.mailbox[hartid].mailbox.lock();
         self.mailbox[hartid].valid.store(true, Ordering::Release);
-        mailbox.push(data);
+        mailbox.push(runnable);
     }
 
     /// Pop a task and run it

@@ -1,15 +1,16 @@
 use alloc::sync::Arc;
-use arch::{Arch, ArchInt};
 use core::{
     future::Future,
     pin::Pin,
     task::{Context, Poll},
 };
 
+use arch::{Arch, ArchInt};
+
 use crate::{
     cpu::current_cpu,
     sched::utils::take_waker,
-    task::Task,
+    task::{status::TaskStatus, Task},
     time::gettime::get_time_us,
     trap::{trap_restore, user_trap_handler},
 };
@@ -30,20 +31,32 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = unsafe { self.get_unchecked_mut() };
-        let p = current_cpu();
+        let task = &this.task;
+        let future = &mut this.future;
         let time_in = get_time_us();
-        p.set_task(&mut this.task);
-        trace!("polling task {}", this.task.tid());
-        let ret = unsafe { Pin::new_unchecked(&mut this.future).poll(cx) };
-        p.clear_task();
+
+        // set task to current cpu, set task status to Running
+        current_cpu().set_task(task);
+        task.set_status(TaskStatus::Running);
+
+        // execute task future
+        let ret = unsafe { Pin::new_unchecked(future).poll(cx) };
+
+        // clear current task
+        // note that task status will be set in other place
+        current_cpu().clear_task();
+
+        // update vruntime
         let time_out = get_time_us();
-        this.task.sched_entity.update_vruntime(time_out - time_in);
+        task.sched_entity.update_vruntime(time_out - time_in);
         trace!(
-            "task {} yield, poll time: {} us, vruntime: {}",
-            this.task.tid(),
+            "task {} yielded, wall_time: {} us, vruntime: {}",
+            task.tid(),
             time_out - time_in,
-            this.task.sched_entity.inner().vruntime.0
+            task.sched_entity.inner().vruntime.0
         );
+
+        // always enable global interrupt before return
         Arch::enable_global_interrupt();
         ret
     }

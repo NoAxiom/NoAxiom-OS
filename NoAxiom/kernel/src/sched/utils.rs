@@ -2,7 +2,6 @@
 //! - use [`yield_now`] to yield current async task;
 //! - use [`take_waker`] to fetch current task's context
 //! - use [`block_on`] to block on a future
-//! - use [`suspend_now`] to suspend current task (without immediate wake)
 
 #![allow(unused)]
 
@@ -13,7 +12,11 @@ use core::{
     task::{Context, Poll, Waker},
 };
 
-use crate::{time::gettime::get_time, utils::intermit};
+use crate::{
+    task::{status::TaskStatus, Task},
+    time::gettime::get_time,
+    utils::intermit,
+};
 
 pub struct YieldFuture {
     visited: bool,
@@ -88,18 +91,12 @@ pub fn block_on<T>(future: impl Future<Output = T>) -> T {
     }
 }
 
-/// suspend current task
-/// difference with yield_now: it won't wake the task immediately
-pub async fn suspend_now() {
-    SuspendFuture::new().await
-}
-
-struct SuspendFuture {
+pub struct SuspendFuture {
     visited: bool,
 }
 
 impl SuspendFuture {
-    const fn new() -> Self {
+    pub const fn new() -> Self {
         Self { visited: false }
     }
 }
