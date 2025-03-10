@@ -28,8 +28,8 @@ use rv_lock::{Lock, LockGuard};
 // use spin::{Mutex, MutexGuard};
 use crate::utils::intermit;
 
-type Mutex<T> = ksync::mutex::Lock<T>;
-type MutexGuard<'a, T> = ksync::mutex::LockGuard<'a, T>;
+type Mutex<T> = ksync::mutex::SpinLock<T>;
+type MutexGuard<'a, T> = ksync::mutex::SpinLockGuard<'a, T>;
 
 /// [`Event`] 的内部数据
 struct Inner {

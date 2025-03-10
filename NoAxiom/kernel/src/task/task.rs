@@ -9,7 +9,7 @@ use core::{
 use arch::{Exception, TrapContext};
 use ksync::{
     cell::SyncUnsafeCell,
-    mutex::{LockGuard, SpinLock, SpinLockGuard},
+    mutex::{SpinLock, SpinLockGuard},
 };
 
 use super::{

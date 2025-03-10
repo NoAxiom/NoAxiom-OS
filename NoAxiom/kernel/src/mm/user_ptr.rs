@@ -1,6 +1,6 @@
 use alloc::{string::String, vec::Vec};
 
-use ksync::mutex::LockGuard;
+use ksync::mutex::SpinLockGuard;
 
 use super::{
     address::VirtAddr,

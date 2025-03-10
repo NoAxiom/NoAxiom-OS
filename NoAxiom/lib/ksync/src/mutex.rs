@@ -6,8 +6,6 @@ use arch::{Arch, ArchAsm, ArchInt};
 
 use super::cell::SyncRefCell;
 
-// pub type SpinLock<T> = Lock<T>;
-// pub type SpinLockGuard<'a, T> = LockGuard<'a, T>;
 pub type SpinLock<T> = kernel_sync::spin::SpinMutex<T, NoIrqLockAction>;
 pub type SpinLockGuard<'a, T> = kernel_sync::spin::SpinMutexGuard<'a, T, NoIrqLockAction>;
 pub type TicketLock<T> = kernel_sync::ticket::TicketMutex<T, NoIrqLockAction>;
@@ -76,58 +74,5 @@ impl LockAction for IrqOffLockAction {
     }
     fn after_lock() {
         assert!(!Arch::is_interrupt_enabled());
-    }
-}
-
-use spin::{Mutex, MutexGuard};
-#[derive(Default)]
-pub struct Lock<T>(pub(self) Mutex<T>);
-
-pub static LOCK_COUNT: AtomicUsize = AtomicUsize::new(0);
-
-pub struct LockGuard<'a, T> {
-    guard: Option<MutexGuard<'a, T>>,
-    int_record: bool,
-}
-
-impl<T> Lock<T> {
-    pub const fn new(obj: T) -> Self {
-        Self(Mutex::new(obj))
-    }
-    pub fn lock(&self) -> LockGuard<'_, T> {
-        let old = Arch::is_interrupt_enabled();
-        Arch::disable_global_interrupt();
-        if Arch::get_hartid() == 0 {
-            LOCK_COUNT.fetch_add(1, core::sync::atomic::Ordering::SeqCst);
-        }
-        LockGuard {
-            guard: Some(self.0.lock()),
-            int_record: old,
-        }
-    }
-}
-
-impl<'a, T> Drop for LockGuard<'a, T> {
-    fn drop(&mut self) {
-        if Arch::get_hartid() == 0 {
-            LOCK_COUNT.fetch_sub(1, core::sync::atomic::Ordering::SeqCst);
-        }
-        self.guard.take();
-        if self.int_record {
-            Arch::enable_global_interrupt();
-        }
-    }
-}
-
-impl<'a, T> core::ops::Deref for LockGuard<'a, T> {
-    type Target = T;
-    fn deref(&self) -> &Self::Target {
-        self.guard.as_ref().unwrap().deref()
-    }
-}
-
-impl<'a, T> core::ops::DerefMut for LockGuard<'a, T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.guard.as_mut().unwrap().deref_mut()
     }
 }
