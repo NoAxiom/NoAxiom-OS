@@ -1,12 +1,9 @@
-use alloc::{string::String, sync::Arc, vec::Vec};
-
-use ksync::mutex::LockGuard;
+use alloc::{sync::Arc, vec::Vec};
 
 use super::{Syscall, SyscallResult};
 use crate::{
     constant::fs::AT_FDCWD,
     fs::{
-        fdtable,
         manager::FS_MANAGER,
         path::Path,
         pipe::PipeFile,
@@ -32,7 +29,7 @@ impl Syscall<'_> {
             return Err(Errno::EINVAL);
         }
 
-        let cwd = self.task.pcb().cwd.clone();
+        let cwd = self.task.cwd().clone();
         let cwd_str = cwd.as_string();
         let cwd_bytes = cwd_str.as_bytes();
 
@@ -99,10 +96,8 @@ impl Syscall<'_> {
         let split_path = path.split('/').collect::<Vec<&str>>();
         root_dentry().find_path(&split_path)?;
 
-        let cwd = self.task.pcb().cwd.clone().from_cd(&"..");
-
-        let mut pcb_guard = self.task.pcb();
-        pcb_guard.cwd = cwd.from_cd(&path);
+        let mut cwd_guard = self.task.cwd();
+        *cwd_guard = cwd_guard.clone().from_cd(&"..").from_cd(&path);
         Ok(0)
     }
 
@@ -126,7 +121,7 @@ impl Syscall<'_> {
         let mode = InodeMode::from_bits_truncate(mode);
         let path = if !path_str.starts_with('/') {
             if fd == AT_FDCWD {
-                let cwd = self.task.pcb().cwd.clone().from_cd(&"..");
+                let cwd = self.task.cwd().clone().from_cd(&"..");
                 trace!("[sys_openat] cwd: {:?}", cwd);
                 cwd.from_cd_or_create(&path_str)
             } else {
@@ -243,7 +238,7 @@ impl Syscall<'_> {
         let fd_table = self.task.fd_table();
         let path = if !path_str.starts_with('/') {
             if dirfd == AT_FDCWD {
-                let cwd = self.task.pcb().cwd.clone().from_cd(&"..");
+                let cwd = self.task.cwd().clone().from_cd(&"..");
                 trace!("[sys_mkdirat] cwd: {:?}", cwd);
                 cwd.from_cd_or_create(&path_str)
             } else {
@@ -397,7 +392,7 @@ fn get_path(
 
     if !path_str.starts_with('/') {
         if fd == AT_FDCWD {
-            let cwd = task.pcb().cwd.clone().from_cd(&"..");
+            let cwd = task.cwd().clone().from_cd(&"..");
             trace!("[{debug_syscall_name}] cwd: {:?}", cwd);
             Ok(cwd.from_cd_or_create(&path_str))
         } else {

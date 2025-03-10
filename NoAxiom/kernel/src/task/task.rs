@@ -1,10 +1,6 @@
 //! # Task
 
-use alloc::{
-    string::String,
-    sync::{Arc, Weak},
-    vec::Vec,
-};
+use alloc::{string::String, sync::Arc, vec::Vec};
 use core::{
     sync::atomic::{AtomicBool, AtomicI32, AtomicUsize, Ordering},
     task::Waker,
@@ -18,6 +14,7 @@ use ksync::{
 
 use super::{
     manager::ThreadGroup,
+    process_info::ProcessInfo,
     status::{AtomicTaskStatus, TaskStatus},
     taskid::{TidTracer, TGID, TID},
 };
@@ -36,7 +33,7 @@ use crate::{
         sched::CloneFlags,
         signal::sig_set::SigMask,
     },
-    ipc::signal::{pending_sigs::PendingSigs, sa_list::SigActionList},
+    ipc::signal::{pending_sigs::PendingSigs, sa_list::SigActionList, sig_info::SignalInfo},
     mm::{
         address::VirtAddr,
         memory_set::{ElfMemoryInfo, MemorySet},
@@ -46,71 +43,6 @@ use crate::{
     syscall::{SysResult, SyscallResult},
     task::{manager::add_new_process, taskid::tid_alloc},
 };
-
-/// process resources info
-pub struct ProcessInfo {
-    /// children tasks, holds lifetime
-    pub children: Vec<Arc<Task>>,
-
-    /// zombie children
-    pub zombie_children: Vec<Arc<Task>>,
-
-    /// parent task, weak ptr
-    pub parent: Option<Weak<Task>>,
-
-    /// wait request
-    pub wait_req: AtomicBool,
-
-    /// current work directory
-    pub cwd: Path,
-}
-
-impl ProcessInfo {
-    pub fn find_child(&self, tid: usize) -> Option<&Arc<Task>> {
-        if let Some(task) = self.children.iter().find(|task| task.tid() == tid) {
-            Some(task)
-        } else if let Some(task) = self.zombie_children.iter().find(|task| task.tid() == tid) {
-            Some(task)
-        } else {
-            None
-        }
-    }
-}
-
-pub struct SignalInfo {
-    /// pending signals
-    pending_sigs: Arc<SpinLock<PendingSigs>>,
-
-    /// signal action list
-    sa_list: Arc<SpinLock<SigActionList>>,
-
-    /// signal mask
-    sig_mask: SyncUnsafeCell<SigMask>,
-    //
-    // /// signal ucontext
-    // sig_ucontext_cx: AtomicUsize,
-    //
-    // /// signal stack
-    // pub sigstack: Option<SignalStack>,
-}
-
-impl SignalInfo {
-    pub fn new(
-        pending_sigs: Option<&Arc<SpinLock<PendingSigs>>>,
-        sa_list: Option<&Arc<SpinLock<SigActionList>>>,
-    ) -> Self {
-        Self {
-            pending_sigs: pending_sigs
-                .map(|p| p.clone())
-                .unwrap_or_else(|| Arc::new(SpinLock::new(PendingSigs::new()))),
-            sa_list: sa_list
-                .map(|p| p.clone())
-                .unwrap_or_else(|| Arc::new(SpinLock::new(SigActionList::new()))),
-            sig_mask: SyncUnsafeCell::new(SigMask::empty()),
-            // sig_ucontext_cx: SyncUnsafeCell::new(SigContext::empty()),
-        }
-    }
-}
 
 /// task control block for a coroutine,
 /// a.k.a thread in current project structure
@@ -155,6 +87,9 @@ pub struct Task {
 
     /// file descriptor table
     fd_table: Arc<SpinLock<FdTable>>,
+
+    /// current work directory
+    cwd: Arc<SpinLock<Path>>,
 
     // signal info
     signal_info: SignalInfo,
@@ -288,6 +223,12 @@ impl Task {
         self.fd_table.lock()
     }
 
+    /// get cwd
+    #[inline(always)]
+    pub fn cwd(&self) -> SpinLockGuard<Path> {
+        self.cwd.lock()
+    }
+
     /// trap context
     #[inline(always)]
     pub fn trap_context(&self) -> &TrapContext {
@@ -350,7 +291,6 @@ impl Task {
                 zombie_children: Vec::new(),
                 parent: None,
                 wait_req: AtomicBool::new(false),
-                cwd: path,
             })),
             memory_set: Arc::new(SpinLock::new(memory_set)),
             trap_cx: SyncUnsafeCell::new(TrapContext::app_init_cx(elf_entry, user_sp)),
@@ -358,6 +298,7 @@ impl Task {
             exit_code: AtomicI32::new(0),
             sched_entity: SchedEntity::new_bare(INIT_PROCESS_ID),
             fd_table: Arc::new(SpinLock::new(FdTable::new())),
+            cwd: Arc::new(SpinLock::new(path)),
             signal_info: SignalInfo::new(None, None),
             waker: SyncUnsafeCell::new(None),
         });
@@ -537,6 +478,7 @@ impl Task {
                 exit_code: AtomicI32::new(0),
                 sched_entity: self.sched_entity.data_clone(tid_val),
                 fd_table,
+                cwd: Arc::new(SpinLock::new(self.cwd.lock().clone())),
                 signal_info: SignalInfo::new(
                     Some(&self.signal_info.pending_sigs),
                     Some(&self.signal_info.sa_list),
@@ -550,7 +492,6 @@ impl Task {
             let new_tid = tid_alloc();
             let tid_val = new_tid.0;
             trace!("fork new process, tgid: {}", tid_val);
-            let mut parent_pcb = self.pcb();
             let new_process = Arc::new(Self {
                 tid: new_tid,
                 tgid: Arc::new(AtomicUsize::new(tid_val)),
@@ -561,7 +502,6 @@ impl Task {
                     zombie_children: Vec::new(),
                     parent: Some(Arc::downgrade(self)),
                     wait_req: AtomicBool::new(false),
-                    cwd: parent_pcb.cwd.clone(),
                 })),
                 memory_set,
                 trap_cx: SyncUnsafeCell::new(self.trap_context().clone()),
@@ -569,11 +509,12 @@ impl Task {
                 exit_code: AtomicI32::new(0),
                 sched_entity: self.sched_entity.data_clone(tid_val),
                 fd_table,
+                cwd: self.cwd.clone(),
                 signal_info: SignalInfo::new(None, None),
                 waker: SyncUnsafeCell::new(None),
             });
             add_new_process(&new_process);
-            parent_pcb.children.push(new_process.clone());
+            self.pcb().children.push(new_process.clone());
             new_process
         };
         res
