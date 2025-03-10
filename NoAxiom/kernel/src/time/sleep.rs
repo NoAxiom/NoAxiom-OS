@@ -6,7 +6,10 @@ use ksync::cell::SyncUnsafeCell;
 use lazy_static::lazy_static;
 
 use super::gettime::get_time;
-use crate::{config::arch::CPU_NUM, cpu::get_hartid, sched::utils::suspend_now, task::Task};
+use crate::{
+    config::arch::CPU_NUM, constant::time::SLEEP_BLOCK_LIMIT_TICKS, cpu::get_hartid,
+    sched::utils::suspend_now, task::Task,
+};
 
 pub struct SleepInfo {
     waker: Waker,
@@ -38,7 +41,7 @@ pub fn current_sleep_manager() -> &'static mut SleepManager {
 
 #[inline(always)]
 fn check_time(current_time: usize, next_time: usize) -> bool {
-    current_time as isize - next_time as isize >= 0
+    (current_time - next_time) as isize >= 0
 }
 
 impl SleepManager {
@@ -47,6 +50,7 @@ impl SleepManager {
             let current_time = get_time();
             if check_time(current_time, info.time) {
                 // sleep wake detected! try check if there are more tasks to wake
+                info.waker.wake();
                 while let Some(info) = self.queue.pop_front() {
                     if check_time(current_time, info.time) {
                         info.waker.wake();
@@ -56,24 +60,31 @@ impl SleepManager {
                     }
                 }
             } else {
-                // restore the info
                 self.info = Some(info);
             }
         }
     }
     pub fn push(&mut self, info: SleepInfo) {
-        self.queue.push_back(info);
+        match self.info {
+            None => self.info = Some(info),
+            Some(_) => self.queue.push_back(info),
+        }
     }
 }
 
+pub fn block_on_sleep(time: usize) {
+    while !check_time(get_time(), time) {}
+}
+
 impl Task {
-    pub async fn sleep(self: &Arc<Self>, time: usize) {
-        if time < 1024 {
-            warn!("sleep time is too short, return immediately");
-            return;
+    pub async fn sleep(self: &Arc<Self>, interval: usize) {
+        let time = get_time() + interval;
+        if interval < SLEEP_BLOCK_LIMIT_TICKS {
+            block_on_sleep(time);
+        } else {
+            let waker = self.waker().as_ref().unwrap().clone();
+            current_sleep_manager().push(SleepInfo { waker, time });
+            suspend_now().await;
         }
-        let waker = self.waker().as_ref().unwrap().clone();
-        current_sleep_manager().push(SleepInfo { waker, time });
-        suspend_now().await;
     }
 }
