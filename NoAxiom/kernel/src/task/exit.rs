@@ -11,7 +11,7 @@ use crate::{
         sig_num::SigNum,
     },
     syscall::Syscall,
-    task::manager::TASK_MANAGER,
+    task::{manager::TASK_MANAGER, status::TaskStatus},
 };
 
 pub async fn init_proc_exit_handler(task: &Arc<Task>) {
@@ -73,6 +73,7 @@ impl Task {
 
                 // del self from parent's children, and wake up suspended parent
                 let mut par_pcb = parent.pcb();
+                self.set_status(TaskStatus::Zombie);
                 par_pcb.children.retain(|task| task.tid() != tid);
                 par_pcb.zombie_children.push(self.clone());
                 if par_pcb.wait_req.load(Ordering::Acquire) {

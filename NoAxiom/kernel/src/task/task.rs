@@ -135,6 +135,10 @@ impl Task {
             .is_ok()
     }
     #[inline(always)]
+    pub fn is_stopped(&self) -> bool {
+        self.status() == TaskStatus::Stopped
+    }
+    #[inline(always)]
     pub fn is_zombie(&self) -> bool {
         self.status() == TaskStatus::Zombie
     }
@@ -147,8 +151,8 @@ impl Task {
         self.status() == TaskStatus::Runnable
     }
     #[inline(always)]
-    pub fn is_suspend(&self) -> bool {
-        self.status() == TaskStatus::Suspend
+    pub fn is_suspended(&self) -> bool {
+        self.status() == TaskStatus::Suspended
     }
 
     // // suspend reason
@@ -287,7 +291,7 @@ impl Task {
             })),
             memory_set: Arc::new(SpinLock::new(memory_set)),
             trap_cx: SyncUnsafeCell::new(TrapContext::app_init_cx(elf_entry, user_sp)),
-            status: AtomicTaskStatus::new(TaskStatus::Suspend),
+            status: AtomicTaskStatus::new(TaskStatus::Suspended),
             exit_code: AtomicI32::new(0),
             sched_entity: SchedEntity::new_bare(INIT_PROCESS_ID),
             fd_table: Arc::new(SpinLock::new(FdTable::new())),
@@ -467,7 +471,7 @@ impl Task {
                 pcb: self.pcb.clone(),
                 memory_set,
                 trap_cx: SyncUnsafeCell::new(self.trap_context().clone()),
-                status: AtomicTaskStatus::new(TaskStatus::Suspend),
+                status: AtomicTaskStatus::new(TaskStatus::Suspended),
                 exit_code: AtomicI32::new(0),
                 sched_entity: self.sched_entity.data_clone(tid_val),
                 fd_table,
@@ -498,7 +502,7 @@ impl Task {
                 })),
                 memory_set,
                 trap_cx: SyncUnsafeCell::new(self.trap_context().clone()),
-                status: AtomicTaskStatus::new(TaskStatus::Suspend),
+                status: AtomicTaskStatus::new(TaskStatus::Suspended),
                 exit_code: AtomicI32::new(0),
                 sched_entity: self.sched_entity.data_clone(tid_val),
                 fd_table,
@@ -551,7 +555,7 @@ impl Task {
         if self.is_group_leader() {
             self.set_exit_code(exit_code);
         }
-        self.set_status(TaskStatus::Zombie);
+        self.set_status(TaskStatus::Stopped);
     }
 
     pub fn grow_brk(self: &Arc<Self>, new_brk: usize) -> SyscallResult {

@@ -57,7 +57,7 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
         );
 
         // normally we set the task to runnable status
-        let _ = task.cmp_xchg_status(TaskStatus::Runnable, TaskStatus::Suspend);
+        let _ = task.cmp_xchg_status(TaskStatus::Runnable, TaskStatus::Suspended);
 
         // always enable global interrupt before return
         Arch::enable_global_interrupt();
@@ -68,12 +68,12 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
 /// user task main
 pub async fn task_main(task: Arc<Task>) {
     task.set_waker(take_waker().await);
-    while !task.is_zombie() {
+    while !task.is_stopped() {
         // kernel -> user
         trace!("[task_main] trap_restore");
         trap_restore(&task);
         // debug!("cx: {:?}", task.trap_context());
-        if task.is_zombie() {
+        if task.is_stopped() {
             warn!("task {} is zombie before trap_handler, break", task.tid());
             break;
         }

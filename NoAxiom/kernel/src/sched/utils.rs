@@ -42,7 +42,7 @@ pub async fn yield_now(task: &Arc<Task>) {
     YieldFuture::new().await;
     assert_ne!(
         task.status(),
-        TaskStatus::Suspend,
+        TaskStatus::Suspended,
         "still under yield status!!!"
     );
 }
@@ -120,7 +120,7 @@ pub async fn suspend_now(task: &Arc<Task>) {
     SuspendFuture::new().await;
     assert_ne!(
         task.status(),
-        TaskStatus::Suspend,
+        TaskStatus::Suspended,
         "still under suspend status!!!"
     );
 }

@@ -13,9 +13,14 @@ pub enum TaskStatus {
     /// a suspended task without being saved in scheduler
     /// instead, its waker would be saved by a specific structure
     /// and it will be woken up later when associated interrupt is triggered
-    Suspend,
+    Suspended,
+
+    /// the stopped state indicates that the task will soon enter the
+    /// exit_handler and will possibly be set to zombie if the task has a parent
+    Stopped,
 
     /// a zombie task which should execute exit handler
-    /// and this task will soon be dropped by parent process
+    /// and this task will soon be dropped by its parent process
+    /// note that only those who owns parent task can be set to zombie
     Zombie,
 }
