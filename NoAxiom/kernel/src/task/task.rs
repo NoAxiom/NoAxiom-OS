@@ -471,7 +471,7 @@ impl Task {
                 exit_code: AtomicI32::new(0),
                 sched_entity: self.sched_entity.data_clone(tid_val),
                 fd_table,
-                cwd: Arc::new(SpinLock::new(self.cwd.lock().clone())),
+                cwd: self.cwd.clone(),
                 signal_info: SignalInfo::new(
                     Some(&self.signal_info.pending_sigs),
                     Some(&self.signal_info.sa_list),
@@ -502,7 +502,7 @@ impl Task {
                 exit_code: AtomicI32::new(0),
                 sched_entity: self.sched_entity.data_clone(tid_val),
                 fd_table,
-                cwd: self.cwd.clone(),
+                cwd: Arc::new(SpinLock::new(self.cwd().clone())),
                 signal_info: SignalInfo::new(None, None),
                 waker: SyncUnsafeCell::new(None),
             });
