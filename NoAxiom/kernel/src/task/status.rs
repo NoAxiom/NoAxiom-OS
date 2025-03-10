@@ -7,26 +7,27 @@ use crate::{sched::utils::SuspendFuture, task::Task};
 #[atomic_enum]
 #[derive(PartialEq)]
 pub enum TaskStatus {
-    Runnable,
-    Suspend,
+    /// a task running on current cpu
+    /// note that it's not in scheduler
     Running,
-    Zombie,
-}
 
-#[atomic_enum]
-#[derive(PartialEq)]
-pub enum SuspendReason {
-    None,
-    WaitSignal,
-    WaitChildExit,
+    /// a runnable task saved in scheduler
+    Runnable,
+
+    /// a suspended task without being saved in scheduler
+    /// instead, its waker would be saved by a specific structure
+    /// and it will be woken up later when associated interrupt is triggered
+    Suspend,
+
+    /// a zombie task which should execute exit handler
+    /// and this task will soon be dropped by parent process
+    Zombie,
 }
 
 impl Task {
     /// suspend current task
     /// difference with yield_now: it won't wake the task immediately
-    pub async fn suspend_now(self: &Arc<Self>, reason: SuspendReason) {
-        self.set_suspend_reason(reason); // don't change order
-        self.set_status(TaskStatus::Suspend);
+    pub async fn suspend_now(self: &Arc<Self>) {
         SuspendFuture::new().await;
         assert_ne!(
             self.status(),

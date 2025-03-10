@@ -163,7 +163,7 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
                     get_hartid(),
                     task.tid(),
                 );
-                yield_now().await;
+                yield_now(task).await;
             }
             Interrupt::SupervisorExternal => {
                 trace!(

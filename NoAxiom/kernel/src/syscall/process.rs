@@ -5,12 +5,10 @@ use crate::{
         process::{PidSel, WaitOption},
         result::Errno,
         sched::CloneFlags,
-        signal::{sig_info::SigExtraInfo, sig_set::SigMask},
     },
     mm::user_ptr::UserPtr,
-    return_errno,
     sched::spawn::spawn_utask,
-    task::{manager::TASK_MANAGER, status::SuspendReason},
+    task::{manager::TASK_MANAGER, wait::WaitChildFuture},
 };
 
 impl Syscall<'_> {
@@ -82,7 +80,7 @@ impl Syscall<'_> {
             "[sys_wait4] pid: {:?}, status_addr: {:?}, options: {:?}",
             pid, status_addr, options
         );
-        let options = WaitOption::from_bits(options as i32).ok_or(Errno::EINVAL)?;
+        let wait_option = WaitOption::from_bits(options as i32).ok_or(Errno::EINVAL)?;
         let status: UserPtr<i32> = UserPtr::new(status_addr);
 
         // pid type
@@ -94,82 +92,9 @@ impl Syscall<'_> {
             pid => PidSel::Group(Some(pid as usize)),
         };
 
-        // clone children info
-        let children = self.task.pcb().children.clone();
-        if children.is_empty() {
-            return_errno!(Errno::ECHILD);
-        }
-
-        // work out target tasks
-        let target_task = match pid_type {
-            PidSel::Task(None) => {
-                trace!("[sys_wait4] task {} wait for all children", self.task.tid());
-                children.into_iter().find(|task| task.is_zombie())
-            }
-            PidSel::Task(Some(pid)) => {
-                if let Some(task) = children.into_iter().find(|task| task.tid() == pid) {
-                    task.is_zombie().then(|| task).or_else(|| None)
-                } else {
-                    return_errno!(Errno::ECHILD);
-                }
-            }
-            PidSel::Group(_) => {
-                error!("wait for process group is not implemented");
-                return Err(Errno::EINVAL);
-            }
-        };
-
-        // wait for target task
-        let (target_tid, exit_code) = match target_task {
-            Some(target_task) => {
-                trace!("[sys_wait4] wait for task {}", target_task.tid());
-                (target_task.tid(), target_task.exit_code())
-            }
-            None => {
-                if options.contains(WaitOption::WNOHANG) {
-                    return Ok(0);
-                }
-                let task = self.task;
-                let (found_pid, exit_code) = {
-                    task.set_wake_signal(!*task.sig_mask() | SigMask::SIGCHLD);
-                    debug!("[sys_wait4] yield now, waiting for SIGCHLD");
-                    // use polling instead of waker
-                    task.suspend_now(SuspendReason::WaitChildExit).await;
-                    let sig_info = task.pending_sigs().pop_with_mask(SigMask::SIGCHLD);
-                    if let Some(sig_info) = sig_info {
-                        if let SigExtraInfo::Extend {
-                            si_pid,
-                            si_status,
-                            si_stime: _,
-                            si_utime: _,
-                        } = sig_info.extra_info
-                        {
-                            debug!(
-                                "[sys_wait4] received SIGCHLD, pid: {}, status: {:?}",
-                                si_pid, si_status
-                            );
-                            match pid_type {
-                                PidSel::Task(None) => (si_pid, si_status),
-                                PidSel::Task(target_pid) => {
-                                    if si_pid as usize == target_pid.unwrap() {
-                                        (si_pid, si_status)
-                                    } else {
-                                        unimplemented!()
-                                    }
-                                }
-                                PidSel::Group(_) => unimplemented!(),
-                            }
-                        } else {
-                            return_errno!(Errno::EINTR)
-                        }
-                    } else {
-                        return_errno!(Errno::EINTR)
-                    }
-                };
-                (found_pid as usize, exit_code.unwrap())
-            }
-        };
-
+        // wait for child exit
+        let (exit_code, tid) =
+            WaitChildFuture::new(self.task.clone(), pid_type, wait_option)?.await?;
         if !status.is_null() {
             trace!(
                 "[sys_wait4]: write exit_code at status_addr = {:#x}",
@@ -178,12 +103,7 @@ impl Syscall<'_> {
             status.write_volatile((exit_code & 0xff) << 8);
             trace!("[sys_wait4]: write exit code {:#x}", exit_code);
         }
-        self.task
-            .pcb()
-            .children
-            .retain(|other| other.tid() != target_tid);
-        TASK_MANAGER.remove(target_tid);
-        Ok(target_tid as isize)
+        Ok(tid as isize)
     }
 
     pub fn sys_getpid(&self) -> SyscallResult {
@@ -198,3 +118,14 @@ impl Syscall<'_> {
         }
     }
 }
+
+/*
+
+注意！如果事件发生没有严格的先后顺序，那么不能使用suspend让权！
+我们来比较一下磁盘IO与等待子进程的情况：
+磁盘IO拥有严格的顺序，一定是先发起IO请求，然后等待IO完成，所以可以使用suspend让权。
+而等待子进程的情况下，子进程可能在 父进程寻找zombie进程 到 父进程让权 这段时间内检测父进程是否为suspend状态
+由于父进程执行wait是无锁的，并不是一个原子的操作，因此假如是上面这种情况就会导致子进程误认为父进程未suspend
+但父进程已经处于suspend的执行流当中了，这就导致父进程suspend之后无法再被唤醒！
+
+*/

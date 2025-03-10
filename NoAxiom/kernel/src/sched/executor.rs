@@ -104,7 +104,11 @@ where
         let woken_hartid = runnable.metadata().hartid();
         if let Some(task) = runnable.metadata().task.as_ref() {
             if let Some(task) = task.upgrade() {
-                task.set_status(TaskStatus::Runnable);
+                let old_status = task.swap_status(TaskStatus::Runnable);
+                if old_status == TaskStatus::Runnable && !info.woken_while_running {
+                    error!("task {} is already runnable", task.tid());
+                    return;
+                }
             }
         }
         if woken_hartid == get_hartid() {

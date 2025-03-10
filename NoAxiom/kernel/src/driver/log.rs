@@ -4,7 +4,7 @@ use core::sync::atomic::{AtomicBool, Ordering};
 
 use log::{self, Level, LevelFilter, Log, Metadata, Record};
 
-use crate::cpu::get_hartid;
+use crate::cpu::{current_cpu, get_hartid};
 
 pub static mut LOG_BOOTED: AtomicBool = AtomicBool::new(false);
 
@@ -29,9 +29,13 @@ impl Log for SimpleLogger {
             Level::Trace => 90, // BrightBlack
         };
         println!(
-            "\u{1B}[{}m[{:>5}, HART{}] {}\u{1B}[0m",
+            "\u{1B}[{}m[{:>5}, HART{}, TID{}] {}\u{1B}[0m",
             color,
             record.level(),
+            current_cpu()
+                .task
+                .as_ref()
+                .map_or_else(|| 0, |task| task.tid()),
             get_hartid(),
             record.args(),
         );

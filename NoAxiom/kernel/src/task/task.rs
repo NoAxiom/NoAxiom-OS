@@ -6,7 +6,7 @@ use alloc::{
     vec::Vec,
 };
 use core::{
-    sync::atomic::{AtomicI32, AtomicUsize, Ordering},
+    sync::atomic::{AtomicBool, AtomicI32, AtomicUsize, Ordering},
     task::Waker,
 };
 
@@ -18,7 +18,7 @@ use ksync::{
 
 use super::{
     manager::ThreadGroup,
-    status::{AtomicSuspendReason, AtomicTaskStatus, SuspendReason, TaskStatus},
+    status::{AtomicTaskStatus, TaskStatus},
     taskid::{TidTracer, TGID, TID},
 };
 use crate::{
@@ -52,11 +52,29 @@ pub struct ProcessInfo {
     /// children tasks, holds lifetime
     pub children: Vec<Arc<Task>>,
 
+    /// zombie children
+    pub zombie_children: Vec<Arc<Task>>,
+
     /// parent task, weak ptr
     pub parent: Option<Weak<Task>>,
 
+    /// wait request
+    pub wait_req: AtomicBool,
+
     /// current work directory
     pub cwd: Path,
+}
+
+impl ProcessInfo {
+    pub fn find_child(&self, tid: usize) -> Option<&Arc<Task>> {
+        if let Some(task) = self.children.iter().find(|task| task.tid() == tid) {
+            Some(task)
+        } else if let Some(task) = self.zombie_children.iter().find(|task| task.tid() == tid) {
+            Some(task)
+        } else {
+            None
+        }
+    }
 }
 
 pub struct SignalInfo {
@@ -129,9 +147,6 @@ pub struct Task {
     /// task status: ready / running / zombie
     status: AtomicTaskStatus,
 
-    /// task suspend reason
-    suspend_reason: AtomicSuspendReason,
-
     /// schedule entity for schedule
     pub sched_entity: SchedEntity,
 
@@ -177,6 +192,21 @@ impl Task {
         self.status.store(status, Ordering::SeqCst);
     }
     #[inline(always)]
+    pub fn swap_status(&self, new_status: TaskStatus) -> TaskStatus {
+        self.status.swap(new_status, Ordering::SeqCst)
+    }
+    #[inline(always)]
+    pub fn cmp_xchg_status(&self, expected_status: TaskStatus, new_status: TaskStatus) -> bool {
+        self.status
+            .compare_exchange(
+                expected_status,
+                new_status,
+                Ordering::SeqCst,
+                Ordering::SeqCst,
+            )
+            .is_ok()
+    }
+    #[inline(always)]
     pub fn is_zombie(&self) -> bool {
         self.status() == TaskStatus::Zombie
     }
@@ -185,7 +215,7 @@ impl Task {
         self.status() == TaskStatus::Running
     }
     #[inline(always)]
-    pub fn is_ready(&self) -> bool {
+    pub fn is_runnable(&self) -> bool {
         self.status() == TaskStatus::Runnable
     }
     #[inline(always)]
@@ -193,14 +223,14 @@ impl Task {
         self.status() == TaskStatus::Suspend
     }
 
-    // suspend reason
-    #[inline(always)]
-    pub fn suspend_reason(&self) -> SuspendReason {
-        self.suspend_reason.load(Ordering::SeqCst)
-    }
-    pub fn set_suspend_reason(&self, reason: SuspendReason) {
-        self.suspend_reason.store(reason, Ordering::SeqCst);
-    }
+    // // suspend reason
+    // #[inline(always)]
+    // pub fn suspend_reason(&self) -> SuspendReason {
+    //     self.suspend_reason.load(Ordering::SeqCst)
+    // }
+    // pub fn set_suspend_reason(&self, reason: SuspendReason) {
+    //     self.suspend_reason.store(reason, Ordering::SeqCst);
+    // }
 
     /// exit code
     #[inline(always)]
@@ -317,13 +347,14 @@ impl Task {
             thread_group: Arc::new(SpinLock::new(ThreadGroup::new())),
             pcb: Arc::new(SpinLock::new(ProcessInfo {
                 children: Vec::new(),
+                zombie_children: Vec::new(),
                 parent: None,
+                wait_req: AtomicBool::new(false),
                 cwd: path,
             })),
             memory_set: Arc::new(SpinLock::new(memory_set)),
             trap_cx: SyncUnsafeCell::new(TrapContext::app_init_cx(elf_entry, user_sp)),
-            status: AtomicTaskStatus::new(TaskStatus::Runnable),
-            suspend_reason: AtomicSuspendReason::new(SuspendReason::None),
+            status: AtomicTaskStatus::new(TaskStatus::Suspend),
             exit_code: AtomicI32::new(0),
             sched_entity: SchedEntity::new_bare(INIT_PROCESS_ID),
             fd_table: Arc::new(SpinLock::new(FdTable::new())),
@@ -502,8 +533,7 @@ impl Task {
                 pcb: self.pcb.clone(),
                 memory_set,
                 trap_cx: SyncUnsafeCell::new(self.trap_context().clone()),
-                status: AtomicTaskStatus::new(TaskStatus::Runnable),
-                suspend_reason: AtomicSuspendReason::new(SuspendReason::None),
+                status: AtomicTaskStatus::new(TaskStatus::Suspend),
                 exit_code: AtomicI32::new(0),
                 sched_entity: self.sched_entity.data_clone(tid_val),
                 fd_table,
@@ -528,13 +558,14 @@ impl Task {
                 thread_group: self.thread_group.clone(),
                 pcb: Arc::new(SpinLock::new(ProcessInfo {
                     children: Vec::new(),
+                    zombie_children: Vec::new(),
                     parent: Some(Arc::downgrade(self)),
+                    wait_req: AtomicBool::new(false),
                     cwd: parent_pcb.cwd.clone(),
                 })),
                 memory_set,
                 trap_cx: SyncUnsafeCell::new(self.trap_context().clone()),
-                status: AtomicTaskStatus::new(TaskStatus::Runnable),
-                suspend_reason: AtomicSuspendReason::new(SuspendReason::None),
+                status: AtomicTaskStatus::new(TaskStatus::Suspend),
                 exit_code: AtomicI32::new(0),
                 sched_entity: self.sched_entity.data_clone(tid_val),
                 fd_table,
@@ -552,8 +583,8 @@ impl Task {
     pub async fn exec(
         self: &Arc<Self>,
         path: Path,
-        mut args: Vec<String>,
-        mut envs: Vec<String>,
+        args: Vec<String>,
+        envs: Vec<String>,
     ) -> SysResult<()> {
         let ElfMemoryInfo {
             memory_set,

@@ -56,6 +56,9 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
             task.sched_entity.inner().vruntime.0
         );
 
+        // normally we set the task to runnable status
+        let _ = task.cmp_xchg_status(TaskStatus::Runnable, TaskStatus::Suspend);
+
         // always enable global interrupt before return
         Arch::enable_global_interrupt();
         ret
