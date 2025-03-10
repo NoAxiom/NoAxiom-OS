@@ -39,7 +39,6 @@ impl Future for YieldFuture {
 /// and will create an await point for the current task flow
 #[inline(always)]
 pub async fn yield_now(task: &Arc<Task>) {
-    task.set_status(TaskStatus::Suspend);
     YieldFuture::new().await;
     assert_ne!(
         task.status(),

@@ -32,11 +32,11 @@ impl Log for SimpleLogger {
             "\u{1B}[{}m[{:>5}, HART{}, TID{}] {}\u{1B}[0m",
             color,
             record.level(),
+            get_hartid(),
             current_cpu()
                 .task
                 .as_ref()
                 .map_or_else(|| 0, |task| task.tid()),
-            get_hartid(),
             record.args(),
         );
     }
