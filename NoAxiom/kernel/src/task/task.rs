@@ -47,54 +47,47 @@ use crate::{
 /// task control block for a coroutine,
 /// a.k.a thread in current project structure
 pub struct Task {
-    /// task id
+    /// [th] task id
     tid: TidTracer,
 
-    /// task group id, aka pid
+    /// [pr] task group id, aka pid
     tgid: Arc<AtomicUsize>,
 
-    /// process group id
+    /// [pr] process group id
     pgid: Arc<AtomicUsize>,
 
-    /// thread group tracer
+    /// [pr] thread group tracer
     pub thread_group: Arc<SpinLock<ThreadGroup>>,
 
-    /// process control block ptr,
-    /// also belongs to other threads
+    /// [pr] process control block ptr,
     pcb: Arc<SpinLock<ProcessInfo>>,
 
-    /// memory set for task
-    /// explanation:
-    /// SyncUnsafeCell: allow to change memory set in immutable context (bug?)
-    /// todo: is SyncUnsafeCell correct??? might cause inter-core sync bugs
-    /// Arc: allow to share memory set between tasks, also provides refcount
-    /// SpinLock: allow to lock memory set in multi-core context
-    // pub memory_set: SyncUnsafeCell<Arc<SpinLock<MemorySet>>>,
+    /// [pr] memory set for task
     pub memory_set: Arc<SpinLock<MemorySet>>,
 
-    /// trap context,
+    /// [th] trap context,
     /// contains stack ptr, registers, etc.
     trap_cx: SyncUnsafeCell<TrapContext>,
 
-    /// task status: ready / running / zombie
+    /// [th] task status: ready / running / zombie
     status: AtomicTaskStatus,
 
-    /// schedule entity for schedule
+    /// [th] schedule entity for schedule
     pub sched_entity: SchedEntity,
 
-    /// task exit code
+    /// [th?] task exit code
     exit_code: AtomicI32,
 
-    /// file descriptor table
+    /// [pr] file descriptor table
     fd_table: Arc<SpinLock<FdTable>>,
 
-    /// current work directory
+    /// [pr] current work directory
     cwd: Arc<SpinLock<Path>>,
 
-    // signal info
+    /// [pr/th] signal info
     signal_info: SignalInfo,
 
-    /// waker
+    /// [th] waker
     waker: SyncUnsafeCell<Option<Waker>>,
 }
 
