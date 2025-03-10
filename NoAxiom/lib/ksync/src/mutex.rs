@@ -6,11 +6,10 @@ use arch::{Arch, ArchAsm, ArchInt};
 
 use super::cell::SyncRefCell;
 
-pub type SpinLock<T> = Lock<T>;
-pub type SpinLockGuard<'a, T> = LockGuard<'a, T>;
-// pub type SpinLock<T> = kernel_sync::spin::SpinMutex<T, NoIrqLockAction>;
-// pub type SpinLockGuard<'a, T> = kernel_sync::spin::SpinMutexGuard<'a, T,
-// NoIrqLockAction>;
+// pub type SpinLock<T> = Lock<T>;
+// pub type SpinLockGuard<'a, T> = LockGuard<'a, T>;
+pub type SpinLock<T> = kernel_sync::spin::SpinMutex<T, NoIrqLockAction>;
+pub type SpinLockGuard<'a, T> = kernel_sync::spin::SpinMutexGuard<'a, T, NoIrqLockAction>;
 pub type TicketLock<T> = kernel_sync::ticket::TicketMutex<T, NoIrqLockAction>;
 pub type RwLock<T> = kernel_sync::rwlock::RwLock<T, NoIrqLockAction>;
 
@@ -40,6 +39,10 @@ const DEFAULT_CPU: SyncRefCell<MutexTracer> = SyncRefCell::new(MutexTracer::new(
 static HART_MUTEX_TRACERS: [SyncRefCell<MutexTracer>; CPU_NUM] = [DEFAULT_CPU; CPU_NUM];
 fn current_mutex_tracer() -> RefMut<'static, MutexTracer> {
     HART_MUTEX_TRACERS[Arch::get_hartid()].borrow_mut()
+}
+
+pub fn check_no_lock() -> bool {
+    current_mutex_tracer().depth == 0
 }
 
 /// maintain riscv arch interrupt behavior for lock action

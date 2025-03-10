@@ -178,7 +178,7 @@ impl UserPtr<u8> {
     /// convert ptr into an slice
     pub async fn as_slice_mut_checked_raw<'a>(&self, len: usize) -> SysResult<&mut [u8]> {
         let page_table = PageTable::from_token(current_token());
-        let mut guard: Option<LockGuard<'a, MemorySet>> = None;
+        let mut guard = None;
         for vpn in VpnRange::new_from_va(
             VirtAddr::from(self.addr_usize()),
             VirtAddr::from(self.addr_usize() + len),

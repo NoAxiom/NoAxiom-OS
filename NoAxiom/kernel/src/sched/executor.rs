@@ -8,7 +8,10 @@ use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use arch::{Arch, ArchAsm, ArchInt};
 use array_init::array_init;
 use async_task::{Runnable, ScheduleInfo};
-use ksync::{cell::SyncUnsafeCell, mutex::SpinLock};
+use ksync::{
+    cell::SyncUnsafeCell,
+    mutex::{check_no_lock, SpinLock},
+};
 use lazy_static::lazy_static;
 
 use super::{
@@ -245,6 +248,7 @@ where
     pub fn run(&self) {
         self.handle_mailbox();
         current_sleep_manager().sleep_handler();
+        assert!(check_no_lock(), "LOCK IS NOT RELEASED!!!");
         if let Some(runnable) = self.pop() {
             runnable.run();
             #[cfg(feature = "multicore")]
