@@ -29,7 +29,7 @@ impl Syscall<'_> {
         fd: isize,
         offset: usize,
     ) -> SyscallResult {
-        debug!("[sys_mmap] start");
+        trace!("[sys_mmap] start");
         let length = align_up(length, PAGE_SIZE);
         let prot = MmapProts::from_bits(prot).unwrap();
         let flags = MmapFlags::from_bits(flags).unwrap();

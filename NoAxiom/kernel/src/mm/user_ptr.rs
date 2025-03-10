@@ -15,7 +15,7 @@ use crate::{
 };
 
 /// check if the slice is well-allocated
-/// any unallcated memory access will cause a page fault
+/// any unallocated memory access will cause a page fault
 /// and will be handled by the kernel_trap_handler => memory_validate
 /// so we should validate the memory before we lock current memory_set
 #[allow(unused)]

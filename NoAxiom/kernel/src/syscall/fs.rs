@@ -280,7 +280,7 @@ impl Syscall<'_> {
 
     /// Get file status
     pub fn sys_fstat(&self, fd: usize, stat_buf: usize) -> SyscallResult {
-        debug!("[sys_fstat]: fd: {}, stat_buf: {:#x}", fd, stat_buf);
+        trace!("[sys_fstat]: fd: {}, stat_buf: {:#x}", fd, stat_buf);
         let fd_table = self.task.fd_table();
         let file = fd_table.get(fd).ok_or(Errno::EBADF)?;
         let kstat = Kstat::from_stat(file.inode().stat()?);

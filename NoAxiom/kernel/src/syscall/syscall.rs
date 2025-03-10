@@ -56,7 +56,10 @@ impl<'a> Syscall<'a> {
             SYS_EXIT => self.sys_exit(args[0]),
             SYS_CLONE => self.sys_fork(args[0], args[1], args[2], args[3], args[4]),
             SYS_EXECVE => self.sys_exec(args[0], args[1], args[2]).await,
-            SYS_WAIT4 => self.sys_wait4(args[0] as isize, args[1], args[2], args[3]).await,
+            SYS_WAIT4 => {
+                self.sys_wait4(args[0] as isize, args[1], args[2], args[3])
+                    .await
+            }
             SYS_GETPID => self.sys_getpid(),
             SYS_GETPPID => self.sys_getppid(),
 
@@ -77,6 +80,7 @@ impl<'a> Syscall<'a> {
             SYS_SCHED_YIELD => self.sys_yield().await,
             SYS_UNAME => Self::sys_uname(args[0]),
             SYS_GETTIMEOFDAY => Self::sys_gettimeofday(args[0]),
+            SYS_NANOSLEEP => self.sys_nanosleep(args[0]).await,
 
             // unsupported: return -1
             _ => {

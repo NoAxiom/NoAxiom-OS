@@ -161,7 +161,7 @@ impl MapArea {
     pub fn change_end_vpn(&mut self, new_end_vpn: VirtPageNum, page_table: &mut PageTable) {
         let old_end_vpn = self.vpn_range.end();
         self.vpn_range = VpnRange::new(self.vpn_range.start(), new_end_vpn);
-        debug!("[change_end_vpn]: old: {:#x}, new: {:#x}", old_end_vpn.0, new_end_vpn.0);
+        trace!("[change_end_vpn]: old: {:#x}, new: {:#x}", old_end_vpn.0, new_end_vpn.0);
         if new_end_vpn < old_end_vpn {
             debug!("[change_end_vpn] remove pages in [{:#x}, {:#x})", new_end_vpn.0, old_end_vpn.0);
             for vpn in VpnRange::new(new_end_vpn, old_end_vpn).into_iter() {

@@ -1,19 +1,19 @@
 use super::{Syscall, SyscallResult};
 use crate::{
-    include::{info::Utsname, time::TMS},
+    include::{
+        info::Utsname,
+        time::{TimeSpec, TimeVal, TMS},
+    },
     mm::user_ptr::UserPtr,
     sched::utils::yield_now,
-    time::{
-        gettime::{get_time_ms, get_time_us, get_timeval},
-        timeval::TimeVal,
-    },
+    time::gettime::{get_time_ms, get_time_us, get_timeval},
 };
 
 impl Syscall<'_> {
     /// yield current task
     pub async fn sys_yield(&self) -> SyscallResult {
         trace!("sys_yield");
-        yield_now(self.task).await;
+        yield_now().await;
         Ok(0)
     }
 
@@ -44,6 +44,13 @@ impl Syscall<'_> {
         let buf = UserPtr::<TimeVal>::new(buf);
         let timeval = get_timeval();
         buf.write_volatile(timeval);
+        Ok(0)
+    }
+
+    pub async fn sys_nanosleep(&self, buf: usize) -> SyscallResult {
+        let buf = UserPtr::<TimeSpec>::new(buf);
+        let time_spec = buf.value();
+        self.task.sleep(time_spec.into_ticks()).await;
         Ok(0)
     }
 }

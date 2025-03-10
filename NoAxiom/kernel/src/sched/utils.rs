@@ -2,6 +2,7 @@
 //! - use [`yield_now`] to yield current async task;
 //! - use [`take_waker`] to fetch current task's context
 //! - use [`block_on`] to block on a future
+//! - use [`suspend_now`] to suspend current task (without immediate wake)
 
 use alloc::{boxed::Box, sync::Arc, task::Wake};
 use core::{
@@ -38,13 +39,8 @@ impl Future for YieldFuture {
 /// note that this should be wrapped in an async function,
 /// and will create an await point for the current task flow
 #[inline(always)]
-pub async fn yield_now(task: &Arc<Task>) {
+pub async fn yield_now() {
     YieldFuture::new().await;
-    assert_ne!(
-        task.status(),
-        TaskStatus::Suspended,
-        "still under yield status!!!"
-    );
 }
 
 /// future to take the waker of the current task
@@ -116,11 +112,6 @@ impl Future for SuspendFuture {
 
 /// suspend current task
 /// difference with yield_now: it won't wake the task immediately
-pub async fn suspend_now(task: &Arc<Task>) {
+pub async fn suspend_now() {
     SuspendFuture::new().await;
-    assert_ne!(
-        task.status(),
-        TaskStatus::Suspended,
-        "still under suspend status!!!"
-    );
 }
