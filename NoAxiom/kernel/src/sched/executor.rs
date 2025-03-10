@@ -112,7 +112,7 @@ where
             }
         }
         if woken_hartid == get_hartid() {
-            debug!(
+            trace!(
                 "[schedule] push into local scheduler, tid: {}",
                 runnable.metadata().sched_entity.tid
             );
@@ -222,7 +222,7 @@ where
         if !self.mailbox[hartid].valid.load(Ordering::Acquire) {
             return;
         }
-        debug!("[handle_mailbox] begin");
+        trace!("[handle_mailbox] begin");
         let mut mailbox = self.mailbox[hartid].mailbox.lock();
         let local = self.current_scheduler();
         while let Some(runnable) = mailbox.pop() {
@@ -250,13 +250,13 @@ where
             if self.current_can_resp_sched_req() {
                 self.try_resp_sched_req();
             } else if self.current_should_set_sched_req() {
-                info!("[set_sched_req] current is underload");
+                trace!("[set_sched_req] current is underload");
                 self.set_sched_req();
             }
         } else {
             #[cfg(feature = "multicore")]
             if self.current_should_set_sched_req() {
-                info!("[set_sched_req] empty queue");
+                trace!("[set_sched_req] empty queue");
                 self.set_sched_req();
                 assert!(Arch::is_interrupt_enabled());
                 Arch::set_idle();

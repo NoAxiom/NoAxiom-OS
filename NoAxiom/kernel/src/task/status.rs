@@ -15,7 +15,7 @@ pub enum TaskStatus {
     /// and it will be woken up later when associated interrupt is triggered
     Suspended,
 
-    /// the stopped state indicates that the task will soon enter the
+    /// a stopped state indicates that the task will soon enter the
     /// exit_handler and will possibly be set to zombie if the task has a parent
     Stopped,
 

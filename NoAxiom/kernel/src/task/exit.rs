@@ -77,11 +77,11 @@ impl Task {
                 par_pcb.children.retain(|task| task.tid() != tid);
                 par_pcb.zombie_children.push(self.clone());
                 if par_pcb.wait_req.load(Ordering::Acquire) {
-                    debug!("waking parent");
+                    trace!("waking parent");
                     par_pcb.wait_req.store(false, Ordering::Release);
                     parent.wake_up();
                 } else {
-                    debug!("I suppose that my parent is already woken");
+                    trace!("I suppose that my parent is already woken");
                 }
             }
         }

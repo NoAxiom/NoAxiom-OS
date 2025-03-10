@@ -73,7 +73,7 @@ pub fn send_ipi(to_hartid: usize, ipi_type: IpiType) {
 
 pub fn ipi_handler() {
     let info = current_ipi_info();
-    debug!("ipi handler, from_hartid: {}", info.from_hartid);
+    trace!("ipi handler, from_hartid: {}", info.from_hartid);
     match info.ipi_type {
         IpiType::TlbShootdown => {
             info!("[IPI] tlb shootdown");

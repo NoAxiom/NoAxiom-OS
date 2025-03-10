@@ -76,7 +76,7 @@ impl Syscall<'_> {
         options: usize,
         _rusage: usize,
     ) -> SyscallResult {
-        debug!(
+        trace!(
             "[sys_wait4] pid: {:?}, status_addr: {:?}, options: {:?}",
             pid, status_addr, options
         );

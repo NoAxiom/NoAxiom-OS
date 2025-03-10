@@ -447,7 +447,7 @@ impl Task {
         let fd_table = if flags.contains(CloneFlags::FILES) {
             self.fd_table.clone()
         } else {
-            debug!("fd table info cloned");
+            trace!("fd table info cloned");
             let tmp = Arc::new(SpinLock::new(self.fd_table.lock().clone()));
             let mut guard = tmp.lock();
             // todo: maybe needn't to realloc STD_IN
@@ -460,7 +460,7 @@ impl Task {
 
         let res = if flags.contains(CloneFlags::THREAD) {
             // fork as a new thread
-            debug!("fork new thread");
+            trace!("fork new thread");
             let new_tid = tid_alloc();
             let tid_val = new_tid.0;
             let new_thread = Arc::new(Self {

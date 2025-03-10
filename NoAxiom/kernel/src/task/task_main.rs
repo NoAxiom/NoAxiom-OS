@@ -42,6 +42,10 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
         // execute task future
         let ret = unsafe { Pin::new_unchecked(future).poll(cx) };
 
+        // normally we set the task to runnable status
+        // fixme: this might cause bugs since we are not in any lock's protection
+        let _ = task.cmp_xchg_status(TaskStatus::Runnable, TaskStatus::Suspended);
+
         // clear current task
         // note that task status will be set in other place
         current_cpu().clear_task();
@@ -55,9 +59,6 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
             time_out - time_in,
             task.sched_entity.inner().vruntime.0
         );
-
-        // normally we set the task to runnable status
-        let _ = task.cmp_xchg_status(TaskStatus::Runnable, TaskStatus::Suspended);
 
         // always enable global interrupt before return
         Arch::enable_global_interrupt();

@@ -116,11 +116,11 @@ impl Scheduler for CFS {
         match order {
             ScheduleOrder::UrgentFirst => {
                 if let Some(runnable) = self.urgent.pop_front() {
-                    debug!("[sched_pop] pop urgent task (urgent first)");
+                    trace!("[sched_pop] pop urgent task (urgent first)");
                     self.sub_load(runnable.metadata().sched_entity.get_load());
                     Some(runnable)
                 } else if let Some(node) = self.normal.pop_first() {
-                    debug!("[sched_pop] pop normal task (urgent first)");
+                    trace!("[sched_pop] pop normal task (urgent first)");
                     let runnable = node.runnable;
                     self.sub_load(runnable.metadata().sched_entity.get_load());
                     Some(runnable)
@@ -130,12 +130,12 @@ impl Scheduler for CFS {
             }
             ScheduleOrder::NormalFirst => {
                 if let Some(node) = self.normal.pop_first() {
-                    debug!("[sched_pop] pop normal task (normal first)");
+                    trace!("[sched_pop] pop normal task (normal first)");
                     let runnable = node.runnable;
                     self.sub_load(runnable.metadata().sched_entity.get_load());
                     Some(runnable)
                 } else if let Some(runnable) = self.urgent.pop_front() {
-                    debug!("[sched_pop] pop urgent task (normal first)");
+                    trace!("[sched_pop] pop urgent task (normal first)");
                     self.sub_load(runnable.metadata().sched_entity.get_load());
                     Some(runnable)
                 } else {
