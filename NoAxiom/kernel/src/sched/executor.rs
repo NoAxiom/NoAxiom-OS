@@ -20,7 +20,7 @@ use crate::{
     config::{arch::CPU_NUM, sched::LOAD_BALANCE_TICKS},
     cpu::get_hartid,
     task::{status::TaskStatus, Task},
-    time::gettime::get_time,
+    time::{gettime::get_time, sleep::current_sleep_manager},
     trap::ipi::{send_ipi, IpiType},
 };
 
@@ -244,6 +244,7 @@ where
     /// Pop a task and run it
     pub fn run(&self) {
         self.handle_mailbox();
+        current_sleep_manager().sleep_handler();
         if let Some(runnable) = self.pop() {
             runnable.run();
             #[cfg(feature = "multicore")]

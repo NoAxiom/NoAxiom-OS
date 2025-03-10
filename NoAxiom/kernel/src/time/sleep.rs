@@ -32,7 +32,7 @@ lazy_static! {
         array_init(|_| SyncUnsafeCell::new(SleepManager::new()));
 }
 
-fn current_sleep_manager() -> &'static mut SleepManager {
+pub fn current_sleep_manager() -> &'static mut SleepManager {
     unsafe { &mut *SLEEP_MANAGER[get_hartid()].get() }
 }
 
