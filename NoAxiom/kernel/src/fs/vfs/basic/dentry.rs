@@ -8,7 +8,8 @@ use alloc::{
 
 use async_trait::async_trait;
 use downcast_rs::DowncastSync;
-type Mutex<T> = ksync::mutex::SpinLock<T>;
+use ksync::mutex::check_no_lock;
+use spin::Mutex;
 
 use super::{
     file::File,
@@ -115,7 +116,7 @@ impl dyn Dentry {
     pub fn add_child(self: &Arc<Self>, name: &str, child_inode: Arc<dyn Inode>) -> Arc<dyn Dentry> {
         let mut children = self.meta().children.lock();
 
-        if let Some(child) = children.get(name) {
+        let res = if let Some(child) = children.get(name) {
             child.set_inode(child_inode);
             child.clone()
         } else {
@@ -123,7 +124,8 @@ impl dyn Dentry {
             child.set_inode(child_inode);
             children.insert(name.to_string(), child.clone());
             child
-        }
+        };
+        res
     }
 
     // pub fn delete_self(self: &Arc<Self>) {
@@ -152,6 +154,7 @@ impl dyn Dentry {
         if self.inode().unwrap().file_type() != InodeMode::DIR {
             return Err(Errno::ENOTDIR);
         }
+        assert!(check_no_lock());
         let child = self.clone().create(name, *mode).await?;
         self.meta()
             .children

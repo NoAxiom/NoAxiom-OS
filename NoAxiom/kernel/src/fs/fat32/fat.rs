@@ -47,7 +47,7 @@ impl FAT {
                 .read_sector((self.fat1_start + sector_id) as usize)
                 .await;
             // find a free cluster
-            for (id, byte) in sector.read().data.chunks(4).enumerate() {
+            for (id, byte) in sector.data.chunks(4).enumerate() {
                 let value = u32::from_le_bytes(byte.try_into().unwrap());
                 if value == 0 {
                     return Some(sector_id * self.bytes_per_sector_id as u32 / 4 + id as u32);
@@ -60,12 +60,11 @@ impl FAT {
     pub async fn set_cluster_id(&self, blk: &ABC, cluster_id: u32, val: u32) {
         let sector_id = self.sector_id(cluster_id);
         let sector_offset = self.sector_offset(cluster_id);
-        let sector = blk.read_sector(sector_id as usize).await;
+        let mut data = *blk.read_sector(sector_id as usize).await.data;
         // write `val` to `cluster_id`
-        sector.write().data[sector_offset as usize..(sector_offset + 4) as usize]
+        data[sector_offset as usize..(sector_offset + 4) as usize]
             .copy_from_slice(&val.to_le_bytes());
-        blk.write_sector(sector_id as usize, &sector.read().data)
-            .await;
+        blk.write_sector(sector_id as usize, &data).await;
     }
     /// get `FAT` links by `first_cluster`
     pub async fn get_link(&self, blk: &ABC, first_cluster: u32) -> Vec<u32> {
@@ -75,7 +74,7 @@ impl FAT {
         res.push(first_cluster);
         loop {
             let sector = blk.read_sector(sector_id).await;
-            let sector = sector.read().data;
+            let sector = sector.data;
             let value = u32::from_le_bytes(
                 sector[sector_offset..(sector_offset + 4)]
                     .try_into()

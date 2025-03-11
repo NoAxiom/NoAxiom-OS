@@ -2,7 +2,8 @@ use alloc::{boxed::Box, sync::Arc};
 
 use async_trait::async_trait;
 use fatfs::{Read, Seek, SeekFrom::Start, Write};
-use ksync::mutex::SpinLock;
+use ksync::mutex::{check_no_lock, SpinLock};
+use spin::Mutex;
 
 use super::{
     dentry::Fat32Dentry,
@@ -21,7 +22,7 @@ use crate::{
 
 pub struct Fat32File {
     meta: FileMeta,
-    inner: Arc<SpinLock<IFatFileFile>>,
+    inner: Arc<Mutex<IFatFileFile>>,
 }
 
 impl Fat32File {
@@ -105,7 +106,7 @@ impl File for Fat32File {
 
 pub struct Fat32Dir {
     meta: FileMeta,
-    inner: Arc<SpinLock<IFatFileDir>>,
+    inner: Arc<Mutex<IFatFileDir>>,
 }
 
 impl Fat32Dir {

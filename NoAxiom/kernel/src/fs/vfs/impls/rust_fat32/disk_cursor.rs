@@ -75,7 +75,7 @@ impl Read for DiskCursor {
     /// `IoError::is_interrupted` returns true is non-fatal and the read
     /// operation should be retried if there is nothing else to do.
     async fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
-        let data = self.blk.read_sector(self.blk_id).await.read().data;
+        let data = self.blk.read_sector(self.blk_id).await.data;
         let read_size = (BLOCK_SIZE - self.offset).min(buf.len());
         buf[..read_size].copy_from_slice(&data[self.offset..self.offset + read_size]);
         self.move_cursor(read_size);
@@ -98,7 +98,7 @@ impl Write for DiskCursor {
     /// It is not considered an error if the entire buffer could not be written
     /// to this writer.
     async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
-        let mut data = self.blk.read_sector(self.blk_id).await.read().data;
+        let mut data = *self.blk.read_sector(self.blk_id).await.data;
         let write_size = (BLOCK_SIZE - self.offset).min(buf.len());
         data[self.offset..self.offset + write_size].copy_from_slice(&buf[..write_size]);
         self.blk.write_sector(self.blk_id as usize, &data).await;

@@ -29,16 +29,17 @@ impl Syscall<'_> {
         fd: isize,
         offset: usize,
     ) -> SyscallResult {
-        trace!("[sys_mmap] start");
         let length = align_up(length, PAGE_SIZE);
         let prot = MmapProts::from_bits(prot).unwrap();
         let flags = MmapFlags::from_bits(flags).unwrap();
         if addr % PAGE_SIZE != 0 || length == 0 {
             return Err(Errno::EINVAL);
         }
-        self.task
+        let res = self
+            .task
             .mmap(addr, length, prot, flags, fd, offset)
-            .map(|addr| addr as isize)
+            .map(|addr| addr as isize);
+        res
     }
 
     pub fn sys_munmap(&self, start: usize, length: usize) -> SyscallResult {

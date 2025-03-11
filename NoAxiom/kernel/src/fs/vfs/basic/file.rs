@@ -1,13 +1,11 @@
 // ! **File** is the file system file instance opened in memory
 
 use alloc::{boxed::Box, string::String, sync::Arc, vec::Vec};
-use core::sync::atomic::AtomicUsize;
+use core::sync::atomic::{AtomicUsize, Ordering};
 
 use async_trait::async_trait;
 use fatfs::SeekFrom;
-type Mutex<T> = ksync::mutex::SpinLock<T>;
-
-use core::sync::atomic::Ordering;
+use spin::Mutex;
 
 use super::{
     dentry::{self, Dentry},

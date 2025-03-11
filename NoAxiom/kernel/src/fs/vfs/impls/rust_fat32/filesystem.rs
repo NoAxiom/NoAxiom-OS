@@ -1,6 +1,7 @@
 use alloc::{boxed::Box, sync::Arc};
 
 use async_trait::async_trait;
+use ksync::mutex::check_no_lock;
 
 use super::{
     dentry::Fat32Dentry, disk_cursor::DiskCursor, inode::Fat32DirInode,

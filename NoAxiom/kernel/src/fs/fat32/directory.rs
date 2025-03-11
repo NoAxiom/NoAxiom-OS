@@ -374,7 +374,7 @@ impl FAT32Directory {
                 // 获取块号对应的扇区偏移
                 let sector = cluster_offset_sectors(&*self.inner.short_dir.bpb, *cluster);
                 let block = self.inner.short_dir.blk.read_sector(sector as usize).await;
-                let block = block.read().data;
+                let block = block.data;
                 for (idx, fat) in block.chunks(32).enumerate() {
                     if fat.iter().all(|b| *b == 0x0) {
                         has_free = true;
@@ -394,7 +394,7 @@ impl FAT32Directory {
                     .blk
                     .read_sector(free_entry.0 as usize)
                     .await;
-                let mut block = block.read().data;
+                let mut block = *block.data;
                 for (idx, e) in block.chunks_mut(32).enumerate() {
                     if idx == free_entry.1 {
                         let new_e: [u8; 32] = entry.clone().as_slice();
@@ -433,7 +433,7 @@ impl FAT32Directory {
                     // 将新的块读取进内存
                     let sector = cluster_offset_sectors(&*self.inner.short_dir.bpb, new_cluster);
                     let block = self.inner.short_dir.blk.read_sector(sector as usize).await;
-                    let mut block = block.read().data;
+                    let mut block = *block.data;
                     // 设置第一项的值
                     let e: [u8; 32] = entry.clone().as_slice();
                     block[0..32].copy_from_slice(&e);

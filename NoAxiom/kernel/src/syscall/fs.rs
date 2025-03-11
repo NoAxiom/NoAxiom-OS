@@ -1,5 +1,7 @@
 use alloc::{sync::Arc, vec::Vec};
 
+use ksync::mutex::check_no_lock;
+
 use super::{Syscall, SyscallResult};
 use crate::{
     constant::fs::AT_FDCWD,
@@ -136,6 +138,7 @@ impl Syscall<'_> {
         } else {
             Path::from(path_str)
         };
+        drop(fd_table);
 
         let dentry = path.dentry();
 
@@ -158,6 +161,7 @@ impl Syscall<'_> {
         let file = dentry.open()?;
         let file_path = file.dentry().path();
         file.set_flags(flags);
+        let mut fd_table = self.task.fd_table();
         let fd = fd_table.alloc_fd()?;
         fd_table.set(fd as usize, file);
 
@@ -253,6 +257,7 @@ impl Syscall<'_> {
         } else {
             Path::from(path_str)
         };
+        drop(fd_table);
 
         info!(
             "[sys_mkdirat] dirfd: {}, path: {:?}, mode: {:?}",
@@ -294,6 +299,7 @@ impl Syscall<'_> {
         let file = self.task.fd_table().get(fd).ok_or(Errno::EBADF)?;
         let user_ptr = UserPtr::<u8>::new(buf);
         let buf_slice = user_ptr.as_slice_mut_checked(len).await?;
+        assert!(check_no_lock());
         file.read_dir(buf_slice).await
     }
 

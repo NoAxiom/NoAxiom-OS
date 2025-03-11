@@ -4,6 +4,7 @@ use alloc::boxed::Box;
 
 use arch::{Arch, ArchInt};
 use async_trait::async_trait;
+use ksync::mutex::check_no_lock;
 
 use crate::{
     config::mm::VIRTIO0,
@@ -112,13 +113,11 @@ impl VirtIOAsyncBlock {
 #[async_trait]
 impl BlockDevice for VirtIOAsyncBlock {
     async fn read<'a>(&'a self, id: usize, buf: &'a mut [u8]) {
-        assert!(Arch::is_interrupt_enabled());
-        assert!(Arch::is_external_interrupt_enabled());
+        assert!(check_no_lock());
         self.read_block(id, buf).await
     }
     async fn write<'a>(&'a self, id: usize, buf: &'a [u8]) {
-        assert!(Arch::is_interrupt_enabled());
-        assert!(Arch::is_external_interrupt_enabled());
+        assert!(check_no_lock());
         self.write_block(id, buf).await
     }
 }
