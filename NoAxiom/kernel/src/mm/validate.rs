@@ -69,19 +69,13 @@ pub async fn validate(
             );
             ms.lazy_alloc_brk(vpn);
             Ok(())
-        } else if ms.mmap_manager.is_in_space(vpn) {
+        } else {
             info!(
                 "[memory_validate] realloc mmap, tid: {}",
                 current_cpu().task.as_ref().unwrap().tid()
             );
-            let res = lazy_alloc_mmap(memory_set, vpn, Some(ms)).await;
-            if let Err(res) = res {
-                warn!("[memory_validate] error when realloc mmap: {}", res);
-            }
+            lazy_alloc_mmap(memory_set, vpn, ms).await?;
             Ok(())
-        } else {
-            error!("[memory_validate] not in any alloc area");
-            Err(Errno::EFAULT)
         }
     }
 }

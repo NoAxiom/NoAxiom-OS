@@ -52,6 +52,11 @@ pub fn kernel_vpn_to_ppn(vpn: usize) -> usize {
     vpn & !KERNEL_PAGENUM_MASK
 }
 
+#[inline(always)]
+pub fn kernel_ppn_to_vpn(ppn: usize) -> usize {
+    ppn | KERNEL_PAGENUM_MASK
+}
+
 pub fn reverse<T: Clone>(vec: &Vec<T>) -> Vec<T> {
     let mut res = vec.clone();
     res.reverse();

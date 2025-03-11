@@ -1,11 +1,6 @@
-use alloc::{collections::btree_map::BTreeMap, sync::Arc};
-use core::{
-    future::Future,
-    pin::{pin, Pin},
-    task::{Context, Poll},
-};
+use alloc::{collections::btree_map::BTreeMap, sync::Arc, vec::Vec};
+use core::task::Waker;
 
-use futures::FutureExt;
 use ksync::mutex::{SpinLock, SpinLockGuard};
 
 use super::{
@@ -17,7 +12,11 @@ use super::{
 use crate::{
     config::mm::{MMAP_BASE_ADDR, PAGE_SIZE},
     fs::vfs::basic::file::File,
-    include::mm::{MmapFlags, MmapProts},
+    include::{
+        mm::{MmapFlags, MmapProts},
+        result::Errno,
+    },
+    sched::utils::{suspend_now, take_waker},
     syscall::SysResult,
 };
 
@@ -64,12 +63,16 @@ impl MmapPage {
     }
 
     /// mmap alloc
-    pub async fn lazy_map_page(&mut self) -> SysResult<()> {
+    pub async fn lazy_map_page(&mut self, kernel_vpn: VirtPageNum) -> SysResult<()> {
         if let Some(file) = self.file.clone() {
             let buf_slice: &mut [u8] = unsafe {
-                core::slice::from_raw_parts_mut(self.vpn.as_va_usize() as *mut u8, PAGE_SIZE)
+                core::slice::from_raw_parts_mut(kernel_vpn.as_va_usize() as *mut u8, PAGE_SIZE)
             };
-            file.base_read(self.offset, buf_slice).await?;
+            // crate::sched::utils::yield_now().await;
+            let res = file.base_read(self.offset, buf_slice).await;
+            if let Err(res) = res {
+                error!("ERROR at mmap read file, msg: {:?}", res);
+            }
         }
         self.valid = true;
         Ok(())
@@ -88,6 +91,9 @@ pub struct MmapManager {
 
     /// frame trackers for already allocated mmap pages
     pub frame_trackers: BTreeMap<VirtPageNum, FrameTracker>,
+
+    /// mmap alloc tracer
+    pub alloc_tracer: BTreeMap<VirtPageNum, Vec<Waker>>,
 }
 
 impl MmapManager {
@@ -97,6 +103,7 @@ impl MmapManager {
             mmap_top,
             mmap_map: BTreeMap::new(),
             frame_trackers: BTreeMap::new(),
+            alloc_tracer: BTreeMap::new(),
         }
     }
 
@@ -139,67 +146,52 @@ impl MmapManager {
 
     /// is a va in mmap space
     pub fn is_in_space(&self, vpn: VirtPageNum) -> bool {
-        self.mmap_map.contains_key(&vpn)
-    }
-}
-
-impl MemorySet {
-    /// actual mmap when pagefault is triggered
-    async unsafe fn lazy_alloc_mmap(&mut self, vpn: VirtPageNum) -> SysResult<()> {
-        let frame = frame_alloc();
-        let ppn = frame.ppn();
-        self.mmap_manager.frame_trackers.insert(vpn, frame);
-        let mmap_page = self.mmap_manager.mmap_map.get_mut(&vpn).unwrap();
-        let pte_flags: PTEFlags = PTEFlags::from(mmap_page.prot) | PTEFlags::U;
-        let page_table = unsafe { &mut (*self.page_table.get()) };
-        page_table.map(vpn, ppn, pte_flags);
-        mmap_page.lazy_map_page().await?;
-        Ok(())
-    }
-}
-
-pub struct LazyAllocMmapFuture<'a> {
-    memory_set: &'a Arc<SpinLock<MemorySet>>,
-    guard: Option<SpinLockGuard<'a, MemorySet>>,
-    vpn: VirtPageNum,
-}
-
-impl<'a> LazyAllocMmapFuture<'a> {
-    pub fn new(
-        memory_set: &'a Arc<SpinLock<MemorySet>>,
-        vpn: VirtPageNum,
-        guard: Option<SpinLockGuard<'a, MemorySet>>,
-    ) -> Self {
-        Self {
-            memory_set,
-            vpn,
-            guard,
-        }
-    }
-}
-
-impl<'a> Future for LazyAllocMmapFuture<'a> {
-    type Output = SysResult<()>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let this = self.get_mut();
-        let mut ms = match this.guard.take() {
-            Some(guard) => guard,
-            None => this.memory_set.lock(),
-        };
-        assert!(this.guard.is_none());
-        let mut fut = unsafe { ms.lazy_alloc_mmap(this.vpn) };
-        let pin = pin!(fut);
-        pin.poll(cx)
+        self.mmap_map.contains_key(&vpn) || self.alloc_tracer.contains_key(&vpn)
     }
 }
 
 pub async fn lazy_alloc_mmap<'a>(
     memory_set: &Arc<SpinLock<MemorySet>>,
     vpn: VirtPageNum,
-    guard: Option<SpinLockGuard<'a, MemorySet>>,
+    mut guard: SpinLockGuard<'a, MemorySet>,
 ) -> SysResult<()> {
-    LazyAllocMmapFuture::new(memory_set, vpn, guard).await
+    let frame = frame_alloc();
+    let ppn = frame.ppn();
+    let kernel_vpn = frame.into_kernel_vpn();
+    guard.mmap_manager.frame_trackers.insert(vpn, frame);
+    let mmap_page = guard.mmap_manager.mmap_map.remove(&vpn);
+    match mmap_page {
+        Some(mut mmap_page) => {
+            drop(guard);
+            let pte_flags: PTEFlags = PTEFlags::from(mmap_page.prot) | PTEFlags::U;
+            mmap_page.lazy_map_page(kernel_vpn).await?;
+            let mut ms = memory_set.lock();
+            ms.page_table().map(vpn, ppn, pte_flags);
+            if let Some(tracer) = ms.mmap_manager.alloc_tracer.get_mut(&vpn) {
+                for waker in tracer.iter() {
+                    waker.wake_by_ref();
+                }
+                ms.mmap_manager.alloc_tracer.remove(&vpn);
+            }
+            assert!(ms.mmap_manager.mmap_map.get(&vpn).is_none());
+            assert!(ms.mmap_manager.alloc_tracer.get(&vpn).is_none());
+            ms.mmap_manager.mmap_map.insert(vpn, mmap_page);
+            drop(ms);
+            Ok(())
+        }
+        None => match guard.mmap_manager.alloc_tracer.get_mut(&vpn) {
+            Some(tracer) => {
+                tracer.push(take_waker().await);
+                drop(guard);
+                suspend_now().await;
+                Ok(())
+            }
+            None => {
+                error!("[lazy_alloc_mmap] vpn not found in mmap_map");
+                Err(Errno::EFAULT)
+            }
+        },
+    }
 }
 
 /*
@@ -222,5 +214,38 @@ mmap这玩意可能会读取文件信息
 不过我觉得mmap的tlb shootdown没有很大的必要诶？？
 因为这玩意其实并不影响正确性，只是会影响信息到达的时间
 到底要不要发ipi啊 =^=
+
+pub struct LazyAllocMmapFuture<'a> {
+    memory_set: &'a Arc<SpinLock<MemorySet>>,
+    vpn: VirtPageNum,
+    mmap_page: MmapPage,
+}
+impl<'a> LazyAllocMmapFuture<'a> {
+    pub fn new(
+        memory_set: &'a Arc<SpinLock<MemorySet>>,
+        vpn: VirtPageNum,
+        mmap_page: MmapPage,
+    ) -> Self {
+        Self {
+            memory_set,
+            vpn,
+            mmap_page,
+        }
+    }
+}
+impl<'a> Future for LazyAllocMmapFuture<'a> {
+    type Output = SysResult<()>;
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output>
+{         let this = self.get_mut();
+        let mut fut = this.mmap_page.lazy_map_page();
+        let pin = pin!(fut);
+        let res = pin.poll(cx);
+        if res.is_ready() {
+
+        }
+        res
+    }
+}
+LazyAllocMmapFuture::new(memory_set, vpn, mmap_page).await?;
 
 */
