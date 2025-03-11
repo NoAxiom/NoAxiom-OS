@@ -472,6 +472,8 @@ impl MemorySet {
                     self.user_stack_area.frame_map.insert(vpn, frame.clone());
                 } else if self.user_brk_area.vpn_range.is_in_range(vpn) {
                     self.user_brk_area.frame_map.insert(vpn, frame.clone());
+                } else if self.mmap_manager.is_in_space(vpn) {
+                    self.mmap_manager.frame_trackers.insert(vpn, frame.clone());
                 } else {
                     panic!("[realloc_cow] vpn is not in any area!!!");
                 }

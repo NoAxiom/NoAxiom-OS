@@ -43,25 +43,6 @@ pub struct MmapPage {
 }
 
 impl MmapPage {
-    /// register a new mmap page without immediate mapping
-    pub fn new(
-        vpn: VirtPageNum,
-        prot: MmapProts,
-        flags: MmapFlags,
-        valid: bool,
-        file: Option<Arc<dyn File>>,
-        offset: usize,
-    ) -> Self {
-        Self {
-            vpn,
-            prot,
-            flags,
-            valid,
-            file,
-            offset,
-        }
-    }
-
     /// mmap alloc
     pub async fn lazy_map_page(&mut self, kernel_vpn: VirtPageNum) -> SysResult<()> {
         if let Some(file) = self.file.clone() {
@@ -125,7 +106,14 @@ impl MmapManager {
         let mut offset = st_offset;
         for vpn in VpnRange::new_from_va(start_va, end_va) {
             // created a mmap page with lazy-mapping
-            let mmap_page = MmapPage::new(vpn, prot, flags, false, file.clone(), offset);
+            let mmap_page = MmapPage {
+                vpn,
+                prot,
+                flags,
+                valid: false,
+                file: file.clone(),
+                offset,
+            };
             self.mmap_map.insert(vpn, mmap_page);
             offset += PAGE_SIZE;
         }
