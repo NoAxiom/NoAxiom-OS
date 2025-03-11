@@ -81,6 +81,10 @@ ifneq ($(ASYNC_FS), )
 	FEATURES += async_fs
 endif
 
+ifneq ($(DEBUG), )
+	FEATURES += debug
+endif
+
 ifneq ($(FEATURES), )
     CARGO_ARGS += --features "$(FEATURES)"
 endif

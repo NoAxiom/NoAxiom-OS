@@ -100,6 +100,7 @@ asm: # build_kernel
 # NOTE THAT if you want to run in single core
 # you should export this as empty
 export MULTICORE_ARGS := 2
+export DEBUG := 1
 
 QFLAGS := 
 QFLAGS += -m 128

@@ -1,7 +1,6 @@
 use core::sync::atomic::AtomicUsize;
 
 use arch::{Arch, ArchInt, ArchSbi};
-use lazy_static::lazy_static;
 
 use crate::{
     config::{arch::CPU_NUM, mm::KERNEL_ADDR_OFFSET},
@@ -95,6 +94,7 @@ pub fn boot_hart_init(_: usize, dtb: usize) {
 
     // main
     println!("{}", NOAXIOM_BANNER);
+    debug_print();
     info!(
         "[first_init] entry init hart_id: {}, dtb_addr: {:#x}",
         get_hartid(),
@@ -102,4 +102,18 @@ pub fn boot_hart_init(_: usize, dtb: usize) {
     );
     rust_main();
     unreachable!();
+}
+
+pub fn debug_print() {
+    #[cfg(feature = "debug")]
+    {
+        #[cfg(feature = "async_fs")]
+        warn!("[compile_args] async-fs is on");
+        #[cfg(feature = "multicore")]
+        warn!("[compile_args] multicore is on");
+    }
+    #[cfg(not(feature = "debug"))]
+    {
+        info!("[compile_args] debug is off\n");
+    }
 }

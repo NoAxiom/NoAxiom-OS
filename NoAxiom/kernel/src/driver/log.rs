@@ -46,6 +46,8 @@ impl Log for SimpleLogger {
 pub fn log_init() {
     static LOGGER: SimpleLogger = SimpleLogger;
     log::set_logger(&LOGGER).unwrap();
+
+    #[cfg(feature = "debug")]
     log::set_max_level(match option_env!("LOG") {
         Some("ERROR") => LevelFilter::Error,
         Some("WARN") => LevelFilter::Warn,
@@ -54,6 +56,9 @@ pub fn log_init() {
         Some("TRACE") => LevelFilter::Trace,
         _ => LevelFilter::Off,
     });
+    #[cfg(not(feature = "debug"))]
+    log::set_max_level(LevelFilter::Off);
+
     unsafe { LOG_BOOTED.store(true, Ordering::SeqCst) };
     info!("[init] log init success");
 }
