@@ -37,6 +37,8 @@ use crate::{
     mm::{
         address::VirtAddr,
         memory_set::{ElfMemoryInfo, MemorySet},
+        page_table::{current_token, translate_vpn_into_pte, PageTable},
+        validate::validate,
     },
     return_errno,
     sched::sched_entity::SchedEntity,
@@ -203,9 +205,8 @@ impl Task {
     ) -> SysResult<()> {
         trace!("[memory_validate] check at addr: {:#x}", addr);
         let vpn = VirtAddr::from(addr).floor();
-        let mut ms = self.memory_set().lock();
-        let pte = ms.page_table().translate_vpn(vpn);
-        ms.validate(vpn, exception, pte).await
+        let pt = PageTable::from_token(current_token());
+        validate(&self.memory_set, vpn, exception, pt.translate_vpn(vpn)).await
     }
 
     /// get pcb
@@ -551,7 +552,7 @@ impl Task {
     }
 
     /// exit current task
-    pub fn exit(&self, exit_code: i32) {
+    pub fn set_stopped(&self, exit_code: i32) {
         if self.is_group_leader() {
             self.set_exit_code(exit_code);
         }

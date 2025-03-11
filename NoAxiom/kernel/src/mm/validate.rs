@@ -1,0 +1,87 @@
+use alloc::sync::Arc;
+
+use arch::Exception;
+use ksync::mutex::SpinLock;
+
+use super::{address::VirtPageNum, memory_set::MemorySet, pte::PageTableEntry};
+use crate::{
+    cpu::current_cpu, include::result::Errno, mm::mmap_manager::lazy_alloc_mmap, syscall::SysResult,
+};
+
+// TODO: add mmap check
+/// # memory validate
+/// Check if is the copy-on-write/lazy-alloc pages triggered the page fault.
+///
+/// As for cow, clone pages for the writer(aka current task),
+/// but should keep original page as cow since it might still be shared.
+/// Note that if the reference count is one, there's no need to clone pages.
+///
+/// As for lazy alloc, realloc pages for the task.
+/// Associated pages: stack, heap, mmap
+///
+/// Return value: true if successfully handled lazy alloc or copy-on-write;
+///               false if the page fault is not in any alloc area.
+///
+/// usages: when any kernel allocation in user_space happens, call this fn;
+/// when user pagefault happens, call this func to check allocation.
+pub async fn validate(
+    memory_set: &Arc<SpinLock<MemorySet>>,
+    vpn: VirtPageNum,
+    exception: Option<Exception>,
+    pte: Option<PageTableEntry>,
+) -> SysResult<()> {
+    if let Some(pte) = pte {
+        let flags = pte.flags();
+        if flags.is_cow() {
+            trace!(
+                "[memory_validate] realloc COW at vpn: {:#x}, pte: {:#x}, flags: {:?}, tid: {}",
+                vpn.0,
+                pte.0,
+                pte.flags(),
+                current_cpu().task.as_ref().unwrap().tid()
+            );
+            memory_set.lock().realloc_cow(vpn, pte);
+            Ok(())
+        } else if exception.is_some() && exception.unwrap() == Exception::StorePageFault {
+            error!(
+                "[memory_validate] store at invalid area, flags: {:?}, tid: {}",
+                flags,
+                current_cpu().task.as_ref().unwrap().tid()
+            );
+            Err(Errno::EFAULT)
+        } else {
+            error!("unknown error in memory validate");
+            Ok(())
+        }
+    } else {
+        let mut ms = memory_set.lock();
+        if ms.user_stack_area.vpn_range.is_in_range(vpn) {
+            info!(
+                "[memory_validate] realloc stack, tid: {}",
+                current_cpu().task.as_ref().unwrap().tid()
+            );
+            ms.lazy_alloc_stack(vpn);
+            Ok(())
+        } else if ms.user_brk_area.vpn_range.is_in_range(vpn) {
+            info!(
+                "[memory_validate] realloc heap, tid: {}",
+                current_cpu().task.as_ref().unwrap().tid()
+            );
+            ms.lazy_alloc_brk(vpn);
+            Ok(())
+        } else if ms.mmap_manager.is_in_space(vpn) {
+            info!(
+                "[memory_validate] realloc mmap, tid: {}",
+                current_cpu().task.as_ref().unwrap().tid()
+            );
+            let res = lazy_alloc_mmap(memory_set, vpn, Some(ms)).await;
+            if let Err(res) = res {
+                warn!("[memory_validate] error when realloc mmap: {}", res);
+            }
+            Ok(())
+        } else {
+            error!("[memory_validate] not in any alloc area");
+            Err(Errno::EFAULT)
+        }
+    }
+}
