@@ -18,7 +18,7 @@ use crate::{
     },
     rust_main,
     sched::utils::block_on,
-    trap::trap_init,
+    trap::trap::trap_init,
 };
 
 /// awake other core

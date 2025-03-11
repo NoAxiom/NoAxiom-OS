@@ -1,7 +1,4 @@
-mod context;
-mod handler;
-mod trap;
+pub mod ext_int;
+pub mod handler;
 pub mod ipi;
-
-pub use handler::user_trap_handler;
-pub use trap::{trap_init, trap_restore};
+pub mod trap;

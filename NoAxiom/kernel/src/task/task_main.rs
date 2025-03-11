@@ -12,7 +12,7 @@ use crate::{
     sched::utils::take_waker,
     task::{status::TaskStatus, Task},
     time::gettime::get_time_us,
-    trap::{trap_restore, user_trap_handler},
+    trap::{handler::user_trap_handler, trap::trap_restore},
 };
 
 pub struct UserTaskFuture<F: Future + Send + 'static> {
