@@ -11,8 +11,6 @@ use core::{
     task::{Context, Poll, Waker},
 };
 
-use crate::task::{status::TaskStatus, Task};
-
 pub struct YieldFuture {
     visited: bool,
 }

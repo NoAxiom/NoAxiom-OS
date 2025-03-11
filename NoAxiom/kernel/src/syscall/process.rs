@@ -15,7 +15,7 @@ impl Syscall<'_> {
     /// exit current task by marking it as zombie
     pub fn sys_exit(&mut self, exit_code: usize) -> SyscallResult {
         let exit_code = exit_code as i32;
-        self.task.exit(exit_code);
+        self.task.set_stopped(exit_code);
         Ok(0)
     }
 

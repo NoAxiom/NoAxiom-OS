@@ -1,11 +1,9 @@
 use alloc::{string::String, vec::Vec};
 
-use ksync::mutex::SpinLockGuard;
-
 use super::{
     address::VirtAddr,
-    memory_set::MemorySet,
     page_table::{current_token, PageTable},
+    validate::validate,
 };
 use crate::{
     config::mm::KERNEL_ADDR_OFFSET,
@@ -178,19 +176,15 @@ impl UserPtr<u8> {
     /// convert ptr into an slice
     pub async fn as_slice_mut_checked_raw<'a>(&self, len: usize) -> SysResult<&mut [u8]> {
         let page_table = PageTable::from_token(current_token());
-        let mut guard = None;
+        let memory_set = current_cpu().task.as_ref().unwrap().memory_set();
         for vpn in VpnRange::new_from_va(
             VirtAddr::from(self.addr_usize()),
             VirtAddr::from(self.addr_usize() + len),
         ) {
             if page_table.translate_vpn(vpn).is_none() {
-                if guard.is_none() {
-                    guard = Some(current_cpu().task.as_ref().unwrap().memory_set().lock())
-                }
-                guard.as_mut().unwrap().validate(vpn, None, None).await?;
-            };
+                validate(memory_set, vpn, None, None).await?;
+            }
         }
-        drop(guard);
         Ok(unsafe { core::slice::from_raw_parts_mut(self.ptr, len) })
     }
 }

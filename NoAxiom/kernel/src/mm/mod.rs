@@ -11,6 +11,7 @@ pub mod page_table;
 pub mod permission;
 pub mod pte;
 pub mod user_ptr;
+pub mod validate;
 
 #[inline(always)]
 pub fn hart_mm_init() {

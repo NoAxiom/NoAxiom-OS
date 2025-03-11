@@ -1,4 +1,12 @@
 use alloc::{collections::btree_map::BTreeMap, sync::Arc};
+use core::{
+    future::Future,
+    pin::{pin, Pin},
+    task::{Context, Poll},
+};
+
+use futures::FutureExt;
+use ksync::mutex::{SpinLock, SpinLockGuard};
 
 use super::{
     address::{VirtAddr, VirtPageNum, VpnRange},
@@ -137,7 +145,7 @@ impl MmapManager {
 
 impl MemorySet {
     /// actual mmap when pagefault is triggered
-    pub async fn lazy_alloc_mmap(&mut self, vpn: VirtPageNum) -> SysResult<()> {
+    async unsafe fn lazy_alloc_mmap(&mut self, vpn: VirtPageNum) -> SysResult<()> {
         let frame = frame_alloc();
         let ppn = frame.ppn();
         self.mmap_manager.frame_trackers.insert(vpn, frame);
@@ -148,6 +156,50 @@ impl MemorySet {
         mmap_page.lazy_map_page().await?;
         Ok(())
     }
+}
+
+pub struct LazyAllocMmapFuture<'a> {
+    memory_set: &'a Arc<SpinLock<MemorySet>>,
+    guard: Option<SpinLockGuard<'a, MemorySet>>,
+    vpn: VirtPageNum,
+}
+
+impl<'a> LazyAllocMmapFuture<'a> {
+    pub fn new(
+        memory_set: &'a Arc<SpinLock<MemorySet>>,
+        vpn: VirtPageNum,
+        guard: Option<SpinLockGuard<'a, MemorySet>>,
+    ) -> Self {
+        Self {
+            memory_set,
+            vpn,
+            guard,
+        }
+    }
+}
+
+impl<'a> Future for LazyAllocMmapFuture<'a> {
+    type Output = SysResult<()>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.get_mut();
+        let mut ms = match this.guard.take() {
+            Some(guard) => guard,
+            None => this.memory_set.lock(),
+        };
+        assert!(this.guard.is_none());
+        let mut fut = unsafe { ms.lazy_alloc_mmap(this.vpn) };
+        let pin = pin!(fut);
+        pin.poll(cx)
+    }
+}
+
+pub async fn lazy_alloc_mmap<'a>(
+    memory_set: &Arc<SpinLock<MemorySet>>,
+    vpn: VirtPageNum,
+    guard: Option<SpinLockGuard<'a, MemorySet>>,
+) -> SysResult<()> {
+    LazyAllocMmapFuture::new(memory_set, vpn, guard).await
 }
 
 /*

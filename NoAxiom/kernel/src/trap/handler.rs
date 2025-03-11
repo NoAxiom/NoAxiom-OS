@@ -123,7 +123,7 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
             stval,
             cx.sepc
         );
-        task.exit(-1);
+        task.set_stopped(-1);
     };
     match scause {
         // syscall
