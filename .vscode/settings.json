@@ -10,7 +10,6 @@
     "multicore",
     "riscv_qemu",
     "async_fs",
-    "debug",
   ],
   "C_Cpp_Runner.cCompilerPath": "gcc",
   "C_Cpp_Runner.cppCompilerPath": "g++",

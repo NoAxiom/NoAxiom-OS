@@ -8,9 +8,7 @@ use array_init::array_init;
 use ksync::mutex::SpinLock;
 use lazy_static::lazy_static;
 
-use crate::{
-    config::arch::CPU_NUM, cpu::get_hartid, entry::init::BOOT_HART_ID, sched::executor::RUNTIME,
-};
+use crate::{config::arch::CPU_NUM, cpu::get_hartid, sched::executor::RUNTIME};
 
 #[derive(Clone)]
 pub enum IpiType {
@@ -90,20 +88,21 @@ pub fn ipi_handler() {
     Arch::clear_ipi();
 }
 
-pub fn send_ipi_test() {
-    let boot_hart_id = BOOT_HART_ID.load(core::sync::atomic::Ordering::SeqCst);
-    let from_hartid = get_hartid();
-    if from_hartid != boot_hart_id {
-        return;
-    }
+// pub fn send_ipi_test() {
+//     let boot_hart_id =
+// crate::entry::init::BOOT_HART_ID.load(core::sync::atomic::Ordering::SeqCst);
+//     let from_hartid = get_hartid();
+//     if from_hartid != boot_hart_id {
+//         return;
+//     }
 
-    debug!("send ipi test begin!");
-    for to_hartid in 0..CPU_NUM {
-        if to_hartid == from_hartid {
-            continue;
-        }
-        debug!("send ipi to hart {}", to_hartid);
-        send_ipi(to_hartid, IpiType::TlbShootdown);
-    }
-    debug!("send ipi test done!");
-}
+//     debug!("send ipi test begin!");
+//     for to_hartid in 0..CPU_NUM {
+//         if to_hartid == from_hartid {
+//             continue;
+//         }
+//         debug!("send ipi to hart {}", to_hartid);
+//         send_ipi(to_hartid, IpiType::TlbShootdown);
+//     }
+//     debug!("send ipi test done!");
+// }

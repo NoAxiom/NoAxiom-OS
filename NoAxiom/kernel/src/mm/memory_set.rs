@@ -1,10 +1,7 @@
 use alloc::{sync::Arc, vec::Vec};
-use core::{
-    intrinsics::atomic_store_seqcst,
-    sync::atomic::{fence, AtomicPtr, AtomicUsize, Ordering},
-};
+use core::sync::atomic::{fence, Ordering};
 
-use arch::{Arch, ArchMemory, Exception};
+use arch::{Arch, ArchMemory};
 use ksync::{cell::SyncUnsafeCell, mutex::SpinLock};
 use lazy_static::lazy_static;
 
@@ -22,16 +19,14 @@ use crate::{
         USER_STACK_SIZE,
     },
     constant::time::CLOCK_FREQ,
-    cpu::current_cpu,
     fs::{path::Path, vfs::basic::file::File},
-    include::{process::auxv::*, result::Errno},
+    include::process::auxv::*,
     map_permission,
     mm::{
         address::{VirtAddr, VirtPageNum},
         map_area::MapAreaType,
         permission::MapType,
     },
-    syscall::SysResult,
 };
 
 extern "C" {

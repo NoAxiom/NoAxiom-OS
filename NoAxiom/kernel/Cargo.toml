@@ -4,7 +4,6 @@ name = "kernel"
 version = "0.1.0"
 
 [features]
-debug = []
 multicore = []
 sv39 = []
 sv48 = []

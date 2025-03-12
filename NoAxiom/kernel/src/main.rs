@@ -11,7 +11,6 @@
 #![feature(panic_info_message)]
 #![feature(alloc_error_handler)]
 #![feature(slice_from_ptr_range)]
-#![feature(core_intrinsics)]
 #![allow(deprecated)]
 // #![allow(dead_code, unused_imports, unused_variables)]
 // #![feature(custom_mir)]

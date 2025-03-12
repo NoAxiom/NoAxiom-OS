@@ -10,7 +10,7 @@ use lazy_static::lazy_static;
 
 use super::address::{PhysPageNum, VirtPageNum};
 use crate::{
-    config::mm::{KERNEL_ADDR_OFFSET, KERNEL_PHYS_MEMORY_END},
+    config::mm::KERNEL_PHYS_MEMORY_END,
     mm::address::PhysAddr,
     utils::{kernel_ppn_to_vpn, kernel_va_to_pa},
 };
@@ -163,7 +163,6 @@ pub fn frame_dealloc(ppn: PhysPageNum) {
     let mut guard = FRAME_ALLOCATOR.lock();
     guard.dealloc(ppn);
     // FIXME: only for debug, remove it in release
-    #[cfg(feature = "debug")]
     assert!(guard.frame_map.contains_key(&ppn.0));
     guard.frame_map.remove(&ppn.0);
 }

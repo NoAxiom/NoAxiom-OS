@@ -59,7 +59,7 @@ pub fn other_hart_init(hart_id: usize, dtb: usize) {
     unreachable!();
 }
 
-pub static BOOT_HART_ID: AtomicUsize = AtomicUsize::new(0);
+// pub static BOOT_HART_ID: AtomicUsize = AtomicUsize::new(0);
 
 // TODO: dtb, init_proc
 /// init bss, mm, console, and other drivers, then jump to rust_main,
@@ -71,7 +71,7 @@ pub fn boot_hart_init(_: usize, dtb: usize) {
     heap_init();
     log_init();
     frame_init();
-    BOOT_HART_ID.store(get_hartid(), core::sync::atomic::Ordering::SeqCst);
+    // BOOT_HART_ID.store(get_hartid(), core::sync::atomic::Ordering::SeqCst);
     Arch::enable_user_memory_access();
 
     // hart resources init
@@ -94,7 +94,6 @@ pub fn boot_hart_init(_: usize, dtb: usize) {
 
     // main
     println!("{}", NOAXIOM_BANNER);
-    debug_print();
     info!(
         "[first_init] entry init hart_id: {}, dtb_addr: {:#x}",
         get_hartid(),
@@ -102,18 +101,4 @@ pub fn boot_hart_init(_: usize, dtb: usize) {
     );
     rust_main();
     unreachable!();
-}
-
-pub fn debug_print() {
-    #[cfg(feature = "debug")]
-    {
-        #[cfg(feature = "async_fs")]
-        warn!("[compile_args] async-fs is on");
-        #[cfg(feature = "multicore")]
-        warn!("[compile_args] multicore is on");
-    }
-    #[cfg(not(feature = "debug"))]
-    {
-        info!("[compile_args] debug is off\n");
-    }
 }

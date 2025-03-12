@@ -10,7 +10,6 @@ endif
 FEATURES :=
 
 # feature flags
-# arch, multicore config is passed from ../makefile
 SV39 := 1
 VF2 :=
 RISCV_QEMU := 1
@@ -79,10 +78,6 @@ endif
 
 ifneq ($(ASYNC_FS), )
 	FEATURES += async_fs
-endif
-
-ifneq ($(DEBUG), )
-	FEATURES += debug
 endif
 
 ifneq ($(FEATURES), )
