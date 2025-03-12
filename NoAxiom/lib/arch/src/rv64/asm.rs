@@ -10,9 +10,7 @@ impl ArchAsm for RV64 {
     }
     #[inline(always)]
     fn set_idle() {
-        unsafe {
-            riscv::asm::wfi();
-        }
+        riscv::asm::wfi();
     }
     #[inline(always)]
     fn current_pc() -> usize {

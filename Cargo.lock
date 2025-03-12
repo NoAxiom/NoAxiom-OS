@@ -416,13 +416,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hello_world"
-version = "0.1.0"
-dependencies = [
- "userlib",
-]
-
-[[package]]
 name = "hermit-abi"
 version = "0.1.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -458,13 +451,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f31827a206f56af32e590ba56d5d2d085f558508192593743f16b2306495269f"
 dependencies = [
  "cc",
-]
-
-[[package]]
-name = "initprocess"
-version = "0.1.0"
-dependencies = [
- "userlib",
 ]
 
 [[package]]
@@ -539,13 +525,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ktest"
-version = "0.1.0"
-dependencies = [
- "userlib",
-]
-
-[[package]]
 name = "lazy_static"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -575,13 +554,6 @@ name = "log"
 version = "0.4.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a7a70ba024b9dc04c27ea2f0c0548feb474ec5c54bba33a7f72f873a39d07b24"
-
-[[package]]
-name = "long_loop"
-version = "0.1.0"
-dependencies = [
- "userlib",
-]
 
 [[package]]
 name = "loongArch64"
@@ -700,13 +672,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f139b0662de085916d1fb67d2b4169d1addddda1919e696f3252b740b629986e"
 dependencies = [
  "unicode-ident",
-]
-
-[[package]]
-name = "process_test"
-version = "0.1.0"
-dependencies = [
- "userlib",
 ]
 
 [[package]]
@@ -929,13 +894,6 @@ name = "unicode-ident"
 version = "1.0.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e91b56cd4cadaeb79bbf1a5645f6b4f8dc5bde8834ad5894a8db35fda9efa1fe"
-
-[[package]]
-name = "userlib"
-version = "0.1.0"
-dependencies = [
- "buddy_system_allocator",
-]
 
 [[package]]
 name = "vcell"

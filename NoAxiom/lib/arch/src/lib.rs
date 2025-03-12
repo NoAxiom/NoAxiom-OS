@@ -22,8 +22,7 @@ mod rv64;
 pub use virt_arch::*;
 
 #[cfg(target_arch = "loongarch64")]
-pub type Arch = la64::LoongArch64;
-
+pub type Arch = la64::LA64;
 #[cfg(target_arch = "riscv64")]
 pub type Arch = rv64::RV64;
 
@@ -34,3 +33,5 @@ pub type TrapContext = <Arch as ArchType>::TrapContext;
 
 #[cfg(target_arch = "riscv64")]
 pub use rv64::{_entry, _entry_other_hart};
+#[cfg(target_arch = "loongarch64")]
+pub use la64::{_entry, _entry_other_hart};

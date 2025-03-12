@@ -5,10 +5,6 @@ use config::{
     mm::{KERNEL_ADDR_OFFSET, KERNEL_STACK_SIZE, KERNEL_STACK_WIDTH},
 };
 
-use crate::ArchBoot;
-
-use super::RV64;
-
 /// temp stack for kernel booting
 #[link_section = ".bss.kstack"]
 static BOOT_STACK: [u8; KERNEL_STACK_SIZE * CPU_NUM] = [0; KERNEL_STACK_SIZE * CPU_NUM];

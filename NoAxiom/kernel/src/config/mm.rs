@@ -5,10 +5,6 @@ pub const PAGE_WIDTH: usize = config::mm::PAGE_WIDTH;
 /// page size : 4KB, 4096 bytes
 pub const PAGE_SIZE: usize = config::mm::PAGE_SIZE;
 
-/// kernel stack width
-pub const KERNEL_STACK_WIDTH: usize = config::mm::KERNEL_STACK_WIDTH;
-/// kernel stack size: 64KB (*CPU_NUM = 128KB)
-pub const KERNEL_STACK_SIZE: usize = config::mm::KERNEL_STACK_SIZE;
 /// kernel heap size: 32MB
 pub const KERNEL_HEAP_SIZE: usize = 0x200_0000;
 
