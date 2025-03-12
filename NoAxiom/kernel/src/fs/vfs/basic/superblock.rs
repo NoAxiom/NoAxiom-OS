@@ -1,5 +1,6 @@
 use alloc::sync::{Arc, Weak};
 
+use downcast_rs::{impl_downcast, DowncastSync};
 use ksync::Once;
 
 use super::{
@@ -28,9 +29,10 @@ impl SuperBlockMeta {
     }
 }
 
-pub trait SuperBlock: Send + Sync {
+pub trait SuperBlock: Send + Sync + DowncastSync {
     fn meta(&self) -> &SuperBlockMeta;
 }
+impl_downcast!(sync SuperBlock);
 
 pub struct EmptySuperBlock {
     meta: SuperBlockMeta,

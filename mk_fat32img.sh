@@ -12,7 +12,7 @@ rm -f fs.img
 
 # 创建新的 fs.img 文件并格式化为 FAT32
 dd if=/dev/zero of=fs.img bs=3M count=16
-mkfs.fat -F 32 fs.img
+mkfs.ext4 fs.img
 
 # 创建并挂载 fs 目录
 mkdir $img_dir

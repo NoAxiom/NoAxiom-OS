@@ -268,3 +268,17 @@ impl LinuxDirent64 {
         }
     }
 }
+
+bitflags! {
+    #[derive(PartialEq, Eq)]
+    pub struct Ext4DirEntryType: u8 {
+        const EXT4_DE_UNKNOWN = 0;
+        const EXT4_DE_REG_FILE = 1;
+        const EXT4_DE_DIR = 2;
+        const EXT4_DE_CHRDEV = 3;
+        const EXT4_DE_BLKDEV = 4;
+        const EXT4_DE_FIFO = 5;
+        const EXT4_DE_SOCK = 6;
+        const EXT4_DE_SYMLINK = 7;
+    }
+}

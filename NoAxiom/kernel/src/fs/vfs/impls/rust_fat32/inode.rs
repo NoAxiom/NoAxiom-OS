@@ -1,6 +1,5 @@
 use alloc::sync::Arc;
 
-use ksync::mutex::SpinLock;
 use spin::Mutex;
 
 use super::{IFatFileDir, IFatFileFile};

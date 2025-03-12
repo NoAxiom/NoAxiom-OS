@@ -1,7 +1,7 @@
 use alloc::sync::Arc;
 
 use basic::dentry::Dentry;
-use impls::rust_fat32::filesystem::AsyncSmpFat32;
+use impls::ext4::filesystem::AsyncSmpExt4;
 use ksync::Once;
 
 use crate::{
@@ -12,7 +12,8 @@ pub mod basic;
 mod impls;
 
 // type RealFs = FAT32FIleSystem;
-type RealFs = AsyncSmpFat32;
+// type RealFs = AsyncSmpFat32;
+type RealFs = AsyncSmpExt4;
 
 lazy_static::lazy_static! {
     static ref ROOT_DENTRY: Once<Arc<dyn Dentry>> = Once::new();

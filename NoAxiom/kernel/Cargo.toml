@@ -79,3 +79,4 @@ fatfs = { path = "../lib/fatfs", default-features = false, features = [
     "lfn",
     "log_level_info",
 ] }
+ext4_rs = { git = "https://github.com/YuXuaann/ext4_rs-async-smp" }

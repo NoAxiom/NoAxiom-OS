@@ -90,7 +90,7 @@ build_kernel:
 	fi
 	@cd $(PROJECT)/kernel && make build
 
-build: $(FS_IMG) build_kernel
+build: $(FS_IMG) build_kernelta
 
 asm: # build_kernel
 	@echo -e "Building Kernel and Generating Assembly..."

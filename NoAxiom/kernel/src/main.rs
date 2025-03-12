@@ -33,6 +33,7 @@ mod fs;
 mod include;
 mod ipc;
 mod mm;
+mod net;
 mod panic;
 mod platform;
 mod sched;

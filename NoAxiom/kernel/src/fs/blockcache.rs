@@ -5,7 +5,7 @@
 use alloc::{sync::Arc, vec::Vec};
 use core::num::NonZeroUsize;
 
-use ksync::mutex::{check_no_lock, RwLock};
+use ksync::mutex::check_no_lock;
 use lru::LruCache;
 type Mutex<T> = ksync::mutex::SpinLock<T>;
 

@@ -1,12 +1,9 @@
-use alloc::{string::String, sync::Arc};
+use alloc::sync::Arc;
 
 use downcast_rs::{impl_downcast, DowncastSync};
 use spin::Mutex;
 
-use super::{
-    file::File,
-    superblock::{EmptySuperBlock, SuperBlock},
-};
+use super::superblock::{EmptySuperBlock, SuperBlock};
 use crate::include::{
     fs::{InodeMode, Stat},
     result::Errno,
