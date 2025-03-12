@@ -4,6 +4,9 @@ use alloc::borrow::ToOwned;
 
 use riscv::{asm::sfence_vma_all, register::satp};
 
+use super::RV64;
+use crate::ArchInt;
+
 /// check if interrupt is enabled
 #[inline(always)]
 pub fn is_interrupt_enabled() -> bool {
@@ -77,5 +80,57 @@ pub fn enable_user_memory_access() {
 pub fn disable_user_memory_access() {
     unsafe {
         riscv::register::sstatus::clear_sum();
+    }
+}
+
+impl ArchInt for RV64 {
+    // check if global interrupt is enabled
+    #[inline(always)]
+    fn is_interrupt_enabled() -> bool {
+        is_interrupt_enabled()
+    }
+
+    // global interrupt
+    #[inline(always)]
+    fn disable_global_interrupt() {
+        disable_global_interrupt();
+    }
+    #[inline(always)]
+    fn enable_global_interrupt() {
+        enable_global_interrupt();
+    }
+
+    // external interrupt
+    #[inline(always)]
+    fn enable_external_interrupt() {
+        enable_external_interrupt();
+    }
+    #[inline(always)]
+    fn disable_external_interrupt() {
+        disable_external_interrupt();
+    }
+    #[inline(always)]
+    fn is_external_interrupt_enabled() -> bool {
+        is_external_interrupt_enabled()
+    }
+
+    // soft / timer interrupt
+    #[inline(always)]
+    fn enable_software_interrupt() {
+        enable_software_interrupt();
+    }
+    #[inline(always)]
+    fn enable_stimer_interrupt() {
+        enable_stimer_interrupt();
+    }
+
+    // user memory access
+    #[inline(always)]
+    fn enable_user_memory_access() {
+        enable_user_memory_access();
+    }
+    #[inline(always)]
+    fn disable_user_memory_access() {
+        disable_user_memory_access();
     }
 }
