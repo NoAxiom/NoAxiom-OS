@@ -33,15 +33,15 @@ use crate::{
         sched::CloneFlags,
         signal::sig_set::SigMask,
     },
-    ipc::signal::{pending_sigs::PendingSigs, sa_list::SigActionList, sig_info::SignalInfo},
     mm::{
         address::VirtAddr,
         memory_set::{ElfMemoryInfo, MemorySet},
-        page_table::{current_token, translate_vpn_into_pte, PageTable},
+        page_table::{current_token, PageTable},
         validate::validate,
     },
     return_errno,
     sched::sched_entity::SchedEntity,
+    signal::{pending_sigs::PendingSigs, sa_list::SigActionList, sig_info::SignalInfo},
     syscall::{SysResult, SyscallResult},
     task::{manager::add_new_process, taskid::tid_alloc},
 };
