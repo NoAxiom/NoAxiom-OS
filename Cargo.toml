@@ -5,6 +5,7 @@ members = [
     "NoAxiom/lib/console",
     "NoAxiom/lib/ksync",
     "NoAxiom/lib/arch",
+    "NoAxiom/lib/config",
     "NoAxiom/lib/fatfs",
     "NoAxiom/user/apps/*",
     "NoAxiom/user/lib",
@@ -21,6 +22,7 @@ fatfs = { path = "NoAxiom/lib/fatfs", default-features = false, features = [
     "lfn",
     "log_level_info",
 ] }
+config = { path = "NoAxiom/lib/config" }
 
 # [profile.release]
 # debug = true

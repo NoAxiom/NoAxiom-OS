@@ -1,5 +1,13 @@
 #![no_std]
-#![allow(unused)]
+#![feature(asm_const)]
+#![feature(ascii_char)]
+#![feature(let_chains)]
+#![feature(error_in_core)]
+#![feature(negative_impls)]
+#![feature(naked_functions)]
+#![feature(panic_info_message)]
+#![feature(alloc_error_handler)]
+#![feature(slice_from_ptr_range)]
 #![allow(deprecated)]
 
 extern crate alloc;
@@ -23,3 +31,6 @@ pub type Exception = <Arch as ArchType>::Exception;
 pub type Interrupt = <Arch as ArchType>::Interrupt;
 pub type Trap = <Arch as ArchType>::Trap;
 pub type TrapContext = <Arch as ArchType>::TrapContext;
+
+#[cfg(target_arch = "riscv64")]
+pub use rv64::{_entry, _entry_other_hart};

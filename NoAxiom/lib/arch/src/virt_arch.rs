@@ -70,7 +70,11 @@ pub trait ArchTime {
 }
 
 /// bootstrap asm code
-pub trait ArchBoot {}
+pub trait ArchBoot {
+    fn _entry_other_hart();
+    fn boot_other_hart();
+    fn boot_hart_init();
+}
 
 /// arch info
 pub trait ArchInfo {
@@ -79,7 +83,7 @@ pub trait ArchInfo {
 
 /// full arch trait
 pub trait FullVirtArch:
-    ArchInt + ArchAsm + ArchSbi + ArchType + ArchTrap + ArchTime + ArchInfo + ArchBoot
+    ArchInt + ArchAsm + ArchSbi + ArchType + ArchTrap + ArchTime + ArchInfo
 {
     // should impl all traits above
 }

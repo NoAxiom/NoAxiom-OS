@@ -1,6 +1,6 @@
 //! spin mutex for riscv kernel
 
-use core::{cell::RefMut, sync::atomic::AtomicUsize};
+use core::cell::RefMut;
 
 use arch::{Arch, ArchAsm, ArchInt};
 

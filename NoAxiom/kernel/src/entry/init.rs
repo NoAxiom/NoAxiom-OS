@@ -1,4 +1,4 @@
-use arch::{Arch, ArchInt, ArchSbi, ArchTrap};
+use arch::{Arch, ArchInt, ArchSbi, ArchTrap, _entry_other_hart};
 
 use crate::{
     config::{arch::CPU_NUM, mm::KERNEL_ADDR_OFFSET},
@@ -6,7 +6,7 @@ use crate::{
     cpu::get_hartid,
     device::init::device_init,
     driver::log::log_init,
-    entry::{boot::_entry_other_hart, init_proc::schedule_spawn_initproc},
+    entry::init_proc::schedule_spawn_initproc,
     fs::fs_init,
     mm::{bss::bss_init, frame::frame_init, hart_mm_init, heap::heap_init},
     platform::{
@@ -43,7 +43,7 @@ pub fn wake_other_hart(forbid_hart_id: usize) {
 }
 
 #[no_mangle]
-pub fn other_hart_init(hart_id: usize, dtb: usize) {
+pub extern "C" fn _other_hart_init(hart_id: usize, dtb: usize) {
     Arch::enable_user_memory_access();
     hart_mm_init();
     Arch::trap_init();
@@ -62,7 +62,7 @@ pub fn other_hart_init(hart_id: usize, dtb: usize) {
 /// init bss, mm, console, and other drivers, then jump to rust_main,
 /// called by [`super::boot`]
 #[no_mangle]
-pub fn boot_hart_init(_: usize, dtb: usize) {
+pub extern "C" fn _boot_hart_init(_: usize, dtb: usize) {
     // global resources init
     bss_init();
     heap_init();

@@ -48,6 +48,7 @@ dependencies = [
 name = "arch"
 version = "0.1.0"
 dependencies = [
+ "config",
  "loongArch64",
  "riscv",
  "sbi-rt",
@@ -169,6 +170,10 @@ dependencies = [
  "num-traits",
  "windows-link",
 ]
+
+[[package]]
+name = "config"
+version = "0.1.0"
 
 [[package]]
 name = "console"
@@ -484,6 +489,7 @@ dependencies = [
  "bit_field",
  "bitflags 2.6.0",
  "buddy_system_allocator",
+ "config",
  "console",
  "crate_interface",
  "downcast-rs",

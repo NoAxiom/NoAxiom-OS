@@ -10,7 +10,6 @@ endif
 FEATURES :=
 
 # feature flags
-SV39 := 1
 VF2 :=
 RISCV_QEMU := 1
 ASYNC_FS := 1
@@ -26,10 +25,6 @@ RAMDISK :=
 
 ifneq ($(MULTICORE_ARGS), )
 	FEATURES += multicore
-endif
-
-ifneq ($(SV39), )
-	FEATURES += sv39
 endif
 
 ifneq ($(UART), )

@@ -8,7 +8,7 @@ use crate::{
     },
     mm::user_ptr::UserPtr,
     sched::spawn::spawn_utask,
-    task::{manager::TASK_MANAGER, wait::WaitChildFuture},
+    task::wait::WaitChildFuture,
 };
 
 impl Syscall<'_> {
@@ -78,7 +78,9 @@ impl Syscall<'_> {
     ) -> SyscallResult {
         trace!(
             "[sys_wait4] pid: {:?}, status_addr: {:?}, options: {:?}",
-            pid, status_addr, options
+            pid,
+            status_addr,
+            options
         );
         let wait_option = WaitOption::from_bits(options as i32).ok_or(Errno::EINVAL)?;
         let status: UserPtr<i32> = UserPtr::new(status_addr);
