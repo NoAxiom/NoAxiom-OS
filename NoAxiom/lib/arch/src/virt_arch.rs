@@ -24,6 +24,7 @@ pub trait ArchAsm {
     // get hartid
     fn get_hartid() -> usize;
     fn set_idle();
+    fn current_pc() -> usize;
 }
 
 /// basic arch types defination

@@ -1,9 +1,9 @@
 use alloc::sync::Arc;
 use core::arch::global_asm;
 
-use arch::{Arch, ArchInt, ArchTrap, TrapContext};
+use arch::{Arch, ArchAsm, ArchInt, ArchTrap, TrapContext};
 
-use crate::{task::Task, utils::current_pc};
+use crate::task::Task;
 
 global_asm!(include_str!("./trap.S"));
 extern "C" {
@@ -58,7 +58,7 @@ pub fn trap_restore(task: &Arc<Task>) {
     }
     trace!(
         "[trap_restore] back to kernel, current_pc: {:#x}, inst: {:#x}",
-        current_pc(),
-        unsafe { *(current_pc() as *const u32) },
+        Arch::current_pc(),
+        unsafe { *(Arch::current_pc() as *const u32) },
     );
 }

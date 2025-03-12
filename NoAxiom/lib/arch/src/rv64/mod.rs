@@ -82,6 +82,12 @@ impl ArchAsm for RV64 {
     fn set_idle() {
         set_idle();
     }
+    #[inline(always)]
+    fn current_pc() -> usize {
+        let pc: usize;
+        unsafe { core::arch::asm!("auipc {}, 0", out(reg) pc) }
+        pc
+    }
 }
 
 impl ArchType for RV64 {

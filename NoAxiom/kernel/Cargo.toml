@@ -71,11 +71,7 @@ atomic_enum = "0.3.0"
 futures = { version = "0.3", default-features = false, features = ["alloc"] }
 
 # no_axiom defined libs
-arch = { path = "../lib/arch" }
-ksync = { path = "../lib/ksync" }
-console = { path = "../lib/console" }
-fatfs = { path = "../lib/fatfs", default-features = false, features = [
-    "alloc",
-    "lfn",
-    "log_level_info",
-] }
+arch = { workspace = true }
+ksync = { workspace = true }
+console = { workspace = true }
+fatfs = { workspace = true }
