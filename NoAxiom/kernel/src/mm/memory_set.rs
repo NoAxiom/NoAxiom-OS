@@ -10,7 +10,7 @@ use super::{
     frame::{frame_alloc, frame_refcount, FrameTracker},
     map_area::MapArea,
     mmap_manager::MmapManager,
-    page_table::PageTable,
+    page_table::{memory_activate_by_token, PageTable},
     pte::PageTableEntry,
 };
 use crate::{
@@ -52,7 +52,7 @@ lazy_static! {
 /// please assure it's initialized before any user space token
 pub static KERNEL_SPACE_TOKEN: AtomicUsize = AtomicUsize::new(0);
 
-pub unsafe fn kernel_space_activate() {
+pub fn kernel_space_activate() {
     Arch::update_pagetable(KERNEL_SPACE_TOKEN.load(Ordering::Relaxed));
     Arch::tlb_flush();
 }
@@ -87,6 +87,22 @@ pub struct MemorySet {
     pub mmap_manager: MmapManager,
 }
 
+pub struct MemorySpace {
+    pub token: AtomicUsize,
+    pub memory_set: Arc<SpinLock<MemorySet>>,
+}
+impl MemorySpace {
+    pub fn token(&self) -> usize {
+        self.token.load(Ordering::Acquire)
+    }
+    pub fn change_token(&self, token: usize) {
+        self.token.store(token, Ordering::Release);
+    }
+    pub fn memory_activate(&self) {
+        memory_activate_by_token(self.token());
+    }
+}
+
 impl MemorySet {
     /// create an new empty memory set without any allocation
     /// do not use this function directly, use [`new_with_kernel`] instead
@@ -118,9 +134,9 @@ impl MemorySet {
 
     /// switch into this memory set
     #[inline(always)]
-    pub unsafe fn activate(&self) {
+    pub unsafe fn memory_activate(&self) {
         unsafe {
-            self.page_table().activate();
+            self.page_table().memory_activate();
         }
     }
 
@@ -356,7 +372,7 @@ impl MemorySet {
     /// clone current memory set,
     /// and mark the new memory set as copy-on-write
     /// used in sys_fork
-    pub fn clone_cow(&mut self) -> Self {
+    pub fn clone_cow(&mut self) -> (Self, usize) {
         trace!("[clone_cow] start");
         let mut new_set = Self::new_with_kernel();
         let remap_cow = |vpn: VirtPageNum,
@@ -428,7 +444,8 @@ impl MemorySet {
         }
         new_set.user_brk_area = new_area;
 
-        new_set
+        let token = new_set.token();
+        (new_set, token)
     }
 
     pub fn lazy_alloc_stack(&mut self, vpn: VirtPageNum) {

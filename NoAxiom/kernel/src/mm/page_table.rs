@@ -172,9 +172,8 @@ impl PageTable {
     /// switch into this page table,
     /// PLEASE make sure context around is mapped into both page tables
     #[inline(always)]
-    pub unsafe fn activate(&self) {
-        Arch::update_pagetable(self.token());
-        Arch::tlb_flush();
+    pub unsafe fn memory_activate(&self) {
+        memory_activate_by_token(self.token());
     }
 
     /// remap a cow page
@@ -190,6 +189,11 @@ impl PageTable {
         ppn.get_bytes_array()
             .copy_from_slice(old_ppn.get_bytes_array());
     }
+}
+
+pub fn memory_activate_by_token(token: usize) {
+    Arch::update_pagetable(token);
+    Arch::tlb_flush();
 }
 
 pub fn current_token() -> usize {
