@@ -15,10 +15,12 @@
 
 use core::arch::asm;
 
-pub use riscv::register::*;
-use riscv::register::{sstatus::SPP, stvec::TrapMode};
+use riscv::register::sstatus::SPP;
+
+use crate::ArchTrapContext;
 
 pub mod reg_id {
+    #![allow(unused)]
     pub const ZERO: usize = 0;
     pub const RA: usize = 1;
     pub const SP: usize = 2;
@@ -130,8 +132,9 @@ pub struct TrapContext {
     pub kernel_tp: usize,
 }
 
-impl TrapContext {
-    pub fn app_init_cx(entry: usize, sp: usize) -> Self {
+impl ArchTrapContext for TrapContext {
+    type SyscallArgs = [usize; 6];
+    fn app_init_cx(entry: usize, sp: usize) -> Self {
         let mut sstatus = Sstatus::read();
         sstatus.set_spp(SPP::User);
         let mut cx = Self {
@@ -147,7 +150,7 @@ impl TrapContext {
         cx.user_reg[reg_id::SP] = sp;
         cx
     }
-    pub fn update_cx(&mut self, entry: usize, sp: usize, argc: usize, argv: usize, envp: usize) {
+    fn update_cx(&mut self, entry: usize, sp: usize, argc: usize, argv: usize, envp: usize) {
         self.sepc = entry;
         self.set_sp(sp);
         self.set_reg(reg_id::A0, argc);
@@ -158,31 +161,31 @@ impl TrapContext {
         self.sstatus = sstatus;
     }
     #[inline(always)]
-    pub fn set_sp(&mut self, sp: usize) {
+    fn set_sp(&mut self, sp: usize) {
         self.user_reg[reg_id::SP] = sp;
     }
     #[inline(always)]
-    pub fn set_reg(&mut self, id: usize, value: usize) {
+    fn set_reg(&mut self, id: usize, value: usize) {
         self.user_reg[id] = value;
     }
     #[inline(always)]
-    pub fn set_result(&mut self, value: usize) {
+    fn set_result(&mut self, value: usize) {
         self.user_reg[reg_id::A0] = value;
     }
     #[inline(always)]
-    pub fn set_ra(&mut self, ra: usize) {
+    fn set_ra(&mut self, ra: usize) {
         self.user_reg[reg_id::RA] = ra;
     }
     #[inline(always)]
-    pub fn result_value(&self) -> usize {
+    fn result_value(&self) -> usize {
         self.user_reg[reg_id::A0]
     }
     #[inline(always)]
-    pub fn get_syscall_id(&self) -> usize {
+    fn get_syscall_id(&self) -> usize {
         self.user_reg[reg_id::A7]
     }
     #[inline(always)]
-    pub fn get_syscall_args(&self) -> [usize; 6] {
+    fn get_syscall_args(&self) -> [usize; 6] {
         [
             self.user_reg[reg_id::A0],
             self.user_reg[reg_id::A1],

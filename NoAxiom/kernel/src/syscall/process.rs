@@ -1,3 +1,5 @@
+use arch::ArchTrapContext;
+
 use super::{Syscall, SyscallResult};
 use crate::{
     fs::path::Path,

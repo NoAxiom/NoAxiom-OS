@@ -2,7 +2,7 @@
 
 use alloc::sync::Arc;
 
-use arch::{Arch, ArchInt, ArchTrap, Exception, Interrupt, Trap};
+use arch::{Arch, ArchInt, ArchTrap, ArchTrapContext, Exception, Interrupt, Trap};
 
 use super::{ext_int::ext_int_handler, ipi::ipi_handler};
 use crate::{

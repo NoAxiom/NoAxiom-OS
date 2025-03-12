@@ -6,7 +6,7 @@ use core::{
     task::Waker,
 };
 
-use arch::{Exception, TrapContext};
+use arch::{ArchTrapContext, Exception, TrapContext};
 use ksync::{
     cell::SyncUnsafeCell,
     mutex::{SpinLock, SpinLockGuard},
