@@ -520,6 +520,7 @@ name = "ksync"
 version = "0.1.0"
 dependencies = [
  "arch",
+ "config",
  "kernel-sync",
  "spin 0.9.8",
 ]

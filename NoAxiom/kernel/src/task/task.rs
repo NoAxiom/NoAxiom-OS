@@ -159,7 +159,7 @@ impl Task {
     }
     #[inline(always)]
     pub fn memory_activate(&self) {
-        self.memory_space.memory_activate();
+        self.memory_space.memory_set.lock().memory_activate(); // .memory_activate();
     }
     /// change current memory set
     pub fn change_memory_set(&self, memory_set: MemorySet) {

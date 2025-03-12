@@ -45,7 +45,7 @@ mod utils;
 core::arch::global_asm!(include_str!("link_apps.S"));
 
 /// rust_main: only act as a task runner
-/// called by [`entry::init::boot_hart_init`]
+/// called by [`entry::init::_boot_hart_init`]
 #[no_mangle]
 pub fn rust_main() {
     trace!("token {:#x}", crate::mm::page_table::current_token());

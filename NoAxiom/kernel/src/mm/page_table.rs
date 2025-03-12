@@ -172,7 +172,7 @@ impl PageTable {
     /// switch into this page table,
     /// PLEASE make sure context around is mapped into both page tables
     #[inline(always)]
-    pub unsafe fn memory_activate(&self) {
+    pub fn memory_activate(&self) {
         memory_activate_by_token(self.token());
     }
 

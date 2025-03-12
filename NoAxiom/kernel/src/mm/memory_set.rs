@@ -49,9 +49,11 @@ lazy_static! {
 /// lazily initialized kernel space token
 /// please assure it's initialized before any user space token
 pub static mut KERNEL_SPACE_TOKEN: usize = 0;
+// pub static KERNEL_SPACE_TOKEN: AtomicUsize = AtomicUsize::new(0);
 
 pub fn kernel_space_activate() {
     Arch::update_pagetable(unsafe { KERNEL_SPACE_TOKEN });
+    // Arch::update_pagetable(KERNEL_SPACE_TOKEN.load(Ordering::SeqCst));
     Arch::tlb_flush();
 }
 
@@ -132,10 +134,8 @@ impl MemorySet {
 
     /// switch into this memory set
     #[inline(always)]
-    pub unsafe fn memory_activate(&self) {
-        unsafe {
-            self.page_table().memory_activate();
-        }
+    pub fn memory_activate(&self) {
+        self.page_table().memory_activate();
     }
 
     /// translate va into pa
@@ -213,6 +213,7 @@ impl MemorySet {
         );
         unsafe {
             KERNEL_SPACE_TOKEN = memory_set.token();
+            // KERNEL_SPACE_TOKEN.store(memory_set.token(), Ordering::SeqCst);
             fence(Ordering::SeqCst);
         }
         memory_set

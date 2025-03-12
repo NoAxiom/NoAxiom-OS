@@ -1,10 +1,8 @@
 //! spin mutex for riscv kernel
 
-use core::cell::RefMut;
-
 use arch::{Arch, ArchAsm, ArchInt};
 
-use super::cell::SyncRefCell;
+use crate::cell::SyncUnsafeCell;
 
 pub type SpinLock<T> = kernel_sync::spin::SpinMutex<T, NoIrqLockAction>;
 pub type SpinLockGuard<'a, T> = kernel_sync::spin::SpinMutexGuard<'a, T, NoIrqLockAction>;
@@ -31,12 +29,12 @@ impl MutexTracer {
     }
 }
 
-#[allow(clippy::declare_interior_mutable_const)]
-const CPU_NUM: usize = 8; // FIXME: use extern const to config cpu_num
-const DEFAULT_CPU: SyncRefCell<MutexTracer> = SyncRefCell::new(MutexTracer::new());
-static HART_MUTEX_TRACERS: [SyncRefCell<MutexTracer>; CPU_NUM] = [DEFAULT_CPU; CPU_NUM];
-fn current_mutex_tracer() -> RefMut<'static, MutexTracer> {
-    HART_MUTEX_TRACERS[Arch::get_hartid()].borrow_mut()
+// #[allow(clippy::declare_interior_mutable_const)]
+const CPU_NUM: usize = config::arch::CPU_NUM; // FIXME: use extern const to config cpu_num
+const DEFAULT_CPU: SyncUnsafeCell<MutexTracer> = SyncUnsafeCell::new(MutexTracer::new());
+static HART_MUTEX_TRACERS: [SyncUnsafeCell<MutexTracer>; CPU_NUM] = [DEFAULT_CPU; CPU_NUM];
+fn current_mutex_tracer() -> &'static mut MutexTracer {
+    HART_MUTEX_TRACERS[Arch::get_hartid()].ref_mut()
 }
 
 pub fn check_no_lock() -> bool {
@@ -49,17 +47,16 @@ impl LockAction for NoIrqLockAction {
     fn before_lock() {
         let old = Arch::is_interrupt_enabled();
         Arch::disable_global_interrupt();
-        let mut cpu = current_mutex_tracer();
+        let cpu = current_mutex_tracer();
         if cpu.depth == 0 {
             cpu.int_record = old;
         }
         cpu.depth += 1;
     }
     fn after_lock() {
-        let mut cpu = current_mutex_tracer();
+        let cpu = current_mutex_tracer();
         cpu.depth -= 1;
         let should_enable = cpu.depth == 0 && cpu.int_record;
-        drop(cpu); // drop before int_en
         if should_enable {
             Arch::enable_global_interrupt();
         }

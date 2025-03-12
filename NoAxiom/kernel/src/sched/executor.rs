@@ -114,6 +114,7 @@ where
                 }
             }
         }
+        #[cfg(feature = "multicore")]
         if woken_hartid == get_hartid() {
             trace!(
                 "[schedule] push into local scheduler, tid: {}",
@@ -127,6 +128,8 @@ where
             );
             self.push_one_to_mailbox(woken_hartid, runnable);
         }
+        #[cfg(not(feature = "multicore"))]
+        self.current_scheduler().push_with_info(runnable, info);
     }
 
     pub fn pop(&self) -> Option<RunnableTask> {
@@ -143,13 +146,13 @@ where
     }
 
     pub fn get_load(&self) -> usize {
-        RUNTIME.all_load.load(core::sync::atomic::Ordering::Relaxed)
+        RUNTIME.all_load.load(Ordering::Acquire)
     }
     pub fn add_load(&self, load: usize) {
-        self.all_load.fetch_add(load, Ordering::Relaxed);
+        self.all_load.fetch_add(load, Ordering::AcqRel);
     }
     pub fn sub_load(&self, load: usize) {
-        self.all_load.fetch_sub(load, Ordering::Relaxed);
+        self.all_load.fetch_sub(load, Ordering::AcqRel);
     }
 
     pub fn last_handle_time(&self) -> usize {
@@ -246,6 +249,7 @@ where
 
     /// Pop a task and run it
     pub fn run(&self) {
+        #[cfg(feature = "multicore")]
         self.handle_mailbox();
         current_sleep_manager().sleep_handler();
         assert!(check_no_lock(), "LOCK IS NOT RELEASED!!!");
