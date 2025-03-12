@@ -1,10 +1,9 @@
-use disk_cursor::DiskCursor;
 use fatfs::{DefaultTimeProvider, Dir, Error, File, FileSystem, LossyOemCpConverter};
 
+use super::disk_cursor::DiskCursor;
 use crate::include::result::Errno;
 
 pub mod dentry;
-mod disk_cursor;
 pub mod file;
 pub mod filesystem;
 pub mod inode;

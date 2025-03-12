@@ -1,4 +1,8 @@
-use alloc::{boxed::Box, sync::Arc};
+use alloc::{
+    boxed::Box,
+    sync::Arc,
+    vec::{self, Vec},
+};
 
 use async_trait::async_trait;
 use fatfs::*;
@@ -23,15 +27,39 @@ impl DiskCursor {
             offset,
         }
     }
-    fn move_cursor(&mut self, offset: usize) {
+    pub fn move_cursor(&mut self, offset: usize) {
         self.set_position(self.position() + offset)
     }
-    fn position(&self) -> usize {
+    pub fn position(&self) -> usize {
         self.blk_id * BLOCK_SIZE + self.offset
     }
-    fn set_position(&mut self, pos: usize) {
+    pub fn set_position(&mut self, pos: usize) {
         self.blk_id = pos / BLOCK_SIZE;
         self.offset = pos % BLOCK_SIZE;
+    }
+
+    pub async fn base_read_exact_block_size(&self, offset: usize) -> Vec<u8> {
+        let (blk, blk_id, offset) = (self.blk.clone(), offset / BLOCK_SIZE, offset % BLOCK_SIZE);
+        let mut res = vec![0u8; BLOCK_SIZE];
+
+        match offset {
+            0 => {
+                let data = blk.read_sector(blk_id).await.data;
+                res.copy_from_slice(&data[..]);
+            }
+            _ => {
+                let data1 = blk.read_sector(blk_id).await.data;
+                let data2 = blk.read_sector(blk_id + 1).await.data;
+                let read_size = (BLOCK_SIZE - offset).min(res.len());
+                res[..read_size].copy_from_slice(&data1[offset..offset + read_size]);
+                res[read_size..].copy_from_slice(&data2[..BLOCK_SIZE - read_size]);
+            }
+        }
+        res
+    }
+
+    async fn base_write_exact(&self, offset: usize, buf: &[u8]) {
+        todo!()
     }
 }
 

@@ -299,7 +299,12 @@ impl FAT32Directory {
         &mut self,
         file: String,
         size: u32,
-    ) -> (ShortDirectoryEntry, Arc<FAT>, Arc<[u8; 512]>, Arc<ABC>) {
+    ) -> (
+        ShortDirectoryEntry,
+        Arc<FAT>,
+        Arc<[u8; BLOCK_SIZE]>,
+        Arc<ABC>,
+    ) {
         let s: String = file.into();
         assert!(!Self::is_long(&s));
 

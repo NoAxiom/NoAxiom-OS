@@ -223,12 +223,10 @@ impl Syscall<'_> {
             return Ok(write_size as isize);
         }
 
-        // debug!("write HERE1");
         if !file.meta().writable() {
             return Err(Errno::EINVAL);
         }
 
-        // debug!("write HERE2");
         let write_size = file.write(buf_slice).await?;
 
         Ok(write_size as isize)

@@ -99,7 +99,7 @@ pub struct Ext4Dir {
 }
 
 impl Ext4Dir {
-    pub fn new(dentry: Arc<Ext4Dentry>, inode: Arc<Ext4FileInode>) -> Self {
+    pub fn new(dentry: Arc<Ext4Dentry>, inode: Arc<Ext4DirInode>) -> Self {
         Self {
             meta: FileMeta::new(dentry.clone(), inode.clone()),
             ino: inode.get_inode().lock().inode_num,
@@ -129,7 +129,9 @@ impl File for Ext4Dir {
             .unwrap()
             .get_fs();
 
+        debug!("here1");
         let entries = ext4.dir_get_entries(self.ino).await;
+        debug!("here2");
 
         for entry in entries {
             let child_name = entry.get_name();

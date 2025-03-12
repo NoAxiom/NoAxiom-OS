@@ -11,6 +11,7 @@ static HEAP_ALLOCATOR: LockedHeap<32> = LockedHeap::empty();
 #[alloc_error_handler]
 /// panic when heap allocation error occurs
 pub fn handle_alloc_error(layout: core::alloc::Layout) -> ! {
+    debug!("{:?}", HEAP_ALLOCATOR.lock());
     panic!("Heap allocation error, layout = {:?}", layout);
 }
 

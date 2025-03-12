@@ -48,13 +48,14 @@ pub async fn device_test(device: Arc<dyn BlockDevice>) {
 /// Create the root dentry, mount multiple fs
 pub async fn fs_init() {
     info!("[vfs] fs initial, register file systems");
-    FS_MANAGER.register(Arc::new(RealFs::new("vfat")));
+    let fs_name = RealFs::name();
+    FS_MANAGER.register(Arc::new(RealFs::new(fs_name)));
     // todo: virtual fs support
 
-    info!("[vfs] fs initial, mounting the inital real fs");
+    info!("[vfs] fs initial, mounting the inital real fs: {}", fs_name);
     let device = chosen_device();
     device_test(device.clone()).await;
-    let disk_fs = FS_MANAGER.get("vfat").unwrap();
+    let disk_fs = FS_MANAGER.get(fs_name).unwrap();
     let root = disk_fs
         .root(None, MountFlags::empty(), "/", Some(device))
         .await; // the root also the vfs root

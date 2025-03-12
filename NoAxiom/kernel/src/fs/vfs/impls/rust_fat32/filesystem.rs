@@ -1,20 +1,19 @@
 use alloc::{boxed::Box, sync::Arc};
 
 use async_trait::async_trait;
-use ksync::mutex::check_no_lock;
 
-use super::{
-    dentry::Fat32Dentry, disk_cursor::DiskCursor, inode::Fat32DirInode,
-    superblock::Fat32SuperBlock, IFatFs,
-};
+use super::{dentry::Fat32Dentry, inode::Fat32DirInode, superblock::Fat32SuperBlock, IFatFs};
 use crate::{
     device::block::BlockDevice,
     fs::{
         blockcache::AsyncBlockCache,
-        vfs::basic::{
-            dentry::Dentry,
-            filesystem::{FileSystem, FileSystemMeta},
-            superblock::SuperBlockMeta,
+        vfs::{
+            basic::{
+                dentry::Dentry,
+                filesystem::{FileSystem, FileSystemMeta},
+                superblock::SuperBlockMeta,
+            },
+            impls::disk_cursor::DiskCursor,
         },
     },
     include::fs::MountFlags,
@@ -29,6 +28,9 @@ impl AsyncSmpFat32 {
         Self {
             meta: FileSystemMeta::new(name),
         }
+    }
+    pub fn name() -> &'static str {
+        "vfat"
     }
 }
 

@@ -21,7 +21,7 @@ use tree::NTree;
 
 use super::blockcache::{AsyncBlockCache, CacheData};
 use crate::{
-    config::fs::{FAT32_SECTOR_SIZE, FIRST_CLUSTER, ROOT_FAKE_ENTRY},
+    config::fs::{BLOCK_SIZE, FAT32_SECTOR_SIZE, FIRST_CLUSTER, ROOT_FAKE_ENTRY},
     device::block::BlockDevice,
     include::fs::InodeMode,
 };
@@ -52,7 +52,7 @@ impl FAT32FIleSystem {
             assert!(Arch::is_external_interrupt_enabled());
         }
 
-        let mut bpb = [0u8; FAT32_SECTOR_SIZE];
+        let mut bpb = [0u8; BLOCK_SIZE];
         device.read(0, &mut bpb).await;
 
         let bpb = bpb;
