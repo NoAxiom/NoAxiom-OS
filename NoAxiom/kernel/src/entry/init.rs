@@ -1,6 +1,4 @@
-use core::sync::atomic::AtomicUsize;
-
-use arch::{Arch, ArchInt, ArchSbi};
+use arch::{Arch, ArchInt, ArchSbi, ArchTrap};
 
 use crate::{
     config::{arch::CPU_NUM, mm::KERNEL_ADDR_OFFSET},
@@ -18,7 +16,6 @@ use crate::{
     },
     rust_main,
     sched::utils::block_on,
-    trap::trap::trap_init,
 };
 
 /// awake other core
@@ -49,7 +46,7 @@ pub fn wake_other_hart(forbid_hart_id: usize) {
 pub fn other_hart_init(hart_id: usize, dtb: usize) {
     Arch::enable_user_memory_access();
     hart_mm_init();
-    trap_init();
+    Arch::trap_init();
     // register_to_hart(); // todo: add multipule devices interrupt support
     info!(
         "[other_init] entry init hart_id: {}, dtb_addr: {:#x}",
@@ -76,7 +73,7 @@ pub fn boot_hart_init(_: usize, dtb: usize) {
 
     // hart resources init
     hart_mm_init();
-    trap_init();
+    Arch::trap_init();
 
     // global resources: fs init
     let platfrom_info = platform_info_from_dtb(dtb);

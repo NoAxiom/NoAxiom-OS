@@ -4,7 +4,7 @@ use alloc::sync::Arc;
 
 use arch::{Arch, ArchInt, ArchTrap, Exception, Interrupt, Trap};
 
-use super::{ext_int::ext_int_handler, ipi::ipi_handler, trap::set_kernel_trap_entry};
+use super::{ext_int::ext_int_handler, ipi::ipi_handler};
 use crate::{
     // constant::register::A0,
     cpu::{current_cpu, get_hartid},
@@ -64,7 +64,7 @@ pub fn kernel_trap_handler() {
 pub async fn user_trap_handler(task: &Arc<Task>) {
     assert!(!Arch::is_interrupt_enabled());
     trace!("[trap_handler] call trap handler");
-    set_kernel_trap_entry();
+    Arch::set_kernel_trap_entry();
     let cx = task.trap_context_mut();
     let scause = Arch::read_trap_cause(); // scause::read();
     let stval = Arch::read_trap_value(); // stval::read();

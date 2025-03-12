@@ -57,6 +57,10 @@ pub trait ArchTrap: ArchType {
     fn read_trap_cause() -> <Self as ArchType>::Trap;
     fn read_trap_value() -> usize;
     fn read_trap_pc() -> usize;
+    fn set_kernel_trap_entry();
+    fn set_user_trap_entry();
+    fn trap_init();
+    fn trap_restore(cx: &mut <Self as ArchType>::TrapContext);
 }
 
 /// time related arch trait
@@ -65,6 +69,9 @@ pub trait ArchTime {
     fn set_timer(time_value: u64) -> usize;
 }
 
+/// bootstrap asm code
+pub trait ArchBoot {}
+
 /// arch info
 pub trait ArchInfo {
     const ARCH_NAME: &'static str = "unknown";
@@ -72,7 +79,7 @@ pub trait ArchInfo {
 
 /// full arch trait
 pub trait FullVirtArch:
-    ArchInt + ArchAsm + ArchSbi + ArchType + ArchTrap + ArchTime + ArchInfo
+    ArchInt + ArchAsm + ArchSbi + ArchType + ArchTrap + ArchTime + ArchInfo + ArchBoot
 {
     // should impl all traits above
 }

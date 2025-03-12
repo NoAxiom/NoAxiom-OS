@@ -5,14 +5,14 @@ use core::{
     task::{Context, Poll},
 };
 
-use arch::{Arch, ArchInt};
+use arch::{Arch, ArchInt, ArchTrap};
 
 use crate::{
     cpu::current_cpu,
     sched::utils::take_waker,
     task::{status::TaskStatus, Task},
     time::gettime::get_time_us,
-    trap::{handler::user_trap_handler, trap::trap_restore},
+    trap::handler::user_trap_handler,
 };
 
 pub struct UserTaskFuture<F: Future + Send + 'static> {
@@ -72,7 +72,7 @@ pub async fn task_main(task: Arc<Task>) {
     while !task.is_stopped() {
         // kernel -> user
         trace!("[task_main] trap_restore");
-        trap_restore(&task);
+        Arch::trap_restore(task.trap_context_mut());
         // debug!("cx: {:?}", task.trap_context());
         if task.is_stopped() {
             warn!("task {} is zombie before trap_handler, break", task.tid());

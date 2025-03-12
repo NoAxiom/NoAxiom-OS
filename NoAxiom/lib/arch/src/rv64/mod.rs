@@ -1,10 +1,12 @@
 mod asm;
+mod context;
 mod interrupt;
 mod register;
 mod sbi;
-mod trap_cx;
+mod trap;
 
 use asm::*;
+use context::TrapContext;
 use interrupt::*;
 use register::*;
 use riscv::asm::sfence_vma_all;
@@ -14,9 +16,11 @@ use sbi_rt::{
     legacy::{clear_ipi, console_getchar, console_putchar, set_timer, shutdown},
     send_ipi,
 };
+use trap::{set_kernel_trap_entry, set_user_trap_entry, trap_init, trap_restore};
 
 use crate::{
-    ArchAsm, ArchInfo, ArchInt, ArchMemory, ArchSbi, ArchTime, ArchTrap, ArchType, FullVirtArch,
+    ArchAsm, ArchBoot, ArchInfo, ArchInt, ArchMemory, ArchSbi, ArchTime, ArchTrap, ArchType,
+    FullVirtArch,
 };
 
 pub struct RV64;
@@ -94,7 +98,7 @@ impl ArchType for RV64 {
     type Trap = riscv::register::scause::Trap;
     type Interrupt = riscv::register::scause::Interrupt;
     type Exception = riscv::register::scause::Exception;
-    type TrapContext = trap_cx::TrapContext;
+    type TrapContext = context::TrapContext;
 }
 
 impl ArchSbi for RV64 {
@@ -154,6 +158,18 @@ impl ArchTrap for RV64 {
     fn read_trap_pc() -> usize {
         sepc::read()
     }
+    fn set_kernel_trap_entry() {
+        set_kernel_trap_entry();
+    }
+    fn set_user_trap_entry() {
+        set_user_trap_entry();
+    }
+    fn trap_init() {
+        trap_init();
+    }
+    fn trap_restore(cx: &mut TrapContext) {
+        trap_restore(cx);
+    }
 }
 
 impl ArchTime for RV64 {
@@ -169,5 +185,7 @@ impl ArchTime for RV64 {
 impl ArchInfo for RV64 {
     const ARCH_NAME: &'static str = "riscv64";
 }
+
+impl ArchBoot for RV64 {}
 
 impl FullVirtArch for RV64 {}
