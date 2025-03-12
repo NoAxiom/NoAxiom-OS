@@ -262,7 +262,7 @@ impl Task {
                 wait_req: AtomicBool::new(false),
             })),
             memory_space: MemorySpace {
-                token: AtomicUsize::new(memory_set.token()),
+                token: SyncUnsafeCell::new(memory_set.token()),
                 memory_set: Arc::new(SpinLock::new(memory_set)),
             },
             trap_cx: SyncUnsafeCell::new(TrapContext::app_init_cx(elf_entry, user_sp)),
@@ -414,11 +414,11 @@ impl Task {
         let (memory_set, token) = if flags.contains(CloneFlags::VM) {
             (
                 self.memory_set().clone(),
-                AtomicUsize::new(self.memory_space.token()),
+                SyncUnsafeCell::new(self.memory_space.token()),
             )
         } else {
             let (ms, token) = self.memory_set().lock().clone_cow();
-            (Arc::new(SpinLock::new(ms)), AtomicUsize::new(token))
+            (Arc::new(SpinLock::new(ms)), SyncUnsafeCell::new(token))
         };
 
         // TODO: CloneFlags::SIGHAND

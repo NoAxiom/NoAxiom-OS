@@ -1,5 +1,8 @@
 use alloc::{sync::Arc, vec::Vec};
-use core::sync::atomic::{AtomicUsize, Ordering};
+use core::{
+    intrinsics::atomic_store_seqcst,
+    sync::atomic::{fence, AtomicPtr, AtomicUsize, Ordering},
+};
 
 use arch::{Arch, ArchMemory, Exception};
 use ksync::{cell::SyncUnsafeCell, mutex::SpinLock};
@@ -50,10 +53,10 @@ lazy_static! {
 
 /// lazily initialized kernel space token
 /// please assure it's initialized before any user space token
-pub static KERNEL_SPACE_TOKEN: AtomicUsize = AtomicUsize::new(0);
+pub static mut KERNEL_SPACE_TOKEN: usize = 0;
 
 pub fn kernel_space_activate() {
-    Arch::update_pagetable(KERNEL_SPACE_TOKEN.load(Ordering::Relaxed));
+    Arch::update_pagetable(unsafe { KERNEL_SPACE_TOKEN });
     Arch::tlb_flush();
 }
 
@@ -88,15 +91,15 @@ pub struct MemorySet {
 }
 
 pub struct MemorySpace {
-    pub token: AtomicUsize,
+    pub token: SyncUnsafeCell<usize>,
     pub memory_set: Arc<SpinLock<MemorySet>>,
 }
 impl MemorySpace {
     pub fn token(&self) -> usize {
-        self.token.load(Ordering::Acquire)
+        *self.token.ref_mut()
     }
     pub fn change_token(&self, token: usize) {
-        self.token.store(token, Ordering::Release);
+        *self.token.ref_mut() = token;
     }
     pub fn memory_activate(&self) {
         memory_activate_by_token(self.token());
@@ -213,7 +216,10 @@ impl MemorySet {
             "[kernel] frame [{:#x}, {:#x})",
             ekernel as usize, KERNEL_VIRT_MEMORY_END as usize
         );
-        KERNEL_SPACE_TOKEN.store(memory_set.token(), Ordering::SeqCst);
+        unsafe {
+            KERNEL_SPACE_TOKEN = memory_set.token();
+            fence(Ordering::SeqCst);
+        }
         memory_set
     }
 
