@@ -189,6 +189,7 @@ where
         }
         trace!("[try_respond_sched_req] begin!");
         let cur_hartid = get_hartid();
+        // todo: use ticketed behaviour instead of from zero
         for i in 0..CPU_NUM {
             if i == cur_hartid {
                 continue;

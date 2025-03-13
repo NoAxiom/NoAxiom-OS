@@ -1,31 +1,29 @@
 use alloc::{string::String, vec::Vec};
+
 use arch::{Arch, ArchMemory};
 
 use super::{address::VirtAddr, page_table::PageTable, validate::validate};
 use crate::{
-    config::mm::KERNEL_ADDR_OFFSET,
-    cpu::current_cpu,
-    mm::address::{VirtPageNum, VpnRange},
-    syscall::SysResult,
+    config::mm::KERNEL_ADDR_OFFSET, cpu::current_cpu, mm::address::VpnRange, syscall::SysResult,
 };
 
-/// check if the slice is well-allocated
-/// any unallocated memory access will cause a page fault
-/// and will be handled by the kernel_trap_handler => memory_validate
-/// so we should validate the memory before we lock current memory_set
-#[allow(unused)]
-pub fn validate_slice(va: usize, len: usize) -> SysResult<()> {
-    warn!(
-        "DON'T ABUSE THIS FUNCTION!!!\n
-        [validate_slice] buf_addr = {:#x}, len = {:#x}",
-        va, len
-    );
-    let start: VirtPageNum = VirtAddr::from(va).floor();
-    let end: VirtPageNum = VirtAddr::from(va + len).ceil();
-    let mut memory_set = current_cpu().task.as_ref().unwrap().memory_set().lock();
-    for vpn in VpnRange::new(start, end) {}
-    Ok(())
-}
+// /// check if the slice is well-allocated
+// /// any unallocated memory access will cause a page fault
+// /// and will be handled by the kernel_trap_handler => memory_validate
+// /// so we should validate the memory before we lock current memory_set
+// #[allow(unused)]
+// pub fn validate_slice(va: usize, len: usize) -> SysResult<()> {
+//     warn!(
+//         "DON'T ABUSE THIS FUNCTION!!!\n
+//         [validate_slice] buf_addr = {:#x}, len = {:#x}",
+//         va, len
+//     );
+//     let start: VirtPageNum = VirtAddr::from(va).floor();
+//     let end: VirtPageNum = VirtAddr::from(va + len).ceil();
+//     let mut memory_set =
+// current_cpu().task.as_ref().unwrap().memory_set().lock();     for vpn in
+// VpnRange::new(start, end) {}     Ok(())
+// }
 
 /// the UserPtr is a wrapper for user-space pointer
 /// NOTE THAT: it will NOT validate the pointer

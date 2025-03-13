@@ -133,7 +133,6 @@ pub struct TrapContext {
 }
 
 impl ArchTrapContext for TrapContext {
-    type SyscallArgs = [usize; 6];
     fn app_init_cx(entry: usize, sp: usize) -> Self {
         let mut sstatus = Sstatus::read();
         sstatus.set_spp(SPP::User);

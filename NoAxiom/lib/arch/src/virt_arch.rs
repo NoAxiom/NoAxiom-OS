@@ -112,7 +112,6 @@ pub trait ArchMemory {
 
 /// trait for trap context
 pub trait ArchTrapContext {
-    type SyscallArgs;
     fn app_init_cx(entry: usize, sp: usize) -> Self;
     fn update_cx(&mut self, entry: usize, sp: usize, argc: usize, argv: usize, envp: usize);
     fn set_sp(&mut self, sp: usize);
@@ -121,7 +120,7 @@ pub trait ArchTrapContext {
     fn set_ra(&mut self, ra: usize);
     fn result_value(&self) -> usize;
     fn get_syscall_id(&self) -> usize;
-    fn get_syscall_args(&self) -> <Self as ArchTrapContext>::SyscallArgs;
+    fn get_syscall_args(&self) -> [usize; 6];
 }
 
 /// trap related arch trait
