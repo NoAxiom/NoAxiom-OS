@@ -1,8 +1,4 @@
-use alloc::{
-    boxed::Box,
-    sync::Arc,
-    vec::{self, Vec},
-};
+use alloc::{boxed::Box, sync::Arc, vec::Vec};
 
 use async_trait::async_trait;
 use fatfs::*;
@@ -38,21 +34,43 @@ impl DiskCursor {
         self.offset = pos % BLOCK_SIZE;
     }
 
+    /// mention that ext4_rs use 4k block size
     pub async fn base_read_exact_block_size(&self, offset: usize) -> Vec<u8> {
         let (blk, blk_id, offset) = (self.blk.clone(), offset / BLOCK_SIZE, offset % BLOCK_SIZE);
-        let mut res = vec![0u8; BLOCK_SIZE];
+
+        const EXT4_RS_BLOCK_SIZE: usize = 4096;
+        const BLK_NUMS: usize = EXT4_RS_BLOCK_SIZE / BLOCK_SIZE;
+
+        let mut res = vec![0u8; EXT4_RS_BLOCK_SIZE];
 
         match offset {
             0 => {
-                let data = blk.read_sector(blk_id).await.data;
-                res.copy_from_slice(&data[..]);
+                let mut data = [[0u8; BLOCK_SIZE]; BLK_NUMS];
+                for i in 0..BLK_NUMS {
+                    data[i] = *blk.read_sector(blk_id + i).await.data;
+                }
+                for i in 0..BLK_NUMS {
+                    res[i * BLOCK_SIZE..(i + 1) * BLOCK_SIZE].copy_from_slice(&data[i]);
+                }
             }
             _ => {
-                let data1 = blk.read_sector(blk_id).await.data;
-                let data2 = blk.read_sector(blk_id + 1).await.data;
-                let read_size = (BLOCK_SIZE - offset).min(res.len());
-                res[..read_size].copy_from_slice(&data1[offset..offset + read_size]);
-                res[read_size..].copy_from_slice(&data2[..BLOCK_SIZE - read_size]);
+                let mut data = [[0u8; BLOCK_SIZE]; BLK_NUMS + 1];
+                for i in 0..BLK_NUMS + 1 {
+                    data[i] = *blk.read_sector(blk_id + i).await.data;
+                }
+
+                // sector 0
+                res[..offset].copy_from_slice(&data[0][offset..]);
+
+                // sector 1 ~ BLK_NUMS - 1
+                for i in 0..BLK_NUMS - 1 {
+                    res[offset + i * BLOCK_SIZE..offset + (i + 1) * BLOCK_SIZE]
+                        .copy_from_slice(&data[i + 1]);
+                }
+
+                // sector BLK_NUMS
+                res[offset + (BLK_NUMS - 1) * BLOCK_SIZE..]
+                    .copy_from_slice(&data[BLK_NUMS][..BLOCK_SIZE - offset]);
             }
         }
         res

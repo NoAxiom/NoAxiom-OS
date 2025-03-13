@@ -129,12 +129,14 @@ impl File for Ext4Dir {
             .unwrap()
             .get_fs();
 
-        debug!("here1");
         let entries = ext4.dir_get_entries(self.ino).await;
-        debug!("here2");
 
         for entry in entries {
             let child_name = entry.get_name();
+            if child_name == "." || child_name == ".." {
+                debug!("load_dir: {:?}, passed", child_name);
+                continue;
+            }
             let child_path = format!(
                 "{}/{}",
                 self.meta().dentry().path().as_string(),
@@ -153,7 +155,7 @@ impl File for Ext4Dir {
                         .await
                         .map_err(fs_err)?;
                     let inode = ext4.get_inode_ref(inode_num).await;
-                    Arc::new(Ext4DirInode::new(super_block.clone(), inode))
+                    Arc::new(Ext4FileInode::new(super_block.clone(), inode))
                 } else {
                     unreachable!();
                 };
