@@ -6,7 +6,7 @@ use core::{
     task::Waker,
 };
 
-use arch::{ArchTrapContext, Exception, TrapContext};
+use arch::{Arch, ArchMemory, ArchTrapContext, Exception, TrapContext};
 use ksync::{
     cell::SyncUnsafeCell,
     mutex::{SpinLock, SpinLockGuard},
@@ -36,7 +36,7 @@ use crate::{
     mm::{
         address::VirtAddr,
         memory_set::{ElfMemoryInfo, MemorySet, MemorySpace},
-        page_table::{current_token, PageTable},
+        page_table::PageTable,
         validate::validate,
     },
     return_errno,
@@ -176,7 +176,7 @@ impl Task {
     ) -> SysResult<()> {
         trace!("[memory_validate] check at addr: {:#x}", addr);
         let vpn = VirtAddr::from(addr).floor();
-        let pt = PageTable::from_token(current_token());
+        let pt = PageTable::from_token(Arch::current_token());
         validate(self.memory_set(), vpn, exception, pt.translate_vpn(vpn)).await
     }
 

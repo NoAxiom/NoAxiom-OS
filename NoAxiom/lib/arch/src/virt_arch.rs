@@ -102,6 +102,12 @@ pub trait ArchMemory {
     fn update_pagetable(_bits: usize) {
         unimplemented!("update_pagetable")
     }
+    fn get_token_by_ppn(_ppn: usize) -> usize {
+        unimplemented!("get_token_by_ppn")
+    }
+    fn current_token() -> usize {
+        unimplemented!("current_token")
+    }
 }
 
 /// trait for trap context

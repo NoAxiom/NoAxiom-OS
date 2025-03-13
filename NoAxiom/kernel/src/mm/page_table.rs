@@ -157,11 +157,22 @@ impl PageTable {
         })
     }
 
+    // /// get the token of this page table (WARNING: sv39 only)
+    // /// which will be written into satp
+    // #[inline(always)]
+    // pub const fn token(&self) -> usize {
+    //     8usize << 60 | self.root_ppn.0
+    // }
     /// get the token of this page table (WARNING: sv39 only)
     /// which will be written into satp
     #[inline(always)]
-    pub const fn token(&self) -> usize {
-        8usize << 60 | self.root_ppn.0
+    pub fn token(&self) -> usize {
+        Arch::get_token_by_ppn(self.root_ppn.0)
+    }
+    /// get root ppn
+    #[inline(always)]
+    pub const fn root_ppn(&self) -> PhysPageNum {
+        self.root_ppn
     }
 
     /// set flags for a vpn
@@ -194,12 +205,6 @@ impl PageTable {
 pub fn memory_activate_by_token(token: usize) {
     Arch::update_pagetable(token);
     Arch::tlb_flush();
-}
-
-pub fn current_token() -> usize {
-    let satp: usize;
-    unsafe { asm!("csrr {}, satp", out(reg) satp) }
-    satp
 }
 
 /// translate the vpn into PTE entry (sv39)
