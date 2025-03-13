@@ -35,6 +35,17 @@ impl DiskCursor {
     }
 
     /// mention that ext4_rs use 4k block size
+    /// so we use 4 times read 512 block to represent 4k block
+    ///
+    /// only use for ext4_rs
+    ///
+    ///
+    /// block:
+    /// |------------------------------------|------------------------------------|------------------------------------|------------------------------------|
+    ///
+    /// request:
+    ///         |---------------------------------------------------------------------------------------------------------------|
+    /// offset  |   BLOCK_SIZE - offset      |
     pub async fn base_read_exact_block_size(&self, offset: usize) -> Vec<u8> {
         let (blk, blk_id, offset) = (self.blk.clone(), offset / BLOCK_SIZE, offset % BLOCK_SIZE);
 
@@ -60,8 +71,9 @@ impl DiskCursor {
                 }
 
                 // sector 0
-                res[..offset].copy_from_slice(&data[0][offset..]);
+                res[..BLOCK_SIZE - offset].copy_from_slice(&data[0][offset..]);
 
+                let offset = BLOCK_SIZE - offset;
                 // sector 1 ~ BLK_NUMS - 1
                 for i in 0..BLK_NUMS - 1 {
                     res[offset + i * BLOCK_SIZE..offset + (i + 1) * BLOCK_SIZE]
@@ -76,8 +88,65 @@ impl DiskCursor {
         res
     }
 
-    async fn base_write_exact(&self, offset: usize, buf: &[u8]) {
-        todo!()
+    /// only use for ext4_rs
+    ///
+    ///  block:
+    /// |------------------------------------|------------------------------------|------------------------------------|------------------------------------|
+    ///
+    /// request:
+    ///         |------------------------------------------------------------|
+    /// offset  |   BLOCK_SIZE - offset      |
+    pub async fn base_write_exact(&self, offset: usize, buf: &[u8]) {
+        log::debug!(
+            "base_write_exact offset: {}, buf.len(): {}",
+            offset,
+            buf.len()
+        );
+        let blk = self.blk.clone();
+        let (st_blk_id, st_offset) = (offset / BLOCK_SIZE, offset % BLOCK_SIZE);
+        let ed_offset = offset + buf.len();
+        let (ed_blk_id, ed_offset) = (ed_offset / BLOCK_SIZE, ed_offset % BLOCK_SIZE);
+
+        log::debug!(
+            "st_blk_id: {}, st_offset: {}, ed_blk_id: {}, ed_offset: {}, buf.len: {}",
+            st_blk_id,
+            st_offset,
+            ed_blk_id,
+            ed_offset,
+            buf.len()
+        );
+
+        if st_blk_id == ed_blk_id {
+            let mut data = *blk.read_sector(st_blk_id).await.data;
+            data[st_offset..ed_offset].copy_from_slice(&buf);
+            blk.write_sector(st_blk_id, &data).await;
+            log::debug!("base_write_exact_offset ok");
+            return;
+        }
+
+        // sector 0
+        let mut data = *blk.read_sector(st_blk_id).await.data;
+        data[st_offset..].copy_from_slice(&buf[..BLOCK_SIZE - st_offset]);
+        blk.write_sector(st_blk_id, &data).await;
+
+        // sector mid
+        let mid_offset = BLOCK_SIZE - st_offset;
+        for i in st_blk_id + 1..ed_blk_id {
+            let mut data = [0u8; BLOCK_SIZE];
+            let kth = i - st_blk_id - 1;
+            data.copy_from_slice(
+                &buf[mid_offset + kth * BLOCK_SIZE..mid_offset + (kth + 1) * BLOCK_SIZE],
+            );
+            blk.write_sector(i, &data).await;
+        }
+
+        // sector ed
+        if ed_offset != 0 {
+            let mut data = *blk.read_sector(ed_blk_id).await.data;
+            data[..ed_offset].copy_from_slice(&buf[buf.len() - ed_offset..]);
+            blk.write_sector(ed_blk_id, &data).await;
+        }
+        log::debug!("base_write_exact_offset ok");
     }
 }
 

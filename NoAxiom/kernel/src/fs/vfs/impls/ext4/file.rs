@@ -130,6 +130,7 @@ impl File for Ext4Dir {
             .get_fs();
 
         let entries = ext4.dir_get_entries(self.ino).await;
+        let self_path = self.meta().dentry().path().as_string();
 
         for entry in entries {
             let child_name = entry.get_name();
@@ -137,11 +138,11 @@ impl File for Ext4Dir {
                 debug!("load_dir: {:?}, passed", child_name);
                 continue;
             }
-            let child_path = format!(
-                "{}/{}",
-                self.meta().dentry().path().as_string(),
-                entry.get_name()
-            );
+            let child_path = if self_path != "/" {
+                format!("{}/{}", self_path, entry.get_name())
+            } else {
+                format!("/{}", entry.get_name())
+            };
             let child_inode: Arc<dyn Inode> =
                 if entry.get_de_type() == Ext4DirEntryType::EXT4_DE_DIR.bits() {
                     debug!("load_dir: {:?}", child_name);
@@ -171,7 +172,12 @@ impl File for Ext4Dir {
             .unwrap()
             .get_fs();
         let mut inode = ext4.get_inode_ref(self.ino).await;
-        let child_path = format!("{}/{}", self.meta().dentry().path().as_string(), name);
+        let self_path = self.meta().dentry().path().as_string();
+        let child_path = if self_path != "/" {
+            format!("{}/{}", self_path, name)
+        } else {
+            format!("/{}", name)
+        };
         ext4.dir_remove_entry(&mut inode, &child_path)
             .await
             .map_err(fs_err)?;

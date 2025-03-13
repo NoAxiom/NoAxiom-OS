@@ -15,7 +15,7 @@ use crate::{
                 filesystem::{FileSystem, FileSystemMeta},
                 superblock::SuperBlockMeta,
             },
-            impls::disk_cursor::DiskCursor,
+            impls::{disk_cursor::DiskCursor, ext4::disk_cursor::Ext4DiskCursor},
         },
     },
     include::fs::MountFlags,
@@ -51,8 +51,9 @@ impl FileSystem for AsyncSmpExt4 {
     ) -> Arc<dyn Dentry> {
         let super_block_meta = SuperBlockMeta::new(device.clone(), self.clone());
         let blk = Arc::new(AsyncBlockCache::from(device.unwrap()));
-        let disk = Arc::new(DiskCursor::new(blk.clone(), 0, 0));
-        let unbooted_fs = Arc::new(Mutex::new(IExtFs::open(disk).await));
+        let disk_cursor = DiskCursor::new(blk.clone(), 0, 0);
+        // let disk_cursor = Ext4DiskCursor::new(Arc::new(Mutex::new(disk_cursor)));
+        let unbooted_fs = Arc::new(Mutex::new(IExtFs::open(Arc::new(disk_cursor)).await));
         let fs_super_block = Arc::new(Ext4SuperBlock::new(super_block_meta, unbooted_fs));
 
         let root_dentry = Ext4Dentry::new(parent.clone(), name, fs_super_block.clone());
@@ -63,11 +64,6 @@ impl FileSystem for AsyncSmpExt4 {
             fs_super_block.clone(),
             ext4.get_inode_ref(ROOT_INODE).await,
         ));
-
-        debug!(
-            "inode type: {:?}",
-            root_inode.clone().into_dyn().file_type()
-        );
 
         if let Some(parent) = parent {
             parent.add_child(name, root_inode.clone());

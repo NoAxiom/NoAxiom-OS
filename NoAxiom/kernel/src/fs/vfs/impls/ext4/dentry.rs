@@ -81,7 +81,13 @@ impl Dentry for Ext4Dentry {
             .downcast_ref::<Ext4SuperBlock>()
             .unwrap()
             .get_fs();
-        let child_path = format!("{}/{}", self.clone().into_dyn().path().as_string(), name);
+        let self_path = self.clone().into_dyn().path().as_string();
+        let child_path = if self_path != "/" {
+            format!("{}/{}", self_path, name)
+        } else {
+            format!("/{}", name)
+        };
+        debug!("create: {}", child_path);
         if mode.contains(InodeMode::FILE) {
             let inode_num = ext4
                 .ext4_file_open(&child_path, &"w+")
