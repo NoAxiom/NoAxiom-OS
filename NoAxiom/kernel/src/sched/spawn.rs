@@ -7,9 +7,7 @@ use core::future::Future;
 
 use async_task::{Builder, WithInfo};
 
-use super::{
-    multicore::SchedInfo, runtime::RUNTIME, sched_entity::SchedEntity, vsched::Runtime,
-};
+use super::{runtime::RUNTIME, sched_entity::SchedEntity, sched_info::SchedInfo, vsched::Runtime};
 use crate::{
     cpu::get_hartid,
     fs::path::Path,

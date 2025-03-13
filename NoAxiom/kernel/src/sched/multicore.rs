@@ -2,7 +2,7 @@
 //! - [`spawn_raw`] to add a task
 //! - [`run`] to run next task
 
-use alloc::{sync::Weak, vec::Vec};
+use alloc::vec::Vec;
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use arch::{Arch, ArchAsm, ArchInt};
@@ -14,42 +14,16 @@ use ksync::{
 };
 
 use super::{
-    sched_entity::SchedEntity,
+    sched_info::SchedInfo,
     vsched::{MulticoreRuntime, MulticoreSchedInfo, MulticoreScheduler, Runtime, ScheduleOrder},
 };
 use crate::{
     config::{arch::CPU_NUM, sched::LOAD_BALANCE_TICKS},
     cpu::get_hartid,
-    sched::runtime::RUNTIME,
-    task::{status::TaskStatus, Task},
+    task::status::TaskStatus,
     time::{gettime::get_time, sleep::current_sleep_manager},
     trap::ipi::{send_ipi, IpiType},
 };
-
-pub struct SchedInfo {
-    pub sched_entity: SchedEntity,
-    /// the hartid that the task should be running on
-    pub hartid: AtomicUsize,
-    pub task: Option<Weak<Task>>,
-}
-impl SchedInfo {
-    pub fn new(sched_entity: SchedEntity, hartid: usize, task: Option<Weak<Task>>) -> Self {
-        Self {
-            sched_entity,
-            hartid: AtomicUsize::new(hartid),
-            task,
-        }
-    }
-}
-
-impl MulticoreSchedInfo for SchedInfo {
-    fn set_hartid(&self, hartid: usize) {
-        self.hartid.store(hartid, Ordering::Release);
-    }
-    fn hartid(&self) -> usize {
-        self.hartid.load(Ordering::Acquire)
-    }
-}
 
 struct RunnableMailbox<T> {
     pub valid: AtomicBool,
@@ -123,10 +97,10 @@ where
         *&mut unsafe { *self.last_request_time[get_hartid()].get() } = get_time();
     }
     fn current_is_overload(&self) -> bool {
-        self.current_scheduler().is_overload(RUNTIME.get_load())
+        self.current_scheduler().is_overload(self.get_load())
     }
     fn current_is_underload(&self) -> bool {
-        self.current_scheduler().is_underload(RUNTIME.get_load())
+        self.current_scheduler().is_underload(self.get_load())
     }
     fn current_can_resp_sched_req(&self) -> bool {
         let is_timeup = get_time() - self.last_handle_time() > LOAD_BALANCE_TICKS;
@@ -155,7 +129,7 @@ where
                 let mut mailbox = self.mailbox[i].mailbox.lock();
                 // the overall load will change when we pop tasks
                 // so save the previous load first
-                let all_load = RUNTIME.get_load();
+                let all_load = self.get_load();
                 while self.current_scheduler().is_overload(all_load) {
                     if let Some(runnable) = self.pop_normal_first() {
                         runnable.metadata().set_hartid(i);

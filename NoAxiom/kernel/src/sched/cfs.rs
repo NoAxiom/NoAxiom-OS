@@ -4,9 +4,9 @@ use core::cmp::Ordering;
 use async_task::{Runnable, ScheduleInfo};
 
 use super::{
-    multicore::SchedInfo,
     runtime::RUNTIME,
     sched_entity::SchedVruntime,
+    sched_info::SchedInfo,
     vsched::{MulticoreRuntime, MulticoreSchedInfo, MulticoreScheduler, ScheduleOrder, Scheduler},
 };
 use crate::{
