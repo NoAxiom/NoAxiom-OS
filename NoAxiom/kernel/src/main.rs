@@ -50,6 +50,7 @@ core::arch::global_asm!(include_str!("link_apps.S"));
 pub fn rust_main() {
     info!("[kernel] hart id {} has been booted", cpu::get_hartid());
     loop {
-        sched::executor::RUNTIME.run();
+        use sched::vsched::Runtime;
+        sched::runtime::RUNTIME.run();
     }
 }

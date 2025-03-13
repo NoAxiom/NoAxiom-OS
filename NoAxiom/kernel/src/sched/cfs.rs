@@ -1,30 +1,40 @@
 use alloc::collections::{btree_set::BTreeSet, vec_deque::VecDeque};
 use core::cmp::Ordering;
 
-use async_task::ScheduleInfo;
+use async_task::{Runnable, ScheduleInfo};
 
 use super::{
-    executor::{RunnableTask, RUNTIME},
+    multicore::SchedInfo,
+    runtime::RUNTIME,
     sched_entity::SchedVruntime,
-    scheduler::{ScheduleOrder, Scheduler},
+    vsched::{MulticoreRuntime, MulticoreSchedInfo, MulticoreScheduler, ScheduleOrder, Scheduler},
 };
 use crate::{
     config::{arch::CPU_NUM, sched::LOAD_BALANCE_LIMIT},
     constant::sched::NICE_0_LOAD,
 };
 
-struct CfsTreeNode {
+struct CfsTreeNode<R>
+where
+    R: MulticoreSchedInfo,
+{
     pub vruntime: SchedVruntime,
     pub tid: usize,
-    pub runnable: RunnableTask,
+    pub runnable: Runnable<R>,
 }
-impl PartialEq for CfsTreeNode {
+impl<R> PartialEq for CfsTreeNode<R>
+where
+    R: MulticoreSchedInfo,
+{
     fn eq(&self, other: &Self) -> bool {
         self.tid == other.tid
     }
 }
-impl Eq for CfsTreeNode {}
-impl PartialOrd for CfsTreeNode {
+impl<R> Eq for CfsTreeNode<R> where R: MulticoreSchedInfo {}
+impl<R> PartialOrd for CfsTreeNode<R>
+where
+    R: MulticoreSchedInfo,
+{
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         let res = self.vruntime.partial_cmp(&other.vruntime);
         match res {
@@ -33,7 +43,10 @@ impl PartialOrd for CfsTreeNode {
         }
     }
 }
-impl Ord for CfsTreeNode {
+impl<R> Ord for CfsTreeNode<R>
+where
+    R: MulticoreSchedInfo,
+{
     fn cmp(&self, other: &Self) -> Ordering {
         let res = self.vruntime.cmp(&other.vruntime);
         match res {
@@ -44,31 +57,52 @@ impl Ord for CfsTreeNode {
 }
 
 /// completely fair scheduler for single core
-pub struct CFS {
+pub struct CFS<R>
+where
+    R: MulticoreSchedInfo,
+{
     /// cfs tree
-    normal: BTreeSet<CfsTreeNode>,
+    normal: BTreeSet<CfsTreeNode<R>>,
     /// realtime / just-woken runnable queue
-    urgent: VecDeque<RunnableTask>,
+    urgent: VecDeque<Runnable<R>>,
     /// load: sum of load_weight of tasks in scheduler
     load: usize,
     /// counter of task
     task_count: usize,
 }
 
-impl CFS {
+impl<R> MulticoreScheduler<R> for CFS<R>
+where
+    Self: Scheduler<R>,
+    R: MulticoreSchedInfo,
+{
+    /// sub both local and global load
     fn sub_load(&mut self, load: usize) {
+        #[cfg(feature = "multicore")]
         RUNTIME.sub_load(load);
         self.load -= load;
         self.task_count -= 1;
     }
+    /// add both local and global load
     fn add_load(&mut self, load: usize) {
+        #[cfg(feature = "multicore")]
         RUNTIME.add_load(load);
         self.load += load;
         self.task_count += 1;
     }
+    /// check if scheduler is overloaded
+    fn is_overload(&self, all_load: usize) -> bool {
+        let ave = all_load / CPU_NUM;
+        self.load > ave + ave / LOAD_BALANCE_LIMIT + 1 && self.task_count > 1
+    }
+    /// check if scheduler is underloaded
+    fn is_underload(&self, all_load: usize) -> bool {
+        let ave = all_load / CPU_NUM;
+        self.load + ave / LOAD_BALANCE_LIMIT < ave && all_load > NICE_0_LOAD
+    }
 }
 
-impl Scheduler for CFS {
+impl Scheduler<SchedInfo> for CFS<SchedInfo> {
     /// default scheduler for init
     fn default() -> Self {
         Self {
@@ -80,12 +114,7 @@ impl Scheduler for CFS {
     }
 
     /// insert task into scheduler when [`core::task::Waker::wake`] get called
-    fn push_with_info(&mut self, runnable: RunnableTask, info: ScheduleInfo) {
-        trace!(
-            "[sched] schedule task, sched_entity: {:?}, woken_while_running: {}",
-            runnable.metadata().sched_entity.inner(),
-            info.woken_while_running
-        );
+    fn push_with_info(&mut self, runnable: Runnable<SchedInfo>, info: ScheduleInfo) {
         if info.woken_while_running {
             self.push_normal(runnable);
         } else {
@@ -94,7 +123,7 @@ impl Scheduler for CFS {
     }
 
     /// push a task to the normal queue, aka cfs tree
-    fn push_normal(&mut self, runnable: RunnableTask) {
+    fn push_normal(&mut self, runnable: Runnable<SchedInfo>) {
         self.add_load(runnable.metadata().sched_entity.get_load());
         let vruntime = runnable.metadata().sched_entity.inner().vruntime;
         let tid = runnable.metadata().sched_entity.tid;
@@ -106,13 +135,13 @@ impl Scheduler for CFS {
     }
 
     /// push a task to the urgent queue
-    fn push_urgent(&mut self, runnable: RunnableTask) {
+    fn push_urgent(&mut self, runnable: Runnable<SchedInfo>) {
         self.add_load(runnable.metadata().sched_entity.get_load());
         self.urgent.push_back(runnable);
     }
 
     /// pop a task from scheduler
-    fn pop(&mut self, order: ScheduleOrder) -> Option<RunnableTask> {
+    fn pop(&mut self, order: ScheduleOrder) -> Option<Runnable<SchedInfo>> {
         match order {
             ScheduleOrder::UrgentFirst => {
                 if let Some(runnable) = self.urgent.pop_front() {
@@ -143,17 +172,5 @@ impl Scheduler for CFS {
                 }
             }
         }
-    }
-
-    /// check if scheduler is overloaded
-    fn is_overload(&self, all_load: usize) -> bool {
-        let ave = all_load / CPU_NUM;
-        self.load > ave + ave / LOAD_BALANCE_LIMIT + 1 && self.task_count > 1
-    }
-
-    /// check if scheduler is underloaded
-    fn is_underload(&self, all_load: usize) -> bool {
-        let ave = all_load / CPU_NUM;
-        self.load + ave / LOAD_BALANCE_LIMIT < ave && all_load > NICE_0_LOAD
     }
 }
