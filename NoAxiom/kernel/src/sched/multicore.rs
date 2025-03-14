@@ -240,7 +240,9 @@ where
         self.handle_mailbox();
         current_sleep_manager().sleep_handler();
         assert!(check_no_lock(), "LOCK IS NOT RELEASED!!!");
+        Arch::disable_global_interrupt();
         if let Some(runnable) = self.pop() {
+            Arch::enable_global_interrupt();
             runnable.run();
             #[cfg(feature = "multicore")]
             if self.current_can_resp_sched_req() {
@@ -250,6 +252,7 @@ where
                 self.set_sched_req();
             }
         } else {
+            Arch::enable_global_interrupt();
             #[cfg(feature = "multicore")]
             if self.current_should_set_sched_req() {
                 trace!("[set_sched_req] empty queue");
