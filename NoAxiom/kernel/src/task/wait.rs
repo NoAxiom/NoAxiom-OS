@@ -41,9 +41,8 @@ impl WaitChildFuture {
     }
 }
 
-type WaitChildFutureOutput = SysResult<(i32, usize)>;
 impl Future for WaitChildFuture {
-    type Output = WaitChildFutureOutput;
+    type Output = SysResult<(i32, usize)>;
     fn poll(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Self::Output> {
         let mut pcb = self.task.pcb();
         let res = match &self.target {

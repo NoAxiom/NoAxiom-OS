@@ -1,3 +1,5 @@
+use arch::TrapArgs;
+
 use super::{Syscall, SyscallResult};
 use crate::{
     fs::path::Path,
@@ -8,7 +10,7 @@ use crate::{
     },
     mm::user_ptr::UserPtr,
     sched::spawn::spawn_utask,
-    task::{manager::TASK_MANAGER, wait::WaitChildFuture},
+    task::wait::WaitChildFuture,
 };
 
 impl Syscall<'_> {
@@ -38,9 +40,9 @@ impl Syscall<'_> {
         let flags = CloneFlags::from_bits(flags & !0xff).unwrap();
         let task = self.task.fork(flags);
         let trap_cx = task.trap_context_mut();
-        trap_cx.set_result(0);
+        trap_cx[TrapArgs::RES] = 0;
         if stack != 0 {
-            trap_cx.set_sp(stack);
+            trap_cx[TrapArgs::SP] = stack;
         }
         trace!("[sys_fork] new task context: {:?}", trap_cx);
         let tid = task.tid();
@@ -66,7 +68,7 @@ impl Syscall<'_> {
         self.task.exec(path, args, envs).await?;
         // On success, execve() does not return, on error -1 is returned, and errno is
         // set to indicate the error.
-        Ok(self.task.trap_context().result_value() as isize)
+        Ok(self.task.trap_context()[TrapArgs::RES] as isize)
     }
 
     pub async fn sys_wait4(
@@ -78,7 +80,9 @@ impl Syscall<'_> {
     ) -> SyscallResult {
         trace!(
             "[sys_wait4] pid: {:?}, status_addr: {:?}, options: {:?}",
-            pid, status_addr, options
+            pid,
+            status_addr,
+            options
         );
         let wait_option = WaitOption::from_bits(options as i32).ok_or(Errno::EINVAL)?;
         let status: UserPtr<i32> = UserPtr::new(status_addr);

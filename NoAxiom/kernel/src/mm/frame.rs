@@ -8,8 +8,12 @@ use core::fmt::{self, Debug, Formatter};
 use ksync::mutex::SpinLock;
 use lazy_static::lazy_static;
 
-use super::address::PhysPageNum;
-use crate::{config::mm::KERNEL_PHYS_MEMORY_END, mm::address::PhysAddr, utils::kernel_va_to_pa};
+use super::address::{PhysPageNum, VirtPageNum};
+use crate::{
+    config::mm::KERNEL_PHYS_MEMORY_END,
+    mm::address::PhysAddr,
+    utils::{kernel_ppn_to_vpn, kernel_va_to_pa},
+};
 
 // pub fn frame_strong_count(ppn: PhysPageNum) -> usize {
 //     FRAME_MAP
@@ -60,6 +64,10 @@ impl FrameTracker {
     #[inline(always)]
     pub fn ppn(&self) -> PhysPageNum {
         self.inner.ppn
+    }
+    #[inline(always)]
+    pub fn into_kernel_vpn(&self) -> VirtPageNum {
+        VirtPageNum::from(kernel_ppn_to_vpn(self.inner.ppn.0))
     }
 }
 impl Clone for FrameTracker {

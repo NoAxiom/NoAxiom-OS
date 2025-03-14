@@ -6,6 +6,7 @@ export TARGET := riscv64gc-unknown-none-elf
 export MODE ?= release
 export BOARD ?= qemu-virt
 export KERNEL ?= kernel
+export ARCH ?= riscv64
 
 export ROOT := $(shell pwd)
 export TARGET_DIR := $(ROOT)/target/$(TARGET)/$(MODE)
@@ -101,6 +102,7 @@ asm: # build_kernel
 # NOTE THAT if you want to run in single core
 # you should export this as empty
 export MULTICORE_ARGS := 2
+export DEBUG := 1
 
 QFLAGS := 
 QFLAGS += -m 128
@@ -172,7 +174,7 @@ vendor:
 
 count:
 	@echo "kernel code statistic:"
-	@cd $(PROJECT) && cloc $(KERNEL) lib --exclude-dir=.trashbin --exclude-ext=md,toml
+	@cd $(PROJECT) && cloc $(KERNEL) lib --exclude-dir=.trash,.trashbin --exclude-ext=md,toml
 
 # sdcard:
 # 	@echo "\e[49;34m\e[1m----------Making sdcard-----------\e[0m"

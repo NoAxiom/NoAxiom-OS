@@ -38,18 +38,14 @@ pub fn kernel_pa_to_va(phys: usize) -> usize {
     phys | KERNEL_ADDR_OFFSET
 }
 
-/// get current pc
-#[inline(always)]
-#[allow(unused)]
-pub fn current_pc() -> usize {
-    let pc: usize;
-    unsafe { core::arch::asm!("auipc {}, 0", out(reg) pc) }
-    pc
-}
-
 #[inline(always)]
 pub fn kernel_vpn_to_ppn(vpn: usize) -> usize {
     vpn & !KERNEL_PAGENUM_MASK
+}
+
+#[inline(always)]
+pub fn kernel_ppn_to_vpn(ppn: usize) -> usize {
+    ppn | KERNEL_PAGENUM_MASK
 }
 
 pub fn reverse<T: Clone>(vec: &Vec<T>) -> Vec<T> {

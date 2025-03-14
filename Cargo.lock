@@ -48,6 +48,7 @@ dependencies = [
 name = "arch"
 version = "0.1.0"
 dependencies = [
+ "config",
  "loongArch64",
  "riscv",
  "sbi-rt",
@@ -169,6 +170,10 @@ dependencies = [
  "num-traits",
  "windows-link",
 ]
+
+[[package]]
+name = "config"
+version = "0.1.0"
 
 [[package]]
 name = "console"
@@ -421,13 +426,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hello_world"
-version = "0.1.0"
-dependencies = [
- "userlib",
-]
-
-[[package]]
 name = "hermit-abi"
 version = "0.1.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -466,13 +464,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "initprocess"
-version = "0.1.0"
-dependencies = [
- "userlib",
-]
-
-[[package]]
 name = "js-sys"
 version = "0.3.77"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -494,6 +485,7 @@ dependencies = [
  "bit_field",
  "bitflags 2.6.0",
  "buddy_system_allocator",
+ "config",
  "console",
  "crate_interface",
  "downcast-rs",
@@ -515,7 +507,6 @@ dependencies = [
  "plic",
  "rand_core",
  "ringbuffer",
- "riscv",
  "smoltcp",
  "spin 0.7.1",
  "thiserror-core",
@@ -539,15 +530,9 @@ name = "ksync"
 version = "0.1.0"
 dependencies = [
  "arch",
+ "config",
  "kernel-sync",
  "spin 0.9.8",
-]
-
-[[package]]
-name = "ktest"
-version = "0.1.0"
-dependencies = [
- "userlib",
 ]
 
 [[package]]
@@ -580,13 +565,6 @@ name = "log"
 version = "0.4.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a7a70ba024b9dc04c27ea2f0c0548feb474ec5c54bba33a7f72f873a39d07b24"
-
-[[package]]
-name = "long_loop"
-version = "0.1.0"
-dependencies = [
- "userlib",
-]
 
 [[package]]
 name = "loongArch64"
@@ -705,13 +683,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f139b0662de085916d1fb67d2b4169d1addddda1919e696f3252b740b629986e"
 dependencies = [
  "unicode-ident",
-]
-
-[[package]]
-name = "process_test"
-version = "0.1.0"
-dependencies = [
- "userlib",
 ]
 
 [[package]]
@@ -934,13 +905,6 @@ name = "unicode-ident"
 version = "1.0.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e91b56cd4cadaeb79bbf1a5645f6b4f8dc5bde8834ad5894a8db35fda9efa1fe"
-
-[[package]]
-name = "userlib"
-version = "0.1.0"
-dependencies = [
- "buddy_system_allocator",
-]
 
 [[package]]
 name = "vcell"

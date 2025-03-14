@@ -7,10 +7,7 @@ use core::future::Future;
 
 use async_task::{Builder, WithInfo};
 
-use super::{
-    executor::{TaskScheduleInfo, RUNTIME},
-    sched_entity::SchedEntity,
-};
+use super::{runtime::RUNTIME, sched_entity::SchedEntity, sched_info::SchedInfo, vsched::Runtime};
 use crate::{
     cpu::get_hartid,
     fs::path::Path,
@@ -30,12 +27,10 @@ pub fn spawn_raw<F, R>(
     F: Future<Output = R> + Send + 'static,
     R: Send + 'static,
 {
+    let schedule = WithInfo(move |runnable, info| RUNTIME.schedule(runnable, info));
     let (runnable, handle) = Builder::new()
-        .metadata(TaskScheduleInfo::new(sched_entity, hartid, task))
-        .spawn(
-            move |_: &TaskScheduleInfo| future,
-            WithInfo(move |runnable, info| RUNTIME.schedule(runnable, info)),
-        );
+        .metadata(SchedInfo::new(sched_entity, hartid, task))
+        .spawn(move |_: &SchedInfo| future, schedule);
     runnable.schedule();
     handle.detach();
 }

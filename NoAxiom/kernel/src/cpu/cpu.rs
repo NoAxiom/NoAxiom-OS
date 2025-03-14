@@ -25,10 +25,10 @@ impl Cpu {
     pub fn set_task(&mut self, task: &Arc<Task>) {
         set_next_trigger();
         self.task = Some(task.clone());
-        unsafe { task.memory_activate() };
+        task.memory_activate();
     }
     pub fn clear_task(&mut self) {
-        unsafe { kernel_space_activate() };
+        kernel_space_activate();
         self.task = None;
     }
 }

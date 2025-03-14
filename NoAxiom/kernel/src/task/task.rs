@@ -6,7 +6,7 @@ use core::{
     task::Waker,
 };
 
-use arch::{Exception, TrapContext};
+use arch::{Arch, ArchMemory, ArchTrapContext, TrapContext, TrapType};
 use ksync::{
     cell::SyncUnsafeCell,
     mutex::{SpinLock, SpinLockGuard},
@@ -33,15 +33,15 @@ use crate::{
         sched::CloneFlags,
         signal::sig_set::SigMask,
     },
-    ipc::signal::{pending_sigs::PendingSigs, sa_list::SigActionList, sig_info::SignalInfo},
     mm::{
         address::VirtAddr,
-        memory_set::{ElfMemoryInfo, MemorySet},
-        page_table::{current_token, translate_vpn_into_pte, PageTable},
+        memory_set::{ElfMemoryInfo, MemorySet, MemorySpace},
+        page_table::PageTable,
         validate::validate,
     },
     return_errno,
     sched::sched_entity::SchedEntity,
+    signal::{pending_sigs::PendingSigs, sa_list::SigActionList, sig_info::SignalInfo},
     syscall::{SysResult, SyscallResult},
     task::{manager::add_new_process, taskid::tid_alloc},
 };
@@ -65,7 +65,7 @@ pub struct Task {
     pcb: Arc<SpinLock<ProcessInfo>>,
 
     /// [pr] memory set for task
-    pub memory_set: Arc<SpinLock<MemorySet>>,
+    memory_space: MemorySpace,
 
     /// [th] trap context,
     /// contains stack ptr, registers, etc.
@@ -140,31 +140,6 @@ impl Task {
     pub fn is_stopped(&self) -> bool {
         self.status() == TaskStatus::Stopped
     }
-    #[inline(always)]
-    pub fn is_zombie(&self) -> bool {
-        self.status() == TaskStatus::Zombie
-    }
-    #[inline(always)]
-    pub fn is_running(&self) -> bool {
-        self.status() == TaskStatus::Running
-    }
-    #[inline(always)]
-    pub fn is_runnable(&self) -> bool {
-        self.status() == TaskStatus::Runnable
-    }
-    #[inline(always)]
-    pub fn is_suspended(&self) -> bool {
-        self.status() == TaskStatus::Suspended
-    }
-
-    // // suspend reason
-    // #[inline(always)]
-    // pub fn suspend_reason(&self) -> SuspendReason {
-    //     self.suspend_reason.load(Ordering::SeqCst)
-    // }
-    // pub fn set_suspend_reason(&self, reason: SuspendReason) {
-    //     self.suspend_reason.store(reason, Ordering::SeqCst);
-    // }
 
     /// exit code
     #[inline(always)]
@@ -180,33 +155,29 @@ impl Task {
     #[inline(always)]
     pub fn memory_set(&self) -> &Arc<SpinLock<MemorySet>> {
         // unsafe { &(*self.memory_set.get()) }
-        &self.memory_set
+        &self.memory_space.memory_set
     }
     #[inline(always)]
-    pub unsafe fn memory_activate(&self) {
-        unsafe { self.memory_set().lock().activate() };
-    }
-    /// get token from memory set
-    #[inline(always)]
-    pub fn token(&self) -> usize {
-        self.memory_set().lock().token()
+    pub fn memory_activate(&self) {
+        self.memory_space.memory_set.lock().memory_activate(); // .memory_activate();
     }
     /// change current memory set
     pub fn change_memory_set(&self, memory_set: MemorySet) {
         // unsafe { (*self.memory_set.get()) = Arc::new(SpinLock::new(memory_set)) };
-        let mut ms = self.memory_set.lock();
+        let mut ms = self.memory_set().lock();
+        self.memory_space.change_token(memory_set.token());
         *ms = memory_set;
     }
 
     pub async fn memory_validate(
         self: &Arc<Self>,
         addr: usize,
-        exception: Option<Exception>,
+        trap_type: Option<TrapType>,
     ) -> SysResult<()> {
         trace!("[memory_validate] check at addr: {:#x}", addr);
         let vpn = VirtAddr::from(addr).floor();
-        let pt = PageTable::from_token(current_token());
-        validate(&self.memory_set, vpn, exception, pt.translate_vpn(vpn)).await
+        let pt = PageTable::from_token(Arch::current_token());
+        validate(self.memory_set(), vpn, trap_type, pt.translate_vpn(vpn)).await
     }
 
     /// get pcb
@@ -290,7 +261,10 @@ impl Task {
                 parent: None,
                 wait_req: AtomicBool::new(false),
             })),
-            memory_set: Arc::new(SpinLock::new(memory_set)),
+            memory_space: MemorySpace {
+                token: SyncUnsafeCell::new(memory_set.token()),
+                memory_set: Arc::new(SpinLock::new(memory_set)),
+            },
             trap_cx: SyncUnsafeCell::new(TrapContext::app_init_cx(elf_entry, user_sp)),
             status: AtomicTaskStatus::new(TaskStatus::Suspended),
             exit_code: AtomicI32::new(0),
@@ -437,10 +411,14 @@ impl Task {
 
     /// fork
     pub fn fork(self: &Arc<Task>, flags: CloneFlags) -> Arc<Self> {
-        let memory_set = if flags.contains(CloneFlags::VM) {
-            self.memory_set().clone()
+        let (memory_set, token) = if flags.contains(CloneFlags::VM) {
+            (
+                self.memory_set().clone(),
+                SyncUnsafeCell::new(self.memory_space.token()),
+            )
         } else {
-            Arc::new(SpinLock::new(self.memory_set().lock().clone_cow()))
+            let (ms, token) = self.memory_set().lock().clone_cow();
+            (Arc::new(SpinLock::new(ms)), SyncUnsafeCell::new(token))
         };
 
         // TODO: CloneFlags::SIGHAND
@@ -470,7 +448,7 @@ impl Task {
                 pgid: self.pgid.clone(),
                 thread_group: self.thread_group.clone(),
                 pcb: self.pcb.clone(),
-                memory_set,
+                memory_space: MemorySpace { token, memory_set },
                 trap_cx: SyncUnsafeCell::new(self.trap_context().clone()),
                 status: AtomicTaskStatus::new(TaskStatus::Suspended),
                 exit_code: AtomicI32::new(0),
@@ -501,7 +479,7 @@ impl Task {
                     parent: Some(Arc::downgrade(self)),
                     wait_req: AtomicBool::new(false),
                 })),
-                memory_set,
+                memory_space: MemorySpace { memory_set, token },
                 trap_cx: SyncUnsafeCell::new(self.trap_context().clone()),
                 status: AtomicTaskStatus::new(TaskStatus::Suspended),
                 exit_code: AtomicI32::new(0),
@@ -532,7 +510,7 @@ impl Task {
             mut auxs,
         } = MemorySet::load_from_path(path).await;
         self.delete_children();
-        unsafe { memory_set.activate() };
+        unsafe { memory_set.memory_activate() };
         self.change_memory_set(memory_set);
         trace!("init usatck");
         let (user_sp, argc, argv_base, envp_base) =
@@ -540,13 +518,6 @@ impl Task {
         self.trap_context_mut()
             .update_cx(elf_entry, user_sp, argc, argv_base, envp_base);
         // debug!("trap_context: {:#x?}", self.trap_context());
-        trace!(
-            "trap_context: tid: {}, A0: {:#x}, A1: {:#x}, A2: {:#x}",
-            self.tid(),
-            self.trap_context().user_reg[10],
-            self.trap_context().user_reg[11],
-            self.trap_context().user_reg[12],
-        );
         // TODO: close fd table, reset sigactions
         Ok(())
     }
@@ -560,7 +531,7 @@ impl Task {
     }
 
     pub fn grow_brk(self: &Arc<Self>, new_brk: usize) -> SyscallResult {
-        let mut memory_set = self.memory_set.lock();
+        let mut memory_set = self.memory_set().lock();
         let grow_size = new_brk - memory_set.user_brk;
         trace!(
             "[grow_brk] start: {:#x}, old_brk: {:#x}, new_brk: {:#x}",

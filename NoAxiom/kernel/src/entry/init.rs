@@ -1,7 +1,4 @@
-use core::sync::atomic::AtomicUsize;
-
-use arch::{Arch, ArchInt, ArchSbi};
-use lazy_static::lazy_static;
+use arch::{Arch, ArchInt, ArchSbi, ArchTrap, _entry_other_hart};
 
 use crate::{
     config::{arch::CPU_NUM, mm::KERNEL_ADDR_OFFSET},
@@ -9,7 +6,7 @@ use crate::{
     cpu::get_hartid,
     device::init::device_init,
     driver::log::log_init,
-    entry::{boot::_entry_other_hart, init_proc::schedule_spawn_initproc},
+    entry::init_proc::schedule_spawn_initproc,
     fs::fs_init,
     mm::{bss::bss_init, frame::frame_init, hart_mm_init, heap::heap_init},
     platform::{
@@ -19,7 +16,6 @@ use crate::{
     },
     rust_main,
     sched::utils::block_on,
-    trap::trap_init,
 };
 
 /// awake other core
@@ -47,10 +43,10 @@ pub fn wake_other_hart(forbid_hart_id: usize) {
 }
 
 #[no_mangle]
-pub fn other_hart_init(hart_id: usize, dtb: usize) {
+pub extern "C" fn _other_hart_init(hart_id: usize, dtb: usize) {
     Arch::enable_user_memory_access();
     hart_mm_init();
-    trap_init();
+    Arch::trap_init();
     // register_to_hart(); // todo: add multipule devices interrupt support
     info!(
         "[other_init] entry init hart_id: {}, dtb_addr: {:#x}",
@@ -60,24 +56,24 @@ pub fn other_hart_init(hart_id: usize, dtb: usize) {
     unreachable!();
 }
 
-pub static BOOT_HART_ID: AtomicUsize = AtomicUsize::new(0);
+// pub static BOOT_HART_ID: AtomicUsize = AtomicUsize::new(0);
 
 // TODO: dtb, init_proc
 /// init bss, mm, console, and other drivers, then jump to rust_main,
 /// called by [`super::boot`]
 #[no_mangle]
-pub fn boot_hart_init(_: usize, dtb: usize) {
+pub extern "C" fn _boot_hart_init(_: usize, dtb: usize) {
     // global resources init
     bss_init();
     heap_init();
     log_init();
     frame_init();
-    BOOT_HART_ID.store(get_hartid(), core::sync::atomic::Ordering::SeqCst);
+    // BOOT_HART_ID.store(get_hartid(), core::sync::atomic::Ordering::SeqCst);
     Arch::enable_user_memory_access();
 
     // hart resources init
     hart_mm_init();
-    trap_init();
+    Arch::trap_init();
 
     // global resources: fs init
     let platfrom_info = platform_info_from_dtb(dtb);

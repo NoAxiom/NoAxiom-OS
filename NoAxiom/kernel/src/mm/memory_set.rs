@@ -1,7 +1,7 @@
 use alloc::{sync::Arc, vec::Vec};
-use core::sync::atomic::{AtomicUsize, Ordering};
+use core::sync::atomic::{fence, Ordering};
 
-use arch::{Arch, ArchMemory, Exception};
+use arch::{Arch, ArchMemory};
 use ksync::{cell::SyncUnsafeCell, mutex::SpinLock};
 use lazy_static::lazy_static;
 
@@ -10,7 +10,7 @@ use super::{
     frame::{frame_alloc, frame_refcount, FrameTracker},
     map_area::MapArea,
     mmap_manager::MmapManager,
-    page_table::PageTable,
+    page_table::{memory_activate_by_token, PageTable},
     pte::PageTableEntry,
 };
 use crate::{
@@ -19,16 +19,14 @@ use crate::{
         USER_STACK_SIZE,
     },
     constant::time::CLOCK_FREQ,
-    cpu::current_cpu,
     fs::{path::Path, vfs::basic::file::File},
-    include::{process::auxv::*, result::Errno},
+    include::process::auxv::*,
     map_permission,
     mm::{
         address::{VirtAddr, VirtPageNum},
         map_area::MapAreaType,
         permission::MapType,
     },
-    syscall::SysResult,
 };
 
 extern "C" {
@@ -50,10 +48,12 @@ lazy_static! {
 
 /// lazily initialized kernel space token
 /// please assure it's initialized before any user space token
-pub static KERNEL_SPACE_TOKEN: AtomicUsize = AtomicUsize::new(0);
+pub static mut KERNEL_SPACE_TOKEN: usize = 0;
+// pub static KERNEL_SPACE_TOKEN: AtomicUsize = AtomicUsize::new(0);
 
-pub unsafe fn kernel_space_activate() {
-    Arch::update_pagetable(KERNEL_SPACE_TOKEN.load(Ordering::Relaxed));
+pub fn kernel_space_activate() {
+    Arch::update_pagetable(unsafe { KERNEL_SPACE_TOKEN });
+    // Arch::update_pagetable(KERNEL_SPACE_TOKEN.load(Ordering::SeqCst));
     Arch::tlb_flush();
 }
 
@@ -87,6 +87,22 @@ pub struct MemorySet {
     pub mmap_manager: MmapManager,
 }
 
+pub struct MemorySpace {
+    pub token: SyncUnsafeCell<usize>,
+    pub memory_set: Arc<SpinLock<MemorySet>>,
+}
+impl MemorySpace {
+    pub fn token(&self) -> usize {
+        *self.token.ref_mut()
+    }
+    pub fn change_token(&self, token: usize) {
+        *self.token.ref_mut() = token;
+    }
+    pub fn memory_activate(&self) {
+        memory_activate_by_token(self.token());
+    }
+}
+
 impl MemorySet {
     /// create an new empty memory set without any allocation
     /// do not use this function directly, use [`new_with_kernel`] instead
@@ -118,10 +134,8 @@ impl MemorySet {
 
     /// switch into this memory set
     #[inline(always)]
-    pub unsafe fn activate(&self) {
-        unsafe {
-            self.page_table().activate();
-        }
+    pub fn memory_activate(&self) {
+        self.page_table().memory_activate();
     }
 
     /// translate va into pa
@@ -197,7 +211,11 @@ impl MemorySet {
             "[kernel] frame [{:#x}, {:#x})",
             ekernel as usize, KERNEL_VIRT_MEMORY_END as usize
         );
-        KERNEL_SPACE_TOKEN.store(memory_set.token(), Ordering::SeqCst);
+        unsafe {
+            KERNEL_SPACE_TOKEN = memory_set.token();
+            // KERNEL_SPACE_TOKEN.store(memory_set.token(), Ordering::SeqCst);
+            fence(Ordering::SeqCst);
+        }
         memory_set
     }
 
@@ -356,7 +374,7 @@ impl MemorySet {
     /// clone current memory set,
     /// and mark the new memory set as copy-on-write
     /// used in sys_fork
-    pub fn clone_cow(&mut self) -> Self {
+    pub fn clone_cow(&mut self) -> (Self, usize) {
         trace!("[clone_cow] start");
         let mut new_set = Self::new_with_kernel();
         let remap_cow = |vpn: VirtPageNum,
@@ -428,7 +446,8 @@ impl MemorySet {
         }
         new_set.user_brk_area = new_area;
 
-        new_set
+        let token = new_set.token();
+        (new_set, token)
     }
 
     pub fn lazy_alloc_stack(&mut self, vpn: VirtPageNum) {
@@ -472,6 +491,8 @@ impl MemorySet {
                     self.user_stack_area.frame_map.insert(vpn, frame.clone());
                 } else if self.user_brk_area.vpn_range.is_in_range(vpn) {
                     self.user_brk_area.frame_map.insert(vpn, frame.clone());
+                } else if self.mmap_manager.is_in_space(vpn) {
+                    self.mmap_manager.frame_trackers.insert(vpn, frame.clone());
                 } else {
                     panic!("[realloc_cow] vpn is not in any area!!!");
                 }

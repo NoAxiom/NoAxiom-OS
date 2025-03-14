@@ -5,8 +5,11 @@
 //! - [`utils`] contains useful func for async tasks execution
 
 mod cfs;
-pub mod executor;
+mod multicore;
+pub mod runtime;
 pub mod sched_entity;
-pub mod scheduler;
+pub mod sched_info;
+mod simple;
 pub mod spawn;
 pub mod utils;
+pub mod vsched;

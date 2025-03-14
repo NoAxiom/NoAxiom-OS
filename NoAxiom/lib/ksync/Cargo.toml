@@ -6,4 +6,5 @@ edition = "2021"
 [dependencies]
 spin = "0.9"
 kernel-sync = { git = "https://github.com/os-module/kernel-sync.git" }
-arch = { path = "../arch" }
+arch = { workspace = true }
+config = { workspace = true }
