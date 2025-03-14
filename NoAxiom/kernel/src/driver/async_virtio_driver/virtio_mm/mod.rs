@@ -82,11 +82,6 @@ pub fn virtio_virt_to_phys(vaddr: VirtualAddress) -> PhysicalAddress {
     //     .expect("virtio virtual address not map!");
     // ppn.start_address().add(offset)
     let pa = PhysicalAddress::from(kernel_va_to_pa(vaddr));
-    let translated_pa = PageTable::from_token(KERNEL_SPACE.lock().token())
-        .translate_va(VirtAddr::from(vaddr))
-        .unwrap()
-        .into();
-    assert_eq!(pa, translated_pa, "virtio_virt_to_phys translation failed");
     pa
 }
 
