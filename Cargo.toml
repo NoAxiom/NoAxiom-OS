@@ -4,6 +4,7 @@ members = ["NoAxiom/kernel"]
 resolver = "2"
 
 [workspace.dependencies]
+log = "0.4"
 arch = { path = "NoAxiom/lib/arch" }
 ksync = { path = "NoAxiom/lib/ksync" }
 console = { path = "NoAxiom/lib/console" }
@@ -13,6 +14,7 @@ fatfs = { path = "NoAxiom/lib/fatfs", default-features = false, features = [
     "log_level_info",
 ] }
 config = { path = "NoAxiom/lib/config" }
+# polyhal = { path = "NoAxiom/lib/polyhal" }
 
 [profile.release]
 debug = true

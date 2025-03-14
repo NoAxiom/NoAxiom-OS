@@ -6,6 +6,7 @@ export TARGET := riscv64gc-unknown-none-elf
 export MODE ?= release
 export BOARD ?= qemu-virt
 export KERNEL ?= kernel
+export ARCH ?= riscv64
 
 export ROOT := $(shell pwd)
 export TARGET_DIR := $(ROOT)/target/$(TARGET)/$(MODE)

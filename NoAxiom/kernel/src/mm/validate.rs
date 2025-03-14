@@ -1,6 +1,6 @@
 use alloc::sync::Arc;
 
-use arch::Exception;
+use arch::TrapType;
 use ksync::mutex::SpinLock;
 
 use super::{address::VirtPageNum, memory_set::MemorySet, pte::PageTableEntry};
@@ -27,7 +27,7 @@ use crate::{
 pub async fn validate(
     memory_set: &Arc<SpinLock<MemorySet>>,
     vpn: VirtPageNum,
-    exception: Option<Exception>,
+    trap_type: Option<TrapType>,
     pte: Option<PageTableEntry>,
 ) -> SysResult<()> {
     if let Some(pte) = pte {
@@ -42,7 +42,7 @@ pub async fn validate(
             );
             memory_set.lock().realloc_cow(vpn, pte);
             Ok(())
-        } else if exception.is_some() && exception.unwrap() == Exception::StorePageFault {
+        } else if trap_type.is_some() && matches!(trap_type.unwrap(), TrapType::StorePageFault(_)) {
             error!(
                 "[memory_validate] store at invalid area, flags: {:?}, tid: {}",
                 flags,

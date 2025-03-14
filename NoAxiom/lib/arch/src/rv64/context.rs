@@ -13,11 +13,14 @@
 //! X10 ~ X17	       a0 ~ a7   用于函数调用，被调用函数需要保存的数据
 //! X18 ~ X27	       s2 ~ s11  用于函数调用，传递参数和返回值
 
-use core::arch::asm;
+use core::{
+    arch::asm,
+    ops::{Index, IndexMut},
+};
 
 use riscv::register::sstatus::SPP;
 
-use crate::ArchTrapContext;
+use crate::{ArchTrapContext, TrapArgs};
 
 pub mod reg_id {
     #![allow(unused)]
@@ -106,30 +109,70 @@ impl Sstatus {
 #[derive(Debug, Clone)]
 pub struct TrapContext {
     /// [0~31]/[0~255]: user registers, saved by caller
-    pub user_reg: [usize; 32],
+    x: [usize; 32],
 
     /// [32]/[256~263]: cpu status
-    pub sstatus: Sstatus,
+    sstatus: Sstatus,
 
     /// [33]/[264~271]: exception pc (va)
-    pub sepc: usize,
+    sepc: usize,
 
     /// [34]/[272~279]: kernel stack top (va)
-    pub kernel_sp: usize,
+    kernel_sp: usize,
 
     /// [35]/[280~287]: kernel return address (va),
     /// returns to this addr when utrap happens,
     /// actually returns to async func
-    pub kernel_ra: usize,
+    kernel_ra: usize,
 
     /// [36~47]/[288~383]: kernel registers (s0 ~ s11), saved by callee
-    pub kernel_reg: [usize; 12],
+    kernel_reg: [usize; 12],
 
     /// [48]/[384~391]: reserved
-    pub kernel_fp: usize,
+    kernel_fp: usize,
 
     /// [49]/[392~399]: tp, aka hartid
-    pub kernel_tp: usize,
+    kernel_tp: usize,
+}
+
+impl Index<TrapArgs> for TrapContext {
+    type Output = usize;
+
+    fn index(&self, index: TrapArgs) -> &Self::Output {
+        match index {
+            TrapArgs::EPC => &self.sepc,
+            TrapArgs::RA => &self.x[reg_id::RA],
+            TrapArgs::SP => &self.x[reg_id::SP],
+            TrapArgs::RES => &self.x[reg_id::A0],
+            TrapArgs::A0 => &self.x[reg_id::A0],
+            TrapArgs::A1 => &self.x[reg_id::A1],
+            TrapArgs::A2 => &self.x[reg_id::A2],
+            TrapArgs::A3 => &self.x[reg_id::A3],
+            TrapArgs::A4 => &self.x[reg_id::A4],
+            TrapArgs::A5 => &self.x[reg_id::A5],
+            TrapArgs::TLS => &self.x[reg_id::TP],
+            TrapArgs::SYSCALL => &self.x[reg_id::A7],
+        }
+    }
+}
+
+impl IndexMut<TrapArgs> for TrapContext {
+    fn index_mut(&mut self, index: TrapArgs) -> &mut Self::Output {
+        match index {
+            TrapArgs::EPC => &mut self.sepc,
+            TrapArgs::RA => &mut self.x[reg_id::RA],
+            TrapArgs::SP => &mut self.x[reg_id::SP],
+            TrapArgs::RES => &mut self.x[reg_id::A0],
+            TrapArgs::A0 => &mut self.x[reg_id::A0],
+            TrapArgs::A1 => &mut self.x[reg_id::A1],
+            TrapArgs::A2 => &mut self.x[reg_id::A2],
+            TrapArgs::A3 => &mut self.x[reg_id::A3],
+            TrapArgs::A4 => &mut self.x[reg_id::A4],
+            TrapArgs::A5 => &mut self.x[reg_id::A5],
+            TrapArgs::TLS => &mut self.x[reg_id::TP],
+            TrapArgs::SYSCALL => &mut self.x[reg_id::A7],
+        }
+    }
 }
 
 impl ArchTrapContext for TrapContext {
@@ -137,7 +180,7 @@ impl ArchTrapContext for TrapContext {
         let mut sstatus = Sstatus::read();
         sstatus.set_spp(SPP::User);
         let mut cx = Self {
-            user_reg: [0; 32],
+            x: [0; 32],
             sstatus,
             sepc: entry,
             kernel_sp: 0,
@@ -146,52 +189,18 @@ impl ArchTrapContext for TrapContext {
             kernel_fp: 0,
             kernel_tp: 0,
         };
-        cx.user_reg[reg_id::SP] = sp;
+        cx.x[reg_id::SP] = sp;
         cx
     }
     fn update_cx(&mut self, entry: usize, sp: usize, argc: usize, argv: usize, envp: usize) {
+        use TrapArgs::*;
         self.sepc = entry;
-        self.set_sp(sp);
-        self.set_reg(reg_id::A0, argc);
-        self.set_reg(reg_id::A1, argv);
-        self.set_reg(reg_id::A2, envp);
+        self[SP] = sp;
+        self[A0] = argc;
+        self[A1] = argv;
+        self[A2] = envp;
         let mut sstatus = Sstatus::read();
         sstatus.set_spp(SPP::User);
         self.sstatus = sstatus;
-    }
-    #[inline(always)]
-    fn set_sp(&mut self, sp: usize) {
-        self.user_reg[reg_id::SP] = sp;
-    }
-    #[inline(always)]
-    fn set_reg(&mut self, id: usize, value: usize) {
-        self.user_reg[id] = value;
-    }
-    #[inline(always)]
-    fn set_result(&mut self, value: usize) {
-        self.user_reg[reg_id::A0] = value;
-    }
-    #[inline(always)]
-    fn set_ra(&mut self, ra: usize) {
-        self.user_reg[reg_id::RA] = ra;
-    }
-    #[inline(always)]
-    fn result_value(&self) -> usize {
-        self.user_reg[reg_id::A0]
-    }
-    #[inline(always)]
-    fn get_syscall_id(&self) -> usize {
-        self.user_reg[reg_id::A7]
-    }
-    #[inline(always)]
-    fn get_syscall_args(&self) -> [usize; 6] {
-        [
-            self.user_reg[reg_id::A0],
-            self.user_reg[reg_id::A1],
-            self.user_reg[reg_id::A2],
-            self.user_reg[reg_id::A3],
-            self.user_reg[reg_id::A4],
-            self.user_reg[reg_id::A5],
-        ]
     }
 }

@@ -56,7 +56,7 @@
     .section  .text.trampoline
     .globl    user_trapvec
     .globl    user_trapret
-    .globl    trap_from_kernel
+    .globl    kernel_trapvec
     .align    2
 
 # user -> kernel
@@ -98,7 +98,7 @@
 # kernel -> kernel
 # only need to save caller-saved regs
 # note that we don't save sepc & stvec here
-    trap_from_kernel:
+    kernel_trapvec:
     addi      sp, sp, -17*8
     sd        ra,  1*8(sp)
     sd        t0,  2*8(sp)

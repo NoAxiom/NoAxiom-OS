@@ -12,26 +12,23 @@
 
 extern crate alloc;
 
-mod virt_arch;
-
 #[cfg(target_arch = "loongarch64")]
 mod la64;
 #[cfg(target_arch = "riscv64")]
 mod rv64;
+mod trap;
+mod varch;
 
-pub use virt_arch::*;
+pub use trap::*;
+pub use varch::*;
 
 #[cfg(target_arch = "loongarch64")]
 pub type Arch = la64::LA64;
 #[cfg(target_arch = "riscv64")]
 pub type Arch = rv64::RV64;
+pub type TrapContext = <Arch as ArchTrap>::TrapContext;
 
-pub type Exception = <Arch as ArchType>::Exception;
-pub type Interrupt = <Arch as ArchType>::Interrupt;
-pub type Trap = <Arch as ArchType>::Trap;
-pub type TrapContext = <Arch as ArchType>::TrapContext;
-
-#[cfg(target_arch = "riscv64")]
-pub use rv64::{_entry, _entry_other_hart};
 #[cfg(target_arch = "loongarch64")]
 pub use la64::{_entry, _entry_other_hart};
+#[cfg(target_arch = "riscv64")]
+pub use rv64::{_entry, _entry_other_hart};

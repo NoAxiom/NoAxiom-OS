@@ -1,7 +1,8 @@
 use core::arch::global_asm;
 
 use riscv::register::{
-    scause, sepc, stval,
+    scause::{self, Exception, Interrupt, Scause, Trap},
+    sepc, stval,
     stvec::{self, TrapMode},
 };
 
@@ -11,14 +12,32 @@ use crate::{
         enable_external_interrupt, enable_global_interrupt, enable_software_interrupt,
         enable_stimer_interrupt,
     },
-    ArchTrap,
+    ArchTrap, TrapType,
 };
 
 global_asm!(include_str!("./trap.S"));
 extern "C" {
     fn user_trapvec();
     fn user_trapret(cx: *mut TrapContext);
-    fn trap_from_kernel();
+    fn kernel_trapvec();
+}
+
+pub fn get_trap_type(scause: Scause, stval: usize) -> TrapType {
+    match scause.cause() {
+        Trap::Exception(Exception::LoadFault) => TrapType::Unknown,
+        Trap::Exception(Exception::UserEnvCall) => TrapType::SysCall,
+        Trap::Interrupt(Interrupt::SupervisorTimer) => TrapType::Timer,
+        Trap::Exception(Exception::StorePageFault) => TrapType::StorePageFault(stval),
+        Trap::Exception(Exception::StoreFault) => TrapType::StorePageFault(stval),
+        Trap::Exception(Exception::InstructionPageFault) => TrapType::InstructionPageFault(stval),
+        Trap::Exception(Exception::IllegalInstruction) => TrapType::IllegalInstruction(stval),
+        Trap::Exception(Exception::LoadPageFault) => TrapType::LoadPageFault(stval),
+        Trap::Interrupt(Interrupt::SupervisorExternal) => TrapType::SupervisorExternal,
+        Trap::Interrupt(Interrupt::SupervisorSoft) => TrapType::SupervisorSoft,
+        _ => {
+            panic!("unknown trap type");
+        }
+    }
 }
 
 #[inline(always)]
@@ -43,22 +62,10 @@ pub fn trap_restore(cx: &mut TrapContext) {
 }
 
 impl ArchTrap for RV64 {
-    #[inline(always)]
-    fn set_trap_entry(addr: usize) {
-        set_trap_entry(addr);
-    }
-    fn read_trap_cause() -> Self::Trap {
-        scause::read().cause()
-    }
-    fn read_trap_value() -> usize {
-        stval::read()
-    }
-    fn read_trap_pc() -> usize {
-        sepc::read()
-    }
+    type TrapContext = super::context::TrapContext;
     /// set trap entry in supervisor mode
     fn set_kernel_trap_entry() {
-        set_trap_entry(trap_from_kernel as usize);
+        set_trap_entry(kernel_trapvec as usize);
     }
     /// set trap entry in user mode
     fn set_user_trap_entry() {
@@ -68,6 +75,14 @@ impl ArchTrap for RV64 {
         trap_init();
     }
     fn trap_restore(cx: &mut TrapContext) {
-        trap_restore(cx);
+        trap_restore(cx)
+    }
+    fn read_epc() -> usize {
+        sepc::read()
+    }
+    fn read_trap_type() -> TrapType {
+        let scause = scause::read();
+        let stval = stval::read();
+        get_trap_type(scause, stval)
     }
 }

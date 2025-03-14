@@ -6,7 +6,7 @@ use core::{
     task::Waker,
 };
 
-use arch::{Arch, ArchMemory, ArchTrapContext, Exception, TrapContext};
+use arch::{Arch, ArchMemory, ArchTrapContext, TrapContext, TrapType};
 use ksync::{
     cell::SyncUnsafeCell,
     mutex::{SpinLock, SpinLockGuard},
@@ -172,12 +172,12 @@ impl Task {
     pub async fn memory_validate(
         self: &Arc<Self>,
         addr: usize,
-        exception: Option<Exception>,
+        trap_type: Option<TrapType>,
     ) -> SysResult<()> {
         trace!("[memory_validate] check at addr: {:#x}", addr);
         let vpn = VirtAddr::from(addr).floor();
         let pt = PageTable::from_token(Arch::current_token());
-        validate(self.memory_set(), vpn, exception, pt.translate_vpn(vpn)).await
+        validate(self.memory_set(), vpn, trap_type, pt.translate_vpn(vpn)).await
     }
 
     /// get pcb
@@ -518,13 +518,6 @@ impl Task {
         self.trap_context_mut()
             .update_cx(elf_entry, user_sp, argc, argv_base, envp_base);
         // debug!("trap_context: {:#x?}", self.trap_context());
-        trace!(
-            "trap_context: tid: {}, A0: {:#x}, A1: {:#x}, A2: {:#x}",
-            self.tid(),
-            self.trap_context().user_reg[10],
-            self.trap_context().user_reg[11],
-            self.trap_context().user_reg[12],
-        );
         // TODO: close fd table, reset sigactions
         Ok(())
     }

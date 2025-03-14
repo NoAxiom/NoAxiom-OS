@@ -496,7 +496,6 @@ dependencies = [
  "plic",
  "rand_core",
  "ringbuffer",
- "riscv",
  "smoltcp",
  "spin 0.7.1",
  "thiserror-core",
