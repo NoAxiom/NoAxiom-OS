@@ -15,7 +15,7 @@ use crate::{
                 filesystem::{FileSystem, FileSystemMeta},
                 superblock::SuperBlockMeta,
             },
-            impls::{disk_cursor::DiskCursor, ext4::disk_cursor::Ext4DiskCursor},
+            impls::disk_cursor::DiskCursor,
         },
     },
     include::fs::MountFlags,
@@ -52,7 +52,6 @@ impl FileSystem for AsyncSmpExt4 {
         let super_block_meta = SuperBlockMeta::new(device.clone(), self.clone());
         let blk = Arc::new(AsyncBlockCache::from(device.unwrap()));
         let disk_cursor = DiskCursor::new(blk.clone(), 0, 0);
-        // let disk_cursor = Ext4DiskCursor::new(Arc::new(Mutex::new(disk_cursor)));
         let unbooted_fs = Arc::new(Mutex::new(IExtFs::open(Arc::new(disk_cursor)).await));
         let fs_super_block = Arc::new(Ext4SuperBlock::new(super_block_meta, unbooted_fs));
 

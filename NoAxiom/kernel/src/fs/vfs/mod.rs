@@ -1,7 +1,7 @@
 use alloc::sync::Arc;
 
 use basic::dentry::Dentry;
-use impls::ext4::filesystem::AsyncSmpExt4;
+use impls::{ext4::filesystem::AsyncSmpExt4, rust_fat32::filesystem::AsyncSmpFat32};
 use ksync::Once;
 
 use crate::{
@@ -12,7 +12,7 @@ pub mod basic;
 mod impls;
 
 // type RealFs = FAT32FIleSystem;
-// type RealFs = AsyncSmpFat32;
+type RealFs2 = AsyncSmpFat32;
 type RealFs = AsyncSmpExt4;
 
 lazy_static::lazy_static! {
@@ -50,15 +50,16 @@ pub async fn fs_init() {
     info!("[vfs] fs initial, register file systems");
     let fs_name = RealFs::name();
     FS_MANAGER.register(Arc::new(RealFs::new(fs_name)));
+    FS_MANAGER.register(Arc::new(RealFs::new(RealFs2::name())));
     // todo: virtual fs support
 
     info!("[vfs] fs initial, mounting the inital real fs: {}", fs_name);
     let device = chosen_device();
     device_test(device.clone()).await;
 
-    impls::ext4::ext4_rs_test(device.clone()).await;
-    debug!("EXT4 test ok!!! will panic!");
-    panic!();
+    // impls::ext4::ext4_rs_test(device.clone()).await;
+    // debug!("EXT4 test ok!!! will panic!");
+    // panic!();
 
     let disk_fs = FS_MANAGER.get(fs_name).unwrap();
     let root = disk_fs

@@ -2,7 +2,6 @@ use alloc::{boxed::Box, sync::Arc};
 
 use async_trait::async_trait;
 use fatfs::{Read, Seek, SeekFrom::Start, Write};
-use ksync::mutex::{check_no_lock, SpinLock};
 use spin::Mutex;
 
 use super::{

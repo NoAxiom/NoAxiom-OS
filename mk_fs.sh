@@ -10,7 +10,7 @@ img_dir="fs_img"
 # 删除旧的 fs 目录和 fs.img 文件
 rm -f fs.img
 
-# 创建新的 fs.img 文件并格式化为 FAT32
+# 创建新的 fs.img 文件并格式化为 FAT32/ext4 文件系统
 dd if=/dev/zero of=fs.img bs=1M count=2048
 mkfs.ext4 fs.img
 

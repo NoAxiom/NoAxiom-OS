@@ -15,7 +15,8 @@ export LOG ?= DEBUG
 
 # choose Custom or Official test samples
 SAMPLE := Official
-MKFS_SH := mk_fat32img.sh
+
+# now is EXT4 fs, you can change to FAT32 in the mk_fs.sh
 
 CHOSEN_PATN := 
 
@@ -47,7 +48,7 @@ KERNEL_SYMBOL_TABLE := $(KERNEL_ELF).txt
 
 TEST_DIR := ./test/riscv-syscalls-testing/user
 FS_IMG := fs.img
-MKFS_SH := ./mk_fat32img.sh
+MKFS_SH := ./mk_fs.sh
 
 export OBJCOPY := rust-objcopy --binary-architecture=riscv64
 

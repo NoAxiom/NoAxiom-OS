@@ -34,6 +34,7 @@ pub const fn fs_err(err: Ext4Error) -> Errno {
     }
 }
 
+#[allow(dead_code, unused_variables)]
 pub async fn ext4_rs_test(device: Arc<dyn BlockDevice>) {
     let blk = Arc::new(AsyncBlockCache::from(device));
     let disk_cursor = DiskCursor::new(blk.clone(), 0, 0);

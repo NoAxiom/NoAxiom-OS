@@ -71,7 +71,10 @@ impl File for Ext4File {
             .downcast_ref::<Ext4SuperBlock>()
             .unwrap()
             .get_fs();
-
+        let size = inode.size();
+        if offset + buf.len() > size {
+            inode.set_size(offset + buf.len());
+        }
         match inode.file_type() {
             InodeMode::FILE => {
                 Ok(ext4.write_at(self.ino, offset, buf).await.map_err(fs_err)? as isize)
@@ -123,6 +126,7 @@ impl File for Ext4Dir {
 
     async fn load_dir(&self) -> Result<(), Errno> {
         debug!("[AsyncSmpExt4]FIle: load_dir");
+        debug!("the file type maybe wrong, don't care");
         let super_block = self.meta.dentry().super_block();
         let ext4 = super_block
             .downcast_ref::<Ext4SuperBlock>()
@@ -172,13 +176,7 @@ impl File for Ext4Dir {
             .unwrap()
             .get_fs();
         let mut inode = ext4.get_inode_ref(self.ino).await;
-        let self_path = self.meta().dentry().path().as_string();
-        let child_path = if self_path != "/" {
-            format!("{}/{}", self_path, name)
-        } else {
-            format!("/{}", name)
-        };
-        ext4.dir_remove_entry(&mut inode, &child_path)
+        ext4.dir_remove_entry(&mut inode, &name)
             .await
             .map_err(fs_err)?;
         Ok(())

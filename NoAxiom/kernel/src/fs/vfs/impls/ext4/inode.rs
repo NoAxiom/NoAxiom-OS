@@ -76,9 +76,6 @@ impl Ext4DirInode {
     pub fn get_inode(&self) -> Arc<Mutex<IExtInode>> {
         self.ino.clone()
     }
-    pub fn into_dyn(self: Arc<Self>) -> Arc<dyn Inode> {
-        self.clone()
-    }
 }
 
 impl Inode for Ext4DirInode {
