@@ -47,6 +47,7 @@ impl DiskCursor {
     ///         |---------------------------------------------------------------------------------------------------------------|
     /// offset  |   BLOCK_SIZE - offset      |
     pub async fn base_read_exact_block_size(&self, offset: usize) -> Vec<u8> {
+        log::trace!("base_read_exact_block_size offset: {}", offset);
         let (blk, blk_id, offset) = (self.blk.clone(), offset / BLOCK_SIZE, offset % BLOCK_SIZE);
 
         const EXT4_RS_BLOCK_SIZE: usize = 4096;
@@ -85,6 +86,7 @@ impl DiskCursor {
                     .copy_from_slice(&data[BLK_NUMS][..BLOCK_SIZE - offset]);
             }
         }
+        log::trace!("base_read_exact_block_size ok");
         res
     }
 
@@ -97,7 +99,7 @@ impl DiskCursor {
     ///         |------------------------------------------------------------|
     /// offset  |   BLOCK_SIZE - offset      |
     pub async fn base_write_exact(&self, offset: usize, buf: &[u8]) {
-        log::debug!(
+        log::trace!(
             "base_write_exact offset: {}, buf.len(): {}",
             offset,
             buf.len()
@@ -107,7 +109,7 @@ impl DiskCursor {
         let ed_offset = offset + buf.len();
         let (ed_blk_id, ed_offset) = (ed_offset / BLOCK_SIZE, ed_offset % BLOCK_SIZE);
 
-        log::debug!(
+        log::trace!(
             "st_blk_id: {}, st_offset: {}, ed_blk_id: {}, ed_offset: {}, buf.len: {}",
             st_blk_id,
             st_offset,
@@ -120,7 +122,7 @@ impl DiskCursor {
             let mut data = *blk.read_sector(st_blk_id).await.data;
             data[st_offset..ed_offset].copy_from_slice(&buf);
             blk.write_sector(st_blk_id, &data).await;
-            log::debug!("base_write_exact_offset ok");
+            log::trace!("base_write_exact_offset ok");
             return;
         }
 
@@ -146,7 +148,7 @@ impl DiskCursor {
             data[..ed_offset].copy_from_slice(&buf[buf.len() - ed_offset..]);
             blk.write_sector(ed_blk_id, &data).await;
         }
-        log::debug!("base_write_exact_offset ok");
+        log::trace!("base_write_exact_offset ok");
     }
 }
 

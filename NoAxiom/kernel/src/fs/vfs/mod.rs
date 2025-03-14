@@ -55,6 +55,11 @@ pub async fn fs_init() {
     info!("[vfs] fs initial, mounting the inital real fs: {}", fs_name);
     let device = chosen_device();
     device_test(device.clone()).await;
+
+    impls::ext4::ext4_rs_test(device.clone()).await;
+    debug!("EXT4 test ok!!! will panic!");
+    panic!();
+
     let disk_fs = FS_MANAGER.get(fs_name).unwrap();
     let root = disk_fs
         .root(None, MountFlags::empty(), "/", Some(device))
