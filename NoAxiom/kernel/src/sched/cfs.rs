@@ -8,10 +8,7 @@ use super::{
     sched_info::SchedInfo,
     vsched::{MulticoreScheduler, ScheduleOrder, Scheduler},
 };
-use crate::{
-    config::sched::{LOAD_BALANCE_LIMIT, LOAD_BALANCE_TICKS},
-    time::gettime::get_time,
-};
+use crate::{config::sched::LOAD_BALANCE_TICKS, time::gettime::get_time};
 
 struct CfsTreeNode<R> {
     pub vruntime: SchedVruntime,

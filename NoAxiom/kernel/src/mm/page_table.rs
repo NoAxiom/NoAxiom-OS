@@ -45,12 +45,22 @@ impl PageTable {
         }
     }
 
-    /// use satp[43:0] to generate a new pagetable,
+    // /// use satp[43:0] to generate a new pagetable,
+    // /// note that the frame won't be saved,
+    // /// so do assure that it's already wrapped in tcb
+    // pub fn from_token(satp: usize) -> Self {
+    //     Self {
+    //         root_ppn: PhysPageNum::from(satp & PPN_MASK),
+    //         frames: Vec::new(),
+    //     }
+    // }
+
+    /// use ppn to generate a new pagetable,
     /// note that the frame won't be saved,
     /// so do assure that it's already wrapped in tcb
-    pub fn from_token(satp: usize) -> Self {
+    pub fn from_ppn(ppn: usize) -> Self {
         Self {
-            root_ppn: PhysPageNum::from(satp & PPN_MASK),
+            root_ppn: PhysPageNum::from(ppn),
             frames: Vec::new(),
         }
     }
@@ -157,18 +167,6 @@ impl PageTable {
         })
     }
 
-    // /// get the token of this page table (WARNING: sv39 only)
-    // /// which will be written into satp
-    // #[inline(always)]
-    // pub const fn token(&self) -> usize {
-    //     8usize << 60 | self.root_ppn.0
-    // }
-    /// get the token of this page table (WARNING: sv39 only)
-    /// which will be written into satp
-    #[inline(always)]
-    pub fn token(&self) -> usize {
-        Arch::get_token_by_ppn(self.root_ppn.0)
-    }
     /// get root ppn
     #[inline(always)]
     pub const fn root_ppn(&self) -> PhysPageNum {
@@ -184,7 +182,7 @@ impl PageTable {
     /// PLEASE make sure context around is mapped into both page tables
     #[inline(always)]
     pub fn memory_activate(&self) {
-        memory_activate_by_token(self.token());
+        Arch::activate(self.root_ppn().0);
     }
 
     /// remap a cow page
@@ -202,8 +200,13 @@ impl PageTable {
     }
 }
 
-pub fn memory_activate_by_token(token: usize) {
-    Arch::update_pagetable(token);
+// pub fn memory_activate_by_token(token: usize) {
+//     Arch::activate(token);
+//     Arch::tlb_flush();
+// }
+
+pub fn memory_activate_by_ppn(root_ppn: usize) {
+    Arch::activate(root_ppn);
     Arch::tlb_flush();
 }
 

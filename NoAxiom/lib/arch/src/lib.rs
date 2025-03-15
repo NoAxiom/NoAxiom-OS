@@ -1,6 +1,7 @@
 #![no_std]
 #![feature(asm_const)]
 #![feature(ascii_char)]
+#![feature(decl_macro)]
 #![feature(let_chains)]
 #![feature(error_in_core)]
 #![feature(negative_impls)]
@@ -12,21 +13,22 @@
 
 extern crate alloc;
 
+mod common;
 #[cfg(target_arch = "loongarch64")]
 mod la64;
 #[cfg(target_arch = "riscv64")]
 mod rv64;
-mod trap;
-mod varch;
+mod utils;
 
-pub use trap::*;
-pub use varch::*;
+pub use common::*;
 
 #[cfg(target_arch = "loongarch64")]
 pub type Arch = la64::LA64;
 #[cfg(target_arch = "riscv64")]
 pub type Arch = rv64::RV64;
 pub type TrapContext = <Arch as ArchTrap>::TrapContext;
+pub type VirtPageTable = <Arch as ArchMemory>::PageTable;
+pub type PageTableEntry = <<Arch as ArchMemory>::PageTable as ArchPageTable>::PageTableEntry;
 
 #[cfg(target_arch = "loongarch64")]
 pub use la64::{_entry, _entry_other_hart};

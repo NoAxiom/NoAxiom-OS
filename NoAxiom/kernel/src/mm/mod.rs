@@ -15,7 +15,7 @@ pub mod validate;
 
 #[inline(always)]
 pub fn hart_mm_init() {
-    unsafe { memory_set::KERNEL_SPACE.lock().memory_activate() };
+    memory_set::KERNEL_SPACE.lock().memory_activate();
 }
 
 /// returns pte flags with multiple flag bits

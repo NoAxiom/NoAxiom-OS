@@ -6,11 +6,11 @@ use ksync::{cell::SyncUnsafeCell, mutex::SpinLock};
 use lazy_static::lazy_static;
 
 use super::{
-    address::PhysAddr,
+    address::{PhysAddr, PhysPageNum},
     frame::{frame_alloc, frame_refcount, FrameTracker},
     map_area::MapArea,
     mmap_manager::MmapManager,
-    page_table::{memory_activate_by_token, PageTable},
+    page_table::{memory_activate_by_ppn, PageTable},
     pte::PageTableEntry,
 };
 use crate::{
@@ -49,11 +49,11 @@ lazy_static! {
 
 /// lazily initialized kernel space token
 /// please assure it's initialized before any user space token
-pub static mut KERNEL_SPACE_TOKEN: usize = 0;
+pub static mut KERNEL_SPACE_ROOT_PPN: usize = 0;
 // pub static KERNEL_SPACE_TOKEN: AtomicUsize = AtomicUsize::new(0);
 
 pub fn kernel_space_activate() {
-    Arch::update_pagetable(unsafe { KERNEL_SPACE_TOKEN });
+    Arch::activate(unsafe { KERNEL_SPACE_ROOT_PPN });
     // Arch::update_pagetable(KERNEL_SPACE_TOKEN.load(Ordering::SeqCst));
     Arch::tlb_flush();
 }
@@ -89,18 +89,18 @@ pub struct MemorySet {
 }
 
 pub struct MemorySpace {
-    pub token: SyncUnsafeCell<usize>,
+    pub root_ppn: SyncUnsafeCell<usize>,
     pub memory_set: Arc<SpinLock<MemorySet>>,
 }
 impl MemorySpace {
-    pub fn token(&self) -> usize {
-        *self.token.ref_mut()
+    pub fn root_ppn(&self) -> usize {
+        *self.root_ppn.ref_mut()
     }
-    pub fn change_token(&self, token: usize) {
-        *self.token.ref_mut() = token;
+    pub fn change_root_ppn(&self, root_ppn: usize) {
+        *self.root_ppn.ref_mut() = root_ppn;
     }
     pub fn memory_activate(&self) {
-        memory_activate_by_token(self.token());
+        memory_activate_by_ppn(self.root_ppn());
     }
 }
 
@@ -128,9 +128,13 @@ impl MemorySet {
         unsafe { &mut (*self.page_table.get()) }
     }
 
-    /// get token, which will be written into satp
-    pub fn token(&self) -> usize {
-        self.page_table().token()
+    // /// get token, which will be written into satp
+    // pub fn token(&self) -> usize {
+    //     self.page_table().token()
+    // }
+
+    pub fn root_ppn(&self) -> PhysPageNum {
+        self.page_table().root_ppn()
     }
 
     /// switch into this memory set
@@ -213,7 +217,7 @@ impl MemorySet {
             ekernel as usize, KERNEL_VIRT_MEMORY_END as usize
         );
         unsafe {
-            KERNEL_SPACE_TOKEN = memory_set.token();
+            KERNEL_SPACE_ROOT_PPN = memory_set.root_ppn().0;
             // KERNEL_SPACE_TOKEN.store(memory_set.token(), Ordering::SeqCst);
             fence(Ordering::SeqCst);
         }
@@ -447,8 +451,8 @@ impl MemorySet {
         }
         new_set.user_brk_area = new_area;
 
-        let token = new_set.token();
-        (new_set, token)
+        let root_ppn = new_set.root_ppn();
+        (new_set, root_ppn.0)
     }
 
     pub fn lazy_alloc_stack(&mut self, vpn: VirtPageNum) {

@@ -5,6 +5,7 @@ resolver = "2"
 
 [workspace.dependencies]
 log = "0.4"
+bitflags = "2.6.0"
 arch = { path = "NoAxiom/lib/arch" }
 ksync = { path = "NoAxiom/lib/ksync" }
 console = { path = "NoAxiom/lib/console" }

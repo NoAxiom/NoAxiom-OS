@@ -4,8 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-# log = { workspace = true }
+log = { workspace = true }
 config = { workspace = true }
+bitflags = { workspace = true }
 
 [target.'cfg(target_arch = "riscv64")'.dependencies]
 riscv = { version = "0.11" }

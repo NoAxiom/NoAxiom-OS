@@ -165,7 +165,7 @@ impl Task {
     pub fn change_memory_set(&self, memory_set: MemorySet) {
         // unsafe { (*self.memory_set.get()) = Arc::new(SpinLock::new(memory_set)) };
         let mut ms = self.memory_set().lock();
-        self.memory_space.change_token(memory_set.token());
+        self.memory_space.change_root_ppn(memory_set.root_ppn().0);
         *ms = memory_set;
     }
 
@@ -176,7 +176,7 @@ impl Task {
     ) -> SysResult<()> {
         trace!("[memory_validate] check at addr: {:#x}", addr);
         let vpn = VirtAddr::from(addr).floor();
-        let pt = PageTable::from_token(Arch::current_token());
+        let pt = PageTable::from_ppn(Arch::current_root_ppn());
         validate(self.memory_set(), vpn, trap_type, pt.translate_vpn(vpn)).await
     }
 
@@ -262,7 +262,7 @@ impl Task {
                 wait_req: false,
             })),
             memory_space: MemorySpace {
-                token: SyncUnsafeCell::new(memory_set.token()),
+                root_ppn: SyncUnsafeCell::new(memory_set.root_ppn().0),
                 memory_set: Arc::new(SpinLock::new(memory_set)),
             },
             trap_cx: SyncUnsafeCell::new(TrapContext::app_init_cx(elf_entry, user_sp)),
@@ -411,14 +411,14 @@ impl Task {
 
     /// fork
     pub fn fork(self: &Arc<Task>, flags: CloneFlags) -> Arc<Self> {
-        let (memory_set, token) = if flags.contains(CloneFlags::VM) {
+        let (memory_set, root_ppn) = if flags.contains(CloneFlags::VM) {
             (
                 self.memory_set().clone(),
-                SyncUnsafeCell::new(self.memory_space.token()),
+                SyncUnsafeCell::new(self.memory_space.root_ppn()),
             )
         } else {
-            let (ms, token) = self.memory_set().lock().clone_cow();
-            (Arc::new(SpinLock::new(ms)), SyncUnsafeCell::new(token))
+            let (ms, root_ppn) = self.memory_set().lock().clone_cow();
+            (Arc::new(SpinLock::new(ms)), SyncUnsafeCell::new(root_ppn))
         };
 
         // TODO: CloneFlags::SIGHAND
@@ -448,7 +448,10 @@ impl Task {
                 pgid: self.pgid.clone(),
                 thread_group: self.thread_group.clone(),
                 pcb: self.pcb.clone(),
-                memory_space: MemorySpace { token, memory_set },
+                memory_space: MemorySpace {
+                    root_ppn,
+                    memory_set,
+                },
                 trap_cx: SyncUnsafeCell::new(self.trap_context().clone()),
                 status: AtomicTaskStatus::new(TaskStatus::Suspended),
                 exit_code: AtomicI32::new(0),
@@ -479,7 +482,10 @@ impl Task {
                     parent: Some(Arc::downgrade(self)),
                     wait_req: false,
                 })),
-                memory_space: MemorySpace { memory_set, token },
+                memory_space: MemorySpace {
+                    memory_set,
+                    root_ppn,
+                },
                 trap_cx: SyncUnsafeCell::new(self.trap_context().clone()),
                 status: AtomicTaskStatus::new(TaskStatus::Suspended),
                 exit_code: AtomicI32::new(0),

@@ -48,7 +48,9 @@ dependencies = [
 name = "arch"
 version = "0.1.0"
 dependencies = [
+ "bitflags 2.6.0",
  "config",
+ "log",
  "loongArch64",
  "riscv",
  "sbi-rt",
