@@ -44,7 +44,9 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
 
         // normally we set the task to runnable status
         // fixme: this might cause bugs since we are not in any lock's protection
-        let _ = task.cmp_xchg_status(TaskStatus::Runnable, TaskStatus::Suspended);
+        if task.status() == TaskStatus::Running {
+            task.set_status(TaskStatus::Suspended);
+        }
 
         // clear current task
         // note that task status will be set in other place

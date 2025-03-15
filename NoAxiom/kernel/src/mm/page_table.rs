@@ -78,7 +78,11 @@ impl PageTable {
 
     /// insert new pte into the page table trie
     fn create_pte(&mut self, vpn: VirtPageNum) -> &mut PageTableEntry {
-        trace!("insert: vpn = {:#x}, root = {:#x}", vpn.0, Arch::current_root_ppn());
+        trace!(
+            "insert: vpn = {:#x}, root = {:#x}",
+            vpn.0,
+            Arch::current_root_ppn()
+        );
         let index = vpn.get_index();
         let mut ppn = self.root_ppn;
         let mut result: Option<&mut PageTableEntry> = None;
@@ -116,7 +120,10 @@ impl PageTable {
         );
         trace!(
             "mapping: vpn: {:#x?}, ppn: {:#x?}, flags: {:?}, pte_addr: {:#x}",
-            vpn, ppn, flags, pte as *mut PageTableEntry as usize
+            vpn,
+            ppn,
+            flags,
+            pte as *mut PageTableEntry as usize
         );
         *pte = PageTableEntry::new(ppn.0, flags | pte_flags!(V, D, A));
 
@@ -204,11 +211,6 @@ impl PageTable {
             .copy_from_slice(old_ppn.get_bytes_array());
     }
 }
-
-// pub fn memory_activate_by_token(token: usize) {
-//     Arch::activate(token);
-//     Arch::tlb_flush();
-// }
 
 pub fn memory_activate_by_ppn(root_ppn: usize) {
     Arch::activate(root_ppn);

@@ -15,7 +15,7 @@ use ksync::{
 use super::{
     manager::ThreadGroup,
     process_info::ProcessInfo,
-    status::{AtomicTaskStatus, TaskStatus},
+    status::TaskStatus,
     taskid::{TidTracer, TGID, TID},
 };
 use crate::{
@@ -72,7 +72,7 @@ pub struct Task {
     trap_cx: SyncUnsafeCell<TrapContext>,
 
     /// [th] task status: ready / running / zombie
-    status: AtomicTaskStatus,
+    status: SyncUnsafeCell<TaskStatus>,
 
     /// [th] schedule entity for schedule
     pub sched_entity: SchedEntity,
@@ -115,26 +115,11 @@ impl Task {
     /// status
     #[inline(always)]
     pub fn status(&self) -> TaskStatus {
-        self.status.load(Ordering::SeqCst)
+        *self.status.ref_mut()
     }
     #[inline(always)]
     pub fn set_status(&self, status: TaskStatus) {
-        self.status.store(status, Ordering::SeqCst);
-    }
-    #[inline(always)]
-    pub fn swap_status(&self, new_status: TaskStatus) -> TaskStatus {
-        self.status.swap(new_status, Ordering::SeqCst)
-    }
-    #[inline(always)]
-    pub fn cmp_xchg_status(&self, expected_status: TaskStatus, new_status: TaskStatus) -> bool {
-        self.status
-            .compare_exchange(
-                expected_status,
-                new_status,
-                Ordering::SeqCst,
-                Ordering::SeqCst,
-            )
-            .is_ok()
+        *self.status.ref_mut() = status;
     }
     #[inline(always)]
     pub fn is_stopped(&self) -> bool {
@@ -159,7 +144,7 @@ impl Task {
     }
     #[inline(always)]
     pub fn memory_activate(&self) {
-        self.memory_space.memory_set.lock().memory_activate(); // .memory_activate();
+        self.memory_space.memory_activate();
     }
     /// change current memory set
     pub fn change_memory_set(&self, memory_set: MemorySet) {
@@ -266,7 +251,7 @@ impl Task {
                 memory_set: Arc::new(SpinLock::new(memory_set)),
             },
             trap_cx: SyncUnsafeCell::new(TrapContext::app_init_cx(elf_entry, user_sp)),
-            status: AtomicTaskStatus::new(TaskStatus::Suspended),
+            status: SyncUnsafeCell::new(TaskStatus::Suspended),
             exit_code: AtomicI32::new(0),
             sched_entity: SchedEntity::new_bare(INIT_PROCESS_ID),
             fd_table: Arc::new(SpinLock::new(FdTable::new())),
@@ -453,7 +438,7 @@ impl Task {
                     memory_set,
                 },
                 trap_cx: SyncUnsafeCell::new(self.trap_context().clone()),
-                status: AtomicTaskStatus::new(TaskStatus::Suspended),
+                status: SyncUnsafeCell::new(TaskStatus::Suspended),
                 exit_code: AtomicI32::new(0),
                 sched_entity: self.sched_entity.data_clone(tid_val),
                 fd_table,
@@ -487,7 +472,7 @@ impl Task {
                     root_ppn,
                 },
                 trap_cx: SyncUnsafeCell::new(self.trap_context().clone()),
-                status: AtomicTaskStatus::new(TaskStatus::Suspended),
+                status: SyncUnsafeCell::new(TaskStatus::Suspended),
                 exit_code: AtomicI32::new(0),
                 sched_entity: self.sched_entity.data_clone(tid_val),
                 fd_table,
@@ -516,7 +501,7 @@ impl Task {
             mut auxs,
         } = MemorySet::load_from_path(path).await;
         self.delete_children();
-        unsafe { memory_set.memory_activate() };
+        memory_set.memory_activate();
         self.change_memory_set(memory_set);
         trace!("init usatck");
         let (user_sp, argc, argv_base, envp_base) =

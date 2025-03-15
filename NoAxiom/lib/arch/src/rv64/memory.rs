@@ -166,6 +166,6 @@ impl ArchMemory for RV64 {
     }
     #[inline(always)]
     fn activate(ppn: usize) {
-        satp::write(8usize << 60 | ppn)
+        satp::write(8usize << 60 | ppn);
     }
 }
