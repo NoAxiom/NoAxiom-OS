@@ -1,9 +1,9 @@
 use alloc::sync::Arc;
 
-use arch::TrapType;
+use arch::{ArchPageTableEntry, MappingFlags, PageTableEntry, TrapType};
 use ksync::mutex::SpinLock;
 
-use super::{address::VirtPageNum, memory_set::MemorySet, pte::PageTableEntry};
+use super::{address::VirtPageNum, memory_set::MemorySet};
 use crate::{
     cpu::current_cpu, include::result::Errno, mm::mmap_manager::lazy_alloc_mmap, syscall::SysResult,
 };
@@ -32,7 +32,7 @@ pub async fn validate(
 ) -> SysResult<()> {
     if let Some(pte) = pte {
         let flags = pte.flags();
-        if flags.is_cow() {
+        if flags.contains(MappingFlags::COW) {
             trace!(
                 "[memory_validate] realloc COW at vpn: {:#x}, pte: {:#x}, flags: {:?}, tid: {}",
                 vpn.0,

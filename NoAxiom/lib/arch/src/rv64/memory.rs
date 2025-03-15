@@ -4,39 +4,80 @@ use bitflags::bitflags;
 use riscv::{asm::sfence_vma_all, register::satp};
 
 use super::RV64;
-use crate::{utils::macros::bit, ArchMemory, ArchPTE, ArchPageTable, MappingFlags};
+use crate::{utils::macros::bit, ArchMemory, ArchPageTable, ArchPageTableEntry, MappingFlags};
 
 mod sv39 {
+    use config::mm::PAGE_WIDTH;
+
     /// physical address width
     pub const PA_WIDTH: usize = 56;
     /// virtual address width
     pub const VA_WIDTH: usize = 39;
     /// index level number of sv39
     pub const INDEX_LEVELS: usize = 3;
+
+    /// physical page number width
+    pub const PPN_WIDTH: usize = PA_WIDTH - PAGE_WIDTH; // 44
+    /// ppn mask
+    pub const PPN_MASK: usize = (1 << PPN_WIDTH) - 1;
+    /// virtual page number width
+    pub const VPN_WIDTH: usize = VA_WIDTH - PAGE_WIDTH; // 27
+
+    /// raw vpn & ppn width of sv39
+    pub const PAGE_NUM_WIDTH: usize = VPN_WIDTH / INDEX_LEVELS; // 9
+    /// page table entry per page
+    pub const PTE_PER_PAGE: usize = 1 << PAGE_NUM_WIDTH; // 512
 }
+use sv39::*;
 
 pub struct PageTable {
     root_ppn: usize,
 }
 
+#[repr(C)]
 #[derive(Clone, Copy)]
-pub struct PageTableEntry {
-    inner: usize,
-}
+pub struct PageTableEntry(pub usize);
+
 impl Into<usize> for PageTableEntry {
     fn into(self) -> usize {
-        self.inner
+        self.0
     }
 }
 impl From<usize> for PageTableEntry {
     fn from(value: usize) -> Self {
-        Self { inner: value }
+        Self(value)
     }
 }
-impl ArchPTE for PageTableEntry {}
+
+const PTE_WIDTH: usize = 10;
+impl ArchPageTableEntry for PageTableEntry {
+    /// create a new page table entry from ppn and flags
+    fn new(ppn: usize, flags: MappingFlags) -> Self {
+        let flags = PTEFlags::from(flags);
+        Self((ppn << PTE_WIDTH) | flags.bits() as usize)
+    }
+    /// get the physical page number
+    fn ppn(&self) -> usize {
+        (self.0 >> PTE_WIDTH) & ((1usize << PPN_WIDTH) - 1)
+    }
+    /// get the pte permission flags
+    fn flags(&self) -> MappingFlags {
+        PTEFlags::from_bits((self.0 & ((1 << PTE_WIDTH) - 1)) as u64)
+            .unwrap()
+            .into()
+    }
+    /// set flags
+    fn set_flags(&mut self, flags: MappingFlags) {
+        let flags = PTEFlags::from(flags);
+        self.0 = (self.0 & !((1 << PTE_WIDTH) - 1)) | (flags.bits() as usize);
+    }
+    /// clear all data
+    fn reset(&mut self) {
+        self.0 = 0;
+    }
+}
 
 impl ArchPageTable for PageTable {
-    type PTEFlags = PTEFlags;
     type PageTableEntry = PageTableEntry;
     const PA_WIDTH: usize = sv39::PA_WIDTH;
     const VA_WIDTH: usize = sv39::VA_WIDTH;
@@ -77,19 +118,17 @@ impl From<MappingFlags> for PTEFlags {
         if flags.is_empty() {
             Self::empty()
         } else {
-            let mut res = Self::V;
-            if flags.contains(MappingFlags::R) {
-                res |= PTEFlags::R | PTEFlags::A;
+            let mut res = Self::empty();
+            macro_rules! set {
+                ($($flag:ident),*) => {
+                    $(
+                        if flags.contains(MappingFlags::$flag) {
+                            res |= PTEFlags::$flag;
+                        }
+                    )*
+                };
             }
-            if flags.contains(MappingFlags::W) {
-                res |= PTEFlags::W | PTEFlags::D;
-            }
-            if flags.contains(MappingFlags::X) {
-                res |= PTEFlags::X;
-            }
-            if flags.contains(MappingFlags::U) {
-                res |= PTEFlags::U;
-            }
+            set!(V, R, W, X, U, G, A, D, COW);
             res
         }
     }
@@ -98,31 +137,16 @@ impl From<MappingFlags> for PTEFlags {
 impl From<PTEFlags> for MappingFlags {
     fn from(value: PTEFlags) -> Self {
         let mut mapping_flags = MappingFlags::empty();
-        if value.contains(PTEFlags::V) {
-            mapping_flags |= MappingFlags::P;
+        macro_rules! set {
+            ($($flag:ident),*) => {
+                $(
+                    if value.contains(PTEFlags::$flag) {
+                        mapping_flags |= MappingFlags::$flag;
+                    }
+                )*
+            };
         }
-        if value.contains(PTEFlags::R) {
-            mapping_flags |= MappingFlags::R;
-        }
-        if value.contains(PTEFlags::W) {
-            mapping_flags |= MappingFlags::W;
-        }
-        if value.contains(PTEFlags::X) {
-            mapping_flags |= MappingFlags::X;
-        }
-        if value.contains(PTEFlags::U) {
-            mapping_flags |= MappingFlags::U;
-        }
-        // fixme: G???
-        if value.contains(PTEFlags::A) {
-            mapping_flags |= MappingFlags::A;
-        }
-        if value.contains(PTEFlags::D) {
-            mapping_flags |= MappingFlags::D;
-        }
-        if value.contains(PTEFlags::COW) {
-            mapping_flags |= MappingFlags::COW;
-        }
+        set!(V, R, W, X, U, G, A, D, COW);
         mapping_flags
     }
 }

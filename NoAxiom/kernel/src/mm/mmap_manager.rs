@@ -1,13 +1,13 @@
 use alloc::{collections::btree_map::BTreeMap, sync::Arc, vec::Vec};
 use core::task::Waker;
 
+use arch::MappingFlags;
 use ksync::mutex::{SpinLock, SpinLockGuard};
 
 use super::{
     address::{VirtAddr, VirtPageNum, VpnRange},
     frame::{frame_alloc, FrameTracker},
     memory_set::MemorySet,
-    pte::PTEFlags,
 };
 use crate::{
     config::mm::{MMAP_BASE_ADDR, PAGE_SIZE},
@@ -151,7 +151,7 @@ pub async fn lazy_alloc_mmap<'a>(
     match mmap_page {
         Some(mut mmap_page) => {
             drop(guard);
-            let pte_flags: PTEFlags = PTEFlags::from(mmap_page.prot) | PTEFlags::U;
+            let pte_flags: MappingFlags = MappingFlags::from(mmap_page.prot) | MappingFlags::U;
             mmap_page.lazy_map_page(kernel_vpn).await?;
             let mut ms = memory_set.lock();
             ms.page_table().map(vpn, ppn, pte_flags);

@@ -2,32 +2,23 @@ use bitflags::bitflags;
 
 use crate::utils::macros::bit;
 
+// VURWXADG Device Cache Cow
 bitflags! {
     /// Mapping flags for page table.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct MappingFlags: u64 {
-        /// Persent
-        const P = bit!(0);
-        /// User Accessable Flag
-        const U = bit!(1);
-        /// Readable Flag
-        const R = bit!(2);
-        /// Writeable Flag
-        const W = bit!(3);
-        /// Executeable Flag
-        const X = bit!(4);
-        /// Accessed Flag
-        const A = bit!(5);
-        /// Dirty Flag, indicating that the page was written
-        const D = bit!(6);
-        /// Global Flag
-        const G = bit!(7);
-        /// Device Flag, indicating that the page was used for device memory
-        const Device = bit!(8);
-        /// Cache Flag, indicating that the page will be cached
-        const Cache = bit!(9);
-        /// Copy on write flag
-        const COW = bit!(10);
+        const V = bit!(0);
+        const R = bit!(1);
+        const W = bit!(2);
+        const X = bit!(3);
+        const U = bit!(4);
+        const G = bit!(5);
+        const A = bit!(6);
+        const D = bit!(7);
+        const COW = bit!(8);
+
+        const Device = bit!(9);
+        const Cache = bit!(10);
 
         /// Read | Write | Executeable Flags
         const RWX = Self::R.bits() | Self::W.bits() | Self::X.bits();

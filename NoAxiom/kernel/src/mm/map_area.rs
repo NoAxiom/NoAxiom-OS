@@ -2,16 +2,19 @@
 
 use alloc::{collections::btree_map::BTreeMap, sync::Arc};
 
-use arch::{Arch, ArchMemory};
+use arch::{Arch, ArchMemory, ArchPageTableEntry};
 
 use super::{
     address::{VirtAddr, VirtPageNum, VpnRange},
     frame::{frame_alloc, FrameTracker},
     page_table::PageTable,
     permission::{MapPermission, MapType},
-    pte::PTEFlags,
 };
-use crate::{config::mm::PAGE_SIZE, fs::vfs::basic::file::File, mm::address::StepOne};
+use crate::{
+    config::mm::PAGE_SIZE,
+    fs::vfs::basic::file::File,
+    mm::address::{PhysPageNum, StepOne},
+};
 
 #[allow(unused)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -117,14 +120,14 @@ impl MapArea {
                     panic!("vm area overlap");
                 }
                 self.frame_map.insert(vpn, frame);
-                let flags = PTEFlags::from_bits(self.map_permission.bits()).unwrap();
+                let flags = self.map_permission.into();
                 page_table.map(vpn, ppn, flags);
                 assert!(page_table.find_pte(vpn).is_some());
             }
             // direct: kernel space
             MapType::Direct => {
                 let ppn = vpn.kernel_translate_into_ppn();
-                let flags = PTEFlags::from_bits(self.map_permission.bits()).unwrap();
+                let flags = self.map_permission.into();
                 page_table.map(vpn, ppn, flags);
             }
         }
@@ -161,9 +164,16 @@ impl MapArea {
     pub fn change_end_vpn(&mut self, new_end_vpn: VirtPageNum, page_table: &mut PageTable) {
         let old_end_vpn = self.vpn_range.end();
         self.vpn_range = VpnRange::new(self.vpn_range.start(), new_end_vpn);
-        trace!("[change_end_vpn]: old: {:#x}, new: {:#x}", old_end_vpn.0, new_end_vpn.0);
+        trace!(
+            "[change_end_vpn]: old: {:#x}, new: {:#x}",
+            old_end_vpn.0,
+            new_end_vpn.0
+        );
         if new_end_vpn < old_end_vpn {
-            debug!("[change_end_vpn] remove pages in [{:#x}, {:#x})", new_end_vpn.0, old_end_vpn.0);
+            debug!(
+                "[change_end_vpn] remove pages in [{:#x}, {:#x})",
+                new_end_vpn.0, old_end_vpn.0
+            );
             for vpn in VpnRange::new(new_end_vpn, old_end_vpn).into_iter() {
                 self.frame_map.remove(&vpn);
                 self.unmap_one(vpn, page_table);
@@ -182,11 +192,8 @@ impl MapArea {
         let len = data.len();
         loop {
             let src = &data[start..len.min(start + PAGE_SIZE)];
-            let dst = &mut page_table
-                .translate_vpn(current_vpn)
-                .unwrap()
-                .ppn()
-                .get_bytes_array()[..src.len()];
+            let ppn = PhysPageNum::from(page_table.translate_vpn(current_vpn).unwrap().ppn());
+            let dst = &mut ppn.get_bytes_array()[..src.len()];
             dst.copy_from_slice(src);
             start += PAGE_SIZE;
             if start >= len {

@@ -1,7 +1,7 @@
 use alloc::{sync::Arc, vec::Vec};
 use core::sync::atomic::{fence, Ordering};
 
-use arch::{Arch, ArchMemory};
+use arch::{Arch, ArchMemory, ArchPageTableEntry, MappingFlags, PageTableEntry};
 use ksync::{cell::SyncUnsafeCell, mutex::SpinLock};
 use lazy_static::lazy_static;
 
@@ -10,8 +10,7 @@ use super::{
     frame::{frame_alloc, frame_refcount, FrameTracker},
     map_area::MapArea,
     mmap_manager::MmapManager,
-    page_table::{memory_activate_by_ppn, PageTable},
-    pte::PageTableEntry,
+    page_table::{flags_switch_to_rw, memory_activate_by_ppn, PageTable},
 };
 use crate::{
     config::mm::{
@@ -23,9 +22,7 @@ use crate::{
     include::process::auxv::*,
     map_permission,
     mm::{
-        address::{VirtAddr, VirtPageNum},
-        map_area::MapAreaType,
-        permission::MapType,
+        address::{VirtAddr, VirtPageNum}, map_area::MapAreaType, page_table::flags_switch_to_cow, permission::MapType
     },
 };
 
@@ -53,6 +50,7 @@ pub static mut KERNEL_SPACE_ROOT_PPN: usize = 0;
 // pub static KERNEL_SPACE_TOKEN: AtomicUsize = AtomicUsize::new(0);
 
 pub fn kernel_space_activate() {
+    // debug!("KERNEL_SPACE_ROOT_PPN: {}", unsafe { KERNEL_SPACE_ROOT_PPN });
     Arch::activate(unsafe { KERNEL_SPACE_ROOT_PPN });
     // Arch::update_pagetable(KERNEL_SPACE_TOKEN.load(Ordering::SeqCst));
     Arch::tlb_flush();
@@ -388,13 +386,13 @@ impl MemorySet {
                          frame_tracker: &FrameTracker| {
             let old_pte = self.page_table().translate_vpn(vpn).unwrap();
             let old_flags = old_pte.flags();
-            if !old_flags.is_writable() {
-                new_set.page_table().map(vpn, old_pte.ppn(), old_flags);
+            if !old_flags.contains(MappingFlags::W) {
+                new_set.page_table().map(vpn, old_pte.ppn().into(), old_flags);
                 new_area.frame_map.insert(vpn, frame_tracker.clone());
             } else {
-                let new_flags = old_flags.switch_to_cow();
+                let new_flags = flags_switch_to_cow(&old_flags);
                 self.page_table().set_flags(vpn, new_flags);
-                new_set.page_table().map(vpn, old_pte.ppn(), new_flags);
+                new_set.page_table().map(vpn, old_pte.ppn().into(), new_flags);
                 new_area.frame_map.insert(vpn, frame_tracker.clone());
                 trace!("remap_cow: vpn = {:#x}, new_flags = {:?}", vpn.0, new_flags);
             }
@@ -474,9 +472,9 @@ impl MemorySet {
     }
 
     pub fn realloc_cow(&mut self, vpn: VirtPageNum, pte: PageTableEntry) {
-        let old_ppn = pte.ppn();
+        let old_ppn = PhysPageNum::from(pte.ppn());
         let old_flags = pte.flags();
-        let new_flags = old_flags.switch_to_rw();
+        let new_flags = flags_switch_to_rw(&old_flags);
         if frame_refcount(old_ppn) == 1 {
             trace!("refcount == 1, set flags to RW");
             self.page_table().set_flags(vpn, new_flags);

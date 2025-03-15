@@ -9,7 +9,6 @@ pub mod memory_set;
 pub mod mmap_manager;
 pub mod page_table;
 pub mod permission;
-pub mod pte;
 pub mod user_ptr;
 pub mod validate;
 
@@ -23,8 +22,8 @@ pub fn hart_mm_init() {
 macro_rules! pte_flags {
     ($($flag:ident),*) => {
         {
-            let mut flags = crate::mm::pte::PTEFlags::empty();
-            $(flags |= crate::mm::pte::PTEFlags::$flag;)*
+            let mut flags = arch::MappingFlags::empty();
+            $(flags |= arch::MappingFlags::$flag;)*
             flags
         }
     };

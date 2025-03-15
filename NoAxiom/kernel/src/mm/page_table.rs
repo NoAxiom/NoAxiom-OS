@@ -1,16 +1,14 @@
 //! page table under sv39
 
 use alloc::vec::Vec;
-use core::arch::asm;
 
-use arch::{Arch, ArchMemory};
+use arch::{Arch, ArchMemory, ArchPageTableEntry, MappingFlags, PageTableEntry};
 
 use super::{
     address::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum},
     frame::{frame_alloc, FrameTracker},
-    pte::{PTEFlags, PageTableEntry},
 };
-use crate::{config::mm::PPN_MASK, pte_flags};
+use crate::pte_flags;
 
 #[derive(Debug)]
 pub struct PageTable {
@@ -80,22 +78,24 @@ impl PageTable {
 
     /// insert new pte into the page table trie
     fn create_pte(&mut self, vpn: VirtPageNum) -> &mut PageTableEntry {
-        // debug!("insert: vpn = {:#x}", vpn.0);
+        trace!("insert: vpn = {:#x}, root = {:#x}", vpn.0, Arch::current_root_ppn());
         let index = vpn.get_index();
         let mut ppn = self.root_ppn;
         let mut result: Option<&mut PageTableEntry> = None;
         for (i, idx) in index.iter().enumerate() {
-            let pte = &mut ppn.get_pte_array()[*idx];
+            let arr = ppn.get_pte_array();
+            let pte = &mut arr[*idx];
             if i == 2 {
                 result = Some(pte);
                 break;
             }
-            if !pte.flags().is_valid() {
+            trace!("pte addr: {:#x}", pte as *mut PageTableEntry as usize);
+            if !pte.flags().contains(MappingFlags::V) {
                 let frame = frame_alloc();
-                *pte = PageTableEntry::new(frame.ppn(), pte_flags!(V));
+                *pte = PageTableEntry::new(frame.ppn().0, pte_flags!(V));
                 self.frames.push(frame);
             }
-            ppn = pte.ppn();
+            ppn = PhysPageNum::from(pte.ppn());
         }
         result.unwrap()
     }
@@ -107,14 +107,18 @@ impl PageTable {
     }
 
     /// map vpn -> ppn
-    pub fn map(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: PTEFlags) {
+    pub fn map(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: MappingFlags) {
         let pte = self.create_pte(vpn);
         assert!(
-            !pte.flags().is_valid(),
+            !pte.flags().contains(MappingFlags::V),
             "{:?} is mapped before mapping",
             vpn
         );
-        *pte = PageTableEntry::new(ppn, flags | pte_flags!(V, D, A));
+        trace!(
+            "mapping: vpn: {:#x?}, ppn: {:#x?}, flags: {:?}, pte_addr: {:#x}",
+            vpn, ppn, flags, pte as *mut PageTableEntry as usize
+        );
+        *pte = PageTableEntry::new(ppn.0, flags | pte_flags!(V, D, A));
 
         // let find_res = self.find_pte(vpn).unwrap();
         // assert!(
@@ -128,7 +132,7 @@ impl PageTable {
     /// unmap a vpn
     pub fn unmap(&mut self, vpn: VirtPageNum) {
         let pte = self.find_pte(vpn).unwrap();
-        if !pte.flags().is_valid() {
+        if !pte.flags().contains(MappingFlags::V) {
             error!("{:?} is invalid before unmapping", vpn);
         }
         pte.reset();
@@ -160,8 +164,8 @@ impl PageTable {
             let offset = va.offset();
             let aligned_pa_usize: usize = aligned_pa.into();
             info!(
-                "translate_va_debug: va: {:#x}, pa: {:#x}, offset: {:#x}, pte: {:#x?}",
-                va.0, aligned_pa_usize, offset, pte
+                "translate_va_debug: va: {:#x}, pa: {:#x}, offset: {:#x}",
+                va.0, aligned_pa_usize, offset
             );
             (aligned_pa_usize + offset).into()
         })
@@ -174,7 +178,7 @@ impl PageTable {
     }
 
     /// set flags for a vpn
-    pub fn set_flags(&mut self, vpn: VirtPageNum, flags: PTEFlags) {
+    pub fn set_flags(&mut self, vpn: VirtPageNum, flags: MappingFlags) {
         self.create_pte(vpn).set_flags(flags);
     }
 
@@ -183,6 +187,7 @@ impl PageTable {
     #[inline(always)]
     pub fn memory_activate(&self) {
         Arch::activate(self.root_ppn().0);
+        Arch::tlb_flush();
     }
 
     /// remap a cow page
@@ -191,10 +196,10 @@ impl PageTable {
         vpn: VirtPageNum,
         ppn: PhysPageNum,
         old_ppn: PhysPageNum,
-        new_flags: PTEFlags,
+        new_flags: MappingFlags,
     ) {
         let pte = self.create_pte(vpn);
-        *pte = PageTableEntry::new(ppn, new_flags);
+        *pte = PageTableEntry::new(ppn.0, new_flags);
         ppn.get_bytes_array()
             .copy_from_slice(old_ppn.get_bytes_array());
     }
@@ -222,14 +227,23 @@ pub fn translate_vpn_into_pte<'a>(
     let mut result: Option<&mut PageTableEntry> = None;
     for (i, idx) in index.iter().enumerate() {
         let pte = &mut ppn.get_pte_array()[*idx];
-        if !pte.flags().is_valid() {
+        if !pte.flags().contains(MappingFlags::V) {
             return None;
         }
         if i == 2 {
             result = Some(pte);
             break;
         }
-        ppn = pte.ppn();
+        ppn = pte.ppn().into();
     }
     result
+}
+
+#[inline(always)]
+pub fn flags_switch_to_cow(flags: &MappingFlags) -> MappingFlags {
+    *flags & !MappingFlags::W | MappingFlags::COW
+}
+#[inline(always)]
+pub fn flags_switch_to_rw(flags: &MappingFlags) -> MappingFlags {
+    *flags & !MappingFlags::COW | MappingFlags::W
 }

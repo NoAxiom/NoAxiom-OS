@@ -10,9 +10,7 @@
 
 use core::ops::{Index, IndexMut};
 
-use config::mm::PAGE_WIDTH;
-
-use super::MappingFlags;
+use super::{ArchPageTable, MappingFlags};
 use crate::{TrapArgs, TrapType};
 
 /// interrupt related arch trait
@@ -64,49 +62,18 @@ pub trait ArchMemory {
     // fn current_token() -> usize;
 }
 
-macro_rules! use_self {
-    ($name:ident) => {
-        <Self as ArchPageTable>::$name
-    };
+pub trait ArchPageTableEntry: Into<usize> + From<usize> + Clone + Copy {
+    /// create a new page table entry from ppn and flags
+    fn new(ppn: usize, flags: MappingFlags) -> Self;
+    /// get the physical page number
+    fn ppn(&self) -> usize;
+    /// get the pte permission flags
+    fn flags(&self) -> MappingFlags;
+    /// set flags
+    fn set_flags(&mut self, flags: MappingFlags);
+    /// clear all data
+    fn reset(&mut self);
 }
-/// raw vpn & ppn width
-const PAGE_NUM_WIDTH: usize = PAGE_WIDTH - 3;
-/// page table entry per page
-const PTE_PER_PAGE: usize = 1 << PAGE_NUM_WIDTH;
-pub trait ArchPageTable {
-    type PTEFlags: Into<MappingFlags> + From<MappingFlags>;
-    type PageTableEntry: ArchPTE;
-
-    /// physical address width
-    const PA_WIDTH: usize;
-    /// virtual address width
-    const VA_WIDTH: usize;
-    /// index level number
-    const INDEX_LEVELS: usize;
-
-    /// physical page number width
-    const PPN_WIDTH: usize = <Self as ArchPageTable>::PA_WIDTH - PAGE_WIDTH;
-    /// ppn mask
-    const PPN_MASK: usize = (1 << <Self as ArchPageTable>::PPN_WIDTH) - 1;
-    /// virtual page number width
-    const VPN_WIDTH: usize = <Self as ArchPageTable>::VA_WIDTH - PAGE_WIDTH;
-    /// single pagenum width
-    const PAGE_NUM_WIDTH: usize = PAGE_NUM_WIDTH;
-    /// page table entry per page
-    const PTE_PER_PAGE: usize = PTE_PER_PAGE;
-
-    fn root_ppn(&self) -> usize;
-    fn new(root_ppn: usize) -> Self;
-    fn activate(&self);
-    fn map(&self, vpn: usize, ppn: usize, flags: MappingFlags) {}
-    fn unmap_vpn(&self, vpn: usize) {}
-    fn unmap_ppn(&self, ppn: usize) {}
-    fn translate(&self, vpn: usize) -> &mut use_self!(PageTableEntry) {
-        todo!()
-    }
-}
-
-pub trait ArchPTE: Into<usize> + From<usize> + Clone + Copy {}
 
 /// trap related arch trait
 pub trait ArchTrap {
