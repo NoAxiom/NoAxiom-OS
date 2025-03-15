@@ -1,10 +1,3 @@
-//! ## async executor
-//! - [`spawn_raw`] to add a task
-//! - [`run`] to run next task
-
-use alloc::vec::Vec;
-use core::sync::atomic::{AtomicUsize, Ordering};
-
 use array_init::array_init;
 use async_task::{Runnable, ScheduleInfo};
 use ksync::mutex::SpinLock;
@@ -13,18 +6,14 @@ use super::{
     sched_info::SchedInfo,
     vsched::{MulticoreRuntime, MulticoreScheduler, Runtime, ScheduleOrder::*},
 };
-use crate::{
-    config::{arch::CPU_NUM, sched::TIME_SLICE_TICKS},
-    cpu::get_hartid,
-    time::sleep::block_on_sleep,
-};
+use crate::{config::arch::CPU_NUM, constant::sched::NICE_0_LOAD, cpu::get_hartid};
 
 pub struct NoAxiomRuntime<T>
 where
     T: MulticoreScheduler<SchedInfo>,
 {
-    /// the load sum of all cores
-    all_load: AtomicUsize,
+    /// load_balance marker
+    load_balance_lock: SpinLock<()>,
 
     /// scheduler for each core
     scheduler: [SpinLock<T>; CPU_NUM],
@@ -35,7 +24,75 @@ where
     T: MulticoreScheduler<SchedInfo>,
 {
     fn current_scheduler<'a>(&self) -> &SpinLock<T> {
-        &self.scheduler[get_hartid()]
+        &self.scheduler[0]
+    }
+    #[allow(unused)]
+    fn load_balance(&self) -> bool {
+        #[derive(Clone, Copy, Default)]
+        struct LoadInfo {
+            hart: usize,
+            load: usize,
+            count: usize,
+            is_running: bool,
+        }
+        impl LoadInfo {
+            fn calc_load(&self) -> usize {
+                let addition = match self.is_running {
+                    true => NICE_0_LOAD,
+                    false => 0,
+                };
+                self.load + addition
+            }
+            fn is_valid(&self) -> bool {
+                match self.is_running {
+                    true => self.count > 0,
+                    false => self.count > 1,
+                }
+            }
+        }
+        let mut load_info = [LoadInfo::default(); CPU_NUM];
+        for i in 0..CPU_NUM {
+            let other = self.scheduler[i].lock();
+            load_info[i] = LoadInfo {
+                hart: i,
+                load: other.load(),
+                count: other.task_count(),
+                is_running: other.is_running(),
+            };
+        }
+        let max_info = *load_info
+            .iter()
+            .max_by(|l, r| l.calc_load().cmp(&r.calc_load()))
+            .unwrap();
+        if max_info.hart == get_hartid() || !max_info.is_valid() {
+            return false;
+        }
+
+        let guard = self.load_balance_lock.lock();
+        let mut local = self.current_scheduler().lock();
+        let mut other = self.scheduler[max_info.hart].lock();
+        let addition = match other.is_running() {
+            true => NICE_0_LOAD,
+            false => 0,
+        };
+        warn!(
+            "load balance from {} to {}, local_load: {}, other_load: {}, other_is_running: {}",
+            max_info.hart,
+            get_hartid(),
+            local.load(),
+            other.load(),
+            other.is_running()
+        );
+        while local.load() + NICE_0_LOAD < other.load() + addition && other.task_count() > 0 {
+            let runnable = other.pop(NormalFirst);
+            if let Some(runnable) = runnable {
+                local.push_normal(runnable);
+            } else {
+                break;
+            }
+        }
+        drop(guard);
+        true
     }
 }
 
@@ -44,15 +101,6 @@ where
     Self: Runtime<T, SchedInfo>,
     T: MulticoreScheduler<SchedInfo>,
 {
-    fn add_load(&self, load: usize) {
-        self.all_load.fetch_add(load, Ordering::AcqRel);
-    }
-    fn sub_load(&self, load: usize) {
-        self.all_load.fetch_sub(load, Ordering::AcqRel);
-    }
-    fn all_load(&self) -> usize {
-        self.all_load.load(Ordering::Acquire)
-    }
 }
 
 impl<T> Runtime<T, SchedInfo> for NoAxiomRuntime<T>
@@ -61,68 +109,36 @@ where
 {
     fn new() -> Self {
         Self {
-            all_load: AtomicUsize::new(0),
+            load_balance_lock: SpinLock::new(()),
             scheduler: array_init(|_| SpinLock::new(T::default())),
         }
     }
 
     fn schedule(&self, runnable: Runnable<SchedInfo>, info: ScheduleInfo) {
-        self.current_scheduler()
-            .lock()
-            .push_with_info(runnable, info);
+        let mut local = self.current_scheduler().lock();
+        local.push_with_info(runnable, info);
     }
 
     fn run(&self) {
         let mut local = self.current_scheduler().lock();
-        // check load balance
-        let all_load = self.all_load(); // safe, it does not affect the correctness
-        if local.is_timeup() {
-            trace!("timeup detected!");
-            local.set_last_time();
-            if local.is_underload(all_load) {
-                for i in 0..CPU_NUM {
-                    if i == get_hartid() {
-                        continue;
-                    }
-                    let mut other = self.scheduler[i].lock();
-                    let mut debug_vec = Vec::new();
-                    if other.is_overload(all_load) {
-                        while other.is_overload(all_load) && local.is_underload(all_load) {
-                            if let Some(runnable) = other.pop(NormalFirst) {
-                                debug_vec.push(
-                                    runnable
-                                        .metadata()
-                                        ._task
-                                        .as_ref()
-                                        .unwrap()
-                                        .upgrade()
-                                        .unwrap()
-                                        .tid(),
-                                );
-                                local.push_normal(runnable);
-                            } else {
-                                break;
-                            }
-                        }
-                        warn!(
-                            "load balance: from[{}] -> to[{}], tid_list {:?}",
-                            i,
-                            get_hartid(),
-                            debug_vec
-                        );
-                        if !local.is_underload(all_load) {
-                            break;
-                        }
-                    }
-                }
-            }
-        }
+        local.set_running(false);
+        // run task
         let runnable = local.pop(UrgentFirst);
-        drop(local);
         if let Some(runnable) = runnable {
+            local.set_running(true);
+            drop(local);
             runnable.run();
         } else {
-            block_on_sleep(TIME_SLICE_TICKS / 10);
+            // #[cfg(feature = "multicore")]
+            // if local.is_timeup() {
+            //     // timeup, check load balance
+            //     trace!("timeup detected!");
+            //     local.set_last_time();
+            //     drop(local);
+            //     if !self.load_balance() {
+            //         local.set_time_limit(LOAD_BALANCE_TICKS * 5);
+            //     }
+            // }
         }
     }
 }

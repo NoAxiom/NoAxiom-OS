@@ -1,7 +1,5 @@
 use async_task::{Runnable, ScheduleInfo};
 
-use crate::{config::sched::LOAD_BALANCE_TICKS, time::gettime::get_time};
-
 #[derive(Clone, Copy, Debug)]
 pub enum ScheduleOrder {
     NormalFirst,
@@ -22,13 +20,16 @@ where
 {
     fn sub_load(&mut self, load: usize);
     fn add_load(&mut self, load: usize);
-    fn is_overload(&self, all_load: usize) -> bool;
-    fn is_underload(&self, all_load: usize) -> bool;
-    fn last_time(&self) -> usize;
-    fn set_last_time(&mut self);
-    fn is_timeup(&self) -> bool {
-        get_time() as isize - self.last_time() as isize > LOAD_BALANCE_TICKS as isize
-    }
+    fn load(&self) -> usize;
+    fn task_count(&self) -> usize;
+
+    fn set_running(&mut self, is_running: bool);
+    fn is_running(&self) -> bool;
+
+    // fn last_time(&self) -> usize;
+    // fn set_last_time(&mut self);
+    // fn set_time_limit(&mut self, limit: usize);
+    // fn is_timeup(&self) -> bool;
 }
 
 pub trait Runtime<T, R>
@@ -45,7 +46,4 @@ where
     Self: Runtime<T, R>,
     T: MulticoreScheduler<R>,
 {
-    fn add_load(&self, load: usize);
-    fn sub_load(&self, load: usize);
-    fn all_load(&self) -> usize;
 }

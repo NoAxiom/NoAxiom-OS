@@ -1,18 +1,16 @@
 use alloc::collections::{btree_set::BTreeSet, vec_deque::VecDeque};
 use core::cmp::Ordering;
 
-use arch::{Arch, ArchTime};
 use async_task::{Runnable, ScheduleInfo};
 
 use super::{
-    runtime::RUNTIME,
     sched_entity::SchedVruntime,
     sched_info::SchedInfo,
-    vsched::{MulticoreRuntime, MulticoreScheduler, ScheduleOrder, Scheduler},
+    vsched::{MulticoreScheduler, ScheduleOrder, Scheduler},
 };
 use crate::{
-    config::{arch::CPU_NUM, sched::LOAD_BALANCE_LIMIT},
-    constant::sched::NICE_0_LOAD,
+    config::sched::{LOAD_BALANCE_LIMIT, LOAD_BALANCE_TICKS},
+    time::gettime::get_time,
 };
 
 struct CfsTreeNode<R> {
@@ -57,41 +55,58 @@ pub struct CFS<R> {
     task_count: usize,
     /// last load balance time (tick)
     last_time: usize,
+    /// load balance time limit
+    time_limit: usize,
+    /// is running
+    is_running: bool,
 }
 
 impl<R> MulticoreScheduler<R> for CFS<R>
 where
     Self: Scheduler<R>,
 {
-    /// sub both local and global load
+    /// sub local load
     fn sub_load(&mut self, load: usize) {
-        #[cfg(feature = "multicore")]
-        RUNTIME.sub_load(load);
         self.load -= load;
         self.task_count -= 1;
     }
-    /// add both local and global load
+    /// add local load
     fn add_load(&mut self, load: usize) {
-        #[cfg(feature = "multicore")]
-        RUNTIME.add_load(load);
         self.load += load;
         self.task_count += 1;
     }
-    /// check if scheduler is overloaded
-    fn is_overload(&self, all_load: usize) -> bool {
-        let ave = all_load / CPU_NUM;
-        self.load > ave + ave / LOAD_BALANCE_LIMIT + 1 && self.task_count > 1
+    /// fetch local load value
+    fn load(&self) -> usize {
+        self.load
     }
-    /// check if scheduler is underloaded
-    fn is_underload(&self, all_load: usize) -> bool {
-        let ave = all_load / CPU_NUM;
-        self.load + ave / LOAD_BALANCE_LIMIT < ave && all_load > NICE_0_LOAD
+    /// fetch local task count
+    fn task_count(&self) -> usize {
+        self.task_count
     }
-    fn last_time(&self) -> usize {
-        self.last_time
+    // /// fetch last load balance time
+    // fn last_time(&self) -> usize {
+    //     self.last_time
+    // }
+    // /// is time up for load balance
+    // fn is_timeup(&self) -> bool {
+    //     get_time() as isize - self.last_time as isize > self.time_limit as isize
+    // }
+    // /// set last load balance time
+    // fn set_last_time(&mut self) {
+    //     self.time_limit = LOAD_BALANCE_TICKS;
+    //     self.last_time = get_time();
+    // }
+    // /// set time limit for load balance
+    // fn set_time_limit(&mut self, limit: usize) {
+    //     self.time_limit = limit;
+    // }
+    /// is running a task
+    fn is_running(&self) -> bool {
+        self.is_running
     }
-    fn set_last_time(&mut self) {
-        self.last_time = Arch::get_time();
+    /// set running status
+    fn set_running(&mut self, is_running: bool) {
+        self.is_running = is_running;
     }
 }
 
@@ -104,6 +119,8 @@ impl Scheduler<SchedInfo> for CFS<SchedInfo> {
             load: 0,
             task_count: 0,
             last_time: 0,
+            time_limit: LOAD_BALANCE_TICKS,
+            is_running: false,
         }
     }
 

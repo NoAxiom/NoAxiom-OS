@@ -101,7 +101,7 @@ asm: # build_kernel
 
 # NOTE THAT if you want to run in single core
 # you should export this as empty
-export MULTICORE_ARGS := 2
+export MULTICORE := 2
 export DEBUG := 1
 
 QFLAGS := 
@@ -114,8 +114,8 @@ QFLAGS += -drive file=$(FS_IMG),if=none,format=raw,id=x0
 QFLAGS += -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 
 # QFLAGS += -device virtio-net-device,netdev=net -netdev user,id=net
 
-ifneq ($(MULTICORE_ARGS),)
-	QFLAGS += -smp $(MULTICORE_ARGS)
+ifneq ($(MULTICORE),)
+	QFLAGS += -smp $(MULTICORE)
 endif
 
 ifeq ($(BOARD), qemu-virt)

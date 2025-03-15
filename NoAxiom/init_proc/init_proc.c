@@ -43,6 +43,7 @@ int main(void)
 {
     int test_num = sizeof(test_points) / sizeof(char*);
     int cnt = 0, i;
+    int time_in = get_time(), time_out;
     // start test
     printf("========== [ init_proc ] start test! num: %d ==========\n",
         test_num);
@@ -52,9 +53,11 @@ int main(void)
         cnt += tmp_res;
     }
     // test done!
+    time_out = get_time();
     printf("========== [ init_proc ] all tests are done!! ==========\n");
     printf("========== [ init_proc ] passed points: %d/%d ==========\n", cnt,
         test_num);
+    printf("test cost time: %d\n", time_out - time_in);
 
     for (i = 0; i < test_num; i++) {
         if (failed_test[i] == 0) {

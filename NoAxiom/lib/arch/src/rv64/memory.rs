@@ -12,6 +12,7 @@ fn ppn_to_pa(ppn: usize) -> usize {
 pub struct PageTable {
     root_ppn: usize,
 }
+
 // impl ArchPageTable for PageTable {}
 
 impl ArchMemory for RV64 {
