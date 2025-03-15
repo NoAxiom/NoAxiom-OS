@@ -6,7 +6,10 @@ use super::{
     sched_info::SchedInfo,
     vsched::{MulticoreRuntime, MulticoreScheduler, Runtime, ScheduleOrder::*},
 };
-use crate::{config::arch::CPU_NUM, constant::sched::NICE_0_LOAD, cpu::get_hartid};
+use crate::{
+    config::arch::CPU_NUM, constant::sched::NICE_0_LOAD, cpu::get_hartid,
+    time::sleep::current_sleep_manager,
+};
 
 pub struct NoAxiomRuntime<T>
 where
@@ -120,6 +123,7 @@ where
     }
 
     fn run(&self) {
+        current_sleep_manager().sleep_handler();
         let mut local = self.current_scheduler().lock();
         local.set_running(false);
         // run task
