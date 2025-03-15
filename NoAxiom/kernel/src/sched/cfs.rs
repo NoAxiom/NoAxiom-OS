@@ -83,23 +83,23 @@ where
     fn task_count(&self) -> usize {
         self.task_count
     }
-    // /// fetch last load balance time
-    // fn last_time(&self) -> usize {
-    //     self.last_time
-    // }
-    // /// is time up for load balance
-    // fn is_timeup(&self) -> bool {
-    //     get_time() as isize - self.last_time as isize > self.time_limit as isize
-    // }
-    // /// set last load balance time
-    // fn set_last_time(&mut self) {
-    //     self.time_limit = LOAD_BALANCE_TICKS;
-    //     self.last_time = get_time();
-    // }
-    // /// set time limit for load balance
-    // fn set_time_limit(&mut self, limit: usize) {
-    //     self.time_limit = limit;
-    // }
+    /// fetch last load balance time
+    fn last_time(&self) -> usize {
+        self.last_time
+    }
+    /// is time up for load balance
+    fn is_timeup(&self) -> bool {
+        get_time() as isize - self.last_time as isize > self.time_limit as isize
+    }
+    /// set last load balance time
+    fn set_last_time(&mut self) {
+        self.time_limit = LOAD_BALANCE_TICKS;
+        self.last_time = get_time();
+    }
+    /// set time limit for load balance
+    fn set_time_limit(&mut self, limit: usize) {
+        self.time_limit = limit;
+    }
     /// is running a task
     fn is_running(&self) -> bool {
         self.is_running

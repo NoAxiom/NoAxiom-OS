@@ -26,10 +26,10 @@ where
     fn set_running(&mut self, is_running: bool);
     fn is_running(&self) -> bool;
 
-    // fn last_time(&self) -> usize;
-    // fn set_last_time(&mut self);
-    // fn set_time_limit(&mut self, limit: usize);
-    // fn is_timeup(&self) -> bool;
+    fn last_time(&self) -> usize;
+    fn set_last_time(&mut self);
+    fn set_time_limit(&mut self, limit: usize);
+    fn is_timeup(&self) -> bool;
 }
 
 pub trait Runtime<T, R>
