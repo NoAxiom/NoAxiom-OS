@@ -2,6 +2,7 @@
 //! - [`spawn_raw`] to add a task
 //! - [`run`] to run next task
 
+use alloc::vec::Vec;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
 use array_init::array_init;
@@ -22,9 +23,6 @@ pub struct NoAxiomRuntime<T>
 where
     T: MulticoreScheduler<SchedInfo>,
 {
-    /// use cpu mask to pass request
-    sched_req: AtomicUsize,
-
     /// the load sum of all cores
     all_load: AtomicUsize,
 
@@ -63,7 +61,6 @@ where
 {
     fn new() -> Self {
         Self {
-            sched_req: AtomicUsize::new(0),
             all_load: AtomicUsize::new(0),
             scheduler: array_init(|_| SpinLock::new(T::default())),
         }
@@ -80,6 +77,7 @@ where
         // check load balance
         let all_load = self.all_load(); // safe, it does not affect the correctness
         if local.is_timeup() {
+            trace!("timeup detected!");
             local.set_last_time();
             if local.is_underload(all_load) {
                 for i in 0..CPU_NUM {
@@ -87,14 +85,31 @@ where
                         continue;
                     }
                     let mut other = self.scheduler[i].lock();
+                    let mut debug_vec = Vec::new();
                     if other.is_overload(all_load) {
                         while other.is_overload(all_load) && local.is_underload(all_load) {
                             if let Some(runnable) = other.pop(NormalFirst) {
+                                debug_vec.push(
+                                    runnable
+                                        .metadata()
+                                        ._task
+                                        .as_ref()
+                                        .unwrap()
+                                        .upgrade()
+                                        .unwrap()
+                                        .tid(),
+                                );
                                 local.push_normal(runnable);
                             } else {
                                 break;
                             }
                         }
+                        warn!(
+                            "load balance: from[{}] -> to[{}], tid_list {:?}",
+                            i,
+                            get_hartid(),
+                            debug_vec
+                        );
                         if !local.is_underload(all_load) {
                             break;
                         }
