@@ -1,11 +1,21 @@
 use core::arch::asm;
 
+use config::mm::PAGE_WIDTH;
 use riscv::{asm::sfence_vma_all, register::satp};
 
 use super::RV64;
 use crate::ArchMemory;
 
+fn ppn_to_pa(ppn: usize) -> usize {
+    ppn << PAGE_WIDTH
+}
+pub struct PageTable {
+    root_ppn: usize,
+}
+// impl ArchPageTable for PageTable {}
+
 impl ArchMemory for RV64 {
+    // type PageTable = PageTable;
     // flush all TLB
     #[inline(always)]
     fn tlb_flush() {

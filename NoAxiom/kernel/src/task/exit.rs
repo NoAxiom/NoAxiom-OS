@@ -76,9 +76,9 @@ impl Task {
                 self.set_status(TaskStatus::Zombie);
                 par_pcb.children.retain(|task| task.tid() != tid);
                 par_pcb.zombie_children.push(self.clone());
-                if par_pcb.wait_req.load(Ordering::Acquire) {
+                if par_pcb.wait_req {
                     trace!("waking parent");
-                    par_pcb.wait_req.store(false, Ordering::Release);
+                    par_pcb.wait_req = false;
                     parent.wake_up();
                 } else {
                     trace!("I suppose that my parent is already woken");

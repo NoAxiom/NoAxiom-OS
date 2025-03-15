@@ -78,9 +78,7 @@ pub fn ipi_handler() {
             Arch::tlb_flush();
         }
         IpiType::LoadBalance => {
-            info!("[IPI] load balance");
-            #[cfg(feature = "multicore")]
-            RUNTIME.handle_mailbox();
+            info!("[IPI] load balance done, current hart is woken!!");
         }
         _ => {
             info!("[IPI] unsupported ipi type");

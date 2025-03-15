@@ -1,40 +1,32 @@
 use alloc::collections::{btree_set::BTreeSet, vec_deque::VecDeque};
 use core::cmp::Ordering;
 
+use arch::{Arch, ArchTime};
 use async_task::{Runnable, ScheduleInfo};
 
 use super::{
     runtime::RUNTIME,
     sched_entity::SchedVruntime,
     sched_info::SchedInfo,
-    vsched::{MulticoreRuntime, MulticoreSchedInfo, MulticoreScheduler, ScheduleOrder, Scheduler},
+    vsched::{MulticoreRuntime, MulticoreScheduler, ScheduleOrder, Scheduler},
 };
 use crate::{
     config::{arch::CPU_NUM, sched::LOAD_BALANCE_LIMIT},
     constant::sched::NICE_0_LOAD,
 };
 
-struct CfsTreeNode<R>
-where
-    R: MulticoreSchedInfo,
-{
+struct CfsTreeNode<R> {
     pub vruntime: SchedVruntime,
     pub tid: usize,
     pub runnable: Runnable<R>,
 }
-impl<R> PartialEq for CfsTreeNode<R>
-where
-    R: MulticoreSchedInfo,
-{
+impl<R> PartialEq for CfsTreeNode<R> {
     fn eq(&self, other: &Self) -> bool {
         self.tid == other.tid
     }
 }
-impl<R> Eq for CfsTreeNode<R> where R: MulticoreSchedInfo {}
-impl<R> PartialOrd for CfsTreeNode<R>
-where
-    R: MulticoreSchedInfo,
-{
+impl<R> Eq for CfsTreeNode<R> {}
+impl<R> PartialOrd for CfsTreeNode<R> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         let res = self.vruntime.partial_cmp(&other.vruntime);
         match res {
@@ -43,10 +35,7 @@ where
         }
     }
 }
-impl<R> Ord for CfsTreeNode<R>
-where
-    R: MulticoreSchedInfo,
-{
+impl<R> Ord for CfsTreeNode<R> {
     fn cmp(&self, other: &Self) -> Ordering {
         let res = self.vruntime.cmp(&other.vruntime);
         match res {
@@ -57,10 +46,7 @@ where
 }
 
 /// completely fair scheduler for single core
-pub struct CFS<R>
-where
-    R: MulticoreSchedInfo,
-{
+pub struct CFS<R> {
     /// cfs tree
     normal: BTreeSet<CfsTreeNode<R>>,
     /// realtime / just-woken runnable queue
@@ -69,12 +55,13 @@ where
     load: usize,
     /// counter of task
     task_count: usize,
+    /// last load balance time (tick)
+    last_time: usize,
 }
 
 impl<R> MulticoreScheduler<R> for CFS<R>
 where
     Self: Scheduler<R>,
-    R: MulticoreSchedInfo,
 {
     /// sub both local and global load
     fn sub_load(&mut self, load: usize) {
@@ -100,6 +87,12 @@ where
         let ave = all_load / CPU_NUM;
         self.load + ave / LOAD_BALANCE_LIMIT < ave && all_load > NICE_0_LOAD
     }
+    fn last_time(&self) -> usize {
+        self.last_time
+    }
+    fn set_last_time(&mut self) {
+        self.last_time = Arch::get_time();
+    }
 }
 
 impl Scheduler<SchedInfo> for CFS<SchedInfo> {
@@ -110,6 +103,7 @@ impl Scheduler<SchedInfo> for CFS<SchedInfo> {
             urgent: VecDeque::new(),
             load: 0,
             task_count: 0,
+            last_time: 0,
         }
     }
 

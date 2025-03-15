@@ -21,7 +21,7 @@ use crate::{
 pub fn spawn_raw<F, R>(
     future: F,
     sched_entity: SchedEntity,
-    hartid: usize,
+    _hartid: usize,
     task: Option<Weak<Task>>,
 ) where
     F: Future<Output = R> + Send + 'static,
@@ -29,7 +29,7 @@ pub fn spawn_raw<F, R>(
 {
     let schedule = WithInfo(move |runnable, info| RUNTIME.schedule(runnable, info));
     let (runnable, handle) = Builder::new()
-        .metadata(SchedInfo::new(sched_entity, hartid, task))
+        .metadata(SchedInfo::new(sched_entity, task))
         .spawn(move |_: &SchedInfo| future, schedule);
     runnable.schedule();
     handle.detach();

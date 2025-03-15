@@ -8,10 +8,7 @@
 //! - [`ArchInfo`]
 //! - [`ArchMemory`]
 
-use core::{
-    fmt::Debug,
-    ops::{Index, IndexMut},
-};
+use core::ops::{Index, IndexMut};
 
 use crate::{TrapArgs, TrapType};
 
@@ -55,11 +52,18 @@ pub trait ArchSbi {
 
 /// memory management arch trait
 pub trait ArchMemory {
+    // type PageTable;
     fn tlb_flush();
     fn update_pagetable(_bits: usize);
     fn get_token_by_ppn(_ppn: usize) -> usize;
     fn current_token() -> usize;
 }
+
+// pub trait ArchPageTable {
+//     fn root_ppn(&self) -> usize;
+//     fn new(root_ppn: usize) -> Self;
+//     fn map(&mut self, vpn: usize, ppn: usize, flags: usize);
+// }
 
 /// trap related arch trait
 pub trait ArchTrap {
@@ -73,7 +77,7 @@ pub trait ArchTrap {
 }
 
 pub trait ArchTrapContext:
-    Index<TrapArgs, Output = usize> + IndexMut<TrapArgs, Output = usize> + Debug
+    Index<TrapArgs, Output = usize> + IndexMut<TrapArgs, Output = usize>
 {
     fn app_init_cx(entry: usize, sp: usize) -> Self;
     fn update_cx(&mut self, entry: usize, sp: usize, argc: usize, argv: usize, envp: usize);

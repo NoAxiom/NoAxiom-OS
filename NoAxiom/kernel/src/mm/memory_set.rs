@@ -41,6 +41,7 @@ extern "C" {
     fn ekernel();
 }
 
+// fixme: virtio_virt_to_phys
 lazy_static! {
     pub static ref KERNEL_SPACE: SpinLock<MemorySet> =
         SpinLock::new(MemorySet::init_kernel_space());

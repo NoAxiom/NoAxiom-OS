@@ -5,7 +5,7 @@
 use alloc::collections::vec_deque::VecDeque;
 
 use async_task::Runnable;
-use ksync::cell::SyncUnsafeCell;
+use ksync::mutex::SpinLock;
 
 use super::{
     sched_info::SchedInfo,
@@ -48,7 +48,7 @@ pub struct SimpleRuntime<T>
 where
     T: Scheduler<Info>,
 {
-    scheduler: SyncUnsafeCell<T>,
+    scheduler: SpinLock<T>,
 }
 
 impl<T> Runtime<T, Info> for SimpleRuntime<T>
@@ -57,15 +57,15 @@ where
 {
     fn new() -> Self {
         Self {
-            scheduler: SyncUnsafeCell::new(T::default()),
+            scheduler: SpinLock::new(T::default()),
         }
     }
     fn run(&self) {
-        if let Some(runnable) = self.scheduler.ref_mut().pop(ScheduleOrder::UrgentFirst) {
+        if let Some(runnable) = self.scheduler.lock().pop(ScheduleOrder::UrgentFirst) {
             runnable.run();
         }
     }
     fn schedule(&self, runnable: Runnable<Info>, info: async_task::ScheduleInfo) {
-        self.scheduler.ref_mut().push_with_info(runnable, info);
+        self.scheduler.lock().push_with_info(runnable, info);
     }
 }

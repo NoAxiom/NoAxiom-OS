@@ -2,7 +2,7 @@
 
 use alloc::{string::String, sync::Arc, vec::Vec};
 use core::{
-    sync::atomic::{AtomicBool, AtomicI32, AtomicUsize, Ordering},
+    sync::atomic::{AtomicI32, AtomicUsize, Ordering},
     task::Waker,
 };
 
@@ -259,7 +259,7 @@ impl Task {
                 children: Vec::new(),
                 zombie_children: Vec::new(),
                 parent: None,
-                wait_req: AtomicBool::new(false),
+                wait_req: false,
             })),
             memory_space: MemorySpace {
                 token: SyncUnsafeCell::new(memory_set.token()),
@@ -477,7 +477,7 @@ impl Task {
                     children: Vec::new(),
                     zombie_children: Vec::new(),
                     parent: Some(Arc::downgrade(self)),
-                    wait_req: AtomicBool::new(false),
+                    wait_req: false,
                 })),
                 memory_space: MemorySpace { memory_set, token },
                 trap_cx: SyncUnsafeCell::new(self.trap_context().clone()),
