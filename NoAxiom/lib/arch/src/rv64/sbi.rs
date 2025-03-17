@@ -18,7 +18,7 @@ impl ArchSbi for RV64 {
     }
     // send ipi
     fn send_ipi(hartid: usize) {
-        sbi_rt::send_ipi(HartMask::from_mask_base(1 << hartid, 0));
+        sbi_rt::send_ipi(HartMask::from_mask_base(0b1, hartid));
     }
     // clear ipi
     fn clear_ipi() {
