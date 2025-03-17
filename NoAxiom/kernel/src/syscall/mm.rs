@@ -33,7 +33,6 @@ impl Syscall<'_> {
         let prot = MmapProts::from_bits(prot).unwrap();
         let flags = MmapFlags::from_bits(flags).unwrap();
         if addr % PAGE_SIZE != 0 || length == 0 {
-            error!("kidding?");
             return Err(Errno::EINVAL);
         }
         let res = self
