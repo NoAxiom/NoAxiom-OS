@@ -13,3 +13,4 @@ NoAxiom/user/bin/
 test/
 test-2025/
 NoAxiom/init_proc/test_points.h
+qemu.log

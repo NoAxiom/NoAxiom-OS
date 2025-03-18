@@ -5,21 +5,24 @@ export PROJECT := NoAxiom
 export MODE ?= release
 export BOARD ?= qemu-virt
 export KERNEL ?= kernel
-export ARCH ?= loongarch64
-
-ifeq ($(ARCH),riscv64)
-	export TARGET := riscv64gc-unknown-none-elf
-	export OBJ_DUMP := riscv64-unknown-elf-objdump
-	export OBJCOPY := rust-objcopy --binary-architecture=riscv64
-else ifeq ($(ARCH),loongarch64)
-	export TARGET := loongarch64-unknown-linux-gnu
-	export OBJ_DUMP := loongarch64-linux-gnu-objdump
-	export OBJCOPY := rust-objcopy --binary-architecture=loongarch64
-endif
+export ARCH_NAME ?= loongarch64
 
 export ROOT := $(shell pwd)
 export TARGET_DIR := $(ROOT)/target/$(TARGET)/$(MODE)
-export SBI ?= $(ROOT)/$(PROJECT)/bootloader/rustsbi-qemu.bin
+
+ifeq ($(ARCH_NAME),riscv64)
+	export TARGET := riscv64gc-unknown-none-elf
+	export OBJ_DUMP := riscv64-unknown-elf-objdump
+	export OBJCOPY := rust-objcopy --binary-architecture=riscv64
+	export SBI ?= $(ROOT)/$(PROJECT)/bootloader/rustsbi-qemu.bin
+	export QEMU := qemu-system-riscv64
+else ifeq ($(ARCH_NAME),loongarch64)
+	export TARGET := loongarch64-unknown-linux-gnu
+	export OBJ_DUMP := loongarch64-linux-gnu-objdump
+	export OBJCOPY := rust-objcopy --binary-architecture=loongarch64
+	export SBI ?= $(ROOT)/$(PROJECT)/bootloader/u-boot-with-spl.bin
+	export QEMU := qemu-system-loongarch64
+endif
 
 export LOG ?= DEBUG
 
@@ -111,22 +114,35 @@ asm: # build_kernel
 export MULTICORE := 2
 
 QFLAGS := 
-QFLAGS += -m 128
-QFLAGS += -machine virt
-QFLAGS += -nographic
-QFLAGS += -kernel kernel-qemu
-QFLAGS += -device loader,file=$(KERNEL_BIN),addr=0x80200000
-QFLAGS += -drive file=$(FS_IMG),if=none,format=raw,id=x0
-QFLAGS += -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 
-# QFLAGS += -device virtio-net-device,netdev=net -netdev user,id=net
+ifeq ($(ARCH_NAME),loongarch64)
+    QFLAGS += -m 1024
+    QFLAGS += -M ls2k -drive if=pflash,file=sbi-qemu
+	# QFLAGS += -serial stdio # turn on serial output
+	QFLAGS += -nographic
+	QFLAGS += -kernel $(KERNEL_ELF)
+	QFLAGS += -bios sbi-qemu
+    QFLAGS += -device ls2k-ahci,id=ahci
+    QFLAGS += -drive file=$(FS_IMG),if=none,format=raw,id=drive0
+    QFLAGS += -device ide-hd,drive=drive0,bus=ahci.0
+	QFLAGS += -D qemu.log -d in_asm,cpu_reset
+    
+    # QFLAGS += -device virtio-net-pci,netdev=net -netdev user,id=net
+else
+	QFLAGS += -m 128
+	QFLAGS += -machine virt
+	QFLAGS += -nographic
+	QFLAGS += -kernel kernel-qemu
+	QFLAGS += -device loader,file=$(KERNEL_BIN),addr=0x80200000
+	QFLAGS += -drive file=$(FS_IMG),if=none,format=raw,id=x0
+	QFLAGS += -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
+	QFLAGS += -bios sbi-qemu
+	# QFLAGS += -device virtio-net-device,netdev=net -netdev user,id=net
+endif
 
 ifneq ($(MULTICORE),)
 	QFLAGS += -smp $(MULTICORE)
 endif
 
-ifeq ($(BOARD), qemu-virt)
-	QFLAGS += -bios sbi-qemu
-endif
 
 
 # backup: 
@@ -140,7 +156,8 @@ sbi-qemu:
 
 run: sbi-qemu
 	@cp $(KERNEL_BIN) kernel-qemu
-	qemu-system-loongarch64 $(QFLAGS)
+	$(QEMU) $(QFLAGS)
+
 # rm -f $(SDCARD_BAK)
 
 # qemu-dtb:backup
@@ -159,7 +176,7 @@ run: sbi-qemu
 # 	qemu-system-riscv64 $(QEMU_ARGS) -s -S
 
 gdb-server: build_kernel
-	qemu-system-riscv64 $(QFLAGS) -s -S
+	$(QEMU) $(QFLAGS) -s -S
 
 
 debug-client:
