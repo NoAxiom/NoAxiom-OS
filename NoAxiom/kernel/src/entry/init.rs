@@ -87,7 +87,6 @@ pub extern "C" fn _boot_hart_init(_: usize, dtb: usize) {
         get_hartid(),
         dtb as usize,
     );
-    Arch::shutdown();
 
     rust_main();
     unreachable!();

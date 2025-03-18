@@ -8,7 +8,6 @@ export KERNEL ?= kernel
 export ARCH_NAME ?= loongarch64
 
 export ROOT := $(shell pwd)
-export TARGET_DIR := $(ROOT)/target/$(TARGET)/$(MODE)
 
 ifeq ($(ARCH_NAME),riscv64)
 	export TARGET := riscv64gc-unknown-none-elf
@@ -23,6 +22,8 @@ else ifeq ($(ARCH_NAME),loongarch64)
 	export SBI ?= $(ROOT)/$(PROJECT)/bootloader/u-boot-with-spl.bin
 	export QEMU := qemu-system-loongarch64
 endif
+
+export TARGET_DIR := $(ROOT)/target/$(TARGET)/$(MODE)
 
 export LOG ?= DEBUG
 
