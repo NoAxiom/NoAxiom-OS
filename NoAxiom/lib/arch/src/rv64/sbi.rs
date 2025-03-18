@@ -29,8 +29,8 @@ impl ArchSbi for RV64 {
         shutdown()
     }
     // hart start
-    fn hart_start(hartid: usize, start_addr: usize, opaque: usize) {
-        let x = hart_start(hartid, start_addr, opaque);
+    fn hart_start(hartid: usize, start_addr: usize) {
+        let x = hart_start(hartid, start_addr, 0);
         if x.is_err() {
             panic!("hart_start failed");
         }

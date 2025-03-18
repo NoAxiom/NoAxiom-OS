@@ -28,16 +28,7 @@ pub fn wake_other_hart(forbid_hart_id: usize) {
     );
     for i in 0..CPU_NUM {
         if i != forbid_hart_id {
-            Arch::hart_start(i, entry, 0);
-            // let result = hart_start(i, entry, 0);
-            // if result.error == 0 {
-            //     info!("[awake_other_hart] hart {:x} start successfully", i);
-            // } else {
-            //     error!(
-            //         "[awake_other_hart] error when waking {}, error code:
-            // {:?}",         i, result
-            //     );
-            // }
+            Arch::hart_start(i, entry);
         }
     }
 }

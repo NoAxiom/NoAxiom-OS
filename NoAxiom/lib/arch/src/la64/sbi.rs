@@ -8,7 +8,7 @@ impl ArchSbi for LA64 {
     fn console_putchar(_c: usize) {
         unimplemented!()
     }
-    fn hart_start(_hartid: usize, _start_addr: usize, _opaque: usize) {
+    fn hart_start(_hartid: usize, _start_addr: usize) {
         unimplemented!()
     }
     fn shutdown() -> ! {
