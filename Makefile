@@ -2,11 +2,18 @@
 
 # general config
 export PROJECT := NoAxiom
-export TARGET := riscv64gc-unknown-none-elf
 export MODE ?= release
 export BOARD ?= qemu-virt
 export KERNEL ?= kernel
-export ARCH ?= riscv64
+export ARCH ?= rv64
+
+ifeq ($(ARCH),rv64)
+	export TARGET := riscv64gc-unknown-none-elf
+	export OBJ_DUMP := riscv64-unknown-elf-objdump
+else ifeq ($(ARCH),la64)
+	export TARGET := loongarch64-unknown-none
+	export OBJ_DUMP := loongarch64-unknown-linux-gnu-objdump
+endif
 
 export ROOT := $(shell pwd)
 export TARGET_DIR := $(ROOT)/target/$(TARGET)/$(MODE)
@@ -96,13 +103,12 @@ build: $(FS_IMG) build_kernelta
 
 asm: # build_kernel
 	@echo -e "Building Kernel and Generating Assembly..."
-	@riscv64-unknown-elf-objdump -d $(KERNEL_ELF) > $(KERNEL_ELF).asm
+	@$(OBJ_DUMP) -d $(KERNEL_ELF) > $(KERNEL_ELF).asm
 	@echo -e "Assembly saved to $(KERNEL_ELF).asm"
 
 # NOTE THAT if you want to run in single core
 # you should export this as empty
 export MULTICORE := 2
-export DEBUG := 1
 
 QFLAGS := 
 QFLAGS += -m 128

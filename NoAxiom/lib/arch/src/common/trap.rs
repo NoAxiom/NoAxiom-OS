@@ -17,7 +17,7 @@ pub enum TrapType {
 /// Trap Frame Arg Type
 ///
 /// Using this by Index and IndexMut trait bound on TrapFrame
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum TrapArgs {
     EPC,
     RA,
