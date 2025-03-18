@@ -1,9 +1,20 @@
+mod asm;
+mod interrupt;
 mod memory;
+mod other;
+mod sbi;
+mod time;
 mod trap;
-mod varch;
-mod page_table;
 
+pub use asm::*;
+pub use interrupt::*;
 pub use memory::*;
-pub use page_table::*;
+pub use other::*;
+pub use sbi::*;
+pub use time::*;
 pub use trap::*;
-pub use varch::*;
+
+/// full arch trait
+pub trait FullVirtArch: ArchInt + ArchAsm + ArchSbi + ArchTrap + ArchTime + ArchInfo {
+    // should impl all traits above
+}
