@@ -7,6 +7,7 @@ edition = "2021"
 log = { workspace = true }
 config = { workspace = true }
 bitflags = { workspace = true }
+page_table_entry = "0.4"
 
 [target.'cfg(target_arch = "riscv64")'.dependencies]
 riscv = { version = "0.11" }

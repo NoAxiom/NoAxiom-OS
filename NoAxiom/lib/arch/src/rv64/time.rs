@@ -9,7 +9,7 @@ impl ArchTime for RV64 {
     fn get_time() -> usize {
         time::read()
     }
-    fn set_timer(time_value: u64) -> usize {
+    fn set_timer(time_value: u64) {
         set_timer(time_value)
     }
 }
