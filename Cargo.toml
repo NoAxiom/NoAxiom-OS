@@ -1,6 +1,6 @@
 # complete these after
 [workspace]
-members = ["NoAxiom/kernel"]
+members = ["NoAxiom/kernel", "NoAxiom/user/apps/*", "NoAxiom/user/lib"]
 resolver = "2"
 
 [workspace.dependencies]
@@ -21,3 +21,4 @@ config = { path = "NoAxiom/lib/config" }
 debug = true
 opt-level = 3           # 优化级别,最低是0,最高是3, 0方便debug
 overflow-checks = false # 关闭整数溢出检查
+panic = "abort"         # for loongarch64, tell the compiler to abort on panic instead of unwinding

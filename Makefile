@@ -5,14 +5,16 @@ export PROJECT := NoAxiom
 export MODE ?= release
 export BOARD ?= qemu-virt
 export KERNEL ?= kernel
-export ARCH ?= rv64
+export ARCH ?= loongarch64
 
-ifeq ($(ARCH),rv64)
+ifeq ($(ARCH),riscv64)
 	export TARGET := riscv64gc-unknown-none-elf
 	export OBJ_DUMP := riscv64-unknown-elf-objdump
-else ifeq ($(ARCH),la64)
-	export TARGET := loongarch64-unknown-none
-	export OBJ_DUMP := loongarch64-unknown-linux-gnu-objdump
+	export OBJCOPY := rust-objcopy --binary-architecture=riscv64
+else ifeq ($(ARCH),loongarch64)
+	export TARGET := loongarch64-unknown-linux-gnu
+	export OBJ_DUMP := loongarch64-linux-gnu-objdump
+	export OBJCOPY := rust-objcopy --binary-architecture=loongarch64
 endif
 
 export ROOT := $(shell pwd)
@@ -58,8 +60,6 @@ TEST_DIR := ./test/riscv-syscalls-testing/user
 FS_IMG := fs.img
 MKFS_SH := ./mk_fs.sh
 
-export OBJCOPY := rust-objcopy --binary-architecture=riscv64
-
 
 # console output colors
 export ERROR := "\e[31m"
@@ -99,7 +99,7 @@ build_kernel:
 	fi
 	@cd $(PROJECT)/kernel && make build
 
-build: $(FS_IMG) build_kernelta
+build: $(FS_IMG) build_kernel
 
 asm: # build_kernel
 	@echo -e "Building Kernel and Generating Assembly..."
@@ -140,7 +140,7 @@ sbi-qemu:
 
 run: sbi-qemu
 	@cp $(KERNEL_BIN) kernel-qemu
-	qemu-system-riscv64 $(QFLAGS)
+	qemu-system-loongarch64 $(QFLAGS)
 # rm -f $(SDCARD_BAK)
 
 # qemu-dtb:backup

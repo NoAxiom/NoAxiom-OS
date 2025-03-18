@@ -2,7 +2,7 @@ use arch::{Arch, ArchInt, ArchSbi, ArchTrap, _entry_other_hart};
 
 use crate::{
     config::{arch::CPU_NUM, mm::KERNEL_ADDR_OFFSET},
-    constant::banner::NOAXIOM_BANNER,
+    constant::{banner::NOAXIOM_BANNER, syscall::SYS_SHUTDOWN},
     cpu::get_hartid,
     device::init::device_init,
     driver::log::log_init,
@@ -87,6 +87,8 @@ pub extern "C" fn _boot_hart_init(_: usize, dtb: usize) {
         get_hartid(),
         dtb as usize,
     );
+    Arch::shutdown();
+
     rust_main();
     unreachable!();
 }
