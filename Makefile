@@ -5,19 +5,19 @@ export PROJECT := NoAxiom
 export MODE ?= release
 export BOARD ?= qemu-virt
 export KERNEL ?= kernel
-export ARCH_NAME ?= loongarch64
+export ARCH_NAME ?= riscv64
 
 export ROOT := $(shell pwd)
 
 ifeq ($(ARCH_NAME),riscv64)
 	export TARGET := riscv64gc-unknown-none-elf
-	export OBJ_DUMP := riscv64-unknown-elf-objdump
+	export OBJDUMP := riscv64-unknown-elf-objdump
 	export OBJCOPY := rust-objcopy --binary-architecture=riscv64
 	export SBI ?= $(ROOT)/$(PROJECT)/bootloader/rustsbi-qemu.bin
 	export QEMU := qemu-system-riscv64
 else ifeq ($(ARCH_NAME),loongarch64)
 	export TARGET := loongarch64-unknown-linux-gnu
-	export OBJ_DUMP := loongarch64-linux-gnu-objdump
+	export OBJDUMP := loongarch64-linux-gnu-objdump
 	export OBJCOPY := loongarch64-linux-gnu-objcopy
 	export SBI ?= $(ROOT)/$(PROJECT)/bootloader/u-boot-with-spl.bin
 	export QEMU := qemu-system-loongarch64
@@ -107,7 +107,7 @@ build: $(FS_IMG) build_kernel
 
 asm: # build_kernel
 	@echo -e "Building Kernel and Generating Assembly..."
-	@$(OBJ_DUMP) -d $(KERNEL_ELF) > $(KERNEL_ELF).asm
+	@$(OBJDUMP) -d $(KERNEL_ELF) > $(KERNEL_ELF).asm
 	@echo -e "Assembly saved to $(KERNEL_ELF).asm"
 
 # NOTE THAT if you want to run in single core
@@ -116,44 +116,34 @@ export MULTICORE := 2
 
 QFLAGS := 
 ifeq ($(ARCH_NAME),loongarch64)
+	QFLAGS += -kernel $(KERNEL_ELF)
     QFLAGS += -m 1024
-    QFLAGS += -M ls2k -drive if=pflash,file=sbi-qemu
-	# QFLAGS += -serial stdio # turn on serial output
 	QFLAGS += -nographic
-	QFLAGS += -kernel kernel-qemu
-	QFLAGS += -bios sbi-qemu
-    QFLAGS += -device ls2k-ahci,id=ahci
-    QFLAGS += -drive file=$(FS_IMG),if=none,format=raw,id=drive0
-    QFLAGS += -device ide-hd,drive=drive0,bus=ahci.0
-	QFLAGS += -D qemu.log -d in_asm,cpu_reset
-    
-    # QFLAGS += -device virtio-net-pci,netdev=net -netdev user,id=net
-else
-	QFLAGS += -m 128
-	QFLAGS += -machine virt
-	QFLAGS += -nographic
-	QFLAGS += -kernel kernel-qemu
-	QFLAGS += -device loader,file=$(KERNEL_BIN),addr=0x80200000
-	QFLAGS += -drive file=$(FS_IMG),if=none,format=raw,id=x0
-	QFLAGS += -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
-	QFLAGS += -bios sbi-qemu
-	# QFLAGS += -device virtio-net-device,netdev=net -netdev user,id=net
-endif
-
-ifneq ($(MULTICORE),)
 	QFLAGS += -smp $(MULTICORE)
+	QFLAGS += -drive file=$(FS_IMG),if=none,format=raw,id=x0
+	QFLAGS += -netdev user,id=net0,hostfwd=tcp::5555-:5555,hostfwd=udp::5555-:5555
+    QFLAGS += -rtc base=utc
+    # QFLAGS += -drive file=disk-la.img,if=none,format=raw,id=x1
+	# QFLAGS += -device virtio-blk-pci,drive=x1,bus=virtio-mmio-bus.1
+else
+	QFLAGS += -machine virt -kernel kernel-qemu
+	QFLAGS += -m 128
+	QFLAGS += -nographic
+	QFLAGS += -smp $(MULTICORE)
+	QFLAGS += -bios default
+	QFLAGS += -drive file=$(FS_IMG),if=none,format=raw,id=x0
+	QFLAGS += -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 
+	QFLAGS += -no-reboot -device virtio-net-device,netdev=net -netdev user,id=net
+	QFLAGS += -rtc base=utc
+	# QFLAGS += -drive file=disk.img,if=none,format=raw,id=x1 
+	# QFLAGS += -device virtio-blk-device,drive=x1,bus=virtio-mmio-bus.1
 endif
-
-
 
 # backup: 
 # 	@cp $(ROOTFS) $(SDCARD_BAK) 
 
 # fs-backup: 
 # 	@cp $(TESTFS) $(FS_BAK) 
-
-sbi-qemu:
-	@cp $(SBI) sbi-qemu
 
 run: sbi-qemu
 	@cp $(KERNEL_BIN) kernel-qemu
