@@ -18,7 +18,7 @@ ifeq ($(ARCH_NAME),riscv64)
 else ifeq ($(ARCH_NAME),loongarch64)
 	export TARGET := loongarch64-unknown-linux-gnu
 	export OBJ_DUMP := loongarch64-linux-gnu-objdump
-	export OBJCOPY := rust-objcopy --binary-architecture=loongarch64
+	export OBJCOPY := loongarch64-linux-gnu-objcopy
 	export SBI ?= $(ROOT)/$(PROJECT)/bootloader/u-boot-with-spl.bin
 	export QEMU := qemu-system-loongarch64
 endif
@@ -120,7 +120,7 @@ ifeq ($(ARCH_NAME),loongarch64)
     QFLAGS += -M ls2k -drive if=pflash,file=sbi-qemu
 	# QFLAGS += -serial stdio # turn on serial output
 	QFLAGS += -nographic
-	QFLAGS += -kernel $(KERNEL_ELF)
+	QFLAGS += -kernel kernel-qemu
 	QFLAGS += -bios sbi-qemu
     QFLAGS += -device ls2k-ahci,id=ahci
     QFLAGS += -drive file=$(FS_IMG),if=none,format=raw,id=drive0
