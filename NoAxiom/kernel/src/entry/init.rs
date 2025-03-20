@@ -85,7 +85,7 @@ pub extern "C" fn _boot_hart_init(_: usize, dtb: usize) {
     block_on(fs_init());
 
     // spawn init_proc and wake other harts
-    // entry::init_proc::schedule_spawn_all_apps();
+    // crate::entry::init_proc::schedule_spawn_all_apps();
     schedule_spawn_initproc();
     wake_other_hart(get_hartid());
 

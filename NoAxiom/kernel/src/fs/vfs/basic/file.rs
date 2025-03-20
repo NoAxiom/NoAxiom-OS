@@ -210,6 +210,7 @@ pub struct EmptyFile {
 }
 
 impl EmptyFile {
+    #[allow(unused)]
     pub fn new() -> Self {
         let dentry = Arc::new(dentry::EmptyDentry::new());
         let inode = Arc::new(inode::EmptyInode::new());

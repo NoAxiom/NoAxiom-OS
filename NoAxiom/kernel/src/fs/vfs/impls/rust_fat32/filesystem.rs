@@ -24,6 +24,7 @@ pub struct AsyncSmpFat32 {
 }
 
 impl AsyncSmpFat32 {
+    #[allow(unused)]
     pub fn new(name: &str) -> Self {
         Self {
             meta: FileSystemMeta::new(name),

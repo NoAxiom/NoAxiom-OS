@@ -7,6 +7,15 @@ use smoltcp::{socket::AnySocket, wire::IpListenEndpoint};
 
 use crate::{constant::net::PORT_MAX, include::result::Errno, syscall::SysResult};
 
+#[derive(Clone, Copy)]
+pub struct PortItem {}
+
+impl PortItem {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
 /// A table to record the listening endpoint of each port
 /// for both TCP/UDP
 ///
@@ -14,14 +23,13 @@ use crate::{constant::net::PORT_MAX, include::result::Errno, syscall::SysResult}
 /// `Some(x)` means the port is listened and the waker is used to wake up
 /// the socket
 pub struct PortManager {
-    inner: Arc<SpinLock<[Option<Waker>; PORT_MAX]>>,
+    inner: Arc<SpinLock<[Option<PortItem>; PORT_MAX]>>,
 }
 
-const ARRAY_REPEAT_VALUE: Option<Waker> = None;
 impl PortManager {
     pub fn new() -> Self {
         Self {
-            inner: Arc::new(SpinLock::new([ARRAY_REPEAT_VALUE; PORT_MAX])),
+            inner: Arc::new(SpinLock::new([None; PORT_MAX])),
         }
     }
 
@@ -32,6 +40,9 @@ impl PortManager {
         let inner = self.inner.lock();
         for _ in 49152..65535 {
             let test_port = unsafe { EPHEMERAL_PORT };
+            unsafe {
+                EPHEMERAL_PORT += 1;
+            }
             if inner[test_port as usize].is_none() {
                 return Ok(test_port);
             }
@@ -40,21 +51,21 @@ impl PortManager {
     }
 
     /// Bind a port with a socket
-    pub fn bind_port<S>(&self, endpoint: IpListenEndpoint, waker: Waker) -> SysResult<()>
+    pub fn bind_port<S>(&self, port: u16) -> SysResult<()>
     where
         S: AnySocket<'static>,
     {
-        let port = if endpoint.port == 0 {
+        let port = if port == 0 {
             self.get_ephemeral_port()?
         } else {
-            endpoint.port
+            port
         };
         let mut inner = self.inner.lock();
-        if let Some(_waker) = &inner[port as usize] {
+        if let Some(_) = &inner[port as usize] {
             // The port is already listened
             Err(Errno::EADDRINUSE)
         } else {
-            inner[port as usize] = Some(waker);
+            inner[port as usize] = Some(PortItem::new());
             Ok(())
         }
     }

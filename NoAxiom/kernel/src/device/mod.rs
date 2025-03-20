@@ -5,6 +5,7 @@ pub mod block;
 pub mod char;
 mod config;
 pub mod init;
+pub mod net;
 pub mod random;
 
 use alloc::{

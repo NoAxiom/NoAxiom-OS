@@ -19,7 +19,7 @@ use super::{
 use crate::{
     fs::path::Path,
     include::{fs::InodeMode, result::Errno},
-    syscall::{SysResult, SyscallResult},
+    syscall::SyscallResult,
 };
 
 pub struct DentryMeta {
@@ -183,6 +183,7 @@ impl dyn Dentry {
     }
 
     /// Find the dentry with `name` in the **WHOLE** sub-tree of the dentry.
+    #[allow(unused)]
     pub fn find(self: Arc<Self>, name: &str) -> Option<Arc<dyn Dentry>> {
         if self.name() == name {
             return Some(self.clone());

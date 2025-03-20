@@ -21,8 +21,10 @@ pub fn schedule_spawn_all_apps() {
     //
     // process
     // paths.push("/mmap");
-    paths.push("/openat");
-
+    // paths.push("/openat");
+    //
+    // net
+    paths.push("/long");
     for path in paths {
         schedule_spawn_new_process(Path::from(path.to_string()));
     }
