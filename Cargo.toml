@@ -1,6 +1,6 @@
 # complete these after
 [workspace]
-members = ["NoAxiom/kernel", "NoAxiom/user/apps/*", "NoAxiom/user/lib"]
+members = ["NoAxiom/kernel"]
 resolver = "2"
 
 [workspace.dependencies]
@@ -15,7 +15,6 @@ fatfs = { path = "NoAxiom/lib/fatfs", default-features = false, features = [
     "log_level_info",
 ] }
 config = { path = "NoAxiom/lib/config" }
-# polyhal = { path = "NoAxiom/lib/polyhal" }
 
 [profile.release]
 debug = true

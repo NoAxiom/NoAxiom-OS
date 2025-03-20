@@ -79,14 +79,6 @@ impl<T> UserPtr<T> {
     }
 
     #[inline(always)]
-    pub fn value(&self) -> T
-    where
-        T: Copy,
-    {
-        unsafe { *self.ptr }
-    }
-
-    #[inline(always)]
     pub fn addr(&self) -> VirtAddr {
         VirtAddr(self.ptr as usize)
     }
@@ -97,7 +89,23 @@ impl<T> UserPtr<T> {
     }
 
     #[inline(always)]
-    pub unsafe fn set(&self, value: T) {
+    pub fn read(&self) -> T
+    where
+        T: Copy,
+    {
+        unsafe { *self.ptr }
+    }
+
+    #[inline(always)]
+    pub fn read_volatile(&self) -> T
+    where
+        T: Copy,
+    {
+        unsafe { self.ptr.read_volatile() }
+    }
+
+    #[inline(always)]
+    pub fn write(&self, value: T) {
         unsafe { *self.ptr = value };
     }
 
@@ -189,13 +197,13 @@ impl UserPtr<UserPtr<u8>> {
     pub fn get_string_vec(&self) -> Vec<String> {
         let mut ptr = self.clone();
         let mut res = Vec::new();
-        while !ptr.is_null() && !ptr.value().is_null() {
+        while !ptr.is_null() && !ptr.read().is_null() {
             trace!(
                 "ptr_addr: {:#}, value: {:#}",
                 ptr.addr().0,
-                ptr.value().addr().0
+                ptr.read().addr().0
             );
-            let data = ptr.value().get_cstr();
+            let data = ptr.read().get_cstr();
             res.push(data);
             ptr.inc(1);
         }

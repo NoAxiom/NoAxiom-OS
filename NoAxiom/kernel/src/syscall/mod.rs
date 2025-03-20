@@ -6,12 +6,13 @@ pub mod fs;
 pub mod mm;
 pub mod others;
 pub mod process;
+pub mod signal;
 pub mod syscall;
 
 #[macro_use]
 pub mod macros;
 
-pub use syscall::{syscall, Syscall};
+pub use syscall::Syscall;
 
 pub type SysResult<T> = Result<T, Errno>;
 pub type SyscallResult = SysResult<isize>;

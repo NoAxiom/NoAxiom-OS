@@ -31,7 +31,6 @@ use crate::{
         process::auxv::{AuxEntry, AT_EXECFN, AT_NULL, AT_RANDOM},
         result::Errno,
         sched::CloneFlags,
-        signal::sig_set::SigMask,
     },
     mm::{
         address::VirtAddr,
@@ -41,7 +40,10 @@ use crate::{
     },
     return_errno,
     sched::sched_entity::SchedEntity,
-    signal::{pending_sigs::PendingSigs, sa_list::SigActionList, sig_info::SignalInfo},
+    signal::{
+        sig_pending::SigPending, sa_list::SigActionList, sig_control_block::SignalControlBlock,
+        sig_set::SigMask,
+    },
     syscall::{SysResult, SyscallResult},
     task::{manager::add_new_process, taskid::tid_alloc},
 };
@@ -87,7 +89,7 @@ pub struct Task {
     cwd: Arc<SpinLock<Path>>,
 
     /// [pr/th] signal info
-    signal_info: SignalInfo,
+    signal: SignalControlBlock,
 
     /// [th] waker
     waker: SyncUnsafeCell<Option<Waker>>,
@@ -193,17 +195,20 @@ impl Task {
         unsafe { &mut (*self.trap_cx.get()) }
     }
 
+    pub fn signal(&self) -> &SignalControlBlock {
+        &self.signal
+    }
     /// signal info: sigaction list
     pub fn sa_list(&self) -> SpinLockGuard<SigActionList> {
-        self.signal_info.sa_list.lock()
+        self.signal.sa_list.lock()
     }
     /// signal info: pending signals
-    pub fn pending_sigs(&self) -> SpinLockGuard<PendingSigs> {
-        self.signal_info.pending_sigs.lock()
+    pub fn pending_sigs(&self) -> SpinLockGuard<SigPending> {
+        self.signal.pending_sigs.lock()
     }
     /// signal info: signal mask
     pub fn sig_mask(&self) -> &SigMask {
-        unsafe { &(*self.signal_info.sig_mask.get()) }
+        unsafe { &(*self.signal.sig_mask.get()) }
     }
 
     /// get waker
@@ -256,7 +261,7 @@ impl Task {
             sched_entity: SchedEntity::new_bare(INIT_PROCESS_ID),
             fd_table: Arc::new(SpinLock::new(FdTable::new())),
             cwd: Arc::new(SpinLock::new(path)),
-            signal_info: SignalInfo::new(None, None),
+            signal: SignalControlBlock::new(None, None),
             waker: SyncUnsafeCell::new(None),
         });
         add_new_process(&task);
@@ -443,9 +448,9 @@ impl Task {
                 sched_entity: self.sched_entity.data_clone(tid_val),
                 fd_table,
                 cwd: self.cwd.clone(),
-                signal_info: SignalInfo::new(
-                    Some(&self.signal_info.pending_sigs),
-                    Some(&self.signal_info.sa_list),
+                signal: SignalControlBlock::new(
+                    Some(&self.signal.pending_sigs),
+                    Some(&self.signal.sa_list),
                 ),
                 waker: SyncUnsafeCell::new(None),
             });
@@ -477,7 +482,7 @@ impl Task {
                 sched_entity: self.sched_entity.data_clone(tid_val),
                 fd_table,
                 cwd: Arc::new(SpinLock::new(self.cwd().clone())),
-                signal_info: SignalInfo::new(None, None),
+                signal: SignalControlBlock::new(None, None),
                 waker: SyncUnsafeCell::new(None),
             });
             add_new_process(&new_process);

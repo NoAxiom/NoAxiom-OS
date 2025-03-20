@@ -2,17 +2,18 @@ use core::arch::asm;
 
 use config::{
     arch::CPU_NUM,
-    mm::{KERNEL_ADDR_OFFSET, KERNEL_STACK_SIZE, KERNEL_STACK_WIDTH},
+    mm::{KERNEL_ADDR_OFFSET, KERNEL_STACK_SIZE, KERNEL_STACK_WIDTH, PAGE_SIZE},
 };
 
 /// temp stack for kernel booting
 #[link_section = ".bss.kstack"]
 static BOOT_STACK: [u8; KERNEL_STACK_SIZE * CPU_NUM] = [0; KERNEL_STACK_SIZE * CPU_NUM];
 
+const PTE_PER_PAGE: usize = PAGE_SIZE / 8;
 /// temp page table for kernel booting, hard linked
 #[link_section = ".data.prepage"]
-static PAGE_TABLE: [usize; 512] = {
-    let mut arr: [usize; 512] = [0; 512];
+static PAGE_TABLE: [usize; PTE_PER_PAGE] = {
+    let mut arr: [usize; PTE_PER_PAGE] = [0; PTE_PER_PAGE];
     // create pte with all flags set
     macro_rules! page_table_config {
         ($($id:expr, $addr:expr)*) => {

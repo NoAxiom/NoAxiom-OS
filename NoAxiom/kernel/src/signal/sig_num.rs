@@ -7,8 +7,10 @@ pub type SigErrno = i32;
 #[repr(usize)]
 #[allow(non_camel_case_types, unused)]
 pub enum SigNum {
-    // non-rt signal
+    // empty signal, it means no signal
     INVALID = 0,
+
+    // non-rt signal
     SIGHUP = 1,
     SIGINT = 2,
     SIGQUIT = 3,
@@ -43,7 +45,7 @@ pub enum SigNum {
     SIGPWR = 30,
     SIGSYS = 31,
 
-    // rt signal
+    // rt signal, not implemented yet!
     SIGTIMER = 32,
     SIGCANCEL = 33,
     SIGSYNCCALL = 34,
@@ -98,7 +100,7 @@ impl Into<usize> for SigNum {
     }
 }
 
-// signum <> usize
+// signum <> signo(i32)
 impl Into<Signo> for SigNum {
     fn into(self) -> Signo {
         self as Signo

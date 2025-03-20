@@ -70,7 +70,7 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
         TrapType::SysCall => {
             cx[TrapArgs::EPC] += 4;
             trace!("[syscall] doing syscall");
-            let result = syscall(task, cx).await;
+            let result = task.syscall(cx).await;
             trace!("[syscall] done! result {:#x}", result);
             task.trap_context_mut()[TrapArgs::RES] = result as usize;
         }
