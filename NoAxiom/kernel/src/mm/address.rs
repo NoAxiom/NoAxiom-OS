@@ -2,7 +2,8 @@
 
 use core::fmt::Debug;
 
-use super::pte::PageTableEntry;
+use arch::PageTableEntry;
+
 use crate::{
     config::mm::*,
     utils::{kernel_va_to_pa, kernel_vpn_to_ppn, signed_extend},
@@ -147,6 +148,7 @@ impl PhysPageNum {
     /// get pte array from self pointing address
     /// SAFETY: only for kernel space
     pub fn get_pte_array(&self) -> &'static mut [PageTableEntry] {
+        trace!("get_pte_array: ppn = {:#x}", self.0);
         unsafe {
             core::slice::from_raw_parts_mut(
                 (self.into_pa().0 | KERNEL_ADDR_OFFSET) as *mut PageTableEntry,

@@ -49,7 +49,7 @@ impl Syscall<'_> {
 
     pub async fn sys_nanosleep(&self, buf: usize) -> SyscallResult {
         let buf = UserPtr::<TimeSpec>::new(buf);
-        let time_spec = buf.value();
+        let time_spec = buf.read();
         self.task.sleep(time_spec.into_ticks()).await;
         Ok(0)
     }

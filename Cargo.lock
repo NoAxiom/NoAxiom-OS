@@ -3,6 +3,15 @@
 version = 3
 
 [[package]]
+name = "aarch64-cpu"
+version = "10.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6a21cd0131c25c438e19cd6a774adf7e3f64f7f4d723022882facc2dee0f8bc9"
+dependencies = [
+ "tock-registers",
+]
+
+[[package]]
 name = "ahash"
 version = "0.8.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -48,8 +57,11 @@ dependencies = [
 name = "arch"
 version = "0.1.0"
 dependencies = [
+ "bitflags 2.6.0",
  "config",
+ "log",
  "loongArch64",
+ "page_table_entry",
  "riscv",
  "sbi-rt",
 ]
@@ -513,7 +525,7 @@ dependencies = [
  "uart16550",
  "uart8250",
  "virtio-drivers",
- "volatile",
+ "volatile 0.2.7",
  "xmas-elf",
 ]
 
@@ -598,6 +610,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
 
 [[package]]
+name = "memory_addr"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5438b8df0f13e16e1f46140de247695a95952a5a4479e47197a8711bf1063373"
+
+[[package]]
 name = "nb"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -628,6 +646,18 @@ name = "once_cell"
 version = "1.20.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1261fe7e33c73b354eab43b1273a57c8f967d0391e80353e51f764ac02cf6775"
+
+[[package]]
+name = "page_table_entry"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "13a40144d5ef66b7a98069a59c807d2f6ff812da1362b63f67091ba0c5187560"
+dependencies = [
+ "aarch64-cpu",
+ "bitflags 2.6.0",
+ "memory_addr",
+ "x86_64",
+]
 
 [[package]]
 name = "paste"
@@ -886,6 +916,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "tock-registers"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b9e2fdb3a1e862c0661768b7ed25390811df1947a8acbfbefe09b47078d93c4"
+
+[[package]]
 name = "uart16550"
 version = "0.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -935,6 +971,12 @@ name = "volatile"
 version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f6b06ad3ed06fef1713569d547cdbdb439eafed76341820fb0e0344f29a41945"
+
+[[package]]
+name = "volatile"
+version = "0.4.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "442887c63f2c839b346c192d047a7c87e73d0689c9157b00b53dcc27dd5ea793"
 
 [[package]]
 name = "volatile-register"
@@ -1121,6 +1163,18 @@ name = "windows_x86_64_msvc"
 version = "0.52.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "589f6da84c646204747d1270a2a5661ea66ed1cced2631d546fdfb155959f9ec"
+
+[[package]]
+name = "x86_64"
+version = "0.15.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4bc79523af8abf92fb1a970c3e086c5a343f6bcc1a0eb890f575cbb3b45743df"
+dependencies = [
+ "bit_field",
+ "bitflags 2.6.0",
+ "rustversion",
+ "volatile 0.4.6",
+]
 
 [[package]]
 name = "xmas-elf"

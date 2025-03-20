@@ -2,7 +2,7 @@
 
 use alloc::{string::String, sync::Arc, vec::Vec};
 use core::{
-    sync::atomic::{AtomicBool, AtomicI32, AtomicUsize, Ordering},
+    sync::atomic::{AtomicI32, AtomicUsize, Ordering},
     task::Waker,
 };
 
@@ -15,7 +15,7 @@ use ksync::{
 use super::{
     manager::ThreadGroup,
     process_info::ProcessInfo,
-    status::{AtomicTaskStatus, TaskStatus},
+    status::TaskStatus,
     taskid::{TidTracer, TGID, TID},
 };
 use crate::{
@@ -31,7 +31,6 @@ use crate::{
         process::auxv::{AuxEntry, AT_EXECFN, AT_NULL, AT_RANDOM},
         result::Errno,
         sched::CloneFlags,
-        signal::sig_set::SigMask,
     },
     mm::{
         address::VirtAddr,
@@ -41,7 +40,10 @@ use crate::{
     },
     return_errno,
     sched::sched_entity::SchedEntity,
-    signal::{pending_sigs::PendingSigs, sa_list::SigActionList, sig_info::SignalInfo},
+    signal::{
+        sig_pending::SigPending, sa_list::SigActionList, sig_control_block::SignalControlBlock,
+        sig_set::SigMask,
+    },
     syscall::{SysResult, SyscallResult},
     task::{manager::add_new_process, taskid::tid_alloc},
 };
@@ -72,7 +74,7 @@ pub struct Task {
     trap_cx: SyncUnsafeCell<TrapContext>,
 
     /// [th] task status: ready / running / zombie
-    status: AtomicTaskStatus,
+    status: SyncUnsafeCell<TaskStatus>,
 
     /// [th] schedule entity for schedule
     pub sched_entity: SchedEntity,
@@ -87,7 +89,7 @@ pub struct Task {
     cwd: Arc<SpinLock<Path>>,
 
     /// [pr/th] signal info
-    signal_info: SignalInfo,
+    signal: SignalControlBlock,
 
     /// [th] waker
     waker: SyncUnsafeCell<Option<Waker>>,
@@ -115,26 +117,11 @@ impl Task {
     /// status
     #[inline(always)]
     pub fn status(&self) -> TaskStatus {
-        self.status.load(Ordering::SeqCst)
+        *self.status.ref_mut()
     }
     #[inline(always)]
     pub fn set_status(&self, status: TaskStatus) {
-        self.status.store(status, Ordering::SeqCst);
-    }
-    #[inline(always)]
-    pub fn swap_status(&self, new_status: TaskStatus) -> TaskStatus {
-        self.status.swap(new_status, Ordering::SeqCst)
-    }
-    #[inline(always)]
-    pub fn cmp_xchg_status(&self, expected_status: TaskStatus, new_status: TaskStatus) -> bool {
-        self.status
-            .compare_exchange(
-                expected_status,
-                new_status,
-                Ordering::SeqCst,
-                Ordering::SeqCst,
-            )
-            .is_ok()
+        *self.status.ref_mut() = status;
     }
     #[inline(always)]
     pub fn is_stopped(&self) -> bool {
@@ -159,13 +146,13 @@ impl Task {
     }
     #[inline(always)]
     pub fn memory_activate(&self) {
-        self.memory_space.memory_set.lock().memory_activate(); // .memory_activate();
+        self.memory_space.memory_activate();
     }
     /// change current memory set
     pub fn change_memory_set(&self, memory_set: MemorySet) {
         // unsafe { (*self.memory_set.get()) = Arc::new(SpinLock::new(memory_set)) };
         let mut ms = self.memory_set().lock();
-        self.memory_space.change_token(memory_set.token());
+        self.memory_space.change_root_ppn(memory_set.root_ppn().0);
         *ms = memory_set;
     }
 
@@ -176,7 +163,7 @@ impl Task {
     ) -> SysResult<()> {
         trace!("[memory_validate] check at addr: {:#x}", addr);
         let vpn = VirtAddr::from(addr).floor();
-        let pt = PageTable::from_token(Arch::current_token());
+        let pt = PageTable::from_ppn(Arch::current_root_ppn());
         validate(self.memory_set(), vpn, trap_type, pt.translate_vpn(vpn)).await
     }
 
@@ -208,17 +195,20 @@ impl Task {
         unsafe { &mut (*self.trap_cx.get()) }
     }
 
+    pub fn signal(&self) -> &SignalControlBlock {
+        &self.signal
+    }
     /// signal info: sigaction list
     pub fn sa_list(&self) -> SpinLockGuard<SigActionList> {
-        self.signal_info.sa_list.lock()
+        self.signal.sa_list.lock()
     }
     /// signal info: pending signals
-    pub fn pending_sigs(&self) -> SpinLockGuard<PendingSigs> {
-        self.signal_info.pending_sigs.lock()
+    pub fn pending_sigs(&self) -> SpinLockGuard<SigPending> {
+        self.signal.pending_sigs.lock()
     }
     /// signal info: signal mask
     pub fn sig_mask(&self) -> &SigMask {
-        unsafe { &(*self.signal_info.sig_mask.get()) }
+        unsafe { &(*self.signal.sig_mask.get()) }
     }
 
     /// get waker
@@ -259,19 +249,19 @@ impl Task {
                 children: Vec::new(),
                 zombie_children: Vec::new(),
                 parent: None,
-                wait_req: AtomicBool::new(false),
+                wait_req: false,
             })),
             memory_space: MemorySpace {
-                token: SyncUnsafeCell::new(memory_set.token()),
+                root_ppn: SyncUnsafeCell::new(memory_set.root_ppn().0),
                 memory_set: Arc::new(SpinLock::new(memory_set)),
             },
             trap_cx: SyncUnsafeCell::new(TrapContext::app_init_cx(elf_entry, user_sp)),
-            status: AtomicTaskStatus::new(TaskStatus::Suspended),
+            status: SyncUnsafeCell::new(TaskStatus::Suspended),
             exit_code: AtomicI32::new(0),
             sched_entity: SchedEntity::new_bare(INIT_PROCESS_ID),
             fd_table: Arc::new(SpinLock::new(FdTable::new())),
             cwd: Arc::new(SpinLock::new(path)),
-            signal_info: SignalInfo::new(None, None),
+            signal: SignalControlBlock::new(None, None),
             waker: SyncUnsafeCell::new(None),
         });
         add_new_process(&task);
@@ -411,14 +401,14 @@ impl Task {
 
     /// fork
     pub fn fork(self: &Arc<Task>, flags: CloneFlags) -> Arc<Self> {
-        let (memory_set, token) = if flags.contains(CloneFlags::VM) {
+        let (memory_set, root_ppn) = if flags.contains(CloneFlags::VM) {
             (
                 self.memory_set().clone(),
-                SyncUnsafeCell::new(self.memory_space.token()),
+                SyncUnsafeCell::new(self.memory_space.root_ppn()),
             )
         } else {
-            let (ms, token) = self.memory_set().lock().clone_cow();
-            (Arc::new(SpinLock::new(ms)), SyncUnsafeCell::new(token))
+            let (ms, root_ppn) = self.memory_set().lock().clone_cow();
+            (Arc::new(SpinLock::new(ms)), SyncUnsafeCell::new(root_ppn))
         };
 
         // TODO: CloneFlags::SIGHAND
@@ -448,16 +438,19 @@ impl Task {
                 pgid: self.pgid.clone(),
                 thread_group: self.thread_group.clone(),
                 pcb: self.pcb.clone(),
-                memory_space: MemorySpace { token, memory_set },
+                memory_space: MemorySpace {
+                    root_ppn,
+                    memory_set,
+                },
                 trap_cx: SyncUnsafeCell::new(self.trap_context().clone()),
-                status: AtomicTaskStatus::new(TaskStatus::Suspended),
+                status: SyncUnsafeCell::new(TaskStatus::Suspended),
                 exit_code: AtomicI32::new(0),
                 sched_entity: self.sched_entity.data_clone(tid_val),
                 fd_table,
                 cwd: self.cwd.clone(),
-                signal_info: SignalInfo::new(
-                    Some(&self.signal_info.pending_sigs),
-                    Some(&self.signal_info.sa_list),
+                signal: SignalControlBlock::new(
+                    Some(&self.signal.pending_sigs),
+                    Some(&self.signal.sa_list),
                 ),
                 waker: SyncUnsafeCell::new(None),
             });
@@ -477,16 +470,19 @@ impl Task {
                     children: Vec::new(),
                     zombie_children: Vec::new(),
                     parent: Some(Arc::downgrade(self)),
-                    wait_req: AtomicBool::new(false),
+                    wait_req: false,
                 })),
-                memory_space: MemorySpace { memory_set, token },
+                memory_space: MemorySpace {
+                    memory_set,
+                    root_ppn,
+                },
                 trap_cx: SyncUnsafeCell::new(self.trap_context().clone()),
-                status: AtomicTaskStatus::new(TaskStatus::Suspended),
+                status: SyncUnsafeCell::new(TaskStatus::Suspended),
                 exit_code: AtomicI32::new(0),
                 sched_entity: self.sched_entity.data_clone(tid_val),
                 fd_table,
                 cwd: Arc::new(SpinLock::new(self.cwd().clone())),
-                signal_info: SignalInfo::new(None, None),
+                signal: SignalControlBlock::new(None, None),
                 waker: SyncUnsafeCell::new(None),
             });
             add_new_process(&new_process);
@@ -510,7 +506,7 @@ impl Task {
             mut auxs,
         } = MemorySet::load_from_path(path).await;
         self.delete_children();
-        unsafe { memory_set.memory_activate() };
+        memory_set.memory_activate();
         self.change_memory_set(memory_set);
         trace!("init usatck");
         let (user_sp, argc, argv_base, envp_base) =

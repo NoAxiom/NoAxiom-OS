@@ -1,8 +1,7 @@
 //! MapPermission for a MapArea
 
+use arch::MappingFlags;
 use bitflags::bitflags;
-
-use super::pte::PTEFlags;
 
 #[allow(unused)]
 #[derive(Copy, Clone, PartialEq, Debug)]
@@ -21,7 +20,7 @@ bitflags! {
     /// map permission contains kernel-associated pte flags,
     /// and don't contain hardware-associated pte flags
     #[derive(Clone, Copy, Debug)]
-    pub struct MapPermission: u16 {
+    pub struct MapPermission: u64 {
         /// readable
         const R = 1 << 1;
         /// writable
@@ -47,13 +46,29 @@ impl MapPermission {
     pub fn is_user(&self) -> bool {
         self.contains(MapPermission::U)
     }
-    pub fn into_pte_flags(&self) -> PTEFlags {
-        PTEFlags::from_bits(self.bits()).unwrap()
-    }
     pub fn merge_from_elf_flags(mut self, flags: xmas_elf::program::Flags) -> Self {
         self.set(MapPermission::R, flags.is_read());
         self.set(MapPermission::W, flags.is_write());
         self.set(MapPermission::X, flags.is_execute());
         self
+    }
+}
+
+impl Into<MappingFlags> for MapPermission {
+    fn into(self) -> MappingFlags {
+        let mut res = MappingFlags::empty();
+        if self.contains(MapPermission::R) {
+            res |= MappingFlags::R;
+        }
+        if self.contains(MapPermission::W) {
+            res |= MappingFlags::W;
+        }
+        if self.contains(MapPermission::X) {
+            res |= MappingFlags::X;
+        }
+        if self.contains(MapPermission::U) {
+            res |= MappingFlags::U;
+        }
+        res
     }
 }

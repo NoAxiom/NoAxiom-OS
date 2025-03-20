@@ -1,6 +1,6 @@
 use alloc::sync::Arc;
 
-use arch::{Arch, ArchInt, ArchTrapContext, TrapArgs, TrapContext};
+use arch::{Arch, ArchInt, ArchTrapContext, TrapContext};
 
 use super::SyscallResult;
 use crate::{constant::syscall::*, include::result::Errno, task::Task};
@@ -63,6 +63,13 @@ impl<'a> Syscall<'a> {
             SYS_GETPID => self.sys_getpid(),
             SYS_GETPPID => self.sys_getppid(),
 
+            // signal
+            SYS_SIGACTION => self.sys_sigaction(args[0] as i32, args[1], args[2]),
+            // SYS_SIGRETURN => self.sys_sigreturn(),
+            // SYS_KILL => self.sys_kill(args[0] as isize, args[1] as isize),
+            // SYS_SIGPROCMASK => self.sys_sigprocmask(args[0] as isize, args[1], args[2]),
+            // SYS_SIGSUSPEND => self.sys_sigsuspend(args[0], args[1], args[2]),
+
             // mm
             SYS_BRK => self.sys_brk(args[0]),
             SYS_MMAP => self.sys_mmap(
@@ -92,19 +99,20 @@ impl<'a> Syscall<'a> {
     }
 }
 
-pub async fn syscall(task: &Arc<Task>, cx: &TrapContext) -> isize {
-    let res = Syscall::new(task)
-        .syscall(cx.get_syscall_id(), cx.get_syscall_args())
-        .await;
-    match res {
-        Ok(res) => res,
-        Err(errno) => {
-            error!("syscall error: {:?}", errno);
-            let errno = errno as isize;
-            if errno > 0 {
-                -errno
-            } else {
-                errno
+impl Task {
+    pub async fn syscall(self: &Arc<Self>, cx: &TrapContext) -> isize {
+        let res = Syscall::new(self)
+            .syscall(cx.get_syscall_id(), cx.get_syscall_args())
+            .await;
+        match res {
+            Ok(res) => res,
+            Err(errno) => {
+                error!("syscall error: {:?}", errno);
+                let errno = errno as isize;
+                match errno > 0 {
+                    true => -errno,
+                    false => errno,
+                }
             }
         }
     }

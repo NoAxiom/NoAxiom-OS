@@ -2,7 +2,7 @@ use arch::{Arch, ArchInt, ArchSbi, ArchTrap, _entry_other_hart};
 
 use crate::{
     config::{arch::CPU_NUM, mm::KERNEL_ADDR_OFFSET},
-    constant::banner::NOAXIOM_BANNER,
+    constant::{banner::NOAXIOM_BANNER, syscall::SYS_SHUTDOWN},
     cpu::get_hartid,
     device::init::device_init,
     driver::log::log_init,
@@ -28,16 +28,7 @@ pub fn wake_other_hart(forbid_hart_id: usize) {
     );
     for i in 0..CPU_NUM {
         if i != forbid_hart_id {
-            Arch::hart_start(i, entry, 0);
-            // let result = hart_start(i, entry, 0);
-            // if result.error == 0 {
-            //     info!("[awake_other_hart] hart {:x} start successfully", i);
-            // } else {
-            //     error!(
-            //         "[awake_other_hart] error when waking {}, error code:
-            // {:?}",         i, result
-            //     );
-            // }
+            Arch::hart_start(i, entry);
         }
     }
 }
@@ -96,6 +87,7 @@ pub extern "C" fn _boot_hart_init(_: usize, dtb: usize) {
         get_hartid(),
         dtb as usize,
     );
+
     rust_main();
     unreachable!();
 }

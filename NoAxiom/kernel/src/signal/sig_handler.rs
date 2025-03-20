@@ -1,4 +1,4 @@
-use crate::include::signal::sig_num::SigNum;
+use super::sig_num::SigNum;
 
 /// terminate the process
 fn sig_default_terminate(sig: SigNum) {

@@ -1,7 +1,4 @@
-use atomic_enum::atomic_enum;
-
-#[atomic_enum]
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone, Copy)]
 pub enum TaskStatus {
     /// a task running on current cpu
     /// note that it's not in scheduler

@@ -2,7 +2,6 @@ use alloc::{
     sync::{Arc, Weak},
     vec::Vec,
 };
-use core::sync::atomic::AtomicBool;
 
 use super::Task;
 
@@ -18,7 +17,7 @@ pub struct ProcessInfo {
     pub parent: Option<Weak<Task>>,
 
     /// wait request
-    pub wait_req: AtomicBool,
+    pub wait_req: bool,
 }
 
 impl ProcessInfo {

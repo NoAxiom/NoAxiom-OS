@@ -1,6 +1,6 @@
 use bitflags::bitflags;
 
-use crate::constant::signal::MAX_SIGNUM;
+use crate::{constant::signal::MAX_SIGNUM, utils::lowbit};
 
 bitflags! {
     /// Signal mask
@@ -82,7 +82,6 @@ impl SigSet {
         if signum >= MAX_SIGNUM {
             panic!("[Kernel] invalid signum when add: {}", signum);
         }
-        // self.set(SigSet::from_bits_truncate(1 << signum), true);
         *self |= SigSet::from_bits_truncate(1 << signum);
     }
     pub fn disable(&mut self, signum: u32) {
@@ -104,14 +103,17 @@ impl SigSet {
     }
     pub fn try_fetch(&mut self) -> Option<u32> {
         // todo: use lowbit?
-        let mut signum = 1;
-        while signum < MAX_SIGNUM {
-            if self.has_signum(signum) {
-                return Some(signum);
-            }
-            signum += 1;
+        // let mut signum = 1;
+        // while signum < MAX_SIGNUM {
+        //     if self.has_signum(signum) {
+        //         return Some(signum);
+        //     }
+        //     signum += 1;
+        // }
+        match self.is_empty() {
+            true => None,
+            false => Some(lowbit(self.bits()).trailing_zeros() + 1),
         }
-        None
     }
 }
 

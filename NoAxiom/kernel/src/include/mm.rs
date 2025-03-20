@@ -1,6 +1,5 @@
+use arch::MappingFlags;
 use bitflags::bitflags;
-
-use crate::mm::pte::PTEFlags;
 
 bitflags! {
 #[derive(Clone, Copy, Debug)]
@@ -19,17 +18,17 @@ bitflags! {
     }
 }
 
-impl From<MmapProts> for PTEFlags {
+impl From<MmapProts> for MappingFlags {
     fn from(prots: MmapProts) -> Self {
-        let mut flags = PTEFlags::empty();
+        let mut flags = MappingFlags::empty();
         if prots.contains(MmapProts::PROT_READ) {
-            flags |= PTEFlags::R;
+            flags |= MappingFlags::R;
         }
         if prots.contains(MmapProts::PROT_WRITE) {
-            flags |= PTEFlags::W;
+            flags |= MappingFlags::W;
         }
         if prots.contains(MmapProts::PROT_EXEC) {
-            flags |= PTEFlags::X;
+            flags |= MappingFlags::X;
         }
         flags
     }

@@ -8,7 +8,7 @@ use array_init::array_init;
 use ksync::mutex::SpinLock;
 use lazy_static::lazy_static;
 
-use crate::{config::arch::CPU_NUM, cpu::get_hartid, sched::runtime::RUNTIME};
+use crate::{config::arch::CPU_NUM, cpu::get_hartid};
 
 #[derive(Clone)]
 pub enum IpiType {
@@ -78,9 +78,7 @@ pub fn ipi_handler() {
             Arch::tlb_flush();
         }
         IpiType::LoadBalance => {
-            info!("[IPI] load balance");
-            #[cfg(feature = "multicore")]
-            RUNTIME.handle_mailbox();
+            info!("[IPI] load balance done, current hart is woken!!");
         }
         _ => {
             info!("[IPI] unsupported ipi type");

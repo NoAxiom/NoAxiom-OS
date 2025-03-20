@@ -12,6 +12,8 @@ pub const TIME_SLICE_TICKS: usize = CLOCK_FREQ / TIME_SLICE_PER_SEC;
 /// load_balance: the overload / underload threshold
 /// when `load < average * (1 - 1 / threshold)`, it's underload
 /// vice versa
+/// WARNING: currently discarded
+#[allow(unused)]
 pub const LOAD_BALANCE_LIMIT: usize = 3;
 
 /// load balance span

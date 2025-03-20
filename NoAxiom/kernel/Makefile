@@ -1,8 +1,6 @@
 KERNEL_ELF := ../../target/$(TARGET)/$(MODE)/$(KERNEL)
 KERNEL_BIN := $(KERNEL_ELF).bin
 
-CARGO_ARGS :=
-
 ifeq ($(MODE),release)
     CARGO_ARGS += --release
 endif
@@ -23,7 +21,7 @@ DEV :=
 SH := 
 RAMDISK :=
 
-ifneq ($(MULTICORE_ARGS), )
+ifneq ($(MULTICORE), )
 	FEATURES += multicore
 endif
 
@@ -83,7 +81,7 @@ all: kernel
 
 kernel:
 	@echo -e $(NORMAL)"Building Kernel..."$(RESET)
-	cargo build $(CARGO_ARGS)
+	cargo build $(CARGO_ARGS) --target $(TARGET)
 	$(OBJCOPY) $(KERNEL_ELF) --strip-all -O binary $(KERNEL_BIN)
 
 # TODO: add initproc dependency when impl user

@@ -1,13 +1,13 @@
 use alloc::{sync::Arc, vec::Vec};
-use core::sync::atomic::Ordering;
 
 use arch::{Arch, ArchSbi};
 
 use super::Task;
 use crate::{
     config::task::INIT_PROCESS_ID,
-    include::signal::{
-        sig_info::{SigCode, SigExtraInfo, SigInfo},
+    signal::{
+        sig_detail::{SigChildDetail, SigDetail},
+        sig_info::{SigCode, SigInfo},
         sig_num::SigNum,
     },
     syscall::Syscall,
@@ -62,12 +62,12 @@ impl Task {
                     signo: SigNum::SIGCHLD.into(),
                     code: SigCode::User,
                     errno: 0,
-                    extra_info: SigExtraInfo::Extend {
-                        si_pid: self.tgid() as u32,
-                        si_status: Some(self.exit_code()),
-                        si_utime: None,
-                        si_stime: None,
-                    },
+                    detail: SigDetail::Child(SigChildDetail {
+                        pid: self.tgid() as u32,
+                        status: Some(self.exit_code()),
+                        utime: None,
+                        stime: None,
+                    }),
                 };
                 parent.proc_recv_siginfo(siginfo);
 
@@ -76,9 +76,9 @@ impl Task {
                 self.set_status(TaskStatus::Zombie);
                 par_pcb.children.retain(|task| task.tid() != tid);
                 par_pcb.zombie_children.push(self.clone());
-                if par_pcb.wait_req.load(Ordering::Acquire) {
+                if par_pcb.wait_req {
                     trace!("waking parent");
-                    par_pcb.wait_req.store(false, Ordering::Release);
+                    par_pcb.wait_req = false;
                     parent.wake_up();
                 } else {
                     trace!("I suppose that my parent is already woken");

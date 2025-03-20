@@ -17,7 +17,7 @@ use crate::{
     mm::{
         address::{PhysAddr, PhysPageNum, StepOne, VirtAddr},
         frame::{frame_alloc, frame_dealloc, FrameTracker},
-        memory_set::KERNEL_SPACE,
+        memory_set::{KERNEL_SPACE, KERNEL_SPACE_ROOT_PPN},
         page_table::PageTable,
     },
     utils::{kernel_pa_to_va, kernel_va_to_pa},
@@ -127,7 +127,7 @@ pub extern "C" fn virtio_virt_to_phys(vaddr: VirtAddr) -> PhysAddr {
     //     .into()
     // ! fixme
     // ! fix additonal translation
-    let translate_pa: PhysAddr = PageTable::from_token(KERNEL_SPACE.lock().token())
+    let translate_pa: PhysAddr = PageTable::from_ppn(unsafe { KERNEL_SPACE_ROOT_PPN })
         .translate_va(vaddr)
         .unwrap()
         .into();

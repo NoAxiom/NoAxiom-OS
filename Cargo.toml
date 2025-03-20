@@ -5,6 +5,7 @@ resolver = "2"
 
 [workspace.dependencies]
 log = "0.4"
+bitflags = "2.6.0"
 arch = { path = "NoAxiom/lib/arch" }
 ksync = { path = "NoAxiom/lib/ksync" }
 console = { path = "NoAxiom/lib/console" }
@@ -14,9 +15,9 @@ fatfs = { path = "NoAxiom/lib/fatfs", default-features = false, features = [
     "log_level_info",
 ] }
 config = { path = "NoAxiom/lib/config" }
-# polyhal = { path = "NoAxiom/lib/polyhal" }
 
 [profile.release]
 debug = true
 opt-level = 3           # 优化级别,最低是0,最高是3, 0方便debug
 overflow-checks = false # 关闭整数溢出检查
+panic = "abort"         # for loongarch64, tell the compiler to abort on panic instead of unwinding

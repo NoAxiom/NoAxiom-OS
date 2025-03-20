@@ -2,15 +2,28 @@
 
 # general config
 export PROJECT := NoAxiom
-export TARGET := riscv64gc-unknown-none-elf
 export MODE ?= release
 export BOARD ?= qemu-virt
 export KERNEL ?= kernel
-export ARCH ?= riscv64
+export ARCH_NAME ?= riscv64
 
 export ROOT := $(shell pwd)
+
+ifeq ($(ARCH_NAME),riscv64)
+	export TARGET := riscv64gc-unknown-none-elf
+	export OBJDUMP := riscv64-unknown-elf-objdump
+	export OBJCOPY := rust-objcopy --binary-architecture=riscv64
+	export SBI ?= $(ROOT)/$(PROJECT)/bootloader/rustsbi-qemu.bin
+	export QEMU := qemu-system-riscv64
+else ifeq ($(ARCH_NAME),loongarch64)
+	export TARGET := loongarch64-unknown-linux-gnu
+	export OBJDUMP := loongarch64-linux-gnu-objdump
+	export OBJCOPY := loongarch64-linux-gnu-objcopy
+	export SBI ?= $(ROOT)/$(PROJECT)/bootloader/u-boot-with-spl.bin
+	export QEMU := qemu-system-loongarch64
+endif
+
 export TARGET_DIR := $(ROOT)/target/$(TARGET)/$(MODE)
-export SBI ?= $(ROOT)/$(PROJECT)/bootloader/rustsbi-qemu.bin
 
 export LOG ?= DEBUG
 
@@ -51,8 +64,6 @@ TEST_DIR := ./test/riscv-syscalls-testing/user
 FS_IMG := fs.img
 MKFS_SH := ./mk_fs.sh
 
-export OBJCOPY := rust-objcopy --binary-architecture=riscv64
-
 
 # console output colors
 export ERROR := "\e[31m"
@@ -92,36 +103,41 @@ build_kernel:
 	fi
 	@cd $(PROJECT)/kernel && make build
 
-build: $(FS_IMG) build_kernelta
+build: $(FS_IMG) build_kernel
 
 asm: # build_kernel
 	@echo -e "Building Kernel and Generating Assembly..."
-	@riscv64-unknown-elf-objdump -d $(KERNEL_ELF) > $(KERNEL_ELF).asm
+	@$(OBJDUMP) -d $(KERNEL_ELF) > $(KERNEL_ELF).asm
 	@echo -e "Assembly saved to $(KERNEL_ELF).asm"
 
 # NOTE THAT if you want to run in single core
 # you should export this as empty
-export MULTICORE_ARGS := 2
-export DEBUG := 1
+export MULTICORE := 2
 
 QFLAGS := 
-QFLAGS += -m 128
-QFLAGS += -machine virt
-QFLAGS += -nographic
-QFLAGS += -kernel kernel-qemu
-QFLAGS += -device loader,file=$(KERNEL_BIN),addr=0x80200000
-QFLAGS += -drive file=$(FS_IMG),if=none,format=raw,id=x0
-QFLAGS += -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 
-# QFLAGS += -device virtio-net-device,netdev=net -netdev user,id=net
-
-ifneq ($(MULTICORE_ARGS),)
-	QFLAGS += -smp $(MULTICORE_ARGS)
+ifeq ($(ARCH_NAME),loongarch64)
+	QFLAGS += -kernel $(KERNEL_ELF)
+    QFLAGS += -m 1024
+	QFLAGS += -nographic
+	QFLAGS += -smp $(MULTICORE)
+	QFLAGS += -drive file=$(FS_IMG),if=none,format=raw,id=x0
+	QFLAGS += -netdev user,id=net0,hostfwd=tcp::5555-:5555,hostfwd=udp::5555-:5555
+    QFLAGS += -rtc base=utc
+    # QFLAGS += -drive file=disk-la.img,if=none,format=raw,id=x1
+	# QFLAGS += -device virtio-blk-pci,drive=x1,bus=virtio-mmio-bus.1
+else
+	QFLAGS += -machine virt -kernel kernel-qemu
+	QFLAGS += -m 128
+	QFLAGS += -nographic
+	QFLAGS += -smp $(MULTICORE)
+	QFLAGS += -bios default
+	QFLAGS += -drive file=$(FS_IMG),if=none,format=raw,id=x0
+	QFLAGS += -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 
+	QFLAGS += -no-reboot -device virtio-net-device,netdev=net -netdev user,id=net
+	QFLAGS += -rtc base=utc
+	# QFLAGS += -drive file=disk.img,if=none,format=raw,id=x1 
+	# QFLAGS += -device virtio-blk-device,drive=x1,bus=virtio-mmio-bus.1
 endif
-
-ifeq ($(BOARD), qemu-virt)
-	QFLAGS += -bios sbi-qemu
-endif
-
 
 # backup: 
 # 	@cp $(ROOTFS) $(SDCARD_BAK) 
@@ -129,12 +145,10 @@ endif
 # fs-backup: 
 # 	@cp $(TESTFS) $(FS_BAK) 
 
-sbi-qemu:
-	@cp $(SBI) sbi-qemu
-
 run: sbi-qemu
 	@cp $(KERNEL_BIN) kernel-qemu
-	qemu-system-riscv64 $(QFLAGS)
+	$(QEMU) $(QFLAGS)
+
 # rm -f $(SDCARD_BAK)
 
 # qemu-dtb:backup
@@ -153,7 +167,7 @@ run: sbi-qemu
 # 	qemu-system-riscv64 $(QEMU_ARGS) -s -S
 
 gdb-server: build_kernel
-	qemu-system-riscv64 $(QFLAGS) -s -S
+	$(QEMU) $(QFLAGS) -s -S
 
 
 debug-client:

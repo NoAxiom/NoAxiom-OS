@@ -5,5 +5,4 @@ pub mod net;
 pub mod process;
 pub mod result;
 pub mod sched;
-pub mod signal;
 pub mod time;

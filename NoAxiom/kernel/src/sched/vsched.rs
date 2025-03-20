@@ -17,12 +17,19 @@ pub trait Scheduler<R> {
 pub trait MulticoreScheduler<R>
 where
     Self: Scheduler<R>,
-    R: MulticoreSchedInfo,
 {
     fn sub_load(&mut self, load: usize);
     fn add_load(&mut self, load: usize);
-    fn is_overload(&self, all_load: usize) -> bool;
-    fn is_underload(&self, all_load: usize) -> bool;
+    fn load(&self) -> usize;
+    fn task_count(&self) -> usize;
+
+    fn set_running(&mut self, is_running: bool);
+    fn is_running(&self) -> bool;
+
+    fn last_time(&self) -> usize;
+    fn set_last_time(&mut self);
+    fn set_time_limit(&mut self, limit: usize);
+    fn is_timeup(&self) -> bool;
 }
 
 pub trait Runtime<T, R>
@@ -38,13 +45,5 @@ pub trait MulticoreRuntime<T, R>
 where
     Self: Runtime<T, R>,
     T: MulticoreScheduler<R>,
-    R: MulticoreSchedInfo,
 {
-    fn add_load(&self, load: usize);
-    fn sub_load(&self, load: usize);
-}
-
-pub trait MulticoreSchedInfo {
-    fn set_hartid(&self, hartid: usize);
-    fn hartid(&self) -> usize;
 }

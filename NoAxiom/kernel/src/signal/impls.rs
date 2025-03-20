@@ -1,10 +1,7 @@
 use alloc::sync::Arc;
 
-use crate::{
-    include::signal::{sig_info::SigInfo, sig_set::SigMask},
-    syscall::SyscallResult,
-    task::{status::TaskStatus, Task},
-};
+use super::{sig_info::SigInfo, sig_set::SigMask};
+use crate::{syscall::SyscallResult, task::Task};
 
 extern "C" {
     fn user_sigreturn();

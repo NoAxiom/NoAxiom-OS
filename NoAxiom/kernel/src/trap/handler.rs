@@ -2,7 +2,7 @@
 
 use alloc::sync::Arc;
 
-use arch::{Arch, ArchInt, ArchTrap, TrapArgs, TrapContext, TrapType};
+use arch::{Arch, ArchInt, ArchTrap, TrapArgs, TrapType};
 
 use super::{ext_int::ext_int_handler, ipi::ipi_handler};
 use crate::{
@@ -61,8 +61,7 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
     let user_exit = |msg: &str| {
         error!(
             "[user_trap_handler] unexpected exit!!! msg: {}, sepc = {:#x}",
-            msg,
-            cx[TrapArgs::EPC]
+            msg, epc,
         );
         task.set_stopped(-1);
     };
@@ -71,7 +70,7 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
         TrapType::SysCall => {
             cx[TrapArgs::EPC] += 4;
             trace!("[syscall] doing syscall");
-            let result = syscall(task, cx).await;
+            let result = task.syscall(cx).await;
             trace!("[syscall] done! result {:#x}", result);
             task.trap_context_mut()[TrapArgs::RES] = result as usize;
         }

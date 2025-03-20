@@ -34,9 +34,7 @@ pub fn get_trap_type(scause: Scause, stval: usize) -> TrapType {
         Trap::Exception(Exception::LoadPageFault) => TrapType::LoadPageFault(stval),
         Trap::Interrupt(Interrupt::SupervisorExternal) => TrapType::SupervisorExternal,
         Trap::Interrupt(Interrupt::SupervisorSoft) => TrapType::SupervisorSoft,
-        _ => {
-            panic!("unknown trap type");
-        }
+        _ => panic!("unknown trap type"),
     }
 }
 
@@ -49,9 +47,9 @@ pub fn set_trap_entry(addr: usize) {
 pub fn trap_init() {
     RV64::set_kernel_trap_entry();
     enable_external_interrupt();
-    enable_global_interrupt();
     enable_software_interrupt();
     enable_stimer_interrupt();
+    enable_global_interrupt();
 }
 
 #[no_mangle]
