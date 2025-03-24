@@ -27,5 +27,6 @@ fn panic(info: &PanicInfo) -> ! {
             info.message().unwrap()
         );
     }
-    Arch::shutdown()
+    loop {}
+    // Arch::shutdown()
 }

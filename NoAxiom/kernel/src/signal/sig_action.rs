@@ -1,7 +1,8 @@
+use array_init::array_init;
 use bitflags::bitflags;
 
 use super::{sig_num::SigNum, sig_set::SigMask};
-use crate::constant::signal::{SIG_DFL, SIG_IGN};
+use crate::constant::signal::{MAX_SIGNUM, SIG_DFL, SIG_IGN};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum SAHandlerType {
@@ -51,7 +52,7 @@ bitflags! {
 // fixme: is this order correct?
 #[derive(Clone, Copy)]
 #[repr(C)]
-pub struct SigAction {
+pub struct USigAction {
     pub handler: usize,
     pub flags: SAFlags,
     pub restorer: usize,
@@ -76,7 +77,7 @@ impl KSigAction {
 }
 
 impl KSigAction {
-    pub fn from_sa(sa: SigAction, signum: SigNum) -> Self {
+    pub fn from_sa(sa: USigAction, signum: SigNum) -> Self {
         match sa.handler {
             SIG_DFL => KSigAction::new_default(signum),
             SIG_IGN => Self {
@@ -91,9 +92,9 @@ impl KSigAction {
             },
         }
     }
-    
-    pub fn into_sa(&self) -> SigAction {
-        SigAction {
+
+    pub fn into_sa(&self) -> USigAction {
+        USigAction {
             handler: match self.handler {
                 SAHandlerType::Ignore => SIG_IGN,
                 SAHandlerType::Kill => SIG_DFL,
@@ -105,5 +106,24 @@ impl KSigAction {
             mask: self.mask,
             restorer: 0,
         }
+    }
+}
+
+/// signal action list of a task
+pub struct SigActionList {
+    pub actions: [KSigAction; MAX_SIGNUM as usize],
+}
+
+impl SigActionList {
+    pub fn new() -> Self {
+        Self {
+            actions: array_init(|signo| KSigAction::new_default(signo.into())),
+        }
+    }
+    pub fn set_sigaction(&mut self, signum: usize, action: KSigAction) {
+        self.actions[signum] = action;
+    }
+    pub fn get(&self, signum: usize) -> Option<&KSigAction> {
+        self.actions.get(signum)
     }
 }

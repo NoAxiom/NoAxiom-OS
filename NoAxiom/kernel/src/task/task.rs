@@ -41,7 +41,7 @@ use crate::{
     return_errno,
     sched::sched_entity::SchedEntity,
     signal::{
-        sig_pending::SigPending, sa_list::SigActionList, sig_control_block::SignalControlBlock,
+        sig_action::SigActionList, sig_control_block::SignalControlBlock, sig_pending::SigPending,
         sig_set::SigMask,
     },
     syscall::{SysResult, SyscallResult},
@@ -74,7 +74,7 @@ pub struct Task {
     trap_cx: SyncUnsafeCell<TrapContext>,
 
     /// [th] task status: ready / running / zombie
-    status: SyncUnsafeCell<TaskStatus>,
+    pub status: Arc<SpinLock<TaskStatus>>,
 
     /// [th] schedule entity for schedule
     pub sched_entity: SchedEntity,
@@ -116,16 +116,33 @@ impl Task {
 
     /// status
     #[inline(always)]
-    pub fn status(&self) -> TaskStatus {
-        *self.status.ref_mut()
+    pub fn status(&self) -> SpinLockGuard<TaskStatus> {
+        self.status.lock()
     }
+    #[inline(always)]
+    pub fn get_status(&self) -> TaskStatus {
+        *self.status.lock()
+    }
+    #[allow(unused)]
     #[inline(always)]
     pub fn set_status(&self, status: TaskStatus) {
-        *self.status.ref_mut() = status;
+        *self.status.lock() = status;
     }
-    #[inline(always)]
-    pub fn is_stopped(&self) -> bool {
-        self.status() == TaskStatus::Stopped
+    #[allow(unused)]
+    pub fn set_suspend(&self) {
+        self.set_status(TaskStatus::Suspend);
+    }
+    #[allow(unused)]
+    pub fn set_runnable(&self) {
+        self.set_status(TaskStatus::Runnable);
+    }
+    #[allow(unused)]
+    pub fn is_suspend(&self) -> bool {
+        self.get_status() == TaskStatus::Suspend
+    }
+    #[allow(unused)]
+    pub fn is_runnable(&self) -> bool {
+        self.get_status() == TaskStatus::Runnable
     }
 
     /// exit code
@@ -210,6 +227,9 @@ impl Task {
     pub fn sig_mask(&self) -> &SigMask {
         unsafe { &(*self.signal.sig_mask.get()) }
     }
+    pub fn sig_mask_mut(&self) -> &mut SigMask {
+        unsafe { &mut (*self.signal.sig_mask.get()) }
+    }
 
     /// get waker
     pub fn waker(&self) -> &Option<Waker> {
@@ -220,10 +240,8 @@ impl Task {
         unsafe { (*self.waker.get()) = Some(waker) };
     }
     /// wake self up
-    pub fn wake_up(&self) {
-        if let Some(waker) = self.waker().as_ref() {
-            waker.wake_by_ref();
-        }
+    pub fn wake(&self) {
+        self.waker().as_ref().unwrap().wake_by_ref();
     }
 
     /// create new process from elf
@@ -233,7 +251,7 @@ impl Task {
             memory_set,
             elf_entry,
             user_sp,
-            auxs,
+            auxs: _,
         } = MemorySet::load_from_path(path.clone()).await;
         trace!("[kernel] succeed to load elf data");
         // identifier
@@ -256,12 +274,12 @@ impl Task {
                 memory_set: Arc::new(SpinLock::new(memory_set)),
             },
             trap_cx: SyncUnsafeCell::new(TrapContext::app_init_cx(elf_entry, user_sp)),
-            status: SyncUnsafeCell::new(TaskStatus::Suspended),
+            status: Arc::new(SpinLock::new(TaskStatus::Runnable)),
             exit_code: AtomicI32::new(0),
             sched_entity: SchedEntity::new_bare(INIT_PROCESS_ID),
             fd_table: Arc::new(SpinLock::new(FdTable::new())),
             cwd: Arc::new(SpinLock::new(path)),
-            signal: SignalControlBlock::new(None, None),
+            signal: SignalControlBlock::new(None),
             waker: SyncUnsafeCell::new(None),
         });
         add_new_process(&task);
@@ -429,7 +447,7 @@ impl Task {
 
         let res = if flags.contains(CloneFlags::THREAD) {
             // fork as a new thread
-            trace!("fork new thread");
+            debug!("fork new thread");
             let new_tid = tid_alloc();
             let tid_val = new_tid.0;
             let new_thread = Arc::new(Self {
@@ -443,15 +461,12 @@ impl Task {
                     memory_set,
                 },
                 trap_cx: SyncUnsafeCell::new(self.trap_context().clone()),
-                status: SyncUnsafeCell::new(TaskStatus::Suspended),
+                status: Arc::new(SpinLock::new(TaskStatus::Runnable)),
                 exit_code: AtomicI32::new(0),
                 sched_entity: self.sched_entity.data_clone(tid_val),
                 fd_table,
                 cwd: self.cwd.clone(),
-                signal: SignalControlBlock::new(
-                    Some(&self.signal.pending_sigs),
-                    Some(&self.signal.sa_list),
-                ),
+                signal: SignalControlBlock::new(Some(&self.signal.sa_list)),
                 waker: SyncUnsafeCell::new(None),
             });
             self.thread_group.lock().insert(&new_thread);
@@ -465,7 +480,7 @@ impl Task {
                 tid: new_tid,
                 tgid: Arc::new(AtomicUsize::new(tid_val)),
                 pgid: self.pgid.clone(),
-                thread_group: self.thread_group.clone(),
+                thread_group: Arc::new(SpinLock::new(ThreadGroup::new())),
                 pcb: Arc::new(SpinLock::new(ProcessInfo {
                     children: Vec::new(),
                     zombie_children: Vec::new(),
@@ -477,12 +492,12 @@ impl Task {
                     root_ppn,
                 },
                 trap_cx: SyncUnsafeCell::new(self.trap_context().clone()),
-                status: SyncUnsafeCell::new(TaskStatus::Suspended),
+                status: Arc::new(SpinLock::new(TaskStatus::Runnable)),
                 exit_code: AtomicI32::new(0),
                 sched_entity: self.sched_entity.data_clone(tid_val),
                 fd_table,
                 cwd: Arc::new(SpinLock::new(self.cwd().clone())),
-                signal: SignalControlBlock::new(None, None),
+                signal: SignalControlBlock::new(None),
                 waker: SyncUnsafeCell::new(None),
             });
             add_new_process(&new_process);
@@ -519,11 +534,11 @@ impl Task {
     }
 
     /// exit current task
-    pub fn set_stopped(&self, exit_code: i32) {
+    pub fn terminate(&self, exit_code: i32) {
         if self.is_group_leader() {
             self.set_exit_code(exit_code);
         }
-        self.set_status(TaskStatus::Stopped);
+        self.set_status(TaskStatus::Terminated);
     }
 
     pub fn grow_brk(self: &Arc<Self>, new_brk: usize) -> SyscallResult {

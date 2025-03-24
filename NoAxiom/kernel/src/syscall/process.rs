@@ -10,6 +10,7 @@ use crate::{
     },
     mm::user_ptr::UserPtr,
     sched::spawn::spawn_utask,
+    signal::sig_set::SigSet,
     task::wait::WaitChildFuture,
 };
 
@@ -17,7 +18,7 @@ impl Syscall<'_> {
     /// exit current task by marking it as zombie
     pub fn sys_exit(&mut self, exit_code: usize) -> SyscallResult {
         let exit_code = exit_code as i32;
-        self.task.set_stopped(exit_code);
+        self.task.terminate(exit_code);
         Ok(0)
     }
 
@@ -97,8 +98,13 @@ impl Syscall<'_> {
         };
 
         // wait for child exit
-        let (exit_code, tid) =
-            WaitChildFuture::new(self.task.clone(), pid_type, wait_option)?.await?;
+        let (exit_code, tid) = self
+            .task
+            .suspend_on(
+                WaitChildFuture::new(self.task.clone(), pid_type, wait_option)?,
+                Some(SigSet::SIGCHLD),
+            )
+            .await?;
         if !status.is_null() {
             trace!(
                 "[sys_wait4]: write exit_code at status_addr = {:#x}",
@@ -122,14 +128,3 @@ impl Syscall<'_> {
         }
     }
 }
-
-/*
-
-注意！如果事件发生没有严格的先后顺序，那么不能使用suspend让权！
-我们来比较一下磁盘IO与等待子进程的情况：
-磁盘IO拥有严格的顺序，一定是先发起IO请求，然后等待IO完成，所以可以使用suspend让权。
-而等待子进程的情况下，子进程可能在 父进程寻找zombie进程 到 父进程让权 这段时间内检测父进程是否为suspend状态
-由于父进程执行wait是无锁的，并不是一个原子的操作，因此假如是上面这种情况就会导致子进程误认为父进程未suspend
-但父进程已经处于suspend的执行流当中了，这就导致父进程suspend之后无法再被唤醒！
-
-*/

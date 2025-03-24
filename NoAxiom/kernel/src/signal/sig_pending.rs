@@ -9,7 +9,7 @@ use super::{sig_info::SigInfo, sig_set::SigSet};
 /// and will be handled when the signal is unmasked
 pub struct SigPending {
     pub queue: VecDeque<SigInfo>, // pending signal queue that should be handled
-    pub cur_sigset: SigSet,       // current pending signal set, used to avoid duplicate signals
+    pub pending_set: SigSet,      // current pending signal set, used to avoid duplicate signals
     pub should_wake: SigSet,      // signals that should wake the task
 }
 
@@ -17,21 +17,25 @@ impl SigPending {
     pub fn new() -> Self {
         Self {
             queue: VecDeque::new(),
-            cur_sigset: SigSet::empty(),
+            pending_set: SigSet::empty(),
             should_wake: SigSet::empty(),
         }
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.queue.is_empty()
+    }
+
     pub fn push(&mut self, sig_info: SigInfo) {
-        if !self.cur_sigset.has_signum(sig_info.signo as u32) {
-            self.cur_sigset.enable(sig_info.signo as u32);
+        if !self.pending_set.contain_signum(sig_info.signo as u32) {
+            self.pending_set.enable(sig_info.signo as u32);
             self.queue.push_back(sig_info);
         }
     }
 
     pub fn pop_one(&mut self) -> Option<SigInfo> {
         if let Some(sig_info) = self.queue.pop_front() {
-            self.cur_sigset.disable(sig_info.signo as u32);
+            self.pending_set.disable(sig_info.signo as u32);
             Some(sig_info)
         } else {
             None
@@ -39,14 +43,14 @@ impl SigPending {
     }
 
     pub fn pop_with_mask(&mut self, mask: SigSet) -> Option<SigInfo> {
-        let x = self.cur_sigset & mask;
+        let x = self.pending_set & mask;
         if x.is_empty() {
             return None;
         } else {
             for i in 0..self.queue.len() {
                 let signo = self.queue[i].signo;
-                if x.has_signum(signo as u32) {
-                    self.cur_sigset.disable(signo as u32);
+                if x.contain_signum(signo as u32) {
+                    self.pending_set.disable(signo as u32);
                     return self.queue.remove(i);
                 }
             }

@@ -4,7 +4,6 @@
     "**/.trashbin": true
   },
   "rust-analyzer.cargo.target": "riscv64gc-unknown-none-elf",
-  // "rust-analyzer.cargo.target": "loongarch64-unknown-linux-gnu",
   "rust-analyzer.check.allTargets": false,
   "rust-analyzer.cargo.features": [
     "multicore",

@@ -2,17 +2,19 @@ use core::arch::global_asm;
 
 use riscv::register::{
     scause::{self, Exception, Interrupt, Scause, Trap},
-    sepc, stval,
+    sepc,
+    sstatus::FS,
+    stval,
     stvec::{self, TrapMode},
 };
 
-use super::{context::TrapContext, RV64};
+use super::{context::TrapContext, interrupt::disable_global_interrupt, RV64};
 use crate::{
     rv64::interrupt::{
         enable_external_interrupt, enable_global_interrupt, enable_software_interrupt,
         enable_stimer_interrupt,
     },
-    ArchTrap, TrapType,
+    ArchTrap, ArchTrapContext, ArchUserFloatContext, TrapType,
 };
 
 global_asm!(include_str!("./trap.S"));
@@ -43,22 +45,6 @@ pub fn set_trap_entry(addr: usize) {
     unsafe { stvec::write(addr, TrapMode::Direct) };
 }
 
-/// trap init of current hart
-pub fn trap_init() {
-    RV64::set_kernel_trap_entry();
-    enable_external_interrupt();
-    enable_software_interrupt();
-    enable_stimer_interrupt();
-    enable_global_interrupt();
-}
-
-#[no_mangle]
-/// kernel back to user
-pub fn trap_restore(cx: &mut TrapContext) {
-    RV64::set_user_trap_entry();
-    unsafe { user_trapret(cx) };
-}
-
 impl ArchTrap for RV64 {
     type TrapContext = super::context::TrapContext;
     /// set trap entry in supervisor mode
@@ -69,15 +55,28 @@ impl ArchTrap for RV64 {
     fn set_user_trap_entry() {
         set_trap_entry(user_trapvec as usize);
     }
+    /// init trap in a single hart
     fn trap_init() {
-        trap_init();
+        RV64::set_kernel_trap_entry();
+        enable_external_interrupt();
+        enable_software_interrupt();
+        enable_stimer_interrupt();
+        enable_global_interrupt();
     }
+    /// restore trap context, with freg handled as well
     fn trap_restore(cx: &mut TrapContext) {
-        trap_restore(cx)
+        disable_global_interrupt();
+        RV64::set_user_trap_entry();
+        cx.freg_mut().restore();
+        cx.sstatus().set_fs(FS::Clean);
+        unsafe { user_trapret(cx) };
+        cx.freg_mut().mark_save_if_needed();
     }
+    /// read exception pc
     fn read_epc() -> usize {
         sepc::read()
     }
+    /// translate scause and stval to common TrapType
     fn read_trap_type() -> TrapType {
         let scause = scause::read();
         let stval = stval::read();

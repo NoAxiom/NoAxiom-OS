@@ -10,7 +10,7 @@ use crate::{
     include::result::Errno,
     mm::user_ptr::UserPtr,
     signal::{
-        sig_action::{KSigAction, SigAction},
+        sig_action::{KSigAction, USigAction},
         sig_num::{SigNum, Signo},
     },
 };
@@ -22,8 +22,8 @@ impl Syscall<'_> {
             signo, act, old_act,
         );
 
-        let act = UserPtr::<SigAction>::new(act);
-        let old_act = UserPtr::<SigAction>::new(old_act);
+        let act = UserPtr::<USigAction>::new(act);
+        let old_act = UserPtr::<USigAction>::new(old_act);
         let task = self.task;
         let signum = SigNum::from(signo);
 
@@ -48,7 +48,7 @@ impl Syscall<'_> {
         Ok(0)
     }
 
-    pub fn sys_sigreturn() {
+    pub fn sys_sigreturn(&self) -> SyscallResult {
         unimplemented!()
     }
 }

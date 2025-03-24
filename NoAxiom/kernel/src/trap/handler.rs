@@ -8,8 +8,7 @@ use super::{ext_int::ext_int_handler, ipi::ipi_handler};
 use crate::{
     // constant::register::A0,
     cpu::{current_cpu, get_hartid},
-    sched::utils::{block_on, yield_now},
-    syscall::syscall,
+    sched::utils::block_on,
     task::Task,
 };
 
@@ -63,7 +62,7 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
             "[user_trap_handler] unexpected exit!!! msg: {}, sepc = {:#x}",
             msg, epc,
         );
-        task.set_stopped(-1);
+        task.terminate(-1);
     };
     match trap_type {
         // syscall
@@ -97,7 +96,7 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
                 get_hartid(),
                 task.tid(),
             );
-            yield_now().await;
+            task.yield_now().await;
         }
         TrapType::SupervisorExternal => {
             trace!(

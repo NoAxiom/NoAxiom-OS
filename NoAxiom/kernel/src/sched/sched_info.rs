@@ -1,18 +1,20 @@
-use alloc::sync::Weak;
+use alloc::sync::Arc;
+
+use ksync::mutex::SpinLock;
 
 use super::sched_entity::SchedEntity;
-use crate::task::Task;
+use crate::task::{status::TaskStatus, Task};
 
 pub struct SchedInfo {
     pub sched_entity: SchedEntity,
-    /// the hartid that the task should be running on
-    pub _task: Option<Weak<Task>>,
+    pub status: Option<Arc<SpinLock<TaskStatus>>>,
 }
 impl SchedInfo {
-    pub fn new(sched_entity: SchedEntity, task: Option<Weak<Task>>) -> Self {
+    pub fn new(sched_entity: SchedEntity, task: Option<&Arc<Task>>) -> Self {
+        let status = task.map(|task| task.status.clone());
         Self {
             sched_entity,
-            _task: task,
+            status,
         }
     }
 }
