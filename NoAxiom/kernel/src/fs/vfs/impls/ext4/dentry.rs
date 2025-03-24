@@ -1,7 +1,6 @@
 use alloc::{boxed::Box, sync::Arc};
 
 use async_trait::async_trait;
-use ext4_rs::ext4_defs::{Ext4DirEntry, Ext4DirSearchResult};
 
 use super::{
     file::{Ext4Dir, Ext4File},
@@ -15,7 +14,6 @@ use crate::{
             superblock::SuperBlock,
         },
         impls::ext4::{fs_err, superblock::Ext4SuperBlock},
-        root_dentry,
     },
     include::{fs::InodeMode, result::Errno},
 };

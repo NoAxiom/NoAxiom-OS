@@ -5,7 +5,6 @@ use ext4_rs::InodeFileType;
 
 use super::{dentry::Ext4Dentry, inode::Ext4FileInode, superblock::Ext4SuperBlock};
 use crate::{
-    entry,
     fs::vfs::{
         basic::{
             file::{File, FileMeta},
@@ -13,10 +12,7 @@ use crate::{
         },
         impls::ext4::{fs_err, inode::Ext4DirInode},
     },
-    include::{
-        fs::{Ext4DirEntryType, InodeMode},
-        result::Errno,
-    },
+    include::{fs::InodeMode, result::Errno},
     syscall::SyscallResult,
 };
 
