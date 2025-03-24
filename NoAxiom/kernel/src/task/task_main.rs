@@ -5,11 +5,11 @@ use core::{
     task::{Context, Poll},
 };
 
-use arch::{Arch, ArchInt, ArchTrap};
+use arch::{Arch, ArchInt, ArchTrap, ArchTrapContext, ArchUserFloatContext};
 
 use crate::{
     cpu::current_cpu,
-    sched::utils::take_waker,
+    sched::utils::{suspend_now, take_waker},
     task::{status::TaskStatus, Task},
     time::gettime::get_time_us,
     trap::handler::user_trap_handler,
@@ -30,6 +30,8 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
     type Output = F::Output;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        Arch::disable_global_interrupt();
+
         let this = unsafe { self.get_unchecked_mut() };
         let task = &this.task;
         let future = &mut this.future;
@@ -37,20 +39,9 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
 
         // set task to current cpu, set task status to Running
         current_cpu().set_task(task);
-        task.set_status(TaskStatus::Running);
 
         // execute task future
         let ret = unsafe { Pin::new_unchecked(future).poll(cx) };
-
-        // normally we set the task to runnable status
-        // fixme: this might cause bugs since we are not in any lock's protection
-        if task.status() == TaskStatus::Running {
-            task.set_status(TaskStatus::Suspended);
-        }
-
-        // clear current task
-        // note that task status will be set in other place
-        current_cpu().clear_task();
 
         // update vruntime
         let time_out = get_time_us();
@@ -62,6 +53,12 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
             task.sched_entity.inner().vruntime.0
         );
 
+        // mark current task's freg as should restore
+        task.trap_context_mut().freg_mut().yield_task();
+
+        // clear current task
+        current_cpu().clear_task();
+
         // always enable global interrupt before return
         Arch::enable_global_interrupt();
         ret
@@ -71,19 +68,28 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
 /// user task main
 pub async fn task_main(task: Arc<Task>) {
     task.set_waker(take_waker().await);
-    while !task.is_stopped() {
+    macro check_status() {
+        match task.get_status() {
+            TaskStatus::Terminated => break,
+            TaskStatus::Stopped => suspend_now().await,
+            _ => {}
+        }
+    }
+    loop {
         // kernel -> user
         trace!("[task_main] trap_restore");
         Arch::trap_restore(task.trap_context_mut());
-        // debug!("cx: {:?}", task.trap_context());
-        if task.is_stopped() {
-            warn!("task {} is zombie before trap_handler, break", task.tid());
-            break;
-        }
-        // user -> kernel
+        check_status!();
+
+        // user -> kernel, enter the handler
         trace!("[task_main] user_trap_handler");
         assert!(!Arch::is_interrupt_enabled());
         user_trap_handler(&task).await;
+        check_status!();
+
+        // check signal before return to user
+        task.check_signal().expect("check_signal error");
+        check_status!();
     }
     task.exit_handler().await;
 }

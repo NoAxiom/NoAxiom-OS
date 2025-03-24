@@ -7,7 +7,7 @@ use super::{
     vsched::{MulticoreRuntime, MulticoreScheduler, Runtime, ScheduleOrder::*},
 };
 use crate::{
-    config::arch::CPU_NUM, constant::sched::NICE_0_LOAD, cpu::get_hartid,
+    config::arch::CPU_NUM, constant::sched::NICE_0_LOAD, cpu::get_hartid, task::status::TaskStatus,
     time::sleep::current_sleep_manager,
 };
 
@@ -118,6 +118,27 @@ where
     }
 
     fn schedule(&self, runnable: Runnable<SchedInfo>, info: ScheduleInfo) {
+        if let Some(status) = runnable.metadata().status.as_ref() {
+            let mut inner = status.lock();
+            match *inner {
+                TaskStatus::Runnable => {}
+                TaskStatus::Suspend => {
+                    warn!(
+                        "wake task {} from suspend",
+                        runnable.metadata().sched_entity.tid
+                    );
+                    *inner = TaskStatus::Runnable;
+                }
+                _ => {
+                    warn!(
+                        "woken task {} is not runnable, status: {:?}",
+                        runnable.metadata().sched_entity.tid,
+                        inner
+                    );
+                }
+            }
+            drop(inner);
+        }
         let mut local = self.current_scheduler().lock();
         local.push_with_info(runnable, info);
     }

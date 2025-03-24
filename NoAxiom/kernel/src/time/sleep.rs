@@ -84,7 +84,9 @@ impl Task {
         } else {
             let waker = self.waker().as_ref().unwrap().clone();
             current_sleep_manager().push(SleepInfo { waker, time });
-            suspend_now().await;
+            while !check_time(get_time(), time) {
+                suspend_now().await;
+            }
         }
     }
 }

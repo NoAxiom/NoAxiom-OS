@@ -47,6 +47,7 @@ pub enum SigCode {
     SigIO = -5,
 }
 
+#[derive(Clone, Copy, Debug)]
 pub struct SigInfo {
     pub signo: Signo,      // signal number
     pub code: SigCode,     // signal code

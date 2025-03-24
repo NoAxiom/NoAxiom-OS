@@ -5,6 +5,7 @@
 #![feature(asm_const)]
 #![feature(ascii_char)]
 #![feature(let_chains)]
+#![feature(decl_macro)]
 #![feature(error_in_core)]
 #![feature(negative_impls)]
 #![feature(naked_functions)]

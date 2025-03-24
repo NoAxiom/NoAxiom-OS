@@ -107,20 +107,21 @@ impl ThreadGroup {
 }
 
 impl Task {
-    #[allow(unused)]
-    pub unsafe fn delete_from_parent(&self) {
-        if let Some(parent) = self.pcb().parent.clone() {
-            let ch_tid = self.tid();
-            let parent = parent.upgrade().unwrap();
-            let mut p_pcb = parent.pcb();
-            p_pcb.children.retain(|x| x.tid() != ch_tid);
-            debug!(
-                "[delete_from_parent] child: {}, parent: {}",
-                ch_tid,
-                parent.tid()
-            );
-        }
-    }
+    // #[allow(unused)]
+    // pub unsafe fn delete_from_parent(&self) {
+    //     error!("DISCARD FUNCTION: delete_from_parent");
+    //     if let Some(parent) = self.pcb().parent.clone() {
+    //         let ch_tid = self.tid();
+    //         let parent = parent.upgrade().unwrap();
+    //         let mut p_pcb = parent.pcb();
+    //         p_pcb.children.retain(|x| x.tid() != ch_tid);
+    //         debug!(
+    //             "[delete_from_parent] child: {}, parent: {}",
+    //             ch_tid,
+    //             parent.tid()
+    //         );
+    //     }
+    // }
     pub fn delete_children(&self) {
         if self.is_group_leader() {
             // process resources clean up

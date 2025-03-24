@@ -18,9 +18,10 @@ use core::{
     ops::{Index, IndexMut},
 };
 
-use riscv::register::sstatus::SPP;
+use bit_field::BitField;
+use riscv::register::sstatus::{self, FS, SPP};
 
-use crate::{ArchTrapContext, TrapArgs};
+use crate::{ArchTrapContext, ArchUserFloatContext, TrapArgs};
 
 pub mod reg_id {
     #![allow(unused)]
@@ -62,16 +63,16 @@ pub mod reg_id {
 /// virtual sstatus register, it's not a real register
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
-pub struct Sstatus(pub usize);
+pub struct MySstatus(pub usize);
 
 #[allow(unused)]
-impl Sstatus {
+impl MySstatus {
     pub fn read() -> Self {
         let val: usize;
         unsafe {
             asm!("csrr {},sstatus", out(reg)val);
         }
-        Sstatus(val)
+        MySstatus(val)
     }
     pub fn sum() -> usize {
         (Self::read().0 >> 18) & 1
@@ -99,6 +100,10 @@ impl Sstatus {
     pub fn set_sie(&mut self, value: bool) {
         self.0 = self.0 & !(1 << 1) | ((value as usize) << 1);
     }
+    pub fn set_fs(&mut self, fs: FS) {
+        let v: u8 = unsafe { core::mem::transmute(fs) };
+        self.0.set_bits(13..15, v as usize);
+    }
 }
 
 /// Trap Context
@@ -112,7 +117,7 @@ pub struct TrapContext {
     x: [usize; 32],
 
     /// [32]/[256~263]: cpu status
-    sstatus: Sstatus,
+    sstatus: MySstatus,
 
     /// [33]/[264~271]: exception pc (va)
     sepc: usize,
@@ -133,6 +138,16 @@ pub struct TrapContext {
 
     /// [49]/[392~399]: tp, aka hartid
     kernel_tp: usize,
+
+    /// freg
+    freg: UserFloatContext,
+}
+
+impl TrapContext {
+    #[inline(always)]
+    pub fn sstatus(&self) -> MySstatus {
+        self.sstatus
+    }
 }
 
 impl Index<TrapArgs> for TrapContext {
@@ -176,8 +191,12 @@ impl IndexMut<TrapArgs> for TrapContext {
 }
 
 impl ArchTrapContext for TrapContext {
+    type FloatContext = UserFloatContext;
+    fn freg_mut(&mut self) -> &mut Self::FloatContext {
+        &mut self.freg
+    }
     fn app_init_cx(entry: usize, sp: usize) -> Self {
-        let mut sstatus = Sstatus::read();
+        let mut sstatus = MySstatus::read();
         sstatus.set_spp(SPP::User);
         let mut cx = Self {
             x: [0; 32],
@@ -188,6 +207,7 @@ impl ArchTrapContext for TrapContext {
             kernel_reg: [0; 12],
             kernel_fp: 0,
             kernel_tp: 0,
+            freg: UserFloatContext::new(),
         };
         cx.x[reg_id::SP] = sp;
         cx
@@ -199,8 +219,132 @@ impl ArchTrapContext for TrapContext {
         self[A0] = argc;
         self[A1] = argv;
         self[A2] = envp;
-        let mut sstatus = Sstatus::read();
+        let mut sstatus = MySstatus::read();
         sstatus.set_spp(SPP::User);
         self.sstatus = sstatus;
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+#[repr(C)]
+pub struct UserFloatContext {
+    pub user_fx: [f64; 32], // 50 - 81
+    pub fcsr: u32,          // 32bit
+    pub need_save: u8,
+    pub need_restore: u8,
+    pub signal_dirty: u8,
+}
+
+impl ArchUserFloatContext for UserFloatContext {
+    fn new() -> Self {
+        unsafe { core::mem::zeroed() }
+    }
+
+    fn mark_save_if_needed(&mut self) {
+        let sstatus = sstatus::read();
+        if sstatus.fs() == FS::Dirty {
+            self.need_save |= 1;
+            self.signal_dirty |= 1;
+        }
+    }
+
+    fn yield_task(&mut self) {
+        self.save();
+        self.need_restore = 1;
+    }
+
+    /// Save reg -> mem
+    fn save(&mut self) {
+        if self.need_save == 0 {
+            return;
+        }
+        self.need_save = 0;
+        unsafe {
+            let mut _t: usize = 1; // alloc a register but not zero.
+            asm!("
+                fsd  f0,  0*8({0})
+                fsd  f1,  1*8({0})
+                fsd  f2,  2*8({0})
+                fsd  f3,  3*8({0})
+                fsd  f4,  4*8({0})
+                fsd  f5,  5*8({0})
+                fsd  f6,  6*8({0})
+                fsd  f7,  7*8({0})
+                fsd  f8,  8*8({0})
+                fsd  f9,  9*8({0})
+                fsd f10, 10*8({0})
+                fsd f11, 11*8({0})
+                fsd f12, 12*8({0})
+                fsd f13, 13*8({0})
+                fsd f14, 14*8({0})
+                fsd f15, 15*8({0})
+                fsd f16, 16*8({0})
+                fsd f17, 17*8({0})
+                fsd f18, 18*8({0})
+                fsd f19, 19*8({0})
+                fsd f20, 20*8({0})
+                fsd f21, 21*8({0})
+                fsd f22, 22*8({0})
+                fsd f23, 23*8({0})
+                fsd f24, 24*8({0})
+                fsd f25, 25*8({0})
+                fsd f26, 26*8({0})
+                fsd f27, 27*8({0})
+                fsd f28, 28*8({0})
+                fsd f29, 29*8({0})
+                fsd f30, 30*8({0})
+                fsd f31, 31*8({0})
+                csrr {1}, fcsr
+                sw  {1}, 32*8({0})
+            ", in(reg) self, inout(reg) _t
+            );
+        };
+    }
+
+    /// Restore mem -> reg
+    fn restore(&mut self) {
+        if self.need_restore == 0 {
+            return;
+        }
+        self.need_restore = 0;
+        unsafe {
+            asm!("
+                fld  f0,  0*8({0})
+                fld  f1,  1*8({0})
+                fld  f2,  2*8({0})
+                fld  f3,  3*8({0})
+                fld  f4,  4*8({0})
+                fld  f5,  5*8({0})
+                fld  f6,  6*8({0})
+                fld  f7,  7*8({0})
+                fld  f8,  8*8({0})
+                fld  f9,  9*8({0})
+                fld f10, 10*8({0})
+                fld f11, 11*8({0})
+                fld f12, 12*8({0})
+                fld f13, 13*8({0})
+                fld f14, 14*8({0})
+                fld f15, 15*8({0})
+                fld f16, 16*8({0})
+                fld f17, 17*8({0})
+                fld f18, 18*8({0})
+                fld f19, 19*8({0})
+                fld f20, 20*8({0})
+                fld f21, 21*8({0})
+                fld f22, 22*8({0})
+                fld f23, 23*8({0})
+                fld f24, 24*8({0})
+                fld f25, 25*8({0})
+                fld f26, 26*8({0})
+                fld f27, 27*8({0})
+                fld f28, 28*8({0})
+                fld f29, 29*8({0})
+                fld f30, 30*8({0})
+                fld f31, 31*8({0})
+                lw  {0}, 32*8({0})
+                csrw fcsr, {0}
+            ", in(reg) self
+            );
+        }
     }
 }

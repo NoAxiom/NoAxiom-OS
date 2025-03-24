@@ -56,6 +56,20 @@ impl Task {
             let parent = self.pcb().parent.clone();
             if let Some(process) = parent {
                 let parent = process.upgrade().unwrap();
+                debug!("parent tid: {}", parent.tid());
+
+                // del self from parent's children, and wake up suspended parent
+                let mut par_pcb = parent.pcb();
+                self.set_status(TaskStatus::Zombie);
+                par_pcb.children.retain(|task| task.tid() != tid);
+                par_pcb.zombie_children.push(self.clone());
+                // if par_pcb.wait_req {
+                //     debug!("waking parent");
+                //     par_pcb.wait_req = false;
+                //     parent.wake();
+                // } else {
+                //     trace!("I suppose that my parent is already woken");
+                // }
 
                 // send SIGCHLD
                 let siginfo = SigInfo {
@@ -69,20 +83,9 @@ impl Task {
                         stime: None,
                     }),
                 };
-                parent.proc_recv_siginfo(siginfo);
+                parent.recv_siginfo(siginfo, false);
 
-                // del self from parent's children, and wake up suspended parent
-                let mut par_pcb = parent.pcb();
-                self.set_status(TaskStatus::Zombie);
-                par_pcb.children.retain(|task| task.tid() != tid);
-                par_pcb.zombie_children.push(self.clone());
-                if par_pcb.wait_req {
-                    trace!("waking parent");
-                    par_pcb.wait_req = false;
-                    parent.wake_up();
-                } else {
-                    trace!("I suppose that my parent is already woken");
-                }
+                drop(par_pcb);
             }
         }
 

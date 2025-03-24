@@ -47,8 +47,10 @@ pub trait ArchTrap {
 pub trait ArchTrapContext:
     Index<TrapArgs, Output = usize> + IndexMut<TrapArgs, Output = usize>
 {
+    type FloatContext: ArchUserFloatContext;
     fn app_init_cx(entry: usize, sp: usize) -> Self;
     fn update_cx(&mut self, entry: usize, sp: usize, argc: usize, argv: usize, envp: usize);
+    fn freg_mut(&mut self) -> &mut Self::FloatContext;
     fn get_syscall_id(&self) -> usize {
         self[TrapArgs::SYSCALL]
     }
@@ -61,5 +63,16 @@ pub trait ArchTrapContext:
             self[TrapArgs::A4],
             self[TrapArgs::A5],
         ]
+    }
+}
+
+pub trait ArchUserFloatContext {
+    fn new() -> Self;
+    fn save(&mut self);
+    fn restore(&mut self);
+    fn mark_save_if_needed(&mut self);
+    fn yield_task(&mut self);
+    fn encounter_signal(&mut self) {
+        self.save();
     }
 }

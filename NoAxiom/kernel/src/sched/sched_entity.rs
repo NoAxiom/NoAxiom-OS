@@ -114,10 +114,10 @@ impl SchedEntity {
             tid,
         }
     }
-    pub fn ref_clone(&self) -> Self {
+    pub fn ref_clone(&self, tid: usize) -> Self {
         Self {
             inner: self.inner.clone(),
-            tid: self.tid,
+            tid,
         }
     }
 }

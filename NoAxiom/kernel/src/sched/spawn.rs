@@ -2,7 +2,7 @@
 //! [`UserTaskFuture`] represents a user task future,
 //! use [`spawn_utask`] to spawn user tasks
 
-use alloc::sync::{Arc, Weak};
+use alloc::sync::Arc;
 use core::future::Future;
 
 use async_task::{Builder, WithInfo};
@@ -22,7 +22,7 @@ pub fn spawn_raw<F, R>(
     future: F,
     sched_entity: SchedEntity,
     _hartid: usize,
-    task: Option<Weak<Task>>,
+    task: Option<&Arc<Task>>,
 ) where
     F: Future<Output = R> + Send + 'static,
     R: Send + 'static,
@@ -39,9 +39,9 @@ pub fn spawn_raw<F, R>(
 pub fn spawn_utask(task: Arc<Task>) {
     spawn_raw(
         UserTaskFuture::new(task.clone(), task_main(task.clone())),
-        task.sched_entity.ref_clone(),
+        task.sched_entity.ref_clone(task.tid()),
         get_hartid(),
-        Some(Arc::downgrade(&task)),
+        Some(&task),
     );
 }
 
