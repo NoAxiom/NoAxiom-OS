@@ -5,7 +5,7 @@ pub mod block;
 pub mod char;
 mod config;
 pub mod init;
-pub mod net;
+// pub mod net;
 pub mod random;
 
 use alloc::{
@@ -56,7 +56,7 @@ type Async<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 pub type ADevResult<'a, T = ()> = Async<'a, DevResult<T>>;
 
 #[allow(dead_code)]
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub enum DeviceType {
     Bus,
     Net,
@@ -198,4 +198,37 @@ impl From<DeviceState> for u32 {
             DeviceState::UnDefined => 2,
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
+#[repr(usize)]
+pub enum DeviceMajor {
+    Serial = 4,
+    Block = 8,
+    Net = 9,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct DevId {
+    /// Major Device Number
+    pub major: DeviceMajor,
+    /// Minor Device Number. It Identifies different device instances of the
+    /// same type
+    pub minor: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeviceMeta {
+    /// Device id.
+    pub dev_id: DevId,
+    /// Name of the device.
+    pub name: String,
+    /// Mmio start address.
+    pub mmio_base: usize,
+    /// Mmio size.
+    pub mmio_size: usize,
+    /// Interrupt number.
+    pub irq_no: Option<usize>,
+    /// Device type.
+    pub dtype: DeviceType,
 }

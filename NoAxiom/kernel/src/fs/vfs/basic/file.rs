@@ -167,7 +167,8 @@ impl dyn File {
         let buf_len = buf.len();
         let mut writen_len = 0;
         let mut buf_it = buf;
-        let children = self.dentry().children();
+        let dentry = self.dentry();
+        let children = dentry.children();
         let offset = self.pos();
         for dentry in children.values().skip(offset) {
             if dentry.is_negetive() {
@@ -185,7 +186,7 @@ impl dyn File {
                 inode.file_type().bits() as u8,
             );
 
-            debug!("[sys_getdents64] linux dirent {linux_dirent:?}");
+            trace!("[sys_getdents64] linux dirent {linux_dirent:?}");
             if writen_len + rec_len > buf_len {
                 break;
             }

@@ -6,6 +6,7 @@ pub mod async_virtio_driver;
 pub mod block;
 pub mod event;
 pub mod log;
+// pub mod net;
 pub mod probe;
 pub mod uart;
 mod virtio_drivers2;

@@ -32,7 +32,7 @@ mod entry;
 mod fs;
 mod include;
 mod mm;
-mod net;
+// mod net;
 mod panic;
 mod platform;
 mod sched;

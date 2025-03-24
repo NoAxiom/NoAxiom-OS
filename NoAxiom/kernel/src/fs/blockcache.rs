@@ -2,9 +2,10 @@
 //!
 //! not sure the RwLock
 
-use alloc::{sync::Arc, vec::Vec};
+use alloc::{boxed::Box, sync::Arc, vec::Vec};
 use core::num::NonZeroUsize;
 
+use async_trait::async_trait;
 use ksync::mutex::check_no_lock;
 use lru::LruCache;
 type Mutex<T> = ksync::mutex::SpinLock<T>;
@@ -15,9 +16,15 @@ use crate::{
 };
 
 /// async block cache for data struct `B` with LRU strategy  
-pub struct AsyncBlockCache<B> {
+pub struct AsyncBlockCache<B: Cache + Clone> {
     cache: Mutex<LruCache<usize, B>>, // todo: use async_mutex
     block_device: Arc<dyn BlockDevice>,
+}
+
+pub trait Cache {
+    fn dirty(&self) -> bool;
+    fn data(&self) -> &[u8; BLOCK_SIZE];
+    fn from(data: [u8; BLOCK_SIZE], dirty: bool) -> Self;
 }
 
 #[derive(Clone)]
@@ -26,7 +33,13 @@ pub struct CacheData {
     pub dirty: bool,
 }
 
-impl CacheData {
+impl Cache for CacheData {
+    fn dirty(&self) -> bool {
+        self.dirty
+    }
+    fn data(&self) -> &[u8; BLOCK_SIZE] {
+        &*self.data
+    }
     fn from(data: [u8; BLOCK_SIZE], dirty: bool) -> Self {
         Self {
             data: Arc::new(data),
@@ -35,7 +48,15 @@ impl CacheData {
     }
 }
 
-impl AsyncBlockCache<CacheData> {
+// impl Drop for CacheData {
+//     fn drop(&mut self) {
+//         if self.dirty {
+//             info!("CacheData Writeback sector: {}", self.sector);
+//         }
+//     }
+// }
+
+impl<B: Cache + Clone> AsyncBlockCache<B> {
     /// create a new `AsyncBlockCache` and clear the cache
     pub fn from(device: Arc<dyn BlockDevice>) -> Self {
         Self {
@@ -48,7 +69,7 @@ impl AsyncBlockCache<CacheData> {
 
     /// read a block from the cache or block device  
     /// mind that `sector` == `block`
-    pub async fn read_sector(&self, sector: usize) -> CacheData {
+    pub async fn read_sector(&self, sector: usize) -> B {
         let mut cache_guard = self.cache.lock();
         if let Some(data) = cache_guard.get(&sector) {
             // if the data is in the cache, return immediately
@@ -60,18 +81,18 @@ impl AsyncBlockCache<CacheData> {
         let mut data = [0; BLOCK_SIZE];
         assert!(check_no_lock());
         self.block_device.read(sector, &mut data).await;
-        let res = CacheData::from(data, false);
+        let res = B::from(data, false);
 
         let mut cache_guard = self.cache.lock();
-        // If the key already exists in the cache, write back the old data
-        let write_back = cache_guard.put(sector, res.clone());
-        drop(cache_guard);
-        if let Some(old_data) = write_back {
-            debug!("write back");
-            assert!(check_no_lock());
-            let _ = self.block_device.write(sector, &(*old_data.data)).await;
-        }
 
+        // The key cannot exist in the cache
+        let write_back = cache_guard.push(sector, res.clone());
+        drop(cache_guard);
+        if let Some((key, value)) = write_back {
+            // trace!("read_sector: write back");
+            assert!(check_no_lock());
+            let _ = self.block_device.write(key, value.data()).await;
+        }
         res
     }
 
@@ -79,30 +100,53 @@ impl AsyncBlockCache<CacheData> {
     /// mind that `sector` == `block`
     pub async fn write_sector(&self, sector: usize, data: &[u8; BLOCK_SIZE]) {
         let mut cache_guard = self.cache.lock();
-        let res = CacheData::from(*data, true);
+        let cache_data = cache_guard.get_mut(&sector);
+        let res = B::from(*data, true);
+
+        if let Some(cache_data) = cache_data {
+            *cache_data = res;
+            return;
+        }
 
         // If the key already exists in the cache, write back the old data
-        let write_back = cache_guard.put(sector, res.clone());
+        let write_back = cache_guard.push(sector, res);
         drop(cache_guard);
-        if let Some(old_data) = write_back {
+        if let Some((key, value)) = write_back {
+            // trace!("write_sector: write back");
             assert!(check_no_lock());
-            let _ = self.block_device.write(sector, &(*old_data.data)).await;
+            let _ = self.block_device.write(key, value.data()).await;
         }
     }
 
     /// flush all dirty data in the cache to the block device
     pub async fn sync_all(&self) {
+        debug!("[AsyncBlockCache] cache sync all!");
         let cache_guard = self.cache.lock();
         let mut dirty_data = Vec::new();
         for (sector, cache) in cache_guard.iter() {
-            if cache.dirty {
+            if cache.dirty() {
                 dirty_data.push((*sector, cache.clone()));
             }
         }
         drop(cache_guard);
         for (sector, cache) in dirty_data {
             assert!(check_no_lock());
-            let _ = self.block_device.write(sector, &(*cache.data)).await;
+            let _ = self.block_device.write(sector, cache.data()).await;
         }
+    }
+}
+
+#[async_trait]
+impl BlockDevice for AsyncBlockCache<CacheData> {
+    async fn read(&self, _id: usize, _buf: &mut [u8]) {
+        unreachable!()
+    }
+
+    async fn write(&self, _id: usize, _buf: &[u8]) {
+        unreachable!()
+    }
+
+    async fn sync_all(&self) {
+        self.sync_all().await
     }
 }

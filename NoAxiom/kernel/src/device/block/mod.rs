@@ -17,6 +17,7 @@ use async_trait::async_trait;
 
 #[async_trait]
 pub trait BlockDevice: Send + Sync {
-    async fn read<'a>(&'a self, id: usize, buf: &'a mut [u8]);
-    async fn write<'a>(&'a self, id: usize, buf: &'a [u8]);
+    async fn read(&self, id: usize, buf: &mut [u8]);
+    async fn write(&self, id: usize, buf: &[u8]);
+    async fn sync_all(&self);
 }

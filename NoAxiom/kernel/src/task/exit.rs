@@ -5,6 +5,7 @@ use arch::{Arch, ArchSbi};
 use super::Task;
 use crate::{
     config::task::INIT_PROCESS_ID,
+    fs::vfs::root_dentry,
     signal::{
         sig_detail::{SigChildDetail, SigDetail},
         sig_info::{SigCode, SigInfo},
@@ -35,6 +36,7 @@ pub async fn init_proc_exit_handler(task: &Arc<Task>) {
             task.exit_code()
         );
     }
+    root_dentry().super_block().sync_all().await;
     Arch::shutdown();
 }
 

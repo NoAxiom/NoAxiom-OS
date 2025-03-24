@@ -1,13 +1,29 @@
-//! ref: Dragon OS
-use alloc::string::String;
+//! ref:
+//! Dragon OS -- NetDevice trait
+mod loopback;
+mod netiface;
+use alloc::{string::String, sync::Arc};
 
-use ksync::mutex::SpinLock;
+use ksync::{mutex::SpinLock, Once};
+use loopback::LoopBackDev;
+use netiface::NetIface;
 use smoltcp::{
     iface::{self, Interface},
+    phy::{DeviceCapabilities, Loopback},
+    time::Instant,
     wire::{self, EthernetAddress},
 };
 
 use crate::syscall::SysResult;
+
+// todo: use dyn NetDevice
+pub static NET_DEVICE_LOOP_BACK: Once<Arc<LoopBackDev>> = Once::new();
+pub static NET_IFACE: Once<Arc<NetIface>> = Once::new();
+
+pub fn init_net_device(net_device: Arc<LoopBackDev>) {
+    NET_DEVICE_LOOP_BACK.call_once(|| net_device);
+    NET_IFACE.call_once(|| NetIface::new(NET_DEVICE_LOOP_BACK.get()));
+}
 
 #[derive(Debug, Copy, Clone)]
 pub enum Operstate {
@@ -42,6 +58,41 @@ bitflags::bitflags! {
     }
 }
 
+/// A token to receive a single network packet.
+pub trait RxToken {
+    /// Consumes the token to receive a single network packet.
+    ///
+    /// This method receives a packet and then calls the given closure `f` with
+    /// the raw packet bytes as argument.
+    fn consume<R, F>(self, f: F) -> R
+    where
+        F: FnOnce(&mut [u8]) -> R;
+
+    /// The Packet ID associated with the frame received by this [`RxToken`]
+    fn meta(&self) -> smoltcp::phy::PacketMeta {
+        smoltcp::phy::PacketMeta::default()
+    }
+}
+
+/// A token to transmit a single network packet.
+pub trait TxToken {
+    /// Consumes the token to send a single network packet.
+    ///
+    /// This method constructs a transmit buffer of size `len` and calls the
+    /// passed closure `f` with a mutable reference to that buffer. The
+    /// closure should construct a valid network packet (e.g. an ethernet
+    /// packet) in the buffer. When the closure returns, the transmit buffer
+    /// is sent out.
+    fn consume<R, F>(self, len: usize, f: F) -> R
+    where
+        F: FnOnce(&mut [u8]) -> R;
+
+    /// The Packet ID to be associated with the frame to be transmitted by this
+    /// [`TxToken`].
+    #[allow(unused_variables)]
+    fn set_meta(&mut self, meta: smoltcp::phy::PacketMeta) {}
+}
+
 pub trait NetDevice: Send + Sync {
     /// @brief 获取网卡的MAC地址
     fn mac(&self) -> EthernetAddress;
@@ -51,23 +102,23 @@ pub trait NetDevice: Send + Sync {
     /// @brief 获取网卡的id
     fn nic_id(&self) -> usize;
 
-    fn poll(&self, sockets: &mut iface::SocketSet) -> SysResult<()>;
+    // fn poll(&self, sockets: &mut iface::SocketSet) -> SysResult<()>;
 
-    fn update_ip_addrs(&self, ip_addrs: &[wire::IpCidr]) -> SysResult<()>;
+    // fn update_ip_addrs(&self, ip_addrs: &[wire::IpCidr]) -> SysResult<()>;
 
-    /// @brief 获取smoltcp的网卡接口类型
+    // @brief 获取smoltcp的网卡接口类型
     fn inner_iface(&self) -> &SpinLock<Interface>;
     // fn as_any_ref(&'static self) -> &'static dyn core::any::Any;
 
-    fn addr_assign_type(&self) -> u8;
+    // fn addr_assign_type(&self) -> u8;
 
-    fn net_device_type(&self) -> u16;
+    // fn net_device_type(&self) -> u16;
 
-    fn net_state(&self) -> NetDeivceState;
+    // fn net_state(&self) -> NetDeivceState;
 
-    fn set_net_state(&self, state: NetDeivceState);
+    // fn set_net_state(&self, state: NetDeivceState);
 
-    fn operstate(&self) -> Operstate;
+    // fn operstate(&self) -> Operstate;
 
-    fn set_operstate(&self, state: Operstate);
+    // fn set_operstate(&self, state: Operstate);
 }

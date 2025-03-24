@@ -49,8 +49,8 @@ impl FileSystem for AsyncSmpExt4 {
         name: &str,
         device: Option<Arc<dyn BlockDevice>>,
     ) -> Arc<dyn Dentry> {
-        let super_block_meta = SuperBlockMeta::new(device.clone(), self.clone());
         let blk = Arc::new(AsyncBlockCache::from(device.unwrap()));
+        let super_block_meta = SuperBlockMeta::new(Some(blk.clone()), self.clone());
         let disk_cursor = DiskCursor::new(blk.clone(), 0, 0);
         let unbooted_fs = Arc::new(Mutex::new(IExtFs::open(Arc::new(disk_cursor)).await));
         let fs_super_block = Arc::new(Ext4SuperBlock::new(super_block_meta, unbooted_fs));

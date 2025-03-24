@@ -10,7 +10,7 @@ pub const FAT32_SECTOR_SIZE: usize = BLOCK_SIZE;
 pub const FAT32_BYTES_PER_CLUSTER_ID: usize = 4;
 
 /// The max LruCache size
-pub const MAX_LRU_CACHE_SIZE: usize = 1024;
+pub const MAX_LRU_CACHE_SIZE: usize = 8192;
 
 pub const IS_DELETED: u8 = 0xe5;
 pub const SPACE: u8 = 0x20;

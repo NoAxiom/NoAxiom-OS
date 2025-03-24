@@ -84,7 +84,16 @@ pub trait Dentry: Send + Sync + DowncastSync {
     /// Set the inode of the dentry
     fn set_inode(&self, inode: Arc<dyn Inode>) {
         if self.meta().inode.lock().is_some() {
-            warn!("replace inode in {:?}", self.name());
+            assert_eq!(
+                inode.file_type(),
+                self.inode().unwrap().file_type(),
+                "{}",
+                format!(
+                    "replace inode in {}, type: {:?}",
+                    self.name(),
+                    self.inode().unwrap().file_type()
+                )
+            );
         }
         *self.meta().inode.lock() = Some(inode);
     }
@@ -108,8 +117,12 @@ impl dyn Dentry {
     }
 
     /// Get the children of the dentry
-    pub fn children(&self) -> BTreeMap<String, Arc<dyn Dentry>> {
-        self.meta().children.lock().clone()
+    pub fn children(&self) -> spin::MutexGuard<BTreeMap<String, Arc<dyn Dentry>>> {
+        self.meta().children.lock()
+    }
+
+    pub fn get_child(&self, name: &str) -> Option<Arc<dyn Dentry>> {
+        self.meta().children.lock().get(name).cloned()
     }
 
     /// Add a child dentry with `name` and `child_inode`, for realfs only.
@@ -234,7 +247,16 @@ impl dyn Dentry {
     }
 
     /// Find the dentry with `path`, create negative dentry if not found.
-    pub fn find_path_or_create(self: Arc<Self>, path: &Vec<&str>) -> Arc<dyn Dentry> {
+    /// if just open a file, and the path is invalid, all the path dentry will
+    /// be created and will write to the disk. If the path isvalid, or `create`
+    /// the file, it's ok.
+    ///
+    /// todo: path cache
+    pub async fn find_path_or_create(
+        self: Arc<Self>,
+        path: &Vec<&str>,
+        mode: InodeMode,
+    ) -> Arc<dyn Dentry> {
         let mut idx = 0;
         let max_idx = path.len() - 1;
         let mut current = self.clone();
@@ -244,24 +266,29 @@ impl dyn Dentry {
                 idx += 1;
                 continue;
             }
-
-            let current_clone = current.clone();
-            let meta = current_clone.meta();
-            let mut children = meta.children.lock();
-
-            if let Some(child) = children.get(name) {
-                if idx < max_idx {
-                    let inode = child.inode().unwrap();
-                    assert!(inode.file_type() == InodeMode::DIR);
+            assert!(current.clone().inode().unwrap().file_type() == InodeMode::DIR);
+            if current.clone().children().is_empty() {
+                if let Ok(current_dir) = current.clone().open() {
+                    assert!(check_no_lock());
+                    current_dir.load_dir().await.unwrap();
                 }
+            }
+            if let Some(child) = current.clone().get_child(name) {
                 current = child.clone();
                 idx += 1;
-            } else {
-                let new_child = current.clone().new_child(name);
-                children.insert(name.to_string(), new_child.clone());
-                current = new_child;
-                idx += 1;
+                continue;
             }
+
+            if idx < max_idx {
+                debug!("[find_path_or_create] create dir {}", name);
+                assert!(check_no_lock());
+                current = current.create(name, InodeMode::DIR).await.unwrap();
+            } else {
+                debug!("[find_path_or_create] create file {}", name);
+                assert!(check_no_lock());
+                current = current.create(name, mode).await.unwrap();
+            }
+            idx += 1;
         }
         current
     }

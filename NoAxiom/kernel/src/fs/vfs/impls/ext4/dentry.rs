@@ -1,6 +1,7 @@
 use alloc::{boxed::Box, sync::Arc};
 
 use async_trait::async_trait;
+use ext4_rs::ext4_defs::{Ext4DirEntry, Ext4DirSearchResult};
 
 use super::{
     file::{Ext4Dir, Ext4File},
@@ -14,6 +15,7 @@ use crate::{
             superblock::SuperBlock,
         },
         impls::ext4::{fs_err, superblock::Ext4SuperBlock},
+        root_dentry,
     },
     include::{fs::InodeMode, result::Errno},
 };
@@ -69,6 +71,12 @@ impl Dentry for Ext4Dentry {
         }
     }
 
+    /*
+    if Path::from_cd_or_create just create a negative dentry
+    Dentry::create calls self.inode()? will panic,
+    so when calling Dentry::create, we are sure that the dentry is not negative,
+    and then we open ALL the dentry from root to here
+     */
     async fn create(
         self: Arc<Self>,
         name: &str,
@@ -92,22 +100,35 @@ impl Dentry for Ext4Dentry {
         } else {
             format!("/{}", name)
         };
+        // if ext4
+        //     .dir_find_entry(
+        //         this_inode_num,
+        //         &name,
+        //         &mut Ext4DirSearchResult::new(Ext4DirEntry::default()),
+        //     )
+        //     .await
+        //     .is_ok()
+        // {
+        //     warn!("file \"{}\" exists, ignore create!", child_path);
+        //     let res = self.into_dyn().get_child(name).unwrap();
+        //     trace!("res file type: {:?}", res.inode().unwrap().file_type());
+        //     return Ok(res);
+        // }
         if mode.contains(InodeMode::FILE) {
-            trace!(
+            debug!(
                 "create file: {}, this_inode: {}",
-                child_path,
-                this_inode_num
+                child_path, this_inode_num
             );
             let new_file_inode = ext4
                 .create(this_inode_num, name, 0x8000)
                 .await
                 .map_err(fs_err)?;
-            let inode_type = new_file_inode.inode.file_type();
-            trace!("new file inode type: {:?}", inode_type);
+            // let inode_type = new_file_inode.inode.file_type();
+            // debug!("new file inode type: {:?}", inode_type);
             let new_inode = Ext4FileInode::new(super_block.clone(), new_file_inode);
             Ok(self.into_dyn().add_child(name, Arc::new(new_inode)))
         } else if mode.contains(InodeMode::DIR) {
-            trace!("create dir: {}", child_path);
+            debug!("create dir: {}", child_path);
             ext4.dir_mk(&child_path).await.map_err(fs_err)?;
             let inode_num = ext4.ext4_dir_open(&child_path).await.map_err(fs_err)?;
             let new_dir_inode = ext4.get_inode_ref(inode_num).await;

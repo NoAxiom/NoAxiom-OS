@@ -1,9 +1,11 @@
 use alloc::{boxed::Box, sync::Arc};
 
 use async_trait::async_trait;
+use ext4_rs::InodeFileType;
 
 use super::{dentry::Ext4Dentry, inode::Ext4FileInode, superblock::Ext4SuperBlock};
 use crate::{
+    entry,
     fs::vfs::{
         basic::{
             file::{File, FileMeta},
@@ -121,12 +123,13 @@ impl File for Ext4Dir {
     }
 
     async fn base_write(&self, _offset: usize, _buf: &[u8]) -> SyscallResult {
+        error!("write to a dir");
         Err(Errno::EISDIR)
     }
 
     async fn load_dir(&self) -> Result<(), Errno> {
+        static mut FIRST: bool = true;
         debug!("[AsyncSmpExt4]FIle: load_dir");
-        debug!("the file type maybe wrong, don't care");
         let super_block = self.meta.dentry().super_block();
         let ext4 = super_block
             .downcast_ref::<Ext4SuperBlock>()
@@ -134,37 +137,32 @@ impl File for Ext4Dir {
             .get_fs();
 
         let entries = ext4.dir_get_entries(self.ino).await;
-        let self_path = self.meta().dentry().path().as_string();
-
         for entry in entries {
+            let entry_inode = ext4.get_inode_ref(entry.inode).await;
+            let file_type = entry_inode.inode.file_type();
             let child_name = entry.get_name();
             if child_name == "." || child_name == ".." {
-                debug!("load_dir: {:?}, passed", child_name);
+                if unsafe { FIRST } {
+                    debug!("load {:?}: {} pass", file_type, child_name);
+                }
                 continue;
             }
-            let child_path = if self_path != "/" {
-                format!("{}/{}", self_path, entry.get_name())
+            if unsafe { FIRST } {
+                debug!("load {:?}: {}", file_type, child_name);
+            }
+            let inode: Arc<dyn Inode> = if entry_inode.inode.file_type() == InodeFileType::S_IFREG {
+                Arc::new(Ext4FileInode::new(super_block.clone(), entry_inode))
+            } else if entry_inode.inode.file_type() == InodeFileType::S_IFDIR {
+                Arc::new(Ext4DirInode::new(super_block.clone(), entry_inode))
             } else {
-                format!("/{}", entry.get_name())
+                unreachable!()
             };
-            let child_inode: Arc<dyn Inode> =
-                if entry.get_de_type() == Ext4DirEntryType::EXT4_DE_DIR.bits() {
-                    debug!("load_dir: {:?}", child_name);
-                    let inode_num = ext4.ext4_dir_open(&child_path).await.map_err(fs_err)?;
-                    let inode = ext4.get_inode_ref(inode_num).await;
-                    Arc::new(Ext4DirInode::new(super_block.clone(), inode))
-                } else if entry.get_de_type() == Ext4DirEntryType::EXT4_DE_REG_FILE.bits() {
-                    debug!("load_file: {:?}", child_name);
-                    let inode_num = ext4
-                        .ext4_file_open(&child_path, "r+")
-                        .await
-                        .map_err(fs_err)?;
-                    let inode = ext4.get_inode_ref(inode_num).await;
-                    Arc::new(Ext4FileInode::new(super_block.clone(), inode))
-                } else {
-                    unreachable!();
-                };
-            self.dentry().add_child(&child_name, child_inode);
+            self.dentry().add_child(&child_name, inode);
+        }
+        unsafe {
+            if FIRST {
+                FIRST = false;
+            }
         }
         Ok(())
     }

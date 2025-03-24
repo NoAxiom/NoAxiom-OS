@@ -112,12 +112,15 @@ impl VirtIOAsyncBlock {
 
 #[async_trait]
 impl BlockDevice for VirtIOAsyncBlock {
-    async fn read<'a>(&'a self, id: usize, buf: &'a mut [u8]) {
+    async fn read(&self, id: usize, buf: &mut [u8]) {
         assert!(check_no_lock());
         self.read_block(id, buf).await
     }
-    async fn write<'a>(&'a self, id: usize, buf: &'a [u8]) {
+    async fn write(&self, id: usize, buf: &[u8]) {
         assert!(check_no_lock());
         self.write_block(id, buf).await
+    }
+    async fn sync_all(&self) {
+        unreachable!()
     }
 }

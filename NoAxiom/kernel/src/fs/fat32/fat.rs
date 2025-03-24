@@ -74,7 +74,7 @@ impl FAT {
         res.push(first_cluster);
         loop {
             let sector = blk.read_sector(sector_id).await;
-            let sector = sector.data;
+            let sector = &sector.data;
             let value = u32::from_le_bytes(
                 sector[sector_offset..(sector_offset + 4)]
                     .try_into()

@@ -379,7 +379,7 @@ impl FAT32Directory {
                 // 获取块号对应的扇区偏移
                 let sector = cluster_offset_sectors(&*self.inner.short_dir.bpb, *cluster);
                 let block = self.inner.short_dir.blk.read_sector(sector as usize).await;
-                let block = block.data;
+                let block = &block.data;
                 for (idx, fat) in block.chunks(32).enumerate() {
                     if fat.iter().all(|b| *b == 0x0) {
                         has_free = true;

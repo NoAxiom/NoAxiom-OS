@@ -42,7 +42,7 @@ impl virtio {
 
 #[async_trait]
 impl BlockDevice for virtio {
-    async fn read<'a>(&'a self, id: usize, buf: &'a mut [u8]) {
+    async fn read(&self, id: usize, buf: &mut [u8]) {
         self.inner()
             .common
             .driver
@@ -54,7 +54,7 @@ impl BlockDevice for virtio {
             .unwrap()
             .read_block(id, buf);
     }
-    async fn write<'a>(&'a self, id: usize, buf: &'a [u8]) {
+    async fn write(&self, id: usize, buf: &[u8]) {
         self.inner()
             .common
             .driver
@@ -65,5 +65,8 @@ impl BlockDevice for virtio {
             .as_blk()
             .unwrap()
             .write_block(id, buf);
+    }
+    async fn sync_all(&self) {
+        unreachable!()
     }
 }

@@ -1,5 +1,9 @@
-use alloc::sync::{Arc, Weak};
+use alloc::{
+    boxed::Box,
+    sync::{Arc, Weak},
+};
 
+use async_trait::async_trait;
 use downcast_rs::{impl_downcast, DowncastSync};
 use ksync::Once;
 
@@ -29,8 +33,14 @@ impl SuperBlockMeta {
     }
 }
 
+#[async_trait]
 pub trait SuperBlock: Send + Sync + DowncastSync {
     fn meta(&self) -> &SuperBlockMeta;
+    async fn sync_all(&self) {
+        if let Some(dev) = &self.meta().device {
+            dev.sync_all().await;
+        }
+    }
 }
 impl_downcast!(sync SuperBlock);
 

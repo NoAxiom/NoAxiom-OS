@@ -113,46 +113,38 @@ impl Syscall<'_> {
     ) -> SyscallResult {
         let ptr = UserPtr::<u8>::new(filename);
         let path_str = get_string_from_ptr(&ptr);
+        let mode = InodeMode::from_bits_truncate(mode);
         info!(
-            "[sys_openat] dirfd {}, flags {:#x}, filename {}, mode {}",
+            "[sys_openat] dirfd {}, flags {:#x}, filename {}, mode {:?}",
             fd, flags, path_str, mode
         );
 
-        let mut fd_table = self.task.fd_table();
         let flags = FileFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
-        let mode = InodeMode::from_bits_truncate(mode);
-        let path = if !path_str.starts_with('/') {
-            if fd == AT_FDCWD {
-                let cwd = self.task.cwd().clone().from_cd(&"..");
-                trace!("[sys_openat] cwd: {:?}", cwd);
-                cwd.from_cd_or_create(&path_str)
-            } else {
-                let cwd = fd_table
-                    .get(fd as usize)
-                    .ok_or(Errno::EBADF)?
-                    .dentry()
-                    .path();
-                trace!("[sys_openat] cwd: {:?}", cwd);
-                cwd.from_cd_or_create(&path_str)
-            }
-        } else {
-            Path::from(path_str)
-        };
-        drop(fd_table);
-
-        let dentry = path.dentry();
+        let split_path = path_str.split('/').collect::<Vec<&str>>();
+        let target = root_dentry().find_path(&split_path);
 
         if flags.contains(FileFlags::O_CREATE) {
             info!("[sys_openat] O_CREATE");
-            if flags.contains(FileFlags::O_EXCL) && !dentry.is_negetive() {
-                return Err(Errno::EEXIST);
+            // check if the file already exists
+            if let Ok(dentry) = target {
+                if flags.contains(FileFlags::O_EXCL) && !dentry.is_negetive() {
+                    return Err(Errno::EEXIST);
+                }
             }
-            let parent = dentry.parent().unwrap();
-            parent
-                .create(&dentry.name(), InodeMode::FILE | mode)
-                .await?;
+        } else {
+            target?;
         }
 
+        // fixme: now if has O_CREATE flag, and the file already exists, we just open it
+        let path = get_path_or_create(
+            self.task.clone(),
+            filename,
+            fd as isize,
+            mode.union(InodeMode::FILE),
+            "sys_openat",
+        )
+        .await?;
+        let dentry = path.dentry();
         let inode = dentry.inode()?;
         if flags.contains(FileFlags::O_DIRECTORY) && !inode.file_type() == InodeMode::DIR {
             return Err(Errno::ENOTDIR);
@@ -235,42 +227,18 @@ impl Syscall<'_> {
     /// Create a directory
     pub async fn sys_mkdirat(&self, dirfd: isize, path: usize, mode: u32) -> SyscallResult {
         let mode = InodeMode::from_bits_truncate(mode);
-        let ptr = UserPtr::<u8>::new(path);
-        let path_str = get_string_from_ptr(&ptr);
-        let fd_table = self.task.fd_table();
-        let path = if !path_str.starts_with('/') {
-            if dirfd == AT_FDCWD {
-                let cwd = self.task.cwd().clone().from_cd(&"..");
-                trace!("[sys_mkdirat] cwd: {:?}", cwd);
-                cwd.from_cd_or_create(&path_str)
-            } else {
-                let cwd = fd_table
-                    .get(dirfd as usize)
-                    .ok_or(Errno::EBADF)?
-                    .dentry()
-                    .path();
-                trace!("[sys_mkdirat] cwd: {:?}", cwd);
-                cwd.from_cd_or_create(&path_str)
-            }
-        } else {
-            Path::from(path_str)
-        };
-        drop(fd_table);
-
+        let path = get_path_or_create(
+            self.task.clone(),
+            path,
+            dirfd,
+            mode.union(InodeMode::DIR),
+            "sys_mkdirat",
+        )
+        .await?;
         info!(
             "[sys_mkdirat] dirfd: {}, path: {:?}, mode: {:?}",
             dirfd, path, mode
         );
-
-        let dentry = path.dentry();
-        if dentry.inode().is_ok() {
-            return Err(Errno::EEXIST);
-        }
-
-        let parent = dentry.parent().unwrap();
-        parent
-            .add_dir_child(&dentry.name(), &mode.union(InodeMode::DIR))
-            .await?;
         Ok(0)
     }
 
@@ -386,6 +354,35 @@ impl Syscall<'_> {
     }
 }
 
+async fn get_path_or_create(
+    task: Arc<Task>,
+    rawpath: usize,
+    fd: isize,
+    mode: InodeMode,
+    debug_syscall_name: &str,
+) -> Result<Path, Errno> {
+    let path_str = get_string_from_ptr(&UserPtr::<u8>::new(rawpath));
+
+    if !path_str.starts_with('/') {
+        if fd == AT_FDCWD {
+            let cwd = task.cwd().clone().from_cd(&"..");
+            trace!("[{debug_syscall_name}] cwd: {:?}", cwd);
+            Ok(cwd.from_cd_or_create(&path_str, mode).await)
+        } else {
+            let cwd = task
+                .fd_table()
+                .get(fd as usize)
+                .ok_or(Errno::EBADF)?
+                .dentry()
+                .path();
+            trace!("[{debug_syscall_name}] cwd: {:?}", cwd);
+            Ok(cwd.from_cd_or_create(&path_str, mode).await)
+        }
+    } else {
+        Ok(Path::from(path_str))
+    }
+}
+
 fn get_path(
     task: Arc<Task>,
     rawpath: usize,
@@ -398,7 +395,7 @@ fn get_path(
         if fd == AT_FDCWD {
             let cwd = task.cwd().clone().from_cd(&"..");
             trace!("[{debug_syscall_name}] cwd: {:?}", cwd);
-            Ok(cwd.from_cd_or_create(&path_str))
+            Ok(cwd.from_cd(&path_str))
         } else {
             let cwd = task
                 .fd_table()
@@ -407,7 +404,7 @@ fn get_path(
                 .dentry()
                 .path();
             trace!("[{debug_syscall_name}] cwd: {:?}", cwd);
-            Ok(cwd.from_cd_or_create(&path_str))
+            Ok(cwd.from_cd(&path_str))
         }
     } else {
         Ok(Path::from(path_str))

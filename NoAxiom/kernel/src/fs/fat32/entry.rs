@@ -227,7 +227,7 @@ impl ShortDirectoryEntry {
         for cluster in clusters_link {
             let cluster = cluster_offset_sectors(&**bpb, cluster);
             let sector = blk.read_sector(cluster as usize).await;
-            let sector = sector.data;
+            let sector = &sector.data;
             sector.iter().for_each(|b| res.push(*b));
         }
         res
@@ -254,7 +254,7 @@ impl ShortDirectoryEntry {
             }
             let cluster = cluster_offset_sectors(&**bpb, cluster);
             let sector = blk.read_sector(cluster as usize).await;
-            let read_data = sector.data;
+            let read_data = sector.data.clone();
             let len = min(BLOCK_SIZE, data.len());
             let len = min(len, BLOCK_SIZE - offset);
             let mut write_data = *read_data;
