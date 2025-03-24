@@ -16,7 +16,7 @@ use crate::{
         mm::{MmapFlags, MmapProts},
         result::Errno,
     },
-    sched::utils::{suspend_now, take_waker},
+    sched::utils::{suspend_no_int_now, take_waker},
     syscall::SysResult,
 };
 
@@ -171,7 +171,8 @@ pub async fn lazy_alloc_mmap<'a>(
             Some(tracer) => {
                 tracer.push(take_waker().await);
                 drop(guard);
-                suspend_now().await;
+                // fixme: kernel block_on could cause bugs here
+                suspend_no_int_now().await;
                 Ok(())
             }
             None => {

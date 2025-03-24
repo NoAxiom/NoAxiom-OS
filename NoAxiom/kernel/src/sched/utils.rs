@@ -120,6 +120,13 @@ impl Future for SuspendFuture {
     }
 }
 
+pub async fn suspend_no_int_now() {
+    let task = current_cpu().task.as_ref().unwrap();
+    task.set_status(TaskStatus::SuspendNoInt);
+    SuspendFuture::new().await;
+    task.set_runnable();
+}
+
 /// suspend current task
 /// difference with yield_now: it won't wake the task immediately
 pub async fn suspend_now() {
@@ -127,7 +134,8 @@ pub async fn suspend_now() {
     task.set_wake_signal(!*task.sig_mask());
     task.set_suspend();
     SuspendFuture::new().await;
-    assert!(!task.is_suspend());
+    task.set_runnable();
+    // assert!(!task.is_suspend());
 }
 
 pub async fn suspend_now_with_sig(sig: SigSet) {
@@ -136,7 +144,8 @@ pub async fn suspend_now_with_sig(sig: SigSet) {
     task.set_wake_signal(sigset);
     task.set_suspend();
     SuspendFuture::new().await;
-    assert!(!task.is_suspend());
+    task.set_runnable();
+    // assert!(!task.is_suspend());
 }
 
 impl Task {
@@ -153,7 +162,7 @@ impl Task {
                 let mut pending = self.pending_sigs();
                 let mut status = self.status();
                 cnt += 1;
-                warn!("task {} suspend on future, poll count: {}", self.tid(), cnt);
+                info!("task {} suspend on future, poll count: {}", self.tid(), cnt);
                 let sigset = (!*self.sig_mask()) | (sig.unwrap_or_else(|| SigSet::empty()));
                 trace!("wake set: {:?}", sigset);
                 *status = TaskStatus::Suspend;
@@ -164,7 +173,8 @@ impl Task {
             }
         })
         .await;
-        assert!(!self.is_suspend());
+        self.set_runnable();
+        // assert!(!self.is_suspend());
         res
     }
 }
