@@ -61,7 +61,8 @@ where
         }
     }
     fn run(&self) {
-        if let Some(runnable) = self.scheduler.lock().pop(ScheduleOrder::UrgentFirst) {
+        let runnable = self.scheduler.lock().pop(ScheduleOrder::UrgentFirst);
+        if let Some(runnable) = runnable {
             runnable.run();
         }
     }

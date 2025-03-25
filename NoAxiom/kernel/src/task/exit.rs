@@ -58,7 +58,7 @@ impl Task {
             let parent = self.pcb().parent.clone();
             if let Some(process) = parent {
                 let parent = process.upgrade().unwrap();
-                debug!("parent tid: {}", parent.tid());
+                trace!("[exit_handler] parent tid: {}", parent.tid());
 
                 // del self from parent's children, and wake up suspended parent
                 let mut par_pcb = parent.pcb();
@@ -92,10 +92,9 @@ impl Task {
         }
 
         info!(
-            "[exit_hander] task {} exited successfully, exit_code: {}, strong_count: {}",
+            "[exit_hander] task {} exited successfully, exit_code: {}",
             self.tid(),
             self.exit_code(),
-            Arc::strong_count(self),
         );
     }
 }

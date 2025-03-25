@@ -68,7 +68,7 @@ impl Future for WaitChildFuture {
                 if self.wait_option.contains(WaitOption::WNOHANG) && res.is_pending() {
                     Poll::Ready(Ok((0, 0)))
                 } else {
-                    debug!("[sys_wait4] suspend for child exit");
+                    trace!("[sys_wait4] suspend for child exit");
                     // pcb.wait_req = true;
                     Poll::Pending
                 }

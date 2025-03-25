@@ -123,24 +123,23 @@ impl Task {
     pub fn get_status(&self) -> TaskStatus {
         *self.status.lock()
     }
-    #[allow(unused)]
     #[inline(always)]
     pub fn set_status(&self, status: TaskStatus) {
         *self.status.lock() = status;
     }
-    #[allow(unused)]
+    #[inline(always)]
     pub fn set_suspend(&self) {
         self.set_status(TaskStatus::Suspend);
     }
-    #[allow(unused)]
+    #[inline(always)]
     pub fn set_runnable(&self) {
         self.set_status(TaskStatus::Runnable);
     }
-    #[allow(unused)]
+    #[inline(always)]
     pub fn is_suspend(&self) -> bool {
         self.get_status() == TaskStatus::Suspend
     }
-    #[allow(unused)]
+    #[inline(always)]
     pub fn is_runnable(&self) -> bool {
         self.get_status() == TaskStatus::Runnable
     }

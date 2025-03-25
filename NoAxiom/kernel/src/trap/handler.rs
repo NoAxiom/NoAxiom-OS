@@ -29,6 +29,10 @@ fn kernel_trap_handler() {
         | TrapType::InstructionPageFault(addr) => {
             if let Some(task) = current_cpu().task.as_mut() {
                 // fixme: currently this block_on cannot be canceled
+                trace!(
+                    "[kernel] block on memory_validate, epc: {:#x}, addr: {:#x}",
+                    epc, addr
+                );
                 match block_on(task.memory_validate(addr, Some(trap_type))) {
                     Ok(_) => trace!("[memory_validate] success in kernel_trap_handler"),
                     Err(_) => kernel_panic("memory_validate failed"),
@@ -39,7 +43,7 @@ fn kernel_trap_handler() {
         }
         TrapType::SupervisorExternal => ext_int_handler(),
         TrapType::Timer => {
-            trace!("[SupervisorTimer] kernel Timer");
+            // trace!("[SupervisorTimer] kernel Timer");
             // fixme: now is just reset timer
             crate::time::timer::set_next_trigger();
         }
@@ -68,7 +72,6 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
         // syscall
         TrapType::SysCall => {
             cx[TrapArgs::EPC] += 4;
-            trace!("[syscall] doing syscall");
             let result = task.syscall(cx).await;
             trace!("[syscall] done! result {:#x}", result);
             task.trap_context_mut()[TrapArgs::RES] = result as usize;

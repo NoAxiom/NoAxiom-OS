@@ -60,7 +60,7 @@ impl Task {
             let mut pending = task.pending_sigs();
             let signum = info.signo as u32;
             pending.push(info);
-            debug!(
+            trace!(
                 "[recv_siginfo_inner] tid: {}, push signal {} to pending, status: {:?}",
                 task.tid(),
                 signum,
@@ -91,7 +91,7 @@ impl Task {
                 let tg = &mut guard.0;
                 for it in tg.iter() {
                     let task = it.1.upgrade().unwrap();
-                    debug!(
+                    trace!(
                         "[recv_siginfo] tid: {}, might recv signal {}",
                         task.tid(),
                         info.signo,
