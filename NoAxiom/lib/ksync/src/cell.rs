@@ -23,8 +23,10 @@ impl<T> SyncRefCell<T> {
 unsafe impl<T> Sync for SyncRefCell<T> {}
 
 /// sync unsafe cell for multi-thread,
-/// this cell is provided for thread resources sharing,
-/// it won't lead to real multi-threading since thread:hart are 1:1 mapped
+/// this cell is provided for thread resources sharing
+///
+/// only hart binded resources / basically immutable resources
+/// can use SyncUnsafeCell
 pub struct SyncUnsafeCell<T> {
     inner: UnsafeCell<T>,
 }

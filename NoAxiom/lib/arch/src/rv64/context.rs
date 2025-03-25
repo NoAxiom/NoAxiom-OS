@@ -223,6 +223,9 @@ impl ArchTrapContext for TrapContext {
         sstatus.set_spp(SPP::User);
         self.sstatus = sstatus;
     }
+    fn gprs(&self) -> &[usize; 32] {
+        &self.x
+    }
 }
 
 #[derive(Clone, Copy, Debug)]

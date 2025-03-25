@@ -1,9 +1,15 @@
 use alloc::{sync::Arc, vec::Vec};
+
 use arch::{ArchTrapContext, ArchUserFloatContext};
 
 use crate::{
-    signal::{sig_action::{SAFlags, SAHandlerType}, sig_info::SigInfo, sig_num::SigNum, sig_set::SigSet},
-    syscall::SyscallResult,
+    signal::{
+        sig_action::{SAFlags, SAHandlerType},
+        sig_info::SigInfo,
+        sig_num::SigNum,
+        sig_set::{SigMask, SigSet},
+    },
+    syscall::SysResult,
     task::{status::TaskStatus, Task},
 };
 
@@ -11,46 +17,72 @@ extern "C" {
     fn user_sigreturn();
 }
 
+enum SignalControlFlow {
+    Continue, // detect default/ignore handler, can handle other signals
+    Break,    // detect user handler, should do restore
+}
+
 impl Task {
-    pub fn check_signal(self: &Arc<Self>) -> SyscallResult {
-        let task = self;
-        let mut pending = task.pending_sigs();
+    fn handle_signal(self: &Arc<Self>, si: SigInfo) -> SignalControlFlow {
+        let sa_list = self.sa_list();
+        let signum = SigNum::from(si.signo);
+        let action = sa_list.get(signum).unwrap().clone();
+        match action.handler {
+            SAHandlerType::Ignore => self.sig_default_ignore(),
+            SAHandlerType::Kill => self.sig_default_terminate(),
+            SAHandlerType::Stop => self.sig_default_stop(),
+            SAHandlerType::Continue => self.sig_default_continue(),
+            SAHandlerType::User { handler } => {
+                info!("[handle_signal] start to handle user sigaction");
+                if !action.flags.contains(SAFlags::SA_NODEFER) {
+                    self.sig_mask_mut().enable(si.signo as u32);
+                };
+                *self.sig_mask_mut() |= action.mask;
+                self.trap_context_mut().freg_mut().encounter_signal(); // save freg
+                return SignalControlFlow::Break;
+            }
+        }
+        SignalControlFlow::Continue
+    }
+    pub fn check_signal(self: &Arc<Self>) -> SysResult<Option<SigMask>> {
+        let mut pending = self.pending_sigs();
         if pending.is_empty() {
-            return Ok(0);
+            return Ok(None);
         }
-        let mut tmp_pending: Vec<SigInfo> = Vec::new();
+        let mut blocked_pending: Vec<SigInfo> = Vec::new();
         let old_mask = self.sig_mask().clone();
-        while let Some(sig_info) = pending.pop_with_mask(old_mask) {
-            let sa_list = task.sa_list();
-            let signo = sig_info.signo;
-            trace!("[check_signal] find a signal {}", signo);
-            if SigNum::from(signo) != SigNum::SIGKILL
-                && SigNum::from(signo) != SigNum::SIGSTOP
-                && task.sig_mask().contain_signum(signo as u32)
-            {
-                info!("[check_signal] sig {} has been blocked", signo);
-                tmp_pending.push(sig_info);
-                continue;
-            }
-            let action = sa_list.get(signo as usize).unwrap().clone();
-            match action.handler {
-                SAHandlerType::Ignore => self.sig_default_ignore(),
-                SAHandlerType::Kill => self.sig_default_terminate(),
-                SAHandlerType::Stop => self.sig_default_stop(),
-                SAHandlerType::Continue => self.sig_default_continue(),
-                SAHandlerType::User { handler } => {
-                    // save freg
-                    task.trap_context_mut().freg_mut().encounter_signal();
-                    if !action.flags.contains(SAFlags::SA_NODEFER) {
-                        task.sig_mask_mut().enable(signo as u32);
-                    };
-                    *task.sig_mask_mut() |= action.mask;
-                    error!("user handler not implemented, handler addr {}", handler);
-                    break;
+        let res = loop {
+            match pending.pop_with_mask(old_mask) {
+                Some(si) => {
+                    trace!("[check_signal] find a signal {}", si.signo);
+                    let signum = SigNum::from(si.signo);
+                    // kill / stop signal cannot be blocked
+                    // other signals can be blocked by sigmask
+                    // todo: maybe can disable sigmask's kill/stop bits to avoid this check?
+                    if signum != SigNum::SIGKILL
+                        && signum != SigNum::SIGSTOP
+                        && self.sig_mask().contain_signum(si.signo as u32)
+                    {
+                        // current signum is blocked by sigmask
+                        info!("[check_signal] sig {}: blocked", si.signo);
+                        blocked_pending.push(si);
+                    } else {
+                        // successfully recived signal, handle it
+                        info!("[check_signal] sig {}: start to handle", si.signo);
+                        match self.handle_signal(si) {
+                            // if detect user sigaction, break with old_mask(should be restored)
+                            SignalControlFlow::Break => break Some(old_mask),
+                            SignalControlFlow::Continue => continue,
+                        }
+                    }
                 }
+                None => break None,
             }
+        };
+        for it in blocked_pending.into_iter() {
+            pending.push(it);
         }
-        Ok(0)
+        Ok(res)
     }
     pub fn set_wake_signal(self: &Arc<Self>, should_wake: SigSet) {
         self.pending_sigs().should_wake = should_wake;
@@ -66,8 +98,8 @@ impl Task {
                 signum,
                 task.status()
             );
-            if pending.should_wake.contain_signum(signum) && task.is_suspend() {
-                task.wake();
+            if pending.should_wake.contain_signum(signum) {
+                task.wake_checked();
             }
             drop(pending);
         }
@@ -79,13 +111,11 @@ impl Task {
             false => {
                 // is process (send signal to thread group)
                 if !self.is_group_leader() {
-                    recv_siginfo_inner(self, info);
                     error!(
                         "send signal to thread group {}, while {} is not group leader",
                         self.tgid(),
                         self.tid()
                     );
-                    return;
                 }
                 let mut guard = self.thread_group.lock();
                 let tg = &mut guard.0;
@@ -136,7 +166,7 @@ impl Task {
         let tg = &self.thread_group.lock().0;
         for (_, t) in tg.iter() {
             let task = t.upgrade().unwrap();
-            task.wake();
+            task.wake_unchecked();
         }
         // todo: notify parent?
     }

@@ -123,7 +123,7 @@ impl SigActionList {
     pub fn set_sigaction(&mut self, signum: usize, action: KSigAction) {
         self.actions[signum] = action;
     }
-    pub fn get(&self, signum: usize) -> Option<&KSigAction> {
-        self.actions.get(signum)
+    pub fn get(&self, signum: SigNum) -> Option<&KSigAction> {
+        self.actions.get(signum as usize)
     }
 }

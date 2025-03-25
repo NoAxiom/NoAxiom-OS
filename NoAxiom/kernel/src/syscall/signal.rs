@@ -35,7 +35,7 @@ impl Syscall<'_> {
         // when detect old sig action request, write the swapped sigaction into old_act
         if !old_act.is_null() {
             let sa = task.signal().sa_list.lock();
-            let old = sa.get(signum as usize).unwrap();
+            let old = sa.get(signum).unwrap();
             old_act.write(old.into_sa());
         }
 

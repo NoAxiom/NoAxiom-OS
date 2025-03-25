@@ -14,7 +14,7 @@ use ksync::{
 
 use super::{
     manager::ThreadGroup,
-    process_info::ProcessInfo,
+    process_info::PCB,
     status::TaskStatus,
     taskid::{TidTracer, TGID, TID},
 };
@@ -64,7 +64,7 @@ pub struct Task {
     pub thread_group: Arc<SpinLock<ThreadGroup>>,
 
     /// [pr] process control block ptr,
-    pcb: Arc<SpinLock<ProcessInfo>>,
+    pcb: Arc<SpinLock<PCB>>,
 
     /// [pr] memory set for task
     memory_space: MemorySpace,
@@ -185,7 +185,7 @@ impl Task {
 
     /// get pcb
     #[inline(always)]
-    pub fn pcb(&self) -> SpinLockGuard<ProcessInfo> {
+    pub fn pcb(&self) -> SpinLockGuard<PCB> {
         self.pcb.lock()
     }
 
@@ -239,8 +239,16 @@ impl Task {
         unsafe { (*self.waker.get()) = Some(waker) };
     }
     /// wake self up
-    pub fn wake(&self) {
+    pub fn wake_unchecked(&self) {
         self.waker().as_ref().unwrap().wake_by_ref();
+    }
+    pub fn wake_checked(&self) {
+        let status = self.status();
+        match *status {
+            TaskStatus::Runnable | TaskStatus::SuspendNoInt => {}
+            _ => self.wake_unchecked(),
+        }
+        drop(status);
     }
 
     /// create new process from elf
@@ -262,7 +270,7 @@ impl Task {
             tgid,
             pgid: Arc::new(AtomicUsize::new(0)),
             thread_group: Arc::new(SpinLock::new(ThreadGroup::new())),
-            pcb: Arc::new(SpinLock::new(ProcessInfo {
+            pcb: Arc::new(SpinLock::new(PCB {
                 children: Vec::new(),
                 zombie_children: Vec::new(),
                 parent: None,
@@ -480,7 +488,7 @@ impl Task {
                 tgid: Arc::new(AtomicUsize::new(tid_val)),
                 pgid: self.pgid.clone(),
                 thread_group: Arc::new(SpinLock::new(ThreadGroup::new())),
-                pcb: Arc::new(SpinLock::new(ProcessInfo {
+                pcb: Arc::new(SpinLock::new(PCB {
                     children: Vec::new(),
                     zombie_children: Vec::new(),
                     parent: Some(Arc::downgrade(self)),
@@ -613,3 +621,17 @@ impl Task {
         Ok(start_va.0)
     }
 }
+
+/*
+
+永远谨记判定锁合并的方法论：
+假如一个高频原子操作中出现了两个以上的锁，那这两个锁理应被合并为同一个
+
+并且需要注意：我们的status也是被锁保护着的，很多操作需要依赖于status
+所以：假如一个操作发生了让权，那么status的锁也应该与这个操作中的锁一起合并！
+除非你能保证这个lockguard能够存活到 status.lock => status.unlock 为止
+
+不过有一种情况不需要考虑这个：假如一个操作存在严格的时间顺序，比如磁盘访问，那就不需要太考虑锁的合并了
+因为，时间会帮你排序的
+
+*/

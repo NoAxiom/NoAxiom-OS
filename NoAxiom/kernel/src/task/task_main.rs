@@ -75,11 +75,17 @@ pub async fn task_main(task: Arc<Task>) {
             _ => {}
         }
     }
+    let mut old_mask = None;
     loop {
         // kernel -> user
         trace!("[task_main] trap_restore");
         Arch::trap_restore(task.trap_context_mut());
         check_status!();
+
+        // if returns from user sigaction, restore old_mask
+        if let Some(old_mask) = old_mask.take() {
+            *task.sig_mask_mut() = old_mask;
+        }
 
         // user -> kernel, enter the handler
         trace!("[task_main] user_trap_handler");
@@ -88,7 +94,7 @@ pub async fn task_main(task: Arc<Task>) {
         check_status!();
 
         // check signal before return to user
-        task.check_signal().expect("check_signal error");
+        old_mask = task.check_signal().expect("check_signal error");
         check_status!();
     }
     task.exit_handler().await;

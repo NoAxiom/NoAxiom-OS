@@ -69,7 +69,7 @@ impl Future for WaitChildFuture {
                     Poll::Ready(Ok((0, 0)))
                 } else {
                     trace!("[sys_wait4] suspend for child exit");
-                    // pcb.wait_req = true;
+                    pcb.wait_req = true;
                     Poll::Pending
                 }
             }

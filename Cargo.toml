@@ -4,7 +4,7 @@ members = ["NoAxiom/kernel"]
 resolver = "2"
 
 [workspace.dependencies]
-log = "0.4"
+log = "0.4.22"
 bitflags = "2.6.0"
 arch = { path = "NoAxiom/lib/arch" }
 ksync = { path = "NoAxiom/lib/ksync" }

@@ -12,7 +12,6 @@ pub enum TaskStatus {
     /// a suspend status that it won't be interrupted
     /// actually, if you don't use suspend_on function, it will lead to
     /// SuspendNoInt as well
-    #[allow(unused)]
     SuspendNoInt,
 
     /// a stopped state indicates that the process should suspend in the future

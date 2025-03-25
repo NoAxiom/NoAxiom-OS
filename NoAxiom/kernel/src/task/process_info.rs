@@ -5,8 +5,9 @@ use alloc::{
 
 use super::Task;
 
-/// process resources info
-pub struct ProcessInfo {
+/// process control block
+/// acturally it contains task's ordinary control info
+pub struct PCB {
     /// children tasks, holds lifetime
     pub children: Vec<Arc<Task>>,
 
@@ -18,9 +19,12 @@ pub struct ProcessInfo {
 
     /// wait request
     pub wait_req: bool,
+
+    // /// exit code
+    // pub exit_code: i32,
 }
 
-impl ProcessInfo {
+impl PCB {
     pub fn find_child(&self, tid: usize) -> Option<&Arc<Task>> {
         if let Some(task) = self.children.iter().find(|task| task.tid() == tid) {
             Some(task)

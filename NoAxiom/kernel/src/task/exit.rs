@@ -65,13 +65,13 @@ impl Task {
                 self.set_status(TaskStatus::Zombie);
                 par_pcb.children.retain(|task| task.tid() != tid);
                 par_pcb.zombie_children.push(self.clone());
-                // if par_pcb.wait_req {
-                //     debug!("waking parent");
-                //     par_pcb.wait_req = false;
-                //     parent.wake();
-                // } else {
-                //     trace!("I suppose that my parent is already woken");
-                // }
+                if par_pcb.wait_req {
+                    info!("[exit_handler] detect wait request, waking parent");
+                    par_pcb.wait_req = false;
+                    parent.wake_unchecked();
+                } else {
+                    trace!("[exit_handler] I suppose that my parent is already woken");
+                }
 
                 // send SIGCHLD
                 let siginfo = SigInfo {

@@ -80,14 +80,14 @@ impl SigSet {
     pub fn enable(&mut self, signum: u32) {
         let signum = signum - 1;
         if signum >= MAX_SIGNUM {
-            panic!("[Kernel] invalid signum when add: {}", signum);
+            panic!("[Kernel] invalid signum when enable signum {}", signum);
         }
         *self |= SigSet::from_bits_truncate(1 << signum);
     }
     pub fn disable(&mut self, signum: u32) {
         let signum = signum - 1;
         if signum >= MAX_SIGNUM {
-            panic!("[Kernel] invalid signum when sub: {}", signum);
+            panic!("[Kernel] invalid signum when disable signum {}", signum);
         }
         *self -= SigSet::from_bits_truncate(1 << signum);
     }

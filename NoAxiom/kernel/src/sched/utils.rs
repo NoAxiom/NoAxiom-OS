@@ -80,6 +80,8 @@ impl Wake for BlockWaker {
 
 /// Block on the future until it's ready.
 /// Note that this function is used in kernel mode.
+/// WARNING: don't use it to wrap a bare suspend_now future
+/// if used, you should wrap the suspend_now in another loop checker
 pub fn block_on<T>(future: impl Future<Output = T>) -> T {
     let mut future = Box::pin(future);
     let waker = Arc::new(BlockWaker).into();
@@ -88,11 +90,6 @@ pub fn block_on<T>(future: impl Future<Output = T>) -> T {
         if let Poll::Ready(res) = future.as_mut().poll(&mut cx) {
             return res;
         }
-        // let mut k = get_time();
-        // for i in 0..10000 {
-        //     k *= (k + i);
-        // }
-        // intermit(|| info!("[block on] val is {}", k));
     }
 }
 
@@ -120,7 +117,7 @@ impl Future for SuspendFuture {
     }
 }
 
-pub async fn suspend_no_int_now() {
+pub async unsafe fn suspend_no_int_now() {
     let task = current_cpu().task.as_ref().unwrap();
     task.set_status(TaskStatus::SuspendNoInt);
     SuspendFuture::new().await;
@@ -159,14 +156,25 @@ impl Task {
         let res = poll_fn(move |mut cx| match future.as_mut().poll(&mut cx) {
             Poll::Ready(res) => return Poll::Ready(res),
             Poll::Pending => {
+                // detect pending status, will soon suspend currnent task!
+                // cnt += 1;
+                // info!("task {} suspend on future, poll count: {}", self.tid(), cnt);
+
+                // dangerous action: lock both pending and status
+                // I suppose that we always lock pending before status
+                // so hopefully, it shouldn't cause deadlock
                 let mut pending = self.pending_sigs();
                 let mut status = self.status();
-                cnt += 1;
-                info!("task {} suspend on future, poll count: {}", self.tid(), cnt);
+
+                // set wake sigset and set suspend status
                 let sigset = (!*self.sig_mask()) | (sig.unwrap_or_else(|| SigSet::empty()));
-                trace!("wake set: {:?}", sigset);
                 *status = TaskStatus::Suspend;
                 pending.should_wake = sigset;
+
+                // now release locks
+                // note that after release,
+                // the task will possibly be resched immediately!
+                // it depends on its waker_tasks' behaviour
                 drop(status);
                 drop(pending);
                 return Poll::Pending;

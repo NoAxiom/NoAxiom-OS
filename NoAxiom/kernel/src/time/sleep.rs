@@ -1,5 +1,9 @@
 use alloc::{collections::vec_deque::VecDeque, sync::Arc};
-use core::{task::Waker, usize};
+use core::{
+    future::poll_fn,
+    task::{Poll, Waker},
+    usize,
+};
 
 use array_init::array_init;
 use ksync::cell::SyncUnsafeCell;
@@ -7,8 +11,7 @@ use lazy_static::lazy_static;
 
 use super::gettime::get_time;
 use crate::{
-    config::arch::CPU_NUM, constant::time::SLEEP_BLOCK_LIMIT_TICKS, cpu::get_hartid,
-    sched::utils::suspend_now, task::Task,
+    config::arch::CPU_NUM, constant::time::SLEEP_BLOCK_LIMIT_TICKS, cpu::get_hartid, task::Task,
 };
 
 pub struct SleepInfo {
@@ -84,9 +87,11 @@ impl Task {
         } else {
             let waker = self.waker().as_ref().unwrap().clone();
             current_sleep_manager().push(SleepInfo { waker, time });
-            while !check_time(get_time(), time) {
-                suspend_now().await;
-            }
+            poll_fn(move |_| match check_time(get_time(), time) {
+                true => Poll::Ready(()),
+                false => Poll::Pending,
+            })
+            .await;
         }
     }
 }
