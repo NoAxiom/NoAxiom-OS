@@ -3,26 +3,14 @@ use alloc::{boxed::Box, sync::Arc};
 use async_trait::async_trait;
 use smoltcp::wire::IpEndpoint;
 
-use crate::{fs::vfs::basic::file::File, include::net::ShutdownType, syscall::SysResult};
-
-#[derive(Debug, Clone)]
-pub enum SocketType {
-    Raw,
-    Tcp,
-    Udp,
-    Unix,
-}
-
-bitflags::bitflags! {
-    #[derive(Default, Debug, Copy, Clone)]
-    pub struct SocketOptions: u32 {
-        const BLOCK = 1 << 0;
-        const BROADCAST = 1 << 1;
-        const MULTICAST = 1 << 2;
-        const REUSEADDR = 1 << 3;
-        const REUSEPORT = 1 << 4;
-    }
-}
+use super::{NET_DEVICES, SOCKET_SET};
+use crate::{
+    include::{
+        net::{ShutdownType, SocketOptions, SocketType},
+        result::Errno,
+    },
+    syscall::SysResult,
+};
 
 #[derive(Debug, Clone)]
 pub struct SocketMetadata {
@@ -60,6 +48,25 @@ impl SocketMetadata {
 #[async_trait]
 // pub trait Socket: File {
 pub trait Socket: Send + Sync {
+    /// Read data from the socket.
+    ///
+    /// `buf` is the buffer to store the read data
+    ///
+    /// return:
+    /// - Success: (Returns the length of the data read, the endpoint
+    /// from which data was read).
+    /// - Failure: Error code
+    async fn read(&self, buf: &mut [u8]) -> (Result<usize, Errno>, Option<IpEndpoint>);
+
+    /// Write data to the socket.
+    ///
+    /// `buf` is the data to be written  
+    /// `to` is the destination endpoint. If None, the written data will be
+    /// discarded.
+    ///
+    /// return: the length of the data written
+    async fn write(&self, buf: &[u8], to: Option<IpEndpoint>) -> Result<usize, Errno>;
+
     /// The bind() function is used to associate a socket with a particular IP
     /// address and port number on the local machine.
     ///
@@ -90,4 +97,12 @@ pub trait Socket: Send + Sync {
     fn shutdown(&mut self, operation: ShutdownType) -> SysResult<()>;
 
     fn end_point(&self) -> Option<IpEndpoint>;
+}
+
+pub fn poll_ifaces() {
+    let devices = NET_DEVICES.read();
+    let mut sockets = SOCKET_SET.lock();
+    for (_, iface) in devices.iter() {
+        iface.poll(&mut sockets).ok();
+    }
 }

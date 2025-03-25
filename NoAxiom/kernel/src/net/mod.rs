@@ -4,11 +4,12 @@ use ksync::mutex::RwLock;
 use port_manager::PortManager;
 use socket_set::SocketSet;
 
-use crate::device::net::NetDevice;
+use crate::driver::net::NetDevice;
 
 mod port_manager;
 mod socket;
 mod socket_set;
+pub mod sockfile;
 mod tcpsocket;
 
 lazy_static::lazy_static! {

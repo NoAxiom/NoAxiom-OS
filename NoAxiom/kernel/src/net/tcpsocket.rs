@@ -5,12 +5,16 @@ use async_trait::async_trait;
 use smoltcp::{iface::SocketHandle, socket::tcp, wire::IpEndpoint};
 
 use super::{
-    socket::{Socket, SocketMetadata, SocketOptions, SocketType},
+    socket::{poll_ifaces, Socket, SocketMetadata},
     NET_DEVICES, PORT_MANAGER, SOCKET_SET,
 };
 use crate::{
     constant::net::{DEFAULT_METADATA_BUF_SIZE, DEFAULT_RX_BUF_SIZE, DEFAULT_TX_BUF_SIZE},
-    include::{net::ShutdownType, result::Errno},
+    driver::net::LOOP_BACK,
+    include::{
+        net::{ShutdownType, SocketOptions, SocketType},
+        result::Errno,
+    },
     sched::utils::yield_now,
     syscall::SysResult,
 };
@@ -30,6 +34,7 @@ pub struct TcpSocket {
     /// client: the FIRST handle is the connect socket handle
     handles: Vec<SocketHandle>,
     local_endpoint: Option<IpEndpoint>,
+    // todo: nonblock?
 }
 
 impl TcpSocket {
@@ -101,6 +106,88 @@ impl TcpSocket {
 
 #[async_trait]
 impl Socket for TcpSocket {
+    /// Read data from the socket.
+    ///
+    /// `buf` is the buffer to store the read data
+    ///
+    /// return:
+    /// - Success: (Returns the length of the data read, the endpoint
+    /// from which data was read).
+    /// - Failure: Error code
+    async fn read(&self, buf: &mut [u8]) -> (Result<usize, Errno>, Option<IpEndpoint>) {
+        loop {
+            poll_ifaces();
+            let mut sockets = SOCKET_SET.lock();
+            let socket = sockets.get_mut::<tcp::Socket>(self.handles[0]);
+
+            // if socket is closed, return error
+            if !socket.is_active() {
+                // debug!("Tcp Socket Read Error, socket is closed");
+                return (Err(Errno::ENOTCONN), None);
+            }
+
+            if socket.may_recv() {
+                match socket.recv_slice(buf) {
+                    Ok(size) => {
+                        if size > 0 {
+                            let remote_endpoint = socket.remote_endpoint();
+                            if remote_endpoint.is_none() {
+                                return (Err(Errno::ENOTCONN), None);
+                            }
+                            drop(sockets);
+                            poll_ifaces();
+                            return (Ok(size), Some(remote_endpoint.unwrap()));
+                        }
+                    }
+                    Err(tcp::RecvError::InvalidState) => {
+                        warn!("Tcp Socket Read Error, InvalidState");
+                        return (Err(Errno::ENOTCONN), None);
+                    }
+                    Err(tcp::RecvError::Finished) => {
+                        // remote write end is closed, we should close the read end
+                        return (Err(Errno::ENOTCONN), None);
+                    }
+                }
+            } else {
+                return (Err(Errno::ENOTCONN), None);
+            }
+            drop(sockets);
+            yield_now().await;
+        }
+    }
+
+    /// Write data to the socket, sync funciton.
+    ///
+    /// `buf` is the data to be written  
+    /// `to` is the destination endpoint. If None, the written data will be
+    /// discarded.
+    ///
+    /// return: the length of the data written
+    async fn write(&self, buf: &[u8], _to: Option<IpEndpoint>) -> Result<usize, Errno> {
+        let mut sockets = SOCKET_SET.lock();
+        let socket = sockets.get_mut::<tcp::Socket>(self.handles[0]);
+
+        if socket.is_open() {
+            if socket.can_send() {
+                match socket.send_slice(buf) {
+                    Ok(size) => {
+                        drop(sockets);
+                        poll_ifaces();
+                        Ok(size)
+                    }
+                    Err(e) => {
+                        error!("Tcp Socket Write Error {e:?}");
+                        Err(Errno::ENOBUFS)
+                    }
+                }
+            } else {
+                Err(Errno::ENOBUFS)
+            }
+        } else {
+            Err(Errno::ENOTCONN)
+        }
+    }
+
     fn bind(&mut self, local: IpEndpoint) -> SysResult<()> {
         PORT_MANAGER.bind_port::<tcp::Socket<'static>>(local.port)?;
         self.local_endpoint = Some(local);
@@ -150,7 +237,7 @@ impl Socket for TcpSocket {
         PORT_MANAGER.bind_port::<tcp::Socket<'static>>(temp_port)?;
 
         let driver_write_guard = NET_DEVICES.write();
-        let iface = driver_write_guard.get(&0).unwrap().clone();
+        let iface = driver_write_guard.get(&0).unwrap().clone(); // now we only have one net device
         let mut iface_inner = iface.inner_iface().lock();
 
         local_socket
@@ -163,6 +250,7 @@ impl Socket for TcpSocket {
         drop(sockets);
         drop(iface_inner);
         loop {
+            poll_ifaces();
             let mut sockets = SOCKET_SET.lock();
             let local_socket = sockets.get_mut::<tcp::Socket>(self.handles[0]);
 
@@ -203,6 +291,7 @@ impl Socket for TcpSocket {
         }
 
         loop {
+            poll_ifaces();
             let mut sockets = SOCKET_SET.lock();
             let chosen_handle_index = self.handles.iter().position(|handle| {
                 let socket = sockets.get::<tcp::Socket>(*handle);
