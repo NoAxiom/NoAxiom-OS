@@ -1,9 +1,8 @@
 //! IP layer
 use alloc::sync::Arc;
-use core::task::Waker;
 
 use ksync::mutex::SpinLock;
-use smoltcp::{socket::AnySocket, wire::IpListenEndpoint};
+use smoltcp::socket::AnySocket;
 
 use crate::{constant::net::PORT_MAX, include::result::Errno, syscall::SysResult};
 

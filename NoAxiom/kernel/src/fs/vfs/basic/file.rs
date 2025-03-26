@@ -51,6 +51,9 @@ impl FileMeta {
         let flags = self.flags.lock();
         flags.contains(FileFlags::O_WRONLY) || flags.contains(FileFlags::O_RDWR)
     }
+    pub fn set_flags(&self, flags: FileFlags) {
+        *self.flags.lock() = flags;
+    }
 }
 
 #[async_trait]
