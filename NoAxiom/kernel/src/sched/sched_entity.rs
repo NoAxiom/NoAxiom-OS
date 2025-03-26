@@ -75,6 +75,7 @@ impl SchedEntityInner {
 }
 
 pub struct SchedEntity {
+    // use unsafe cell since we don't care about its correctness
     inner: Arc<SyncUnsafeCell<SchedEntityInner>>,
     pub tid: usize,
 }

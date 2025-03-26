@@ -37,6 +37,9 @@ fn current_mutex_tracer() -> &'static mut MutexTracer {
     HART_MUTEX_TRACERS[Arch::get_hartid()].ref_mut()
 }
 
+pub fn current_lock_depth() -> usize {
+    current_mutex_tracer().depth as usize
+}
 pub fn check_no_lock() -> bool {
     current_mutex_tracer().depth == 0
 }

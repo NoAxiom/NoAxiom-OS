@@ -77,6 +77,9 @@ bitflags! {
 pub type SigMask = SigSet;
 
 impl SigSet {
+    pub fn without_kill(&self) -> Self {
+        *self - SigSet::SIGKILL - SigSet::SIGSTOP
+    }
     pub fn enable(&mut self, signum: u32) {
         let signum = signum - 1;
         if signum >= MAX_SIGNUM {

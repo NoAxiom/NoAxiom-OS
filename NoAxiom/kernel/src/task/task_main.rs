@@ -6,6 +6,7 @@ use core::{
 };
 
 use arch::{Arch, ArchInt, ArchTrap, ArchTrapContext, ArchUserFloatContext};
+use ksync::mutex::{check_no_lock, current_lock_depth};
 
 use crate::{
     cpu::current_cpu,
@@ -68,34 +69,49 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
 /// user task main
 pub async fn task_main(task: Arc<Task>) {
     task.set_waker(take_waker().await);
-    macro check_status() {
-        match task.get_status() {
-            TaskStatus::Terminated => break,
-            TaskStatus::Stopped => suspend_now().await,
-            _ => {}
-        }
-    }
     let mut old_mask = None;
+    assert!(check_no_lock());
     loop {
         // kernel -> user
         trace!("[task_main] trap_restore");
         Arch::trap_restore(task.trap_context_mut());
-        check_status!();
-
-        // if returns from user sigaction, restore old_mask
+        assert!(check_no_lock());
+        let mut pcb = task.pcb();
         if let Some(old_mask) = old_mask.take() {
-            *task.sig_mask_mut() = old_mask;
+            pcb.pending_sigs.sig_mask = old_mask;
         }
+        match pcb.status() {
+            TaskStatus::Terminated => break,
+            TaskStatus::Stopped => suspend_now(pcb).await,
+            _ => drop(pcb),
+        }
+        assert!(check_no_lock());
 
         // user -> kernel, enter the handler
         trace!("[task_main] user_trap_handler");
         assert!(!Arch::is_interrupt_enabled());
+        assert!(check_no_lock());
         user_trap_handler(&task).await;
-        check_status!();
+        let pcb = task.pcb();
+        match pcb.status() {
+            TaskStatus::Terminated => break,
+            TaskStatus::Stopped => suspend_now(pcb).await,
+            _ => drop(pcb),
+        }
+        assert!(check_no_lock());
 
         // check signal before return to user
+        trace!("[task_main] check_signal");
         old_mask = task.check_signal().expect("check_signal error");
-        check_status!();
+        assert!(check_no_lock());
+        let pcb = task.pcb();
+        match pcb.status() {
+            TaskStatus::Terminated => break,
+            TaskStatus::Stopped => suspend_now(pcb).await,
+            _ => drop(pcb),
+        }
+        assert!(check_no_lock());
     }
+    assert!(check_no_lock());
     task.exit_handler().await;
 }

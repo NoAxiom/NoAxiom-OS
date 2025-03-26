@@ -1,10 +1,11 @@
 //! # Task
 
-use alloc::{string::String, sync::Arc, vec::Vec};
-use core::{
-    sync::atomic::{AtomicI32, AtomicUsize, Ordering},
-    task::Waker,
+use alloc::{
+    string::String,
+    sync::{Arc, Weak},
+    vec::Vec,
 };
+use core::{sync::atomic::AtomicUsize, task::Waker};
 
 use arch::{Arch, ArchMemory, ArchTrapContext, TrapContext, TrapType};
 use ksync::{
@@ -14,9 +15,8 @@ use ksync::{
 
 use super::{
     manager::ThreadGroup,
-    process_info::PCB,
     status::TaskStatus,
-    taskid::{TidTracer, TGID, TID},
+    taskid::{TidTracer, PGID, TGID, TID},
 };
 use crate::{
     config::{mm::USER_HEAP_SIZE, task::INIT_PROCESS_ID},
@@ -34,141 +34,187 @@ use crate::{
     },
     mm::{
         address::VirtAddr,
-        memory_set::{ElfMemoryInfo, MemorySet, MemorySpace},
+        memory_set::{ElfMemoryInfo, MemorySet},
         page_table::PageTable,
         validate::validate,
     },
     return_errno,
     sched::sched_entity::SchedEntity,
-    signal::{
-        sig_action::SigActionList, sig_control_block::SignalControlBlock, sig_pending::SigPending,
-        sig_set::SigMask,
-    },
+    signal::{sig_action::SigActionList, sig_pending::SigPending, sig_set::{SigMask, SigSet}},
     syscall::{SysResult, SyscallResult},
     task::{manager::add_new_process, taskid::tid_alloc},
 };
 
+/// shared between threads
+type Shared<T> = Arc<SpinLock<T>>;
+
+/// only used in current thread, mutable resources
+type Mutable<T> = SpinLock<T>;
+
+/// only used in current thread, read-only resources
+type Immutable<T> = T;
+
+/// task control block inner
+/// it is protected by a spinlock to assure its atomicity
+/// so there's no need to use any lock in this struct
+pub struct TaskInner {
+    /// children tasks, holds children's lifetime
+    /// assertion: only when the task is group leader, it can have children
+    pub children: Vec<Arc<Task>>,
+
+    /// zombie children, holds children's lifetime
+    pub zombie_children: Vec<Arc<Task>>,
+
+    /// parent task, weak ptr
+    pub parent: Option<Weak<Task>>,
+
+    /// task status
+    pub status: TaskStatus,
+
+    /// exit code
+    pub exit_code: i32,
+
+    /// pending signals, saves signals not handled
+    pub pending_sigs: SigPending,
+}
+
+impl Default for TaskInner {
+    fn default() -> Self {
+        Self {
+            children: Vec::new(),
+            zombie_children: Vec::new(),
+            parent: None,
+            status: TaskStatus::Runnable,
+            exit_code: 0,
+            pending_sigs: SigPending::new(),
+        }
+    }
+}
+
+impl TaskInner {
+    // task status
+    #[inline(always)]
+    pub fn status(&self) -> TaskStatus {
+        self.status
+    }
+    #[inline(always)]
+    pub fn set_status(&mut self, status: TaskStatus) {
+        self.status = status;
+    }
+    #[inline(always)]
+    pub fn set_suspend(&mut self) {
+        self.set_status(TaskStatus::Suspend);
+    }
+    #[inline(always)]
+    pub fn set_runnable(&mut self) {
+        self.set_status(TaskStatus::Runnable);
+    }
+    #[inline(always)]
+    pub fn is_suspend(&self) -> bool {
+        self.status() == TaskStatus::Suspend
+    }
+    #[inline(always)]
+    pub fn is_runnable(&self) -> bool {
+        self.status() == TaskStatus::Runnable
+    }
+
+    // exit code
+    pub fn exit_code(&self) -> i32 {
+        self.exit_code
+    }
+    pub fn set_exit_code(&mut self, exit_code: i32) {
+        self.exit_code = exit_code;
+    }
+
+    /// suspend task can be woken up
+    pub fn can_wake(&self) -> bool {
+        self.is_suspend()
+    }
+
+    /// set wake signal
+    pub fn set_wake_signal(&mut self, sig: SigSet) {
+        self.pending_sigs.should_wake = sig;
+    }
+    /// signal mask
+    pub fn sig_mask(&self) -> SigMask {
+        self.pending_sigs.sig_mask
+    }
+}
+
 /// task control block for a coroutine,
 /// a.k.a thread in current project structure
 pub struct Task {
-    /// [th] task id
-    tid: TidTracer,
+    // immutable
+    tid: Immutable<TidTracer>, // task id, with lifetime holded
+    tgid: Immutable<TGID>,     // task group id, aka pid
+    pgid: Immutable<PGID>,     // process group id
 
-    /// [pr] task group id, aka pid
-    tgid: Arc<AtomicUsize>,
+    // mutable
+    inner: Mutable<TaskInner>, // task control block inner, protected by lock
 
-    /// [pr] process group id
-    pgid: Arc<AtomicUsize>,
+    // unsafe cell
+    waker: SyncUnsafeCell<Option<Waker>>, // waker for the task
+    trap_cx: SyncUnsafeCell<TrapContext>, // trap context
 
-    /// [pr] thread group tracer
-    pub thread_group: Arc<SpinLock<ThreadGroup>>,
+    // shared
+    fd_table: Shared<FdTable>,             // file descriptor table
+    cwd: Shared<Path>,                     // current work directory
+    sa_list: Shared<SigActionList>,        // signal action list, saves signal handler
+    memory_set: Shared<MemorySet>,         // memory set for the task
+    pub thread_group: Shared<ThreadGroup>, // thread group
 
-    /// [pr] process control block ptr,
-    pcb: Arc<SpinLock<PCB>>,
-
-    /// [pr] memory set for task
-    memory_space: MemorySpace,
-
-    /// [th] trap context,
-    /// contains stack ptr, registers, etc.
-    trap_cx: SyncUnsafeCell<TrapContext>,
-
-    /// [th] task status: ready / running / zombie
-    pub status: Arc<SpinLock<TaskStatus>>,
-
-    /// [th] schedule entity for schedule
-    pub sched_entity: SchedEntity,
-
-    /// [th?] task exit code
-    exit_code: AtomicI32,
-
-    /// [pr] file descriptor table
-    fd_table: Arc<SpinLock<FdTable>>,
-
-    /// [pr] current work directory
-    cwd: Arc<SpinLock<Path>>,
-
-    /// [pr/th] signal info
-    signal: SignalControlBlock,
-
-    /// [th] waker
-    waker: SyncUnsafeCell<Option<Waker>>,
+    // others
+    pub sched_entity: SchedEntity, // sched entity for schedule
 }
 
 /// user tasks
 /// - usage: wrap it in Arc<Task>
 impl Task {
+    /// lock the process control block
+    #[inline(always)]
+    pub fn pcb(&self) -> SpinLockGuard<TaskInner> {
+        self.inner.lock()
+    }
+
     /// tid
     #[inline(always)]
     pub fn tid(&self) -> TID {
         self.tid.0
     }
     pub fn tgid(&self) -> TGID {
-        self.tgid.load(Ordering::SeqCst)
+        self.tgid
     }
-    pub fn pgid(&self) -> usize {
-        self.pgid.load(Ordering::SeqCst)
+    pub fn pgid(&self) -> PGID {
+        self.pgid
     }
+    pub fn get_tg_leader(&self) -> Option<Arc<Task>> {
+        self.thread_group
+            .lock()
+            .0
+            .get(&self.tgid)
+            .unwrap()
+            .upgrade()
+    }
+
+    /// check if the task is group leader
+    /// if true, the task is also called process
     #[inline(always)]
     pub fn is_group_leader(&self) -> bool {
         self.tid() == self.tgid()
     }
 
-    /// status
-    #[inline(always)]
-    pub fn status(&self) -> SpinLockGuard<TaskStatus> {
-        self.status.lock()
-    }
-    #[inline(always)]
-    pub fn get_status(&self) -> TaskStatus {
-        *self.status.lock()
-    }
-    #[inline(always)]
-    pub fn set_status(&self, status: TaskStatus) {
-        *self.status.lock() = status;
-    }
-    #[inline(always)]
-    pub fn set_suspend(&self) {
-        self.set_status(TaskStatus::Suspend);
-    }
-    #[inline(always)]
-    pub fn set_runnable(&self) {
-        self.set_status(TaskStatus::Runnable);
-    }
-    #[inline(always)]
-    pub fn is_suspend(&self) -> bool {
-        self.get_status() == TaskStatus::Suspend
-    }
-    #[inline(always)]
-    pub fn is_runnable(&self) -> bool {
-        self.get_status() == TaskStatus::Runnable
-    }
-
-    /// exit code
-    #[inline(always)]
-    pub fn exit_code(&self) -> i32 {
-        self.exit_code.load(Ordering::SeqCst)
-    }
-    #[inline(always)]
-    pub fn set_exit_code(&self, exit_code: i32) {
-        self.exit_code.store(exit_code, Ordering::SeqCst);
-    }
-
     /// memory set
     #[inline(always)]
     pub fn memory_set(&self) -> &Arc<SpinLock<MemorySet>> {
-        // unsafe { &(*self.memory_set.get()) }
-        &self.memory_space.memory_set
+        &self.memory_set
     }
     #[inline(always)]
     pub fn memory_activate(&self) {
-        self.memory_space.memory_activate();
+        self.memory_set.lock().memory_activate();
     }
     /// change current memory set
     pub fn change_memory_set(&self, memory_set: MemorySet) {
-        // unsafe { (*self.memory_set.get()) = Arc::new(SpinLock::new(memory_set)) };
         let mut ms = self.memory_set().lock();
-        self.memory_space.change_root_ppn(memory_set.root_ppn().0);
         *ms = memory_set;
     }
 
@@ -181,12 +227,6 @@ impl Task {
         let vpn = VirtAddr::from(addr).floor();
         let pt = PageTable::from_ppn(Arch::current_root_ppn());
         validate(self.memory_set(), vpn, trap_type, pt.translate_vpn(vpn)).await
-    }
-
-    /// get pcb
-    #[inline(always)]
-    pub fn pcb(&self) -> SpinLockGuard<PCB> {
-        self.pcb.lock()
     }
 
     /// get fd_table
@@ -211,23 +251,9 @@ impl Task {
         unsafe { &mut (*self.trap_cx.get()) }
     }
 
-    pub fn signal(&self) -> &SignalControlBlock {
-        &self.signal
-    }
     /// signal info: sigaction list
     pub fn sa_list(&self) -> SpinLockGuard<SigActionList> {
-        self.signal.sa_list.lock()
-    }
-    /// signal info: pending signals
-    pub fn pending_sigs(&self) -> SpinLockGuard<SigPending> {
-        self.signal.pending_sigs.lock()
-    }
-    /// signal info: signal mask
-    pub fn sig_mask(&self) -> &SigMask {
-        unsafe { &(*self.signal.sig_mask.get()) }
-    }
-    pub fn sig_mask_mut(&self) -> &mut SigMask {
-        unsafe { &mut (*self.signal.sig_mask.get()) }
+        self.sa_list.lock()
     }
 
     /// get waker
@@ -242,14 +268,6 @@ impl Task {
     pub fn wake_unchecked(&self) {
         self.waker().as_ref().unwrap().wake_by_ref();
     }
-    pub fn wake_checked(&self) {
-        let status = self.status();
-        match *status {
-            TaskStatus::Runnable | TaskStatus::SuspendNoInt => {}
-            _ => self.wake_unchecked(),
-        }
-        drop(status);
-    }
 
     /// create new process from elf
     pub async fn new_process(path: Path) -> Arc<Self> {
@@ -263,30 +281,20 @@ impl Task {
         trace!("[kernel] succeed to load elf data");
         // identifier
         let tid = tid_alloc();
-        let tgid = Arc::new(AtomicUsize::new(tid.0));
+        let tgid = tid.0;
         // create task
         let task = Arc::new(Self {
             tid,
             tgid,
-            pgid: Arc::new(AtomicUsize::new(0)),
+            pgid: 0,
+            inner: SpinLock::new(TaskInner::default()),
             thread_group: Arc::new(SpinLock::new(ThreadGroup::new())),
-            pcb: Arc::new(SpinLock::new(PCB {
-                children: Vec::new(),
-                zombie_children: Vec::new(),
-                parent: None,
-                wait_req: false,
-            })),
-            memory_space: MemorySpace {
-                root_ppn: SyncUnsafeCell::new(memory_set.root_ppn().0),
-                memory_set: Arc::new(SpinLock::new(memory_set)),
-            },
+            memory_set: Arc::new(SpinLock::new(memory_set)),
             trap_cx: SyncUnsafeCell::new(TrapContext::app_init_cx(elf_entry, user_sp)),
-            status: Arc::new(SpinLock::new(TaskStatus::Runnable)),
-            exit_code: AtomicI32::new(0),
             sched_entity: SchedEntity::new_bare(INIT_PROCESS_ID),
             fd_table: Arc::new(SpinLock::new(FdTable::new())),
             cwd: Arc::new(SpinLock::new(path)),
-            signal: SignalControlBlock::new(None),
+            sa_list: Arc::new(SpinLock::new(SigActionList::new())),
             waker: SyncUnsafeCell::new(None),
         });
         add_new_process(&task);
@@ -426,14 +434,11 @@ impl Task {
 
     /// fork
     pub fn fork(self: &Arc<Task>, flags: CloneFlags) -> Arc<Self> {
-        let (memory_set, root_ppn) = if flags.contains(CloneFlags::VM) {
-            (
-                self.memory_set().clone(),
-                SyncUnsafeCell::new(self.memory_space.root_ppn()),
-            )
+        let memory_set = if flags.contains(CloneFlags::VM) {
+            self.memory_set().clone()
         } else {
-            let (ms, root_ppn) = self.memory_set().lock().clone_cow();
-            (Arc::new(SpinLock::new(ms)), SyncUnsafeCell::new(root_ppn))
+            let (ms, _) = self.memory_set().lock().clone_cow();
+            Arc::new(SpinLock::new(ms))
         };
 
         // TODO: CloneFlags::SIGHAND
@@ -462,18 +467,16 @@ impl Task {
                 tgid: self.tgid.clone(),
                 pgid: self.pgid.clone(),
                 thread_group: self.thread_group.clone(),
-                pcb: self.pcb.clone(),
-                memory_space: MemorySpace {
-                    root_ppn,
-                    memory_set,
-                },
+                inner: SpinLock::new(TaskInner {
+                    parent: self.inner.lock().parent.clone(),
+                    ..Default::default()
+                }),
+                memory_set,
                 trap_cx: SyncUnsafeCell::new(self.trap_context().clone()),
-                status: Arc::new(SpinLock::new(TaskStatus::Runnable)),
-                exit_code: AtomicI32::new(0),
                 sched_entity: self.sched_entity.data_clone(tid_val),
                 fd_table,
                 cwd: self.cwd.clone(),
-                signal: SignalControlBlock::new(Some(&self.signal.sa_list)),
+                sa_list: self.sa_list.clone(),
                 waker: SyncUnsafeCell::new(None),
             });
             self.thread_group.lock().insert(&new_thread);
@@ -481,30 +484,23 @@ impl Task {
         } else {
             // fork as a new process
             let new_tid = tid_alloc();
-            let tid_val = new_tid.0;
-            trace!("fork new process, tgid: {}", tid_val);
+            let new_tgid = new_tid.0;
+            trace!("fork new process, tgid: {}", new_tgid);
             let new_process = Arc::new(Self {
                 tid: new_tid,
-                tgid: Arc::new(AtomicUsize::new(tid_val)),
+                tgid: new_tgid,
                 pgid: self.pgid.clone(),
                 thread_group: Arc::new(SpinLock::new(ThreadGroup::new())),
-                pcb: Arc::new(SpinLock::new(PCB {
-                    children: Vec::new(),
-                    zombie_children: Vec::new(),
+                inner: SpinLock::new(TaskInner {
                     parent: Some(Arc::downgrade(self)),
-                    wait_req: false,
-                })),
-                memory_space: MemorySpace {
-                    memory_set,
-                    root_ppn,
-                },
+                    ..Default::default()
+                }),
+                memory_set,
                 trap_cx: SyncUnsafeCell::new(self.trap_context().clone()),
-                status: Arc::new(SpinLock::new(TaskStatus::Runnable)),
-                exit_code: AtomicI32::new(0),
-                sched_entity: self.sched_entity.data_clone(tid_val),
+                sched_entity: self.sched_entity.data_clone(new_tgid),
                 fd_table,
                 cwd: Arc::new(SpinLock::new(self.cwd().clone())),
-                signal: SignalControlBlock::new(None),
+                sa_list: Arc::new(SpinLock::new(SigActionList::new())),
                 waker: SyncUnsafeCell::new(None),
             });
             add_new_process(&new_process);
@@ -542,10 +538,11 @@ impl Task {
 
     /// exit current task
     pub fn terminate(&self, exit_code: i32) {
+        let mut pcb = self.pcb();
         if self.is_group_leader() {
-            self.set_exit_code(exit_code);
+            pcb.set_exit_code(exit_code);
         }
-        self.set_status(TaskStatus::Terminated);
+        pcb.set_status(TaskStatus::Terminated);
     }
 
     pub fn grow_brk(self: &Arc<Self>, new_brk: usize) -> SyscallResult {

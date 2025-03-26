@@ -25,7 +25,7 @@ impl WaitChildFuture {
         let pcb = task.pcb();
         let target = match pid_type {
             PidSel::Task(None) => None,
-            PidSel::Task(Some(pid)) => match pcb.find_child(pid) {
+            PidSel::Task(Some(tgid)) => match pcb.children.iter().find(|task| task.tid() == tgid) {
                 Some(task) => Some(task.clone()),
                 None => return Err(Errno::ECHILD),
             },
@@ -43,37 +43,41 @@ impl WaitChildFuture {
 impl Future for WaitChildFuture {
     type Output = SysResult<(i32, usize)>;
     fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
-        // if !cx.waker().will_wake(self.task.waker().as_ref().unwrap()) {
-        //     error!("[sys_wait4] waker not match");
-        //     self.task.set_waker(cx.waker().clone());
-        // }
         let mut pcb = self.task.pcb();
         let res = match &self.target {
             None => match pcb.zombie_children.pop() {
-                Some(task) => Poll::Ready(Ok((task.exit_code(), task.tid()))),
+                Some(task) => Poll::Ready(Ok((pcb.exit_code(), task.tid()))),
                 None => Poll::Pending,
             },
-            Some(task) => match *task.status() {
-                TaskStatus::Zombie => {
-                    let target_tid = task.tid();
-                    let exit_code = task.exit_code();
-                    pcb.zombie_children.retain(|task| task.tid() != target_tid);
-                    Poll::Ready(Ok((exit_code, target_tid)))
+            Some(child) => {
+                let mut ch_pcb = child.pcb();
+                match ch_pcb.status() {
+                    TaskStatus::Zombie => {
+                        let target_tid = child.tid();
+                        let exit_code = ch_pcb.exit_code();
+                        ch_pcb
+                            .zombie_children
+                            .retain(|task| task.tid() != target_tid);
+                        Poll::Ready(Ok((exit_code, target_tid)))
+                    }
+                    _ => Poll::Pending,
                 }
-                _ => Poll::Pending,
-            },
+            }
         };
         match res {
             Poll::Pending => {
                 if self.wait_option.contains(WaitOption::WNOHANG) && res.is_pending() {
+                    trace!("[sys_wait4] return nohang");
                     Poll::Ready(Ok((0, 0)))
                 } else {
                     trace!("[sys_wait4] suspend for child exit");
-                    pcb.wait_req = true;
                     Poll::Pending
                 }
             }
-            Poll::Ready(_) => res,
+            Poll::Ready(_) => {
+                trace!("[sys_wait4] exited child found");
+                res
+            }
         }
     }
 }

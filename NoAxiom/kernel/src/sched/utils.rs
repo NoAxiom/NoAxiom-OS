@@ -11,10 +11,12 @@ use core::{
     task::{Context, Poll, Waker},
 };
 
+use ksync::mutex::{check_no_lock, SpinLockGuard};
+
 use crate::{
     cpu::current_cpu,
     signal::sig_set::SigSet,
-    task::{status::TaskStatus, Task},
+    task::{status::TaskStatus, Task, TaskInner},
 };
 pub struct YieldFuture {
     visited: bool,
@@ -117,77 +119,59 @@ impl Future for SuspendFuture {
     }
 }
 
-pub async unsafe fn suspend_no_int_now() {
-    let task = current_cpu().task.as_ref().unwrap();
-    task.set_status(TaskStatus::SuspendNoInt);
+#[inline(always)]
+fn current_set_runnable() {
+    current_cpu().task.as_ref().unwrap().pcb().set_runnable();
+}
+
+pub async fn suspend_no_int_now(mut pcb: SpinLockGuard<'_, TaskInner>) {
+    pcb.set_status(TaskStatus::SuspendNoInt);
+    drop(pcb);
     SuspendFuture::new().await;
-    task.set_runnable();
+    current_set_runnable();
 }
 
 /// suspend current task
 /// difference with yield_now: it won't wake the task immediately
-pub async fn suspend_now() {
-    let task = current_cpu().task.as_ref().unwrap();
-    task.set_wake_signal(!*task.sig_mask());
-    task.set_suspend();
+pub async fn suspend_now(mut pcb: SpinLockGuard<'_, TaskInner>) {
+    pcb.pending_sigs.should_wake = !pcb.pending_sigs.sig_mask;
+    pcb.set_suspend();
+    drop(pcb);
     SuspendFuture::new().await;
-    task.set_runnable();
-    // assert!(!task.is_suspend());
+    current_set_runnable();
 }
 
-pub async fn suspend_now_with_sig(sig: SigSet) {
-    let task = current_cpu().task.as_ref().unwrap();
-    let sigset = !*task.sig_mask() | sig;
-    task.set_wake_signal(sigset);
-    task.set_suspend();
+pub async fn suspend_now_with_sig(mut pcb: SpinLockGuard<'_, TaskInner>, sig: SigSet) {
+    let sigset = (!pcb.sig_mask()) | sig;
+    pcb.pending_sigs.should_wake = sigset;
+    pcb.set_suspend();
+    drop(pcb);
     SuspendFuture::new().await;
-    task.set_runnable();
-    // assert!(!task.is_suspend());
+    current_set_runnable();
 }
 
 impl Task {
     pub async fn suspend_on<T>(
         self: &Arc<Self>,
+        mut pcb: SpinLockGuard<'_, TaskInner>,
         future: impl Future<Output = T>,
         sig: Option<SigSet>,
     ) -> T {
-        let mut future = Box::pin(future);
-        let mut cnt = 0;
-        let res = poll_fn(move |mut cx| match future.as_mut().poll(&mut cx) {
-            Poll::Ready(res) => return Poll::Ready(res),
-            Poll::Pending => {
-                // detect pending status, will soon suspend currnent task!
-                // cnt += 1;
-                // info!("task {} suspend on future, poll count: {}", self.tid(), cnt);
-
-                // dangerous action: lock both pending and status
-                // I suppose that we always lock pending before status
-                // so hopefully, it shouldn't cause deadlock
-                let mut pending = self.pending_sigs();
-                let mut status = self.status();
-
-                // set wake sigset and set suspend status
-                let sigset = (!*self.sig_mask()) | (sig.unwrap_or_else(|| SigSet::empty()));
-                *status = TaskStatus::Suspend;
-                pending.should_wake = sigset;
-
-                // now release locks
-                // note that after release,
-                // the task will possibly be resched immediately!
-                // it depends on its waker_tasks' behaviour
-                drop(status);
-                drop(pending);
-                return Poll::Pending;
-            }
-        })
-        .await;
-        self.set_runnable();
-        // assert!(!self.is_suspend());
+        let sigset = (!pcb.sig_mask()) | (sig.unwrap_or_else(|| SigSet::empty()));
+        pcb.pending_sigs.should_wake = sigset;
+        pcb.set_suspend();
+        drop(pcb);
+        let res = future.await;
+        current_set_runnable();
         res
     }
 }
 
-pub async fn suspend_on<T>(future: impl Future<Output = T>, sig: Option<SigSet>) -> T {
+pub async fn suspend_on<T>(
+    future: impl Future<Output = T>,
+    sig: Option<SigSet>,
+) -> T {
     let task = current_cpu().task.as_ref().unwrap();
-    task.suspend_on(future, sig).await
+    assert!(check_no_lock());
+    task.suspend_on(task.pcb(), future, sig).await
 }

@@ -6,7 +6,6 @@ pub enum TaskStatus {
     /// a suspended task without being saved in scheduler
     /// instead, its waker would be saved by a specific structure
     /// and it will be woken up later when associated interrupt is triggered
-    /// todo: impl this
     Suspend,
 
     /// a suspend status that it won't be interrupted
@@ -26,4 +25,10 @@ pub enum TaskStatus {
     /// and this task will soon be dropped by its parent process
     /// note that only those who owns parent task can be set to zombie
     Zombie,
+}
+
+impl Default for TaskStatus {
+    fn default() -> Self {
+        TaskStatus::Runnable
+    }
 }

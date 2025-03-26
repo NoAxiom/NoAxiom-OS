@@ -11,6 +11,7 @@ use super::{
 };
 use crate::{
     config::mm::{MMAP_BASE_ADDR, PAGE_SIZE},
+    cpu::current_cpu,
     fs::vfs::basic::file::File,
     include::{
         mm::{MmapFlags, MmapProts},
@@ -172,7 +173,7 @@ pub async fn lazy_alloc_mmap<'a>(
                 tracer.push(take_waker().await);
                 drop(guard);
                 // fixme: kernel block_on could cause bugs here
-                unsafe { suspend_no_int_now().await };
+                suspend_no_int_now(current_cpu().task.as_ref().unwrap().pcb()).await;
                 Ok(())
             }
             None => {
