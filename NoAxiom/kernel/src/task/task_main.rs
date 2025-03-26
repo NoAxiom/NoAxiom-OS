@@ -6,7 +6,7 @@ use core::{
 };
 
 use arch::{Arch, ArchInt, ArchTrap, ArchTrapContext, ArchUserFloatContext};
-use ksync::mutex::{check_no_lock, current_lock_depth};
+use ksync::mutex::check_no_lock;
 
 use crate::{
     cpu::current_cpu,

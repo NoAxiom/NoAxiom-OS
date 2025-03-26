@@ -1,7 +1,7 @@
 use alloc::{sync::Arc, vec::Vec};
 
 use arch::{ArchTrapContext, ArchUserFloatContext};
-use ksync::mutex::{SpinLock, SpinLockGuard};
+use ksync::mutex::SpinLockGuard;
 
 use super::task::TaskInner;
 use crate::{
@@ -92,7 +92,7 @@ impl Task {
                         self.tid()
                     );
                 }
-                let mut guard = self.thread_group.lock();
+                let mut guard = self.thread_group();
                 let tg = &mut guard.0;
                 for it in tg.iter() {
                     let task = it.1.upgrade().unwrap();
@@ -137,24 +137,24 @@ impl Task {
 
     /// terminate the process
     fn sig_default_terminate(&self) {
-        let tg = &self.thread_group.lock().0;
-        for (_, t) in tg.iter() {
+        let tg = self.thread_group();
+        for (_, t) in tg.0.iter() {
             let task = t.upgrade().unwrap();
             task.pcb().set_status(TaskStatus::Terminated);
         }
     }
     /// stop the process
     fn sig_default_stop(&self) {
-        let tg = &self.thread_group.lock().0;
-        for (_, t) in tg.iter() {
+        let tg = self.thread_group();
+        for (_, t) in tg.0.iter() {
             let task = t.upgrade().unwrap();
             task.pcb().set_status(TaskStatus::Stopped);
         }
     }
     /// continue the process
     fn sig_default_continue(&self) {
-        let tg = &self.thread_group.lock().0;
-        for (_, t) in tg.iter() {
+        let tg = self.thread_group();
+        for (_, t) in tg.0.iter() {
             let task = t.upgrade().unwrap();
             task.wake_unchecked();
         }

@@ -1,7 +1,6 @@
 use alloc::{sync::Arc, vec::Vec};
 
 use arch::{Arch, ArchSbi};
-use ksync::mutex::check_no_lock;
 
 use super::Task;
 use crate::{
@@ -52,7 +51,7 @@ impl Task {
         }
 
         // thread resources clean up
-        self.thread_group.lock().remove(tid);
+        self.thread_group().remove(tid);
         TASK_MANAGER.remove(tid);
         self.delete_children();
 

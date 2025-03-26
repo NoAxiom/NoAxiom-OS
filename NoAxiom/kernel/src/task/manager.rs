@@ -87,7 +87,7 @@ pub static TASK_MANAGER: Lazy<TaskManager> = Lazy::new(TaskManager::new);
 pub static PROCESS_GROUP_MANAGER: Lazy<ProcessGroupManager> = Lazy::new(ProcessGroupManager::new);
 
 pub fn add_new_process(new_process: &Arc<Task>) {
-    new_process.thread_group.lock().insert(new_process);
+    new_process.thread_group().insert(new_process);
     TASK_MANAGER.insert(&new_process);
     PROCESS_GROUP_MANAGER.insert_process(new_process.pgid(), new_process.tid());
 }

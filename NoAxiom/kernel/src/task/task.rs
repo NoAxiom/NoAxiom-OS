@@ -1,11 +1,12 @@
 //! # Task
 
 use alloc::{
+    borrow::ToOwned,
     string::String,
     sync::{Arc, Weak},
     vec::Vec,
 };
-use core::{sync::atomic::AtomicUsize, task::Waker};
+use core::task::Waker;
 
 use arch::{Arch, ArchMemory, ArchTrapContext, TrapContext, TrapType};
 use ksync::{
@@ -40,7 +41,11 @@ use crate::{
     },
     return_errno,
     sched::sched_entity::SchedEntity,
-    signal::{sig_action::SigActionList, sig_pending::SigPending, sig_set::{SigMask, SigSet}},
+    signal::{
+        sig_action::SigActionList,
+        sig_pending::SigPending,
+        sig_set::{SigMask, SigSet},
+    },
     syscall::{SysResult, SyscallResult},
     task::{manager::add_new_process, taskid::tid_alloc},
 };
@@ -113,10 +118,6 @@ impl TaskInner {
     pub fn is_suspend(&self) -> bool {
         self.status() == TaskStatus::Suspend
     }
-    #[inline(always)]
-    pub fn is_runnable(&self) -> bool {
-        self.status() == TaskStatus::Runnable
-    }
 
     // exit code
     pub fn exit_code(&self) -> i32 {
@@ -157,11 +158,11 @@ pub struct Task {
     trap_cx: SyncUnsafeCell<TrapContext>, // trap context
 
     // shared
-    fd_table: Shared<FdTable>,             // file descriptor table
-    cwd: Shared<Path>,                     // current work directory
-    sa_list: Shared<SigActionList>,        // signal action list, saves signal handler
-    memory_set: Shared<MemorySet>,         // memory set for the task
-    pub thread_group: Shared<ThreadGroup>, // thread group
+    fd_table: Shared<FdTable>,         // file descriptor table
+    cwd: Shared<Path>,                 // current work directory
+    sa_list: Shared<SigActionList>,    // signal action list, saves signal handler
+    memory_set: Shared<MemorySet>,     // memory set for the task
+    thread_group: Shared<ThreadGroup>, // thread group
 
     // others
     pub sched_entity: SchedEntity, // sched entity for schedule
@@ -187,13 +188,13 @@ impl Task {
     pub fn pgid(&self) -> PGID {
         self.pgid
     }
-    pub fn get_tg_leader(&self) -> Option<Arc<Task>> {
+    pub fn get_tg_leader(&self) -> Weak<Task> {
         self.thread_group
             .lock()
             .0
             .get(&self.tgid)
             .unwrap()
-            .upgrade()
+            .to_owned()
     }
 
     /// check if the task is group leader
@@ -227,6 +228,11 @@ impl Task {
         let vpn = VirtAddr::from(addr).floor();
         let pt = PageTable::from_ppn(Arch::current_root_ppn());
         validate(self.memory_set(), vpn, trap_type, pt.translate_vpn(vpn)).await
+    }
+
+    /// thread group
+    pub fn thread_group(&self) -> SpinLockGuard<ThreadGroup> {
+        self.thread_group.lock()
     }
 
     /// get fd_table
@@ -492,7 +498,7 @@ impl Task {
                 pgid: self.pgid.clone(),
                 thread_group: Arc::new(SpinLock::new(ThreadGroup::new())),
                 inner: SpinLock::new(TaskInner {
-                    parent: Some(Arc::downgrade(self)),
+                    parent: Some(self.get_tg_leader()),
                     ..Default::default()
                 }),
                 memory_set,

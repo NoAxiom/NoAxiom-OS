@@ -134,7 +134,8 @@ pub async fn suspend_no_int_now(mut pcb: SpinLockGuard<'_, TaskInner>) {
 /// suspend current task
 /// difference with yield_now: it won't wake the task immediately
 pub async fn suspend_now(mut pcb: SpinLockGuard<'_, TaskInner>) {
-    pcb.pending_sigs.should_wake = !pcb.pending_sigs.sig_mask;
+    let mask = pcb.pending_sigs.sig_mask;
+    pcb.set_wake_signal(!mask);
     pcb.set_suspend();
     drop(pcb);
     SuspendFuture::new().await;
@@ -143,7 +144,7 @@ pub async fn suspend_now(mut pcb: SpinLockGuard<'_, TaskInner>) {
 
 pub async fn suspend_now_with_sig(mut pcb: SpinLockGuard<'_, TaskInner>, sig: SigSet) {
     let sigset = (!pcb.sig_mask()) | sig;
-    pcb.pending_sigs.should_wake = sigset;
+    pcb.set_wake_signal(sigset);
     pcb.set_suspend();
     drop(pcb);
     SuspendFuture::new().await;
@@ -158,7 +159,7 @@ impl Task {
         sig: Option<SigSet>,
     ) -> T {
         let sigset = (!pcb.sig_mask()) | (sig.unwrap_or_else(|| SigSet::empty()));
-        pcb.pending_sigs.should_wake = sigset;
+        pcb.set_wake_signal(sigset);
         pcb.set_suspend();
         drop(pcb);
         let res = future.await;
