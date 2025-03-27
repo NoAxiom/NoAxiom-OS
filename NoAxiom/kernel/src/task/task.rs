@@ -35,6 +35,7 @@ use crate::{
         address::VirtAddr,
         memory_set::{ElfMemoryInfo, MemorySet},
         page_table::PageTable,
+        user_ptr::UserPtr,
         validate::validate,
     },
     sched::sched_entity::SchedEntity,
@@ -42,6 +43,7 @@ use crate::{
         sig_action::SigActionList,
         sig_pending::SigPending,
         sig_set::{SigMask, SigSet},
+        sig_stack::{SigAltStack, UContext},
     },
     syscall::SysResult,
     task::{manager::add_new_process, taskid::tid_alloc},
@@ -78,6 +80,12 @@ pub struct TaskInner {
 
     /// pending signals, saves signals not handled
     pub pending_sigs: SigPending,
+
+    /// signal alternate stack
+    pub sig_stack: Option<SigAltStack>,
+
+    /// ucontext ptr
+    pub ucontext_ptr: UserPtr<UContext>,
 }
 
 impl Default for TaskInner {
@@ -89,6 +97,8 @@ impl Default for TaskInner {
             status: TaskStatus::Runnable,
             exit_code: 0,
             pending_sigs: SigPending::new(),
+            sig_stack: None,
+            ucontext_ptr: UserPtr::new_null(),
         }
     }
 }
@@ -136,6 +146,10 @@ impl TaskInner {
     /// signal mask
     pub fn sig_mask(&self) -> SigMask {
         self.pending_sigs.sig_mask
+    }
+    /// signal stack
+    pub fn set_sig_stack(&mut self, ss: SigAltStack) {
+        self.sig_stack = Some(ss);
     }
 }
 

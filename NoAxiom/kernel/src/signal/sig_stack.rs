@@ -1,3 +1,5 @@
+use arch::{ArchTrapContext, TrapArgs, TrapContext};
+
 use super::sig_set::SigMask;
 
 /// signal alternate stack
@@ -12,10 +14,16 @@ pub struct SigAltStack {
     pub ss_size: usize,
 }
 
+impl Default for SigAltStack {
+    fn default() -> Self {
+        Self::new_bare()
+    }
+}
+
 impl SigAltStack {
-    fn new_bare() -> Self {
+    pub fn new_bare() -> Self {
         SigAltStack {
-            ss_sp: 0usize.into(),
+            ss_sp: 0usize,
             ss_flags: 0,
             ss_size: 0,
         }
@@ -48,7 +56,24 @@ pub struct UContext {
 #[repr(C)]
 pub struct MContext {
     /// user general regs
-    pub user_x: [usize; 32],
+    user_x: [usize; 32],
     /// float reg state, currently unused
-    pub fpstate: [usize; 66],
+    fpstate: [usize; 66],
+}
+
+impl MContext {
+    pub fn new_bare() -> Self {
+        Self {
+            user_x: [0; 32],
+            fpstate: [0; 66],
+        }
+    }
+    pub fn from_cx(value: &TrapContext) -> Self {
+        let mut res = Self {
+            user_x: *value.gprs(),
+            fpstate: [0; 66],
+        };
+        res.user_x[0] = value[TrapArgs::EPC];
+        res
+    }
 }

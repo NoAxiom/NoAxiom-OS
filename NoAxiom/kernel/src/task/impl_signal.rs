@@ -1,17 +1,19 @@
-use alloc::{sync::Arc, vec::Vec};
+use alloc::sync::Arc;
+use core::mem::size_of;
 
-use arch::{ArchTrapContext, ArchUserFloatContext};
+use arch::{ArchTrapContext, ArchUserFloatContext, TrapArgs};
 use ksync::mutex::SpinLockGuard;
 
 use super::task::TaskInner;
 use crate::{
+    mm::user_ptr::UserPtr,
     signal::{
         sig_action::{SAFlags, SAHandlerType},
         sig_info::SigInfo,
         sig_num::SigNum,
         sig_set::SigMask,
+        sig_stack::{MContext, UContext},
     },
-    syscall::SysResult,
     task::{status::TaskStatus, Task},
 };
 
@@ -20,55 +22,92 @@ extern "C" {
 }
 
 impl Task {
-    pub fn check_signal(self: &Arc<Self>) -> SysResult<Option<SigMask>> {
+    pub fn check_signal(self: &Arc<Self>) -> Option<SigMask> {
         let mut pcb = self.pcb();
         if pcb.pending_sigs.is_empty() {
-            return Ok(None);
+            return None;
         }
-        let mut blocked_pending: Vec<SigInfo> = Vec::new();
         let old_mask = pcb.pending_sigs.sig_mask.clone();
-        let res = loop {
-            match pcb.pending_sigs.pop_with_mask(old_mask) {
-                Some(si) => {
-                    trace!("[check_signal] find a signal {}", si.signo);
-                    let signum = SigNum::from(si.signo);
-                    // kill / stop signal cannot be blocked
-                    // other signals can be blocked by sigmask
-                    // todo: maybe can disable sigmask's kill/stop bits to avoid this check?
-                    if signum != SigNum::SIGKILL
-                        && signum != SigNum::SIGSTOP
-                        && old_mask.contain_signum(si.signo as u32)
-                    {
-                        // current signum is blocked by sigmask
-                        info!("[check_signal] sig {}: blocked", si.signo);
-                        blocked_pending.push(si);
-                    } else {
-                        // successfully recived signal, handle it
-                        info!("[check_signal] sig {}: start to handle", si.signo);
-                        let sa_list = self.sa_list();
-                        let signum = SigNum::from(si.signo);
-                        let action = sa_list.get(signum).unwrap().clone();
-                        match action.handler {
-                            SAHandlerType::Ignore => self.sig_default_ignore(),
-                            SAHandlerType::Kill => self.sig_default_terminate(),
-                            SAHandlerType::Stop => self.sig_default_stop(),
-                            SAHandlerType::Continue => self.sig_default_continue(),
-                            SAHandlerType::User { handler } => {
-                                info!("[handle_signal] start to handle user sigaction");
-                                if !action.flags.contains(SAFlags::SA_NODEFER) {
-                                    pcb.pending_sigs.sig_mask.enable(si.signo as u32);
-                                };
-                                pcb.pending_sigs.sig_mask |= action.mask;
-                                self.trap_context_mut().freg_mut().encounter_signal(); // save freg
-                                break Some(old_mask);
-                            }
+        while let Some(si) = pcb.pending_sigs.pop_with_mask(old_mask) {
+            trace!("[check_signal] find a signal {}", si.signo);
+            // successfully recived signal, handle it
+            info!("[check_signal] sig {}: start to handle", si.signo);
+            let sa_list = self.sa_list();
+            let signum = SigNum::from(si.signo);
+            let action = sa_list.get(signum).unwrap().clone();
+            match action.handler {
+                SAHandlerType::Ignore => self.sig_default_ignore(),
+                SAHandlerType::Kill => self.sig_default_terminate(),
+                SAHandlerType::Stop => self.sig_default_stop(),
+                SAHandlerType::Continue => self.sig_default_continue(),
+                SAHandlerType::User { handler } => {
+                    info!("[handle_signal] start to handle user sigaction");
+                    if !action.flags.contains(SAFlags::SA_NODEFER) {
+                        pcb.pending_sigs.sig_mask.enable(si.signo as u32);
+                    };
+                    pcb.pending_sigs.sig_mask |= action.mask;
+
+                    use TrapArgs::*;
+                    let cx = self.trap_context_mut();
+                    cx.freg_mut().encounter_signal(); // save freg
+
+                    // if detect user-defined stack, use it at first
+                    let sp = match pcb.sig_stack.take() {
+                        Some(s) => {
+                            error!("[sigstack] user defined signal stack. unimplemented!");
+                            s.stack_top()
                         }
+                        None => cx[SP],
+                    };
+
+                    // write ucontext
+                    let mut new_sp = sp - size_of::<UContext>();
+                    let ucontext_ptr: UserPtr<UContext> = new_sp.into();
+                    let ucontext = UContext {
+                        uc_flags: 0,
+                        uc_link: 0,
+                        // fixme: always returns default here
+                        uc_stack: pcb.sig_stack.unwrap_or_default(),
+                        uc_sigmask: old_mask,
+                        uc_sig: [0; 16],
+                        uc_mcontext: MContext::from_cx(&cx),
+                    };
+                    ucontext_ptr.write(ucontext);
+                    pcb.ucontext_ptr = new_sp.into();
+                    cx[A0] = si.signo as usize;
+
+                    // write sig_info
+                    if action.flags.contains(SAFlags::SA_SIGINFO) {
+                        cx[A2] = new_sp;
+                        #[derive(Default, Copy, Clone)]
+                        #[repr(C)]
+                        pub struct LinuxSigInfo {
+                            pub si_signo: i32,
+                            pub si_errno: i32,
+                            pub si_code: i32,
+                            pub _pad: [i32; 29],
+                            _align: [u64; 0],
+                        }
+                        let mut siginfo_v = LinuxSigInfo::default();
+                        siginfo_v.si_signo = si.signo;
+                        siginfo_v.si_code = si.code as i32;
+                        new_sp -= size_of::<LinuxSigInfo>();
+                        let siginfo_ptr: UserPtr<LinuxSigInfo> = new_sp.into();
+                        siginfo_ptr.write(siginfo_v);
+                        cx[A1] = new_sp;
                     }
+
+                    // update cx
+                    // fixme: should we update gp & tp?
+                    cx[EPC] = handler;
+                    cx[RA] = user_sigreturn as usize;
+                    cx[SP] = new_sp;
+
+                    return Some(old_mask);
                 }
-                None => break None,
             }
-        };
-        Ok(res)
+        }
+        None
     }
 
     /// siginfo receiver with thread checked

@@ -68,6 +68,10 @@ impl<T> UserPtr<T> {
         }
     }
 
+    pub fn new_null() -> Self {
+        Self::new(0)
+    }
+
     #[inline(always)]
     pub fn is_null(&self) -> bool {
         self.ptr.is_null()
@@ -214,3 +218,9 @@ impl UserPtr<UserPtr<u8>> {
 // the userptr is safe to send and sync
 unsafe impl<T> Send for UserPtr<T> {}
 unsafe impl<T> Sync for UserPtr<T> {}
+
+impl<T> From<usize> for UserPtr<T> {
+    fn from(value: usize) -> Self {
+        Self::new(value)
+    }
+}

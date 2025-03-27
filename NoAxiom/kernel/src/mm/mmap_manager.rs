@@ -173,6 +173,7 @@ pub async fn lazy_alloc_mmap<'a>(
                 tracer.push(take_waker().await);
                 drop(guard);
                 // fixme: kernel block_on could cause bugs here
+                debug!("[lazy_alloc_mmap] suspend_no_int_now");
                 suspend_no_int_now(current_cpu().task.as_ref().unwrap().pcb()).await;
                 Ok(())
             }
