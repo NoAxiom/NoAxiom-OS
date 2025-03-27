@@ -14,6 +14,7 @@ use crate::{
     signal::{
         sig_action::{KSigAction, USigAction},
         sig_num::{SigNum, Signo},
+        sig_set::SigSet,
         sig_stack::UContext,
     },
 };
@@ -67,5 +68,51 @@ impl Syscall<'_> {
 
         // fixme: why return A0?
         Ok(cx[A0] as isize)
+    }
+
+    pub fn sys_sigprocmask(
+        &self,
+        how: usize,
+        set: usize,
+        old_set: usize,
+        sigset_size: usize,
+    ) -> SyscallResult {
+        const SIGBLOCK: usize = 0;
+        const SIGUNBLOCK: usize = 1;
+        const SIGSETMASK: usize = 2;
+        if sigset_size != 8 {
+            error!("[sys_sigprocmask] sigset_size isn't 8");
+        }
+
+        let task = self.task;
+        let set = UserPtr::<SigSet>::new(set);
+        let old_set = UserPtr::<SigSet>::new(old_set);
+        let mut pcb = task.pcb();
+
+        if !old_set.is_null() {
+            old_set.write(pcb.sig_mask());
+        }
+        if !set.is_null() {
+            let mut set = set.read();
+            log::info!("[sys_rt_sigprocmask] set:{set:#x}");
+            // It is not possible to block SIGKILL or SIGSTOP.  Attempts to do so are
+            // silently ignored.
+            set.remove(SigSet::SIGKILL | SigSet::SIGCONT);
+            match how {
+                SIGBLOCK => {
+                    *pcb.sig_mask_mut() |= set;
+                }
+                SIGUNBLOCK => {
+                    pcb.sig_mask_mut().remove(set);
+                }
+                SIGSETMASK => {
+                    *pcb.sig_mask_mut() = set;
+                }
+                _ => {
+                    return Err(Errno::EINVAL);
+                }
+            };
+        }
+        Ok(0)
     }
 }

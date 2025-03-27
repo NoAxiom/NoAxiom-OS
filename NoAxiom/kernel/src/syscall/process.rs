@@ -10,7 +10,6 @@ use crate::{
     },
     mm::user_ptr::UserPtr,
     sched::spawn::spawn_utask,
-    signal::sig_set::SigSet,
     task::wait::WaitChildFuture,
 };
 
@@ -105,7 +104,7 @@ impl Syscall<'_> {
                 "[sys_wait4]: write exit_code at status_addr = {:#x}",
                 status.addr().0,
             );
-            status.write_volatile((exit_code & 0xff) << 8);
+            status.write((exit_code & 0xff) << 8);
             trace!("[sys_wait4]: write exit code {:#x}", exit_code);
         }
         Ok(tid as isize)

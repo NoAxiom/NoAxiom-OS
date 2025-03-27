@@ -26,14 +26,14 @@ impl Syscall<'_> {
             tms_cutime: sec,
             tms_cstime: sec,
         };
-        tms.write_volatile(res);
+        tms.write(res);
         Ok(0)
     }
 
     pub fn sys_uname(buf: usize) -> SyscallResult {
         let buf = UserPtr::<Utsname>::new(buf);
         let res = Utsname::get();
-        buf.write_volatile(res);
+        buf.write(res);
         Ok(0)
     }
 
@@ -43,7 +43,7 @@ impl Syscall<'_> {
         }
         let buf = UserPtr::<TimeVal>::new(buf);
         let timeval = get_timeval();
-        buf.write_volatile(timeval);
+        buf.write(timeval);
         Ok(0)
     }
 

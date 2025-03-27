@@ -138,7 +138,6 @@ pub fn before_suspend(mut pcb: SpinLockGuard<'_, TaskInner>, sig: Option<SigSet>
     drop(pcb);
 }
 
-#[inline(always)]
 pub fn after_suspend(pcb: Option<SpinLockGuard<'_, TaskInner>>) {
     match pcb {
         Some(mut pcb) => pcb.set_runnable(),
