@@ -102,7 +102,7 @@ pub async fn task_main(task: Arc<Task>) {
 
         // check signal before return to user
         trace!("[task_main] check_signal");
-        old_mask = task.check_signal().expect("check_signal error");
+        old_mask = task.check_signal();
         assert!(check_no_lock());
         let pcb = task.pcb();
         match pcb.status() {

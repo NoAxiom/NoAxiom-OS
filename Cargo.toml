@@ -18,6 +18,6 @@ config = { path = "NoAxiom/lib/config" }
 
 [profile.release]
 debug = true
-opt-level = 1           # 优化级别,最低是0,最高是3, 0方便debug
+opt-level = 3           # 优化级别,最低是0,最高是3, 0方便debug
 overflow-checks = false # 关闭整数溢出检查
 panic = "abort"         # for loongarch64, tell the compiler to abort on panic instead of unwinding

@@ -11,6 +11,8 @@ use crate::{
         process::{PidSel, WaitOption},
         result::Errno,
     },
+    sched::utils::{after_suspend, before_suspend},
+    signal::sig_set::SigSet,
     syscall::SysResult,
 };
 
@@ -64,7 +66,7 @@ impl Future for WaitChildFuture {
                 }
             }
         };
-        match res {
+        let res = match res {
             Poll::Pending => {
                 if self.wait_option.contains(WaitOption::WNOHANG) && res.is_pending() {
                     trace!("[sys_wait4] return nohang");
@@ -78,6 +80,15 @@ impl Future for WaitChildFuture {
                 trace!("[sys_wait4] exited child found");
                 res
             }
+        };
+        match res {
+            Poll::Pending => {
+                before_suspend(pcb, Some(SigSet::SIGCHLD));
+            }
+            Poll::Ready(_) => {
+                after_suspend(Some(pcb));
+            }
         }
+        res
     }
 }

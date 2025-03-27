@@ -39,6 +39,8 @@ impl SigPending {
     }
 
     pub fn pop_with_mask(&mut self, mask: SigMask) -> Option<SigInfo> {
+        // kill / stop signal cannot be blocked
+        // other signals can be blocked by sigmask
         let accept_set = self.pending_set & !mask.without_kill();
         if accept_set.is_empty() {
             return None;

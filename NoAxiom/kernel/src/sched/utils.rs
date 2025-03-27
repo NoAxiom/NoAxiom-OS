@@ -131,48 +131,30 @@ pub async fn suspend_no_int_now(mut pcb: SpinLockGuard<'_, TaskInner>) {
     current_set_runnable();
 }
 
-/// suspend current task
-/// difference with yield_now: it won't wake the task immediately
-pub async fn suspend_now(mut pcb: SpinLockGuard<'_, TaskInner>) {
-    let mask = pcb.pending_sigs.sig_mask;
-    pcb.set_wake_signal(!mask);
-    pcb.set_suspend();
-    drop(pcb);
-    SuspendFuture::new().await;
-    current_set_runnable();
-}
-
-pub async fn suspend_now_with_sig(mut pcb: SpinLockGuard<'_, TaskInner>, sig: SigSet) {
-    let sigset = (!pcb.sig_mask()) | sig;
+pub fn before_suspend(mut pcb: SpinLockGuard<'_, TaskInner>, sig: Option<SigSet>) {
+    let sigset = (!pcb.sig_mask()) | (sig.unwrap_or_else(|| SigSet::empty()));
     pcb.set_wake_signal(sigset);
     pcb.set_suspend();
     drop(pcb);
-    SuspendFuture::new().await;
-    current_set_runnable();
 }
 
-impl Task {
-    pub async fn suspend_on<T>(
-        self: &Arc<Self>,
-        mut pcb: SpinLockGuard<'_, TaskInner>,
-        future: impl Future<Output = T>,
-        sig: Option<SigSet>,
-    ) -> T {
-        let sigset = (!pcb.sig_mask()) | (sig.unwrap_or_else(|| SigSet::empty()));
-        pcb.set_wake_signal(sigset);
-        pcb.set_suspend();
-        drop(pcb);
-        let res = future.await;
-        current_set_runnable();
-        res
+pub fn after_suspend(pcb: Option<SpinLockGuard<'_, TaskInner>>) {
+    match pcb {
+        Some(mut pcb) => pcb.set_runnable(),
+        None => current_set_runnable(),
     }
 }
 
-pub async fn suspend_on<T>(
-    future: impl Future<Output = T>,
-    sig: Option<SigSet>,
-) -> T {
-    let task = current_cpu().task.as_ref().unwrap();
-    assert!(check_no_lock());
-    task.suspend_on(task.pcb(), future, sig).await
+/// suspend current task
+/// difference with yield_now: it won't wake the task immediately
+pub async fn suspend_now(pcb: SpinLockGuard<'_, TaskInner>) {
+    before_suspend(pcb, None);
+    SuspendFuture::new().await;
+    after_suspend(None);
+}
+
+pub async fn suspend_now_with_sig(pcb: SpinLockGuard<'_, TaskInner>, sig: SigSet) {
+    before_suspend(pcb, Some(sig));
+    SuspendFuture::new().await;
+    after_suspend(None);
 }
