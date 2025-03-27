@@ -9,8 +9,9 @@ use crate::driver::net::NetDevice;
 mod port_manager;
 mod socket;
 mod socket_set;
-pub mod sockfile;
+pub mod socketfile;
 mod tcpsocket;
+mod udpsocket;
 
 lazy_static::lazy_static! {
     pub static ref SOCKET_SET: SocketSet = SocketSet::new();

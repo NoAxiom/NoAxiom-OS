@@ -1,5 +1,5 @@
 //! Network Layer
-use alloc::{boxed::Box, sync::Arc, vec::Vec};
+use alloc::{boxed::Box, vec::Vec};
 
 use async_trait::async_trait;
 use smoltcp::{iface::SocketHandle, socket::tcp, wire::IpEndpoint};
@@ -9,8 +9,7 @@ use super::{
     NET_DEVICES, PORT_MANAGER, SOCKET_SET,
 };
 use crate::{
-    constant::net::{DEFAULT_METADATA_BUF_SIZE, DEFAULT_RX_BUF_SIZE, DEFAULT_TX_BUF_SIZE},
-    driver::net::LOOP_BACK,
+    constant::net::TCP_CONSTANTS,
     include::{
         net::{ShutdownType, SocketOptions, SocketType},
         result::Errno,
@@ -23,7 +22,7 @@ use crate::{
 pub enum TcpState {
     Closed,
     Listen,
-    Established,
+    // Established,
 }
 
 pub struct TcpSocket {
@@ -45,9 +44,9 @@ impl TcpSocket {
 
         let meta = SocketMetadata::new(
             SocketType::Tcp,
-            DEFAULT_RX_BUF_SIZE,
-            DEFAULT_TX_BUF_SIZE,
-            DEFAULT_METADATA_BUF_SIZE,
+            TCP_CONSTANTS.default_rx_buf_size,
+            TCP_CONSTANTS.default_tx_buf_size,
+            TCP_CONSTANTS.default_metadata_buf_size,
             options,
         );
 
@@ -66,9 +65,9 @@ impl TcpSocket {
     ) -> Self {
         let meta = SocketMetadata::new(
             SocketType::Tcp,
-            DEFAULT_RX_BUF_SIZE,
-            DEFAULT_TX_BUF_SIZE,
-            DEFAULT_METADATA_BUF_SIZE,
+            TCP_CONSTANTS.default_rx_buf_size,
+            TCP_CONSTANTS.default_tx_buf_size,
+            TCP_CONSTANTS.default_metadata_buf_size,
             options,
         );
 
@@ -82,8 +81,8 @@ impl TcpSocket {
 
     /// Create a new smoltcp's tcp::Socket
     pub fn new_socket() -> tcp::Socket<'static> {
-        let rx_buffer = tcp::SocketBuffer::new(vec![0; DEFAULT_RX_BUF_SIZE]);
-        let tx_buffer = tcp::SocketBuffer::new(vec![0; DEFAULT_TX_BUF_SIZE]);
+        let rx_buffer = tcp::SocketBuffer::new(vec![0; TCP_CONSTANTS.default_rx_buf_size]);
+        let tx_buffer = tcp::SocketBuffer::new(vec![0; TCP_CONSTANTS.default_tx_buf_size]);
         tcp::Socket::new(rx_buffer, tx_buffer)
     }
 
@@ -114,7 +113,7 @@ impl Socket for TcpSocket {
     /// - Success: (Returns the length of the data read, the endpoint
     /// from which data was read).
     /// - Failure: Error code
-    async fn read(&self, buf: &mut [u8]) -> (Result<usize, Errno>, Option<IpEndpoint>) {
+    async fn read(&self, buf: &mut [u8]) -> (SysResult<usize>, Option<IpEndpoint>) {
         loop {
             poll_ifaces();
             let mut sockets = SOCKET_SET.lock();
@@ -163,7 +162,7 @@ impl Socket for TcpSocket {
     /// discarded.
     ///
     /// return: the length of the data written
-    async fn write(&self, buf: &[u8], _to: Option<IpEndpoint>) -> Result<usize, Errno> {
+    async fn write(&self, buf: &[u8], _to: Option<IpEndpoint>) -> SysResult<usize> {
         let mut sockets = SOCKET_SET.lock();
         let socket = sockets.get_mut::<tcp::Socket>(self.handles[0]);
 
@@ -285,7 +284,7 @@ impl Socket for TcpSocket {
     }
 
     /// It is used to accept a new incoming connection.
-    async fn accept(&mut self) -> SysResult<(Arc<dyn Socket>, IpEndpoint)> {
+    async fn accept(&mut self) -> SysResult<(TcpSocket, IpEndpoint)> {
         if self.state != TcpState::Listen {
             return Err(Errno::EINVAL);
         }
@@ -313,7 +312,7 @@ impl Socket for TcpSocket {
                 let remote_socket = sockets.get::<tcp::Socket>(old_socket_handle);
                 let remote_endpoint = remote_socket.remote_endpoint().ok_or(Errno::ENOTCONN)?;
 
-                return Ok((Arc::new(old_socket), remote_endpoint));
+                return Ok((old_socket, remote_endpoint));
             }
 
             yield_now().await;

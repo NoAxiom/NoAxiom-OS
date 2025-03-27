@@ -7,6 +7,7 @@ use super::{
 use crate::{
     constant::fs::{RLIMIT_HARD_MAX, RLIMIT_SOFT_MAX},
     include::result::Errno,
+    net::socketfile::SocketFile,
     syscall::SyscallResult,
 };
 
@@ -67,6 +68,21 @@ impl FdTable {
         } else {
             None
         }
+    }
+
+    /// Get the `fd` socket slot, None if `fd` > `table.len()`
+    pub fn get_socketfile(&self, fd: usize) -> Option<Arc<SocketFile>> {
+        if fd < self.table.len() {
+            let socket_file = self.table[fd].clone();
+            if let Some(socket_file) = socket_file {
+                let socket = socket_file.downcast_arc::<SocketFile>();
+                if let Ok(socket) = socket {
+                    return Some(socket);
+                }
+            }
+        }
+
+        None
     }
 
     /// Set the `fd` slot

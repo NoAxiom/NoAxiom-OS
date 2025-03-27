@@ -52,6 +52,13 @@ impl<'a> Syscall<'a> {
             SYS_LINKAT => self.sys_linkat(args[0], args[1], args[2], args[3], args[4]),
             SYS_UNLINKAT => self.sys_unlinkat(args[0], args[1], args[2]).await,
 
+            // net
+            SYS_SOCKET => self.sys_socket(args[0], args[1], args[2]),
+            SYS_BIND => self.sys_bind(args[0], args[1], args[2]),
+            SYS_LISTEN => self.sys_listen(args[0], args[1]),
+            SYS_ACCEPT => self.sys_accept(args[0], args[1], args[2]).await,
+            SYS_CONNECT => self.sys_connect(args[0], args[1], args[2]).await,
+
             // process
             SYS_EXIT => self.sys_exit(args[0]),
             SYS_CLONE => self.sys_fork(args[0], args[1], args[2], args[3], args[4]),

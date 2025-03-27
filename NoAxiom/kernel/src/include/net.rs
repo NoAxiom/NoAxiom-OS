@@ -1,4 +1,5 @@
 use bitflags::bitflags;
+use smoltcp::wire::{IpAddress, IpEndpoint, Ipv4Address, Ipv6Address};
 
 use super::result::Errno;
 
@@ -84,6 +85,125 @@ impl TryFrom<u16> for AddressFamily {
             2 => Ok(Self::AF_INET),
             10 => Ok(Self::AF_INET6),
             _ => Err(Self::Error::EINVAL),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord)]
+#[repr(C)]
+pub struct SockAddrIpv4 {
+    /// 地址协议族
+    pub sin_family: u16,
+    /// Ipv4 的端口
+    pub sin_port: u16,
+    /// Ipv4 的地址
+    pub sin_addr: u32,
+    /// 零位，用于后续扩展
+    pub sin_zero: [u8; 8],
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord)]
+#[repr(C)]
+pub struct SockAddrIpv6 {
+    /// 地址协议族
+    pub sin6_family: u16,
+    /// Ipv6 的端口
+    pub sin6_port: u16,
+    /// Ipv6 的流信息
+    pub sin6_flowinfo: u32,
+    /// Ipv6 的地址
+    pub sin6_addr: [u8; 16],
+    /// IPv6 的范围ID
+    pub sin6_scope_id: u32,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct SockAddrUnix {
+    pub sun_family: u16,
+    pub sun_path: [u8; 108],
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct SockAddrLinklayer {
+    pub sll_family: u16,
+    pub sll_protocol: u16,
+    pub sll_ifindex: u32,
+    pub sll_hatype: u16,
+    pub sll_pkttype: u8,
+    pub sll_halen: u8,
+    pub sll_addr: [u8; 8],
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct SockAddrNetlink {
+    nl_family: u16,
+    nl_pad: u16,
+    nl_pid: u32,
+    nl_groups: u32,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct SockAddrPlaceholder {
+    pub family: u16,
+    pub data: [u8; 14],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub union SockAddr {
+    pub family: u16, // 地址协议族,用于match分配
+    pub addr_ipv4: SockAddrIpv4,
+    pub addr_ipv6: SockAddrIpv6,
+    pub addr_unix: SockAddrUnix,
+    pub addr_linklayer: SockAddrLinklayer,
+    pub addr_netlink: SockAddrNetlink,
+    pub addr_ph: SockAddrPlaceholder,
+}
+
+impl SockAddr {
+    pub fn get_endpoint(&self) -> IpEndpoint {
+        unsafe {
+            match AddressFamily::try_from(self.family).unwrap() {
+                AddressFamily::AF_INET => {
+                    let addr = self.addr_ipv4.sin_addr;
+                    let port = self.addr_ipv4.sin_port.to_be();
+                    IpEndpoint::new(
+                        IpAddress::Ipv4(Ipv4Address::from_bytes(&addr.to_be_bytes())),
+                        port,
+                    )
+                }
+                AddressFamily::AF_INET6 => {
+                    let addr = self.addr_ipv6.sin6_addr;
+                    let port = self.addr_ipv6.sin6_port.to_be();
+                    IpEndpoint::new(IpAddress::Ipv6(Ipv6Address::from_bytes(&addr)), port)
+                }
+                AddressFamily::AF_UNIX => unreachable!(),
+            }
+        }
+    }
+    pub fn from_endpoint(endpoint: IpEndpoint) -> Self {
+        match endpoint.addr {
+            IpAddress::Ipv4(v4) => Self {
+                addr_ipv4: SockAddrIpv4 {
+                    sin_family: AddressFamily::AF_INET as u16,
+                    sin_port: endpoint.port.to_be(),
+                    sin_addr: u32::from_be_bytes(v4.0),
+                    sin_zero: [0; 8],
+                },
+            },
+            IpAddress::Ipv6(v6) => Self {
+                addr_ipv6: SockAddrIpv6 {
+                    sin6_family: AddressFamily::AF_INET6 as u16,
+                    sin6_port: endpoint.port.to_be(),
+                    sin6_flowinfo: 0,
+                    sin6_addr: v6.0,
+                    sin6_scope_id: 0,
+                },
+            },
         }
     }
 }

@@ -4,6 +4,7 @@ use alloc::{boxed::Box, string::String, sync::Arc, vec::Vec};
 use core::sync::atomic::{AtomicUsize, Ordering};
 
 use async_trait::async_trait;
+use downcast_rs::{impl_downcast, DowncastSync};
 use fatfs::SeekFrom;
 use spin::Mutex;
 
@@ -57,7 +58,7 @@ impl FileMeta {
 }
 
 #[async_trait]
-pub trait File: Send + Sync {
+pub trait File: Send + Sync + DowncastSync {
     /// Get the size of file
     fn size(&self) -> usize {
         self.meta().inode.size()
@@ -82,6 +83,8 @@ pub trait File: Send + Sync {
     /// Delete dentry, only for directories
     async fn delete_child(&self, name: &str) -> Result<(), Errno>;
 }
+
+impl_downcast!(sync File);
 
 impl dyn File {
     fn pos(&self) -> usize {

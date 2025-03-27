@@ -1,14 +1,12 @@
-use alloc::{boxed::Box, sync::Arc};
+use alloc::boxed::Box;
 
 use async_trait::async_trait;
+use downcast_rs::{impl_downcast, DowncastSync};
 use smoltcp::wire::IpEndpoint;
 
-use super::{NET_DEVICES, SOCKET_SET};
+use super::{tcpsocket::TcpSocket, NET_DEVICES, SOCKET_SET};
 use crate::{
-    include::{
-        net::{ShutdownType, SocketOptions, SocketType},
-        result::Errno,
-    },
+    include::net::{ShutdownType, SocketOptions, SocketType},
     syscall::SysResult,
 };
 
@@ -47,7 +45,7 @@ impl SocketMetadata {
 /// TCP/UDP or other socket should implement this trait
 #[async_trait]
 // pub trait Socket: File {
-pub trait Socket: Send + Sync {
+pub trait Socket: Send + Sync + DowncastSync {
     /// Read data from the socket.
     ///
     /// `buf` is the buffer to store the read data
@@ -56,7 +54,7 @@ pub trait Socket: Send + Sync {
     /// - Success: (Returns the length of the data read, the endpoint
     /// from which data was read).
     /// - Failure: Error code
-    async fn read(&self, buf: &mut [u8]) -> (Result<usize, Errno>, Option<IpEndpoint>);
+    async fn read(&self, buf: &mut [u8]) -> (SysResult<usize>, Option<IpEndpoint>);
 
     /// Write data to the socket.
     ///
@@ -65,7 +63,7 @@ pub trait Socket: Send + Sync {
     /// discarded.
     ///
     /// return: the length of the data written
-    async fn write(&self, buf: &[u8], to: Option<IpEndpoint>) -> Result<usize, Errno>;
+    async fn write(&self, buf: &[u8], to: Option<IpEndpoint>) -> SysResult<usize>;
 
     /// The bind() function is used to associate a socket with a particular IP
     /// address and port number on the local machine.
@@ -89,7 +87,9 @@ pub trait Socket: Send + Sync {
     async fn connect(&mut self, remote: IpEndpoint) -> SysResult<()>;
 
     /// It is used to accept a new incoming connection.
-    async fn accept(&mut self) -> SysResult<(Arc<dyn Socket>, IpEndpoint)>;
+    ///
+    /// only used for TCP
+    async fn accept(&mut self) -> SysResult<(TcpSocket, IpEndpoint)>;
 
     /// It is used to send data to a connected socket.
     ///
@@ -98,6 +98,8 @@ pub trait Socket: Send + Sync {
 
     fn end_point(&self) -> Option<IpEndpoint>;
 }
+
+impl_downcast!(sync Socket);
 
 pub fn poll_ifaces() {
     let devices = NET_DEVICES.read();

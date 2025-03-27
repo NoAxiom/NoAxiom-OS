@@ -1,19 +1,32 @@
 //! IP layer
 use alloc::sync::Arc;
+use core::task::Waker;
 
+use futures::task::noop_waker;
 use ksync::mutex::SpinLock;
 use smoltcp::socket::AnySocket;
 
 use crate::{constant::net::PORT_MAX, include::result::Errno, syscall::SysResult};
 
-#[derive(Clone, Copy)]
-pub struct PortItem {}
+pub struct PortItem {
+    waker: Waker,
+}
 
 impl PortItem {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(waker: Waker) -> Self {
+        Self { waker }
     }
 }
+
+impl Default for PortItem {
+    fn default() -> Self {
+        Self {
+            waker: noop_waker(),
+        }
+    }
+}
+
+const EMPTY_PORT_ITEM: Option<PortItem> = None;
 
 /// A table to record the listening endpoint of each port
 /// for both TCP/UDP
@@ -28,7 +41,7 @@ pub struct PortManager {
 impl PortManager {
     pub fn new() -> Self {
         Self {
-            inner: Arc::new(SpinLock::new([None; PORT_MAX])),
+            inner: Arc::new(SpinLock::new([EMPTY_PORT_ITEM; PORT_MAX])),
         }
     }
 
@@ -64,7 +77,9 @@ impl PortManager {
             // The port is already listened
             Err(Errno::EADDRINUSE)
         } else {
-            inner[port as usize] = Some(PortItem::new());
+            let current_task = crate::cpu::current_cpu().task.clone().unwrap();
+            let waker = current_task.waker().clone().unwrap();
+            inner[port as usize] = Some(PortItem::new(waker));
             Ok(())
         }
     }
