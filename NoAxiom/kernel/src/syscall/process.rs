@@ -9,7 +9,7 @@ use crate::{
         sched::CloneFlags,
     },
     mm::user_ptr::UserPtr,
-    sched::{spawn::spawn_utask, utils::suspend_on},
+    sched::spawn::spawn_utask,
     signal::sig_set::SigSet,
     task::wait::WaitChildFuture,
 };
@@ -98,8 +98,8 @@ impl Syscall<'_> {
         };
 
         // wait for child exit
-        let fut = WaitChildFuture::new(self.task.clone(), pid_type, wait_option)?;
-        let (exit_code, tid) = suspend_on(fut, Some(SigSet::SIGCHLD)).await?;
+        let (exit_code, tid) =
+            WaitChildFuture::new(self.task.clone(), pid_type, wait_option)?.await?;
         if !status.is_null() {
             trace!(
                 "[sys_wait4]: write exit_code at status_addr = {:#x}",
