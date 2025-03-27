@@ -62,30 +62,20 @@ type Immutable<T> = T;
 /// it is protected by a spinlock to assure its atomicity
 /// so there's no need to use any lock in this struct
 pub struct TaskInner {
-    /// children tasks, holds children's lifetime
-    /// assertion: only when the task is group leader, it can have children
-    pub children: Vec<Arc<Task>>,
+    // paternity
+    // assertion: only when the task is group leader, it can have children
+    pub children: Vec<Arc<Task>>,        // children tasks
+    pub zombie_children: Vec<Arc<Task>>, // zombie children
+    pub parent: Option<Weak<Task>>,      // parent task, weak ptr
 
-    /// zombie children, holds children's lifetime
-    pub zombie_children: Vec<Arc<Task>>,
+    // task status
+    pub status: TaskStatus, // task status
+    pub exit_code: i32,     // exit code
 
-    /// parent task, weak ptr
-    pub parent: Option<Weak<Task>>,
-
-    /// task status
-    pub status: TaskStatus,
-
-    /// exit code
-    pub exit_code: i32,
-
-    /// pending signals, saves signals not handled
-    pub pending_sigs: SigPending,
-
-    /// signal alternate stack
-    pub sig_stack: Option<SigAltStack>,
-
-    /// ucontext ptr
-    pub ucontext_ptr: UserPtr<UContext>,
+    // signal structs
+    pub pending_sigs: SigPending,        // pending signals
+    pub sig_stack: Option<SigAltStack>,  // signal alternate stack
+    pub ucontext_ptr: UserPtr<UContext>, // ucontext pointer
 }
 
 impl Default for TaskInner {
@@ -147,9 +137,8 @@ impl TaskInner {
     pub fn sig_mask(&self) -> SigMask {
         self.pending_sigs.sig_mask
     }
-    /// signal stack
-    pub fn set_sig_stack(&mut self, ss: SigAltStack) {
-        self.sig_stack = Some(ss);
+    pub fn sig_mask_mut(&mut self) -> &mut SigMask {
+        &mut self.pending_sigs.sig_mask
     }
 }
 

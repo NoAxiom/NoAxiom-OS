@@ -145,7 +145,7 @@ pub struct TrapContext {
 
 impl TrapContext {
     #[inline(always)]
-    pub fn sstatus(&self) -> MySstatus {
+    pub(crate) fn sstatus(&self) -> MySstatus {
         self.sstatus
     }
 }
@@ -225,6 +225,9 @@ impl ArchTrapContext for TrapContext {
     }
     fn gprs(&self) -> &[usize; 32] {
         &self.x
+    }
+    fn gprs_mut(&mut self) -> &mut [usize; 32] {
+        &mut self.x
     }
 }
 

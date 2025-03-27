@@ -62,18 +62,19 @@ pub struct MContext {
 }
 
 impl MContext {
-    pub fn new_bare() -> Self {
-        Self {
-            user_x: [0; 32],
-            fpstate: [0; 66],
-        }
-    }
     pub fn from_cx(value: &TrapContext) -> Self {
         let mut res = Self {
-            user_x: *value.gprs(),
+            user_x: value.gprs().clone(),
             fpstate: [0; 66],
         };
+        // fixme: is this correct in LA64?
         res.user_x[0] = value[TrapArgs::EPC];
         res
+    }
+    pub fn epc(&self) -> usize {
+        self.user_x[0]
+    }
+    pub fn gprs(&self) -> [usize; 32] {
+        self.user_x
     }
 }

@@ -18,6 +18,9 @@ use crate::{
 };
 
 extern "C" {
+    /// user_sigreturn: we set RA to this function before entering sig hander
+    /// when returning from user sigaction handler,
+    /// it will jump to this func and trigger syscall_SIGRETURN
     fn user_sigreturn();
 }
 
@@ -98,6 +101,8 @@ impl Task {
                     }
 
                     // update cx
+                    // flow: kernel (restore) -> handler -> ..
+                    // -> user_sigreturn -> (syscall) kernel
                     // fixme: should we update gp & tp?
                     cx[EPC] = handler;
                     cx[RA] = user_sigreturn as usize;
