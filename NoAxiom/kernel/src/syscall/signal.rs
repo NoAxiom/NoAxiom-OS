@@ -8,15 +8,19 @@ use arch::{ArchTrapContext, TrapArgs};
 
 use super::{Syscall, SyscallResult};
 use crate::{
+    config::task::INIT_PROCESS_ID,
     constant::signal::MAX_SIGNUM,
     include::result::Errno,
     mm::user_ptr::UserPtr,
     signal::{
         sig_action::{KSigAction, USigAction},
+        sig_detail::{SigDetail, SigKillDetail},
+        sig_info::{SigCode, SigInfo},
         sig_num::{SigNum, Signo},
         sig_set::SigSet,
         sig_stack::UContext,
     },
+    task::manager::{PROCESS_GROUP_MANAGER, TASK_MANAGER},
 };
 
 impl Syscall<'_> {
@@ -66,8 +70,7 @@ impl Syscall<'_> {
         cx[EPC] = ucontext.uc_mcontext.epc();
         *cx.gprs_mut() = ucontext.uc_mcontext.gprs();
 
-        // fixme: why return A0?
-        Ok(cx[A0] as isize)
+        Ok(cx[RES] as isize)
     }
 
     pub fn sys_sigprocmask(
@@ -94,9 +97,7 @@ impl Syscall<'_> {
         }
         if !set.is_null() {
             let mut set = set.read();
-            log::info!("[sys_rt_sigprocmask] set:{set:#x}");
-            // It is not possible to block SIGKILL or SIGSTOP.  Attempts to do so are
-            // silently ignored.
+            // sigmask shouldn't contain SIGKILL and SIGCONT
             set.remove(SigSet::SIGKILL | SigSet::SIGCONT);
             match how {
                 SIGBLOCK => {
@@ -112,6 +113,102 @@ impl Syscall<'_> {
                     return Err(Errno::EINVAL);
                 }
             };
+        }
+        Ok(0)
+    }
+
+    pub fn sys_kill(&self, pid: isize, signo: i32) -> SyscallResult {
+        if signo == 0 {
+            return Ok(0);
+        }
+        let sig = SigNum::from(signo);
+        if sig == SigNum::INVALID {
+            return Err(Errno::EINVAL);
+        }
+        match pid {
+            0 => {
+                // process group
+                let pgid = self.task.pgid();
+                for task in PROCESS_GROUP_MANAGER
+                    .get(pgid)
+                    .into_iter()
+                    .map(|t| t.upgrade().unwrap())
+                {
+                    task.recv_siginfo(
+                        &mut task.pcb(),
+                        SigInfo {
+                            signo,
+                            code: SigCode::User,
+                            errno: 0,
+                            detail: SigDetail::Kill(SigKillDetail { pid: pgid }),
+                        },
+                        false,
+                    );
+                }
+            }
+            -1 => {
+                for (_, task) in TASK_MANAGER.0.lock().iter() {
+                    let task = task.upgrade().unwrap();
+                    if task.tgid() != INIT_PROCESS_ID && task.is_group_leader() {
+                        task.recv_siginfo(
+                            &mut task.pcb(),
+                            SigInfo {
+                                signo,
+                                code: SigCode::User,
+                                errno: 0,
+                                detail: SigDetail::Kill(SigKillDetail { pid: task.tgid() }),
+                            },
+                            false,
+                        );
+                    }
+                }
+            }
+            _ if pid > 0 => {
+                if let Some(task) = TASK_MANAGER.get(pid as usize) {
+                    if task.is_group_leader() {
+                        task.recv_siginfo(
+                            &mut task.pcb(),
+                            SigInfo {
+                                signo,
+                                code: SigCode::User,
+                                errno: 0,
+                                detail: SigDetail::Kill(SigKillDetail { pid: task.tgid() }),
+                            },
+                            false,
+                        );
+                    } else {
+                        // sys_kill is sent to process not thread
+                        return Err(Errno::ESRCH);
+                    }
+                } else {
+                    return Err(Errno::ESRCH);
+                }
+            }
+            _ => {
+                // pid < -1
+                // sig is sent to every process in the process group whose ID is -pid.
+                let pgid = self.task.pgid();
+                for task in PROCESS_GROUP_MANAGER
+                    .get(pgid)
+                    .into_iter()
+                    .map(|t| t.upgrade().unwrap())
+                {
+                    if task.tgid() == -pid as usize {
+                        task.recv_siginfo(
+                            &mut task.pcb(),
+                            SigInfo {
+                                signo,
+                                code: SigCode::User,
+                                errno: 0,
+                                detail: SigDetail::Kill(SigKillDetail { pid: pgid }),
+                            },
+                            false,
+                        );
+                        return Ok(0);
+                    }
+                }
+                return Err(Errno::ESRCH);
+            }
         }
         Ok(0)
     }
