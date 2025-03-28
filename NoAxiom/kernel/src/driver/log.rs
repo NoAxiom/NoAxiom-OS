@@ -2,6 +2,7 @@
 
 use core::sync::atomic::{AtomicBool, Ordering};
 
+use arch::{Arch, ArchSbi};
 use log::{self, Level, LevelFilter, Log, Metadata, Record};
 
 use crate::cpu::{current_cpu, get_hartid};
@@ -44,6 +45,8 @@ impl Log for SimpleLogger {
 }
 
 pub fn log_init() {
+    Arch::console_init();
+
     static LOGGER: SimpleLogger = SimpleLogger;
     log::set_logger(&LOGGER).unwrap();
 

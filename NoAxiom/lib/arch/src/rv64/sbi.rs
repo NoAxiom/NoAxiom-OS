@@ -8,6 +8,7 @@ use super::RV64;
 use crate::ArchSbi;
 
 impl ArchSbi for RV64 {
+    fn console_init() {}
     // write in console
     fn console_putchar(c: usize) {
         console_putchar(c);

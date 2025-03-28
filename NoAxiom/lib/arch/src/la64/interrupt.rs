@@ -1,3 +1,4 @@
+use log::warn;
 use loongArch64::register::crmd;
 
 use super::LA64;
@@ -23,6 +24,7 @@ impl ArchInt for LA64 {
     fn enable_stimer_interrupt() {}
     fn enable_user_memory_access() {}
     fn is_external_interrupt_enabled() -> bool {
+        warn!("is_external_interrupt_enabled not implemented");
         true
     }
 }

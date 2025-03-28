@@ -1,4 +1,4 @@
-use arch::{Arch, ArchInt, ArchSbi, ArchTrap, _entry_other_hart};
+use arch::{Arch, ArchInt, ArchMemory, ArchSbi, ArchTrap, _entry_other_hart};
 
 use crate::{
     config::{arch::CPU_NUM, mm::KERNEL_ADDR_OFFSET},
@@ -8,7 +8,10 @@ use crate::{
     driver::log::log_init,
     entry::init_proc::schedule_spawn_initproc,
     fs::fs_init,
-    mm::{bss::bss_init, frame::frame_init, hart_mm_init, heap::heap_init},
+    mm::{
+        bss::bss_init, frame::frame_init, heap::heap_init, kernel_space_init,
+        memory_set::kernel_space_activate,
+    },
     platform::{
         base_riscv::platforminfo::platform_info_from_dtb,
         platform_init,
@@ -36,7 +39,8 @@ pub fn wake_other_hart(forbid_hart_id: usize) {
 #[no_mangle]
 pub extern "C" fn _other_hart_init(hart_id: usize, dtb: usize) {
     Arch::enable_user_memory_access();
-    hart_mm_init();
+    kernel_space_activate();
+    Arch::tlb_init();
     Arch::trap_init();
     // register_to_hart(); // todo: add multipule devices interrupt support
     info!(
@@ -54,22 +58,22 @@ pub extern "C" fn _other_hart_init(hart_id: usize, dtb: usize) {
 /// called by [`super::boot`]
 #[no_mangle]
 pub extern "C" fn _boot_hart_init(_: usize, dtb: usize) {
-    // global resources init
+    // data init
     bss_init();
     heap_init();
-    // todo: move ALL the driver implementations to the arch lib
-    #[cfg(target_arch = "loongarch64")]
-    arch::la64_dev_init();
-    log_init();
-    frame_init();
-    // BOOT_HART_ID.store(get_hartid(), core::sync::atomic::Ordering::SeqCst);
-    Arch::enable_user_memory_access();
 
-    // hart resources init
-    hart_mm_init();
+    // log init
     Arch::trap_init();
+    log_init();
 
-    // global resources: fs init
+    // kernel space init
+    Arch::enable_user_memory_access();
+    Arch::tlb_init();
+    frame_init();
+    kernel_space_init();
+
+    // fs init
+    Arch::enable_global_interrupt();
     let platfrom_info = platform_info_from_dtb(dtb);
     platform_init(get_hartid(), dtb);
     init_plic(platfrom_info.plic.start + KERNEL_ADDR_OFFSET);

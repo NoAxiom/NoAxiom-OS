@@ -153,6 +153,7 @@ impl From<PTEFlags> for MappingFlags {
 
 impl ArchMemory for RV64 {
     type PageTable = PageTable;
+    fn tlb_init() {}
     // flush all TLB
     #[inline(always)]
     fn tlb_flush() {

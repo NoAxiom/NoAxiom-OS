@@ -33,8 +33,8 @@ SECTIONS
     sdata = .;
     .data : {
         . = ALIGN(4K);
-        *(.data.prepage .data.prepage.*)
-        . = ALIGN(4K);
+        /* *(.data.prepage .data.prepage.*)
+        . = ALIGN(4K); */
         *(.data .data.*)
         *(.sdata .sdata.*)
     }

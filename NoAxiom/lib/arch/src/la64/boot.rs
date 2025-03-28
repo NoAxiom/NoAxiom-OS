@@ -1,10 +1,10 @@
 use core::arch::asm;
 
-use config::{
-    arch::CPU_NUM,
-    mm::{KERNEL_STACK_SIZE, PAGE_SIZE},
-};
+use config::{arch::CPU_NUM, mm::KERNEL_STACK_SIZE};
 use loongArch64::consts::LOONGARCH_CSR_MAIL_BUF0;
+
+use super::LA64;
+use crate::ArchTrap;
 
 extern "C" {
     fn _boot_hart_init();
@@ -15,10 +15,10 @@ extern "C" {
 #[link_section = ".bss.kstack"]
 pub(crate) static BOOT_STACK: [u8; KERNEL_STACK_SIZE * CPU_NUM] = [0; KERNEL_STACK_SIZE * CPU_NUM];
 
-/// temp page table for kernel booting, hard linked
-const PTE_PER_PAGE: usize = PAGE_SIZE / 8;
-#[link_section = ".data.prepage"]
-pub(crate) static PAGE_TABLE: [usize; PTE_PER_PAGE] = [0; PTE_PER_PAGE];
+// /// temp page table for kernel booting, hard linked
+// const PTE_PER_PAGE: usize = PAGE_SIZE / 8;
+// #[link_section = ".data.prepage"]
+// pub(crate) static PAGE_TABLE: [usize; PTE_PER_PAGE] = [0; PTE_PER_PAGE];
 
 #[naked]
 #[no_mangle]

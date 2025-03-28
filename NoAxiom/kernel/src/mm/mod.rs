@@ -13,7 +13,7 @@ pub mod user_ptr;
 pub mod validate;
 
 #[inline(always)]
-pub fn hart_mm_init() {
+pub fn kernel_space_init() {
     memory_set::KERNEL_SPACE.lock().memory_activate();
 }
 

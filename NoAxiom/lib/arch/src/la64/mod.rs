@@ -7,6 +7,7 @@ mod other;
 pub mod poly;
 mod sbi;
 mod time;
+mod tlb;
 mod trap;
 
 pub use boot::{_entry, _entry_other_hart};

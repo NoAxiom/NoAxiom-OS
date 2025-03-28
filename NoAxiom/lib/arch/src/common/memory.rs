@@ -83,6 +83,7 @@ pub trait ArchPageTable {
 /// memory management arch trait
 pub trait ArchMemory {
     type PageTable: ArchPageTable;
+    fn tlb_init();
     fn tlb_flush();
     fn current_root_ppn() -> usize;
     fn activate(ppn: usize);

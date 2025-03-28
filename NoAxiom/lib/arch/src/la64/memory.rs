@@ -1,7 +1,10 @@
 use config::mm::PAGE_WIDTH;
 use loongArch64::register::pgdl;
 
-use super::LA64;
+use super::{
+    tlb::{tlb_fill, tlb_init},
+    LA64,
+};
 use crate::{utils::macros::bit, ArchMemory, ArchPageTable, ArchPageTableEntry, MappingFlags};
 
 const PA_WIDTH: usize = 56;
@@ -168,6 +171,9 @@ impl ArchPageTable for PageTable {
 
 impl ArchMemory for LA64 {
     type PageTable = PageTable;
+    fn tlb_init() {
+        tlb_init(tlb_fill as _);
+    }
     fn tlb_flush() {
         // fixme: is this tlbflush or dbar?
         tlb_flush_all_with_dbar();

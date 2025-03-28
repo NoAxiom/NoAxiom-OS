@@ -11,8 +11,7 @@ use riscv::register::{
 use super::{context::TrapContext, interrupt::disable_global_interrupt, RV64};
 use crate::{
     rv64::interrupt::{
-        enable_external_interrupt, enable_global_interrupt, enable_software_interrupt,
-        enable_stimer_interrupt,
+        enable_external_interrupt, enable_software_interrupt, enable_stimer_interrupt,
     },
     ArchTrap, ArchTrapContext, ArchUserFloatContext, TrapType,
 };
@@ -56,12 +55,12 @@ impl ArchTrap for RV64 {
         set_trap_entry(user_trapvec as usize);
     }
     /// init trap in a single hart
+    /// note that it won't turn on global interrupt
     fn trap_init() {
         RV64::set_kernel_trap_entry();
         enable_external_interrupt();
         enable_software_interrupt();
         enable_stimer_interrupt();
-        enable_global_interrupt();
     }
     /// restore trap context, with freg handled as well
     fn trap_restore(cx: &mut TrapContext) {

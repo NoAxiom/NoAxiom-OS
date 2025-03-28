@@ -24,7 +24,7 @@ mod utils;
 
 pub use common::*;
 #[cfg(target_arch = "loongarch64")]
-pub use la64::{la_libc_import::*, poly::la64_dev_init};
+pub use la64::la_libc_import::*;
 
 #[cfg(target_arch = "loongarch64")]
 pub type Arch = la64::LA64;

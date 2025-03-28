@@ -120,7 +120,7 @@ impl<B: Cache + Clone> AsyncBlockCache<B> {
 
     /// flush all dirty data in the cache to the block device
     pub async fn sync_all(&self) {
-        debug!("[AsyncBlockCache] cache sync all!");
+        trace!("[AsyncBlockCache] cache sync all begin");
         let cache_guard = self.cache.lock();
         let mut dirty_data = Vec::new();
         for (sector, cache) in cache_guard.iter() {
@@ -133,6 +133,7 @@ impl<B: Cache + Clone> AsyncBlockCache<B> {
             assert!(check_no_lock());
             let _ = self.block_device.write(sector, cache.data()).await;
         }
+        info!("[AsyncBlockCache] cache sync all!");
     }
 }
 
