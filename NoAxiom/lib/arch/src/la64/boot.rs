@@ -1,10 +1,10 @@
 use core::arch::asm;
-use loongArch64::consts::LOONGARCH_CSR_MAIL_BUF0;
 
 use config::{
     arch::CPU_NUM,
     mm::{KERNEL_STACK_SIZE, PAGE_SIZE},
 };
+use loongArch64::consts::LOONGARCH_CSR_MAIL_BUF0;
 
 extern "C" {
     fn _boot_hart_init();
@@ -27,6 +27,9 @@ static PAGE_TABLE: [usize; PTE_PER_PAGE] = [0; PTE_PER_PAGE];
 pub unsafe extern "C" fn _entry() -> ! {
     asm!(
         "
+        2:
+            b 2b
+
             ori         $t0, $zero, 0x1     # CSR_DMW1_PLV0
             lu52i.d     $t0, $t0, -2048     # UC, PLV0, 0x8000 xxxx xxxx xxxx
             csrwr       $t0, 0x180          # LOONGARCH_CSR_DMWIN0
