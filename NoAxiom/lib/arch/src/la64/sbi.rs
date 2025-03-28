@@ -1,12 +1,15 @@
-use super::LA64;
+use super::{
+    poly::console::{getchar, putchar},
+    LA64,
+};
 use crate::ArchSbi;
 
 impl ArchSbi for LA64 {
     fn console_getchar() -> usize {
-        unimplemented!()
+        getchar() as usize
     }
-    fn console_putchar(_c: usize) {
-        unimplemented!()
+    fn console_putchar(c: usize) {
+        putchar(c as u8);
     }
     fn hart_start(_hartid: usize, _start_addr: usize) {
         unimplemented!()
