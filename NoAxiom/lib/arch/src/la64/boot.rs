@@ -13,12 +13,12 @@ extern "C" {
 
 /// temp stack for kernel booting
 #[link_section = ".bss.kstack"]
-static BOOT_STACK: [u8; KERNEL_STACK_SIZE * CPU_NUM] = [0; KERNEL_STACK_SIZE * CPU_NUM];
+pub(crate) static BOOT_STACK: [u8; KERNEL_STACK_SIZE * CPU_NUM] = [0; KERNEL_STACK_SIZE * CPU_NUM];
 
 /// temp page table for kernel booting, hard linked
 const PTE_PER_PAGE: usize = PAGE_SIZE / 8;
 #[link_section = ".data.prepage"]
-static PAGE_TABLE: [usize; PTE_PER_PAGE] = [0; PTE_PER_PAGE];
+pub(crate) static PAGE_TABLE: [usize; PTE_PER_PAGE] = [0; PTE_PER_PAGE];
 
 #[naked]
 #[no_mangle]
@@ -27,9 +27,6 @@ static PAGE_TABLE: [usize; PTE_PER_PAGE] = [0; PTE_PER_PAGE];
 pub unsafe extern "C" fn _entry() -> ! {
     asm!(
         "
-        2:
-            b 2b
-
             ori         $t0, $zero, 0x1     # CSR_DMW1_PLV0
             lu52i.d     $t0, $t0, -2048     # UC, PLV0, 0x8000 xxxx xxxx xxxx
             csrwr       $t0, 0x180          # LOONGARCH_CSR_DMWIN0
@@ -75,6 +72,27 @@ pub unsafe extern "C" fn _entry() -> ! {
 
 #[naked]
 #[no_mangle]
+#[link_section = ".text.entry"]
 pub unsafe extern "C" fn _entry_other_hart() -> ! {
-    asm!("", options(noreturn))
+    core::arch::asm!(
+        "
+        ori          $t0, $zero, 0x1     # CSR_DMW1_PLV0
+        lu52i.d      $t0, $t0, -2048     # UC, PLV0, 0x8000 xxxx xxxx xxxx
+        csrwr        $t0, 0x180          # LOONGARCH_CSR_DMWIN0
+        ori          $t0, $zero, 0x11    # CSR_DMW1_MAT | CSR_DMW1_PLV0
+        lu52i.d      $t0, $t0, -1792     # CA, PLV0, 0x9000 xxxx xxxx xxxx
+        csrwr        $t0, 0x181          # LOONGARCH_CSR_DMWIN1
+
+        li.w         $t0, {MBUF1}
+        iocsrrd.d    $sp, $t0
+
+        csrrd        $a0, 0x20                  # cpuid
+        la.global    $t0, {entry}
+
+        jirl $zero,$t0,0
+        ",
+        options(noreturn),
+        MBUF1 = const loongArch64::consts::LOONGARCH_CSR_MAIL_BUF1,
+        entry = sym _other_hart_init,
+    )
 }

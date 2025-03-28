@@ -2,7 +2,7 @@ use arch::{Arch, ArchInt, ArchSbi, ArchTrap, _entry_other_hart};
 
 use crate::{
     config::{arch::CPU_NUM, mm::KERNEL_ADDR_OFFSET},
-    constant::{banner::NOAXIOM_BANNER, syscall::SYS_SHUTDOWN},
+    constant::banner::NOAXIOM_BANNER,
     cpu::get_hartid,
     device::init::device_init,
     driver::log::log_init,
