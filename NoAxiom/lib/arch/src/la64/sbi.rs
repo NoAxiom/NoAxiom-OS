@@ -3,13 +3,18 @@ use loongArch64::ipi::{csr_mail_send, send_ipi_single};
 
 use super::LA64;
 use crate::{la64::boot::BOOT_STACK, ArchSbi};
+use super::{
+    poly::console::{getchar, putchar},
+    LA64,
+};
+use crate::ArchSbi;
 
 impl ArchSbi for LA64 {
     fn console_getchar() -> usize {
-        unimplemented!()
+        getchar() as usize
     }
-    fn console_putchar(_c: usize) {
-        unimplemented!()
+    fn console_putchar(c: usize) {
+        putchar(c as u8);
     }
     fn hart_start(hartid: usize, start_addr: usize) {
         let sp_addr = &BOOT_STACK as *const _ as usize + KERNEL_STACK_SIZE * hartid;

@@ -4,6 +4,7 @@ mod context;
 mod interrupt;
 mod memory;
 mod other;
+pub mod poly;
 mod sbi;
 mod time;
 mod trap;

@@ -57,6 +57,9 @@ pub extern "C" fn _boot_hart_init(_: usize, dtb: usize) {
     // global resources init
     bss_init();
     heap_init();
+    // todo: move ALL the driver implementations to the arch lib
+    #[cfg(target_arch = "loongarch64")]
+    arch::la64_dev_init();
     log_init();
     frame_init();
     // BOOT_HART_ID.store(get_hartid(), core::sync::atomic::Ordering::SeqCst);

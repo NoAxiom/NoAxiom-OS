@@ -18,3 +18,8 @@ sbi-rt = { version = "0.0.3", features = ["legacy"] }
 rlibc = "1.0.0"
 volatile = "0.4.6"
 loongArch64 = "0.2.4"
+polyhal = { git = "https://github.com/Byte-OS/polyhal.git", features = [
+    "graphic",
+    "logger",
+] }
+devices = { git = "https://github.com/Byte-OS/devices.git" }
