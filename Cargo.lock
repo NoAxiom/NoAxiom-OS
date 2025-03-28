@@ -4,11 +4,20 @@ version = 3
 
 [[package]]
 name = "aarch64-cpu"
+version = "9.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ac42a04a61c19fc8196dd728022a784baecc5d63d7e256c01ad1b3fbfab26287"
+dependencies = [
+ "tock-registers 0.8.1",
+]
+
+[[package]]
+name = "aarch64-cpu"
 version = "10.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6a21cd0131c25c438e19cd6a774adf7e3f64f7f4d723022882facc2dee0f8bc9"
 dependencies = [
- "tock-registers",
+ "tock-registers 0.9.0",
 ]
 
 [[package]]
@@ -60,13 +69,33 @@ dependencies = [
  "bit_field",
  "bitflags 2.6.0",
  "config",
+ "devices",
  "log",
  "loongArch64",
  "page_table_entry",
+ "polyhal",
  "riscv",
  "rlibc",
- "sbi-rt",
+ "sbi-rt 0.0.3",
  "volatile 0.4.6",
+]
+
+[[package]]
+name = "arm_gicv2"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "47d25e73c949c69f75d1b9dba39c5475523403b31eb8c2fdc99da4dc33bc1aca"
+dependencies = [
+ "tock-registers 0.8.1",
+]
+
+[[package]]
+name = "arm_pl011"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "efcf6afca4502993a737ba1e00952d1321078689da92bf7aab27d4e5756c0bec"
+dependencies = [
+ "tock-registers 0.8.1",
 ]
 
 [[package]]
@@ -119,6 +148,12 @@ name = "autocfg"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
+
+[[package]]
+name = "bit"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b645c5c09a7d4035949cfce1a915785aaad6f17800c35fda8a8c311c491f284"
 
 [[package]]
 name = "bit_field"
@@ -254,6 +289,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "devices"
+version = "0.1.0"
+source = "git+https://github.com/Byte-OS/devices.git#89a7844a041117af8465b2f484f3627aef929a32"
+dependencies = [
+ "fdt 0.1.5",
+ "frame_allocator",
+ "linkme",
+ "log",
+ "polyhal",
+ "sync",
+ "timestamp",
+ "virtio-drivers 0.7.1",
+]
+
+[[package]]
 name = "downcast-rs"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -321,6 +371,12 @@ dependencies = [
 
 [[package]]
 name = "fdt"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "784a4df722dc6267a04af36895398f59d21d07dce47232adf31ec0ff2fa45e67"
+
+[[package]]
+name = "fdt"
 version = "0.2.0-alpha1"
 source = "git+https://github.com/repnop/fdt#059bb2383873f8001959456e36ec123228f67642"
 
@@ -329,6 +385,17 @@ name = "foldhash"
 version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f81ec6369c545a7d40e4589b5597581fa1c441fe1cce96dd1de43159910a36a2"
+
+[[package]]
+name = "frame_allocator"
+version = "0.1.0"
+source = "git+https://github.com/Byte-OS/bit_frame_allocator.git#b989b6a4e17d960fca1e77c83f060cb6006fc924"
+dependencies = [
+ "bit_field",
+ "log",
+ "polyhal",
+ "sync",
+]
 
 [[package]]
 name = "fscommon"
@@ -516,7 +583,7 @@ dependencies = [
  "downcast-rs",
  "ext4_rs",
  "fatfs",
- "fdt",
+ "fdt 0.2.0-alpha1",
  "futures",
  "futures-lite",
  "hashbrown 0.14.5",
@@ -538,7 +605,7 @@ dependencies = [
  "thiserror-core",
  "uart16550",
  "uart8250",
- "virtio-drivers",
+ "virtio-drivers 0.7.5",
  "volatile 0.2.7",
  "xmas-elf",
 ]
@@ -575,6 +642,26 @@ name = "libc"
 version = "0.2.169"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b5aba8db14291edd000dfcc4d620c7ebfb122c613afb886ca8803fa4e128a20a"
+
+[[package]]
+name = "linkme"
+version = "0.3.32"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "22d227772b5999ddc0690e733f734f95ca05387e329c4084fe65678c51198ffe"
+dependencies = [
+ "linkme-impl",
+]
+
+[[package]]
+name = "linkme-impl"
+version = "0.3.32"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "71a98813fa0073a317ed6a8055dcd4722a49d9b862af828ee68449adb799b6be"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.87",
+]
 
 [[package]]
 name = "lock_api"
@@ -630,6 +717,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5438b8df0f13e16e1f46140de247695a95952a5a4479e47197a8711bf1063373"
 
 [[package]]
+name = "multiboot"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f87ad3b7b7bcf5da525c22221e3eb3a020cd68b2d55ae62f629c15e8bc3bd56e"
+dependencies = [
+ "paste",
+]
+
+[[package]]
 name = "nb"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -667,10 +763,10 @@ version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13a40144d5ef66b7a98069a59c807d2f6ff812da1362b63f67091ba0c5187560"
 dependencies = [
- "aarch64-cpu",
+ "aarch64-cpu 10.0.0",
  "bitflags 2.6.0",
  "memory_addr",
- "x86_64",
+ "x86_64 0.15.1",
 ]
 
 [[package]]
@@ -695,6 +791,42 @@ checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
 name = "plic"
 version = "0.1.0"
 source = "git+https://github.com/os-module/plic#1a714257a15595612ba74b83062481ef31c68c34"
+
+[[package]]
+name = "polyhal"
+version = "0.1.3"
+source = "git+https://github.com/Byte-OS/polyhal.git#5b890102fb32de0ca0f7c3e7a776454b6d0bd583"
+dependencies = [
+ "aarch64-cpu 9.4.0",
+ "arm_gicv2",
+ "arm_pl011",
+ "bitflags 2.6.0",
+ "cfg-if",
+ "fdt 0.1.5",
+ "log",
+ "loongArch64",
+ "multiboot",
+ "polyhal-macro",
+ "raw-cpuid 11.5.0",
+ "riscv",
+ "sbi-rt 0.0.2",
+ "spin 0.9.8",
+ "tock-registers 0.8.1",
+ "x2apic",
+ "x86",
+ "x86_64 0.14.13",
+]
+
+[[package]]
+name = "polyhal-macro"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e8445234620fa3a0886b9cae5d5fa568a6124efb916041628eb9c4011d1a3e8b"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.87",
+]
 
 [[package]]
 name = "proc-macro-error"
@@ -743,6 +875,24 @@ name = "rand_core"
 version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
+
+[[package]]
+name = "raw-cpuid"
+version = "10.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6c297679cb867470fa8c9f67dbba74a78d78e3e98d7cf2b08d6d71540f797332"
+dependencies = [
+ "bitflags 1.3.2",
+]
+
+[[package]]
+name = "raw-cpuid"
+version = "11.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c6df7ab838ed27997ba19a4664507e6f82b41fe6e20be42929332156e5e85146"
+dependencies = [
+ "bitflags 2.6.0",
+]
 
 [[package]]
 name = "regex"
@@ -803,11 +953,29 @@ checksum = "f7c45b9784283f1b2e7fb61b42047c2fd678ef0960d4f6f1eba131594cc369d4"
 
 [[package]]
 name = "sbi-rt"
+version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8c113c53291db8ac141e01f43224ed488b8d6001ab66737b82e04695a43a42b7"
+dependencies = [
+ "sbi-spec 0.0.4",
+]
+
+[[package]]
+name = "sbi-rt"
 version = "0.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7fbaa69be1eedc61c426e6d489b2260482e928b465360576900d52d496a58bd0"
 dependencies = [
- "sbi-spec",
+ "sbi-spec 0.0.7",
+]
+
+[[package]]
+name = "sbi-spec"
+version = "0.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6d4027cf9bb591a9fd0fc0e283be6165c5abe96cb73e9f0e24738c227f425377"
+dependencies = [
+ "static_assertions",
 ]
 
 [[package]]
@@ -865,6 +1033,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
 
 [[package]]
+name = "static_assertions"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
+
+[[package]]
 name = "syn"
 version = "1.0.109"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -884,6 +1058,14 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
+]
+
+[[package]]
+name = "sync"
+version = "0.1.0"
+source = "git+https://github.com/Byte-OS/sync.git#8c5f094d85cd7f4574bb6035c87d94dc5dee3998"
+dependencies = [
+ "spin 0.9.8",
 ]
 
 [[package]]
@@ -936,6 +1118,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "timestamp"
+version = "0.1.0"
+source = "git+https://github.com/Byte-OS/timestamp.git#0394ccfa14db1912047a0a3e7e1c38b027856165"
+
+[[package]]
+name = "tock-registers"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "696941a0aee7e276a165a978b37918fd5d22c55c3d6bda197813070ca9c0f21c"
+
+[[package]]
 name = "tock-registers"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -973,6 +1166,16 @@ name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
+
+[[package]]
+name = "virtio-drivers"
+version = "0.7.1"
+source = "git+https://github.com/rcore-os/virtio-drivers?rev=61ece50#61ece509c40f32c03378a7a037ef9863ed5deba7"
+dependencies = [
+ "bitflags 2.6.0",
+ "log",
+ "zerocopy",
+]
 
 [[package]]
 name = "virtio-drivers"
@@ -1183,6 +1386,42 @@ name = "windows_x86_64_msvc"
 version = "0.52.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "589f6da84c646204747d1270a2a5661ea66ed1cced2631d546fdfb155959f9ec"
+
+[[package]]
+name = "x2apic"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cbcd582541cbb8ef1dfc24a3c849a64ff074b1b512af723ad90056558d424602"
+dependencies = [
+ "bit",
+ "bitflags 1.3.2",
+ "paste",
+ "raw-cpuid 10.7.0",
+ "x86_64 0.14.13",
+]
+
+[[package]]
+name = "x86"
+version = "0.52.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2781db97787217ad2a2845c396a5efe286f87467a5810836db6d74926e94a385"
+dependencies = [
+ "bit_field",
+ "bitflags 1.3.2",
+ "raw-cpuid 10.7.0",
+]
+
+[[package]]
+name = "x86_64"
+version = "0.14.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c101112411baafbb4bf8d33e4c4a80ab5b02d74d2612331c61e8192fc9710491"
+dependencies = [
+ "bit_field",
+ "bitflags 2.6.0",
+ "rustversion",
+ "volatile 0.4.6",
+]
 
 [[package]]
 name = "x86_64"
