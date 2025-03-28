@@ -6,6 +6,7 @@ export MODE ?= release
 export BOARD ?= qemu-virt
 export KERNEL ?= kernel
 export ARCH_NAME ?= riscv64
+# export ARCH_NAME ?= loongarch64
 
 export ROOT := $(shell pwd)
 

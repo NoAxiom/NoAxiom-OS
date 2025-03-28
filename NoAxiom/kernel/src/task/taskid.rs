@@ -4,7 +4,6 @@ use ksync::mutex::SpinLock;
 
 pub type TID = usize;
 pub type TGID = TID;
-pub type PID = TGID;
 pub type PGID = usize;
 
 /// Task ID allocator

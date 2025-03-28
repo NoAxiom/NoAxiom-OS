@@ -9,6 +9,7 @@
 #![feature(panic_info_message)]
 #![feature(alloc_error_handler)]
 #![feature(slice_from_ptr_range)]
+#![feature(lang_items)]
 #![allow(deprecated)]
 
 extern crate alloc;
@@ -22,6 +23,8 @@ mod rv64;
 mod utils;
 
 pub use common::*;
+#[cfg(target_arch = "loongarch64")]
+pub use la64::la_libc_import::*;
 
 #[cfg(target_arch = "loongarch64")]
 pub type Arch = la64::LA64;

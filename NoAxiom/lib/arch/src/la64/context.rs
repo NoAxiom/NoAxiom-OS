@@ -1,6 +1,6 @@
 use core::ops::{Index, IndexMut};
 
-use crate::{ArchTrapContext, TrapArgs};
+use crate::{ArchTrapContext, ArchUserFloatContext, TrapArgs};
 
 /// Saved registers when a trap (interrupt or exception) occurs.
 #[repr(C)]
@@ -29,6 +29,9 @@ pub struct TrapContext {
 
     /// [49]/[392~399]: tp, aka hartid
     kernel_tp: usize,
+
+    /// freg
+    freg: UserFloatContext,
 }
 
 impl TrapContext {
@@ -87,7 +90,55 @@ impl IndexMut<TrapArgs> for TrapContext {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+#[repr(C)]
+pub struct UserFloatContext {
+    pub user_fx: [f64; 32], // 50 - 81
+    pub fcsr: u32,          // 32bit
+    pub need_save: u8,
+    pub need_restore: u8,
+    pub signal_dirty: u8,
+}
+
+impl ArchUserFloatContext for UserFloatContext {
+    fn save(&mut self) {
+        todo!()
+    }
+    fn restore(&mut self) {
+        todo!()
+    }
+    fn mark_save_if_needed(&mut self) {
+        todo!()
+    }
+    fn new() -> Self {
+        todo!()
+    }
+    fn yield_task(&mut self) {
+        todo!()
+    }
+}
+
+impl Default for UserFloatContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ArchTrapContext for TrapContext {
+    type FloatContext = UserFloatContext;
+
+    fn freg_mut(&mut self) -> &mut Self::FloatContext {
+        &mut self.freg
+    }
+
+    fn gprs(&self) -> &[usize; 32] {
+        &self.x
+    }
+
+    fn gprs_mut(&mut self) -> &mut [usize; 32] {
+        &mut self.x
+    }
+
     fn app_init_cx(entry: usize, sp: usize) -> Self {
         // Self::new contains priv level settings
         let mut cx = Self::new();

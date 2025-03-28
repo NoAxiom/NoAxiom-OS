@@ -1,5 +1,14 @@
+use core::arch::global_asm;
+
 use super::{context::TrapContext, LA64};
 use crate::ArchTrap;
+
+global_asm!(include_str!("./trap.S"));
+extern "C" {
+    fn user_trapvec();
+    fn user_trapret(cx: *mut TrapContext);
+    fn kernel_trapvec();
+}
 
 impl ArchTrap for LA64 {
     type TrapContext = TrapContext;
