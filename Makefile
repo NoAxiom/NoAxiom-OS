@@ -5,7 +5,7 @@ export PROJECT := NoAxiom
 export MODE ?= release
 export BOARD ?= qemu-virt
 export KERNEL ?= kernel
-export ARCH_NAME ?= riscv64
+export ARCH_NAME ?= loongarch64
 # export ARCH_NAME ?= loongarch64
 
 export ROOT := $(shell pwd)
@@ -118,13 +118,15 @@ export MULTICORE := 2
 QFLAGS := 
 ifeq ($(ARCH_NAME),loongarch64)
 	QFLAGS += -kernel $(KERNEL_ELF)
-    QFLAGS += -m 1024
+	QFLAGS += -m 1024
 	QFLAGS += -nographic
 	QFLAGS += -smp $(MULTICORE)
 	QFLAGS += -drive file=$(FS_IMG),if=none,format=raw,id=x0
+	QFLAGS += -device virtio-blk-pci,drive=x0 -no-reboot # Official says bus=virtio-mmio-bus.0, but it's wrong
+	QFLAGS += -device virtio-net-pci,netdev=net0
 	QFLAGS += -netdev user,id=net0,hostfwd=tcp::5555-:5555,hostfwd=udp::5555-:5555
-    QFLAGS += -rtc base=utc
-    # QFLAGS += -drive file=disk-la.img,if=none,format=raw,id=x1
+	QFLAGS += -rtc base=utc
+	# QFLAGS += -drive file=disk-la.img,if=none,format=raw,id=x1
 	# QFLAGS += -device virtio-blk-pci,drive=x1,bus=virtio-mmio-bus.1
 else
 	QFLAGS += -machine virt -kernel kernel-qemu
