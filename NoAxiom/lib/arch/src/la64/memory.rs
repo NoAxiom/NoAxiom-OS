@@ -1,8 +1,8 @@
 use config::mm::PAGE_WIDTH;
-use loongArch64::register::pgdl;
+use loongArch64::register::{pgdh, pgdl};
 
 use super::{
-    tlb::{tlb_fill, tlb_init},
+    tlb::{tlb_fill, tlb_flush_all, tlb_init},
     LA64,
 };
 use crate::{utils::macros::bit, ArchMemory, ArchPageTable, ArchPageTableEntry, MappingFlags};
@@ -144,25 +144,12 @@ impl ArchPageTableEntry for PageTableEntry {
     }
 }
 
-/// flush the TLB entry by VirtualAddress
-/// currently unused
-#[inline]
-#[allow(unused)]
-pub fn flush_vaddr(va: usize) {
-    unsafe {
-        core::arch::asm!("dbar 0; invtlb 0x05, $r0, {reg}", reg = in(reg) va);
-    }
-}
-
-#[inline]
-pub fn tlb_flush_all_with_dbar() {
-    unsafe {
-        core::arch::asm!("dbar 0; invtlb 0x00, $r0, $r0");
-    }
-}
-
-fn activate_ppn(ppn: usize) {
+fn low_activate_ppn(ppn: usize) {
     pgdl::set_base(ppn << PAGE_WIDTH);
+}
+
+fn high_activate_ppn(ppn: usize) {
+    pgdh::set_base(ppn << PAGE_WIDTH);
 }
 
 pub struct PageTable(pub usize);
@@ -179,7 +166,7 @@ impl ArchPageTable for PageTable {
         self.0
     }
     fn activate(&self) {
-        activate_ppn(self.0);
+        low_activate_ppn(self.0);
     }
 }
 
@@ -189,13 +176,17 @@ impl ArchMemory for LA64 {
     type PageTable = PageTable;
     fn tlb_init() {
         tlb_init(tlb_fill as _);
+        tlb_flush_all();
     }
     fn tlb_flush() {
-        // fixme: is this tlbflush or dbar?
-        tlb_flush_all_with_dbar();
+        tlb_flush_all();
     }
-    fn activate(ppn: usize) {
-        activate_ppn(ppn);
+    fn activate(ppn: usize, is_kernel: bool) {
+        match is_kernel {
+            true => high_activate_ppn(ppn),
+            false => low_activate_ppn(ppn),
+        }
+        tlb_flush_all();
     }
     fn current_root_ppn() -> usize {
         pgdl::read().base() >> PAGE_WIDTH

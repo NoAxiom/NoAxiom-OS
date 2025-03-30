@@ -40,10 +40,9 @@ pub fn wake_other_hart(forbid_hart_id: usize) {
 
 #[no_mangle]
 pub extern "C" fn _other_hart_init(hart_id: usize, dtb: usize) {
-    Arch::enable_user_memory_access();
+    Arch::trap_init();
     kernel_space_activate();
     Arch::tlb_init();
-    Arch::trap_init();
     // register_to_hart(); // todo: add multipule devices interrupt support
     info!(
         "[other_init] entry init hart_id: {}, dtb_addr: {:#x}",
@@ -69,10 +68,12 @@ pub extern "C" fn _boot_hart_init(_: usize, dtb: usize) {
     log_init();
 
     // kernel space init
-    Arch::enable_user_memory_access();
-    Arch::tlb_init();
     frame_init();
     kernel_space_init();
+    Arch::tlb_init();
+
+    // let ptr = 114514 as usize as *const u8;
+    // debug!("addr: {:#x}, value: {}", ptr as usize, unsafe { *ptr });
 
     // device init
     info!("[device init] dtb addr: {:#x}", dtb);

@@ -190,7 +190,7 @@ pub fn frame_init() {
         PhysAddr::from(kernel_va_to_pa(ekernel as usize)).ceil(),
         PhysAddr::from(KERNEL_PHYS_MEMORY_END).floor(),
     );
-    info!("[init] frame allocator init success.");
+    info!("[frame_init] frame allocator init success.");
 }
 
 #[allow(unused)]
@@ -198,15 +198,15 @@ pub fn frame_allocator_test() {
     let mut v: Vec<FrameTracker> = Vec::new();
     for i in 0..5 {
         let frame = frame_alloc();
-        println!("{:?}", frame);
+        debug!("{:?}", frame);
         v.push(frame);
     }
     v.clear();
     for i in 0..5 {
         let frame = frame_alloc();
-        println!("{:?}", frame);
+        debug!("{:?}", frame);
         v.push(frame);
     }
     drop(v);
-    println!("frame_allocator_test passed!");
+    debug!("frame_allocator_test passed!");
 }

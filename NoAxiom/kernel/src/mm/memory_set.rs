@@ -40,17 +40,18 @@ extern "C" {
     fn ekernel();
 }
 
-// fixme: virtio_virt_to_phys
-pub static KERNEL_SPACE: Lazy<SpinLock<MemorySet>> =
-    Lazy::new(|| SpinLock::new(MemorySet::init_kernel_space()));
+pub static KERNEL_SPACE: Lazy<SpinLock<MemorySet>> = Lazy::new(|| {
+    let ms = MemorySet::init_kernel_space();
+    ms.page_table().mark_as_kernel();
+    SpinLock::new(ms)
+});
 
 /// lazily initialized kernel space token
 /// please assure it's initialized before any user space token
 pub static mut KERNEL_SPACE_ROOT_PPN: usize = 0;
 
 pub fn kernel_space_activate() {
-    Arch::activate(unsafe { KERNEL_SPACE_ROOT_PPN });
-    Arch::tlb_flush();
+    Arch::activate(unsafe { KERNEL_SPACE_ROOT_PPN }, true);
 }
 
 #[inline(always)]

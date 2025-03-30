@@ -170,7 +170,7 @@ impl ArchMemory for RV64 {
         satp & ((1 << PPN_WIDTH) - 1)
     }
     #[inline(always)]
-    fn activate(ppn: usize) {
+    fn activate(ppn: usize, _is_kernel: bool) {
         satp::write(8usize << 60 | ppn);
     }
 }

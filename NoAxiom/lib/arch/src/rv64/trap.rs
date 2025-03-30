@@ -12,6 +12,7 @@ use super::{context::TrapContext, interrupt::disable_global_interrupt, RV64};
 use crate::{
     rv64::interrupt::{
         enable_external_interrupt, enable_software_interrupt, enable_stimer_interrupt,
+        enable_user_memory_access,
     },
     ArchTrap, ArchTrapContext, ArchUserFloatContext, TrapType,
 };
@@ -57,6 +58,7 @@ impl ArchTrap for RV64 {
     /// init trap in a single hart
     /// note that it won't turn on global interrupt
     fn trap_init() {
+        enable_user_memory_access();
         RV64::set_kernel_trap_entry();
         enable_external_interrupt();
         enable_software_interrupt();

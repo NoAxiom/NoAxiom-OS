@@ -18,6 +18,9 @@ pub struct PageTable {
     /// page table frame tracker holder,
     /// doesn't track data pages
     frames: Vec<FrameTracker>,
+
+    /// is kernel?
+    is_kernel: bool,
 }
 
 impl PageTable {
@@ -28,6 +31,7 @@ impl PageTable {
         PageTable {
             root_ppn: PhysPageNum(0),
             frames: Vec::new(),
+            is_kernel: false,
         }
     }
 
@@ -40,7 +44,12 @@ impl PageTable {
         PageTable {
             root_ppn: frame.ppn(),
             frames: vec![frame],
+            is_kernel: false,
         }
+    }
+
+    pub fn mark_as_kernel(&mut self) {
+        self.is_kernel = true;
     }
 
     // /// use satp[43:0] to generate a new pagetable,
@@ -60,6 +69,7 @@ impl PageTable {
         Self {
             root_ppn: PhysPageNum::from(ppn),
             frames: Vec::new(),
+            is_kernel: false,
         }
     }
 
@@ -73,6 +83,7 @@ impl PageTable {
         PageTable {
             root_ppn: new_frame.ppn(),
             frames: vec![new_frame],
+            is_kernel: false,
         }
     }
 
@@ -193,8 +204,7 @@ impl PageTable {
     /// PLEASE make sure context around is mapped into both page tables
     #[inline(always)]
     pub fn memory_activate(&self) {
-        Arch::activate(self.root_ppn().0);
-        Arch::tlb_flush();
+        Arch::activate(self.root_ppn().0, self.is_kernel);
     }
 
     /// remap a cow page

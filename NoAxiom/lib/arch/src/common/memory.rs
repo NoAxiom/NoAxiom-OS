@@ -65,8 +65,5 @@ pub trait ArchMemory {
     fn tlb_init();
     fn tlb_flush();
     fn current_root_ppn() -> usize;
-    fn activate(ppn: usize);
-    // fn update_pagetable(_bits: usize);
-    // fn get_token_by_ppn(_ppn: usize) -> usize;
-    // fn current_token() -> usize;
+    fn activate(ppn: usize, is_kernel: bool);
 }

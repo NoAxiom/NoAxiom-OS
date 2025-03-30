@@ -40,6 +40,23 @@ pub fn set_tlb_refill_entry(tlbrentry: usize) {
 //     set_tlbrentry(tlbrentry);
 // }
 
+/// flush the TLB entry by VirtualAddress
+/// currently unused
+#[inline]
+#[allow(unused)]
+pub fn flush_vaddr(va: usize) {
+    unsafe {
+        core::arch::asm!("dbar 0; invtlb 0x05, $r0, {reg}", reg = in(reg) va);
+    }
+}
+
+#[inline]
+pub fn tlb_flush_all() {
+    unsafe {
+        core::arch::asm!("invtlb 0x0, $r0, $r0");
+    }
+}
+
 pub const PS_4K: usize = 0x0c;
 pub const _PS_16K: usize = 0x0e;
 pub const _PS_2M: usize = 0x15;
@@ -76,4 +93,6 @@ pub fn tlb_init(tlbrentry: usize) {
     set_tlb_refill_entry(tlbrentry);
     // pgdl::set_base(kernel_pgd_base);
     // pgdh::set_base(kernel_pgd_base);
+
+    tlb_flush_all();
 }
