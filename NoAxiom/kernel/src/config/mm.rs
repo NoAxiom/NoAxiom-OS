@@ -23,6 +23,10 @@ pub const PAGE_NUM_WIDTH: usize = PAGE_WIDTH - 3;
 /// page table entry per page: 512
 pub const PTE_PER_PAGE: usize = 1 << PAGE_NUM_WIDTH;
 
+/// kernel address offset from phys to virt
+pub const KERNEL_ADDR_OFFSET: usize = mem_const!(KERNEL_ADDR_OFFSET);
+/// kernle pagenum offset from phys to virt
+pub const KERNEL_PAGENUM_MASK: usize = (KERNEL_ADDR_OFFSET as isize >> PAGE_WIDTH) as usize;
 /// kernel phys memory end address
 pub const KERNEL_PHYS_MEMORY_END: usize = mem_const!(PHYS_MEMORY_END);
 /// kernel virt memory end address

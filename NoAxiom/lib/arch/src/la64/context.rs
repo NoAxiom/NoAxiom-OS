@@ -7,11 +7,11 @@ use crate::{ArchTrapContext, ArchUserFloatContext, TrapArgs};
 #[derive(Debug, Default, Clone, Copy)]
 pub struct TrapContext {
     /// [0~31]/[0~255]: General Registers
-    pub x: [usize; 32],
+    pub(crate) x: [usize; 32],
     /// [32]/[256~263]: Pre-exception Mode information
-    pub prmd: usize,
+    pub(crate) prmd: usize,
     /// [33]/[264~271]: Exception Return Address
-    pub era: usize,
+    pub(crate) era: usize,
 
     /// [34]/[272~279]: kernel stack top (va)
     kernel_sp: usize,
@@ -22,6 +22,7 @@ pub struct TrapContext {
     kernel_ra: usize,
 
     /// [36~47]/[288~383]: kernel registers (s0 ~ s11), saved by callee
+    /// fixme: actually we should only save s0 ~ s9
     kernel_reg: [usize; 12],
 
     /// [48]/[384~391]: reserved

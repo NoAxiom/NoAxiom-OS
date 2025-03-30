@@ -52,16 +52,6 @@ impl PageTable {
         self.is_kernel = true;
     }
 
-    // /// use satp[43:0] to generate a new pagetable,
-    // /// note that the frame won't be saved,
-    // /// so do assure that it's already wrapped in tcb
-    // pub fn from_token(satp: usize) -> Self {
-    //     Self {
-    //         root_ppn: PhysPageNum::from(satp & PPN_MASK),
-    //         frames: Vec::new(),
-    //     }
-    // }
-
     /// use ppn to generate a new pagetable,
     /// note that the frame won't be saved,
     /// so do assure that it's already wrapped in tcb

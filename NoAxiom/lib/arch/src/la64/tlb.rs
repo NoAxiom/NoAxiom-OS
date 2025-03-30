@@ -35,11 +35,6 @@ pub fn set_tlb_refill_entry(tlbrentry: usize) {
     set_tlbrentry(tlbrentry & 0xFFFF_FFFF_FFFF);
 }
 
-// #[inline]
-// pub fn set_tlb_refill_entry(tlbrentry: usize) {
-//     set_tlbrentry(tlbrentry);
-// }
-
 /// flush the TLB entry by VirtualAddress
 /// currently unused
 #[inline]

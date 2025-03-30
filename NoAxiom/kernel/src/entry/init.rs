@@ -71,9 +71,10 @@ pub extern "C" fn _boot_hart_init(_: usize, dtb: usize) {
     frame_init();
     kernel_space_init();
     Arch::tlb_init();
-
-    // let ptr = 114514 as usize as *const u8;
-    // debug!("addr: {:#x}, value: {}", ptr as usize, unsafe { *ptr });
+    
+    // [debug] wake other hart
+    // wake_other_hart(get_hartid());
+    // rust_main();
 
     // device init
     info!("[device init] dtb addr: {:#x}", dtb);
