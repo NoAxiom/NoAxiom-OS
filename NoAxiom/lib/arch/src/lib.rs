@@ -16,8 +16,6 @@ extern crate alloc;
 
 #[macro_use]
 mod common;
-#[macro_use]
-mod console;
 
 #[cfg(target_arch = "loongarch64")]
 mod la64;

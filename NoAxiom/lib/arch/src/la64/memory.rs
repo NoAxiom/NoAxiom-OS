@@ -10,43 +10,11 @@ use crate::{utils::macros::bit, ArchMemory, ArchPageTable, ArchPageTableEntry, M
 const PA_WIDTH: usize = 56;
 const VA_WIDTH: usize = 39;
 const INDEX_LEVELS: usize = 3;
-
-impl From<MappingFlags> for PTEFlags {
-    fn from(value: MappingFlags) -> Self {
-        let mut flags = PTEFlags::V;
-        if value.contains(MappingFlags::W) {
-            flags |= PTEFlags::W | PTEFlags::D;
-        }
-        // if !value.contains(MappingFlags::X) {
-        //     flags |= PTEFlags::NX;
-        // }
-        if value.contains(MappingFlags::U) {
-            flags |= PTEFlags::PLV_USER;
-        }
-        flags
-    }
-}
-
-impl From<PTEFlags> for MappingFlags {
-    fn from(val: PTEFlags) -> Self {
-        let mut flags = MappingFlags::empty();
-        if val.contains(PTEFlags::W) {
-            flags |= MappingFlags::W;
-        }
-        if val.contains(PTEFlags::D) {
-            flags |= MappingFlags::D;
-        }
-        // if !self.contains(PTEFlags::NX) {
-        //     flags |= MappingFlags::X;
-        // }
-        if val.contains(PTEFlags::PLV_USER) {
-            flags |= MappingFlags::U;
-        }
-        flags
-    }
-}
+const PHYS_MEMORY_START: usize = 0x0000_0000_9000_0000;
+const MEMORY_SIZE: usize = 0x1000_0000;
 
 bitflags::bitflags! {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
     /// Possible flags for a page table entry.
     pub struct PTEFlags: u64 {
         /// Page Valid
@@ -69,19 +37,66 @@ bitflags::bitflags! {
         const W = bit!(8);
 
         /// Is a Global Page if using huge page(GH bit).
-        const G = bit!(10);
+        const G = bit!(12);
 
         /// Page is not readable.
-        const NR = bit!(11);
+        const NR = bit!(61);
 
         /// Page is not executable.
-        /// FIXME: Is it just for a huge page?
         /// Linux related url: https://github.com/torvalds/linux/blob/master/arch/loongarch/include/asm/pgtable-bits.h
-        const NX = bit!(12);
+        const NX = bit!(62);
 
         /// Whether the privilege Level is restricted. When RPLV is 0, the PTE
         /// can be accessed by any program with privilege Level highter than PLV.
         const RPLV = bit!(63);
+    }
+}
+
+impl From<MappingFlags> for PTEFlags {
+    fn from(flags: MappingFlags) -> Self {
+        let mut res = PTEFlags::empty();
+        // V D U P W G?? NX
+        if flags.contains(MappingFlags::V) {
+            res |= PTEFlags::V;
+            res |= PTEFlags::P;
+        }
+        if flags.contains(MappingFlags::X) {
+            res |= PTEFlags::NX;
+        }
+        if flags.contains(MappingFlags::W) {
+            res |= PTEFlags::W;
+        }
+        if flags.contains(MappingFlags::D) {
+            res |= PTEFlags::D;
+        }
+        if flags.contains(MappingFlags::U) {
+            res |= PTEFlags::PLV_USER;
+        }
+        res
+    }
+}
+
+impl From<PTEFlags> for MappingFlags {
+    fn from(val: PTEFlags) -> Self {
+        let mut res = MappingFlags::empty();
+        // V D U P W G?? NX
+        // log::debug!("PTEFlags: {:?}", val);
+        if val.contains(PTEFlags::V) && val.contains(PTEFlags::P) {
+            res |= MappingFlags::V;
+        }
+        if val.contains(PTEFlags::W) {
+            res |= MappingFlags::W;
+        }
+        if val.contains(PTEFlags::D) {
+            res |= MappingFlags::D;
+        }
+        if !val.contains(PTEFlags::NX) {
+            res |= MappingFlags::X;
+        }
+        if val.contains(PTEFlags::PLV_USER) {
+            res |= MappingFlags::U;
+        }
+        res
     }
 }
 
@@ -154,7 +169,6 @@ pub struct PageTable(pub usize);
 
 impl ArchPageTable for PageTable {
     type PageTableEntry = PageTableEntry;
-    const PA_WIDTH: usize = PA_WIDTH;
     const VA_WIDTH: usize = VA_WIDTH;
     const INDEX_LEVELS: usize = INDEX_LEVELS;
 
@@ -170,6 +184,8 @@ impl ArchPageTable for PageTable {
 }
 
 impl ArchMemory for LA64 {
+    const PHYS_MEMORY_START: usize = PHYS_MEMORY_START;
+    const PHYS_MEMORY_END: usize = PHYS_MEMORY_START + MEMORY_SIZE;
     type PageTable = PageTable;
     fn tlb_init() {
         tlb_init(tlb_fill as _);

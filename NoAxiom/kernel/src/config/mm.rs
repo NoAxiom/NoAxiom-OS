@@ -1,32 +1,32 @@
 //! Memory management configuration
 
-use arch::{ArchPageTable, VirtPageTable};
+use arch::{Arch, ArchMemory, ArchPageTable, VirtPageTable};
 pub use config::mm::*;
 
-macro_rules! trait_const {
+macro_rules! pt_const {
     ($const:ident) => {
         <VirtPageTable as ArchPageTable>::$const
     };
 }
+macro_rules! mem_const {
+    ($const:ident) => {
+        <Arch as ArchMemory>::$const
+    };
+}
 
-/// physical address width
-pub const PA_WIDTH: usize = trait_const!(PA_WIDTH);
 /// virtual address width
-pub const VA_WIDTH: usize = trait_const!(VA_WIDTH);
+pub const VA_WIDTH: usize = pt_const!(VA_WIDTH);
+/// index level number
+pub const INDEX_LEVELS: usize = pt_const!(INDEX_LEVELS);
+/// raw vpn & ppn width: 9
+pub const PAGE_NUM_WIDTH: usize = PAGE_WIDTH - 3;
+/// page table entry per page: 512
+pub const PTE_PER_PAGE: usize = 1 << PAGE_NUM_WIDTH;
 
-/// physical page number width
-pub const PPN_WIDTH: usize = trait_const!(PPN_WIDTH); // 44
-/// ppn mask
-pub const PPN_MASK: usize = trait_const!(PPN_MASK);
-/// virtual page number width
-pub const VPN_WIDTH: usize = trait_const!(VPN_WIDTH); // 27
-
-/// index level number of sv39
-pub const INDEX_LEVELS: usize = trait_const!(INDEX_LEVELS);
-/// raw vpn & ppn width of sv39
-pub const PAGE_NUM_WIDTH: usize = trait_const!(PAGE_NUM_WIDTH); // 9
-/// page table entry per page
-pub const PTE_PER_PAGE: usize = trait_const!(PTE_PER_PAGE); // 512
+/// kernel phys memory end address
+pub const KERNEL_PHYS_MEMORY_END: usize = mem_const!(PHYS_MEMORY_END);
+/// kernel virt memory end address
+pub const KERNEL_VIRT_MEMORY_END: usize = KERNEL_ADDR_OFFSET | KERNEL_PHYS_MEMORY_END;
 
 /// kernel heap size: 32MB
 pub const KERNEL_HEAP_SIZE: usize = 0x200_0000;
@@ -42,16 +42,6 @@ pub const MMAP_BASE_ADDR: usize = 0x6000_0000;
 pub const MMAP_MAX_SIZE: usize = 0x1000_0000;
 /// mmap max_end address
 pub const MMAP_MAX_END_ADDR: usize = MMAP_BASE_ADDR + MMAP_MAX_SIZE;
-
-// /// kernel phys memory start address
-// pub const KERNEL_PHYS_ENTRY: usize = 0x8020_0000;
-// /// kernel virt memory start address
-// pub const KERNEL_VIRT_ENTRY: usize = KERNEL_ADDR_OFFSET | KERNEL_PHYS_ENTRY;
-
-/// kernel phys memory end address
-pub const KERNEL_PHYS_MEMORY_END: usize = 0x8800_0000;
-/// kernel virt memory end address
-pub const KERNEL_VIRT_MEMORY_END: usize = KERNEL_ADDR_OFFSET | KERNEL_PHYS_MEMORY_END;
 
 /// Dynamic linked interpreter address range in user space
 pub const DL_INTERP_OFFSET: usize = 0x20_0000_0000;

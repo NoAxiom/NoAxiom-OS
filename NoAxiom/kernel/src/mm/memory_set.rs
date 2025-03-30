@@ -2,15 +2,14 @@ use alloc::{sync::Arc, vec::Vec};
 use core::sync::atomic::{fence, Ordering};
 
 use arch::{Arch, ArchMemory, ArchPageTableEntry, MappingFlags, PageTableEntry};
-use ksync::{cell::SyncUnsafeCell, mutex::SpinLock};
-use lazy_static::lazy_static;
+use ksync::{cell::SyncUnsafeCell, mutex::SpinLock, Lazy};
 
 use super::{
     address::{PhysAddr, PhysPageNum},
     frame::{frame_alloc, frame_refcount, FrameTracker},
     map_area::MapArea,
     mmap_manager::MmapManager,
-    page_table::{flags_switch_to_rw, memory_activate_by_ppn, PageTable},
+    page_table::{flags_switch_to_rw, PageTable},
 };
 use crate::{
     config::mm::{
@@ -22,7 +21,10 @@ use crate::{
     include::process::auxv::*,
     map_permission,
     mm::{
-        address::{VirtAddr, VirtPageNum}, map_area::MapAreaType, page_table::flags_switch_to_cow, permission::MapType
+        address::{VirtAddr, VirtPageNum},
+        map_area::MapAreaType,
+        page_table::flags_switch_to_cow,
+        permission::MapType,
     },
 };
 
@@ -39,21 +41,21 @@ extern "C" {
 }
 
 // fixme: virtio_virt_to_phys
-lazy_static! {
-    pub static ref KERNEL_SPACE: SpinLock<MemorySet> =
-        SpinLock::new(MemorySet::init_kernel_space());
-}
+pub static KERNEL_SPACE: Lazy<SpinLock<MemorySet>> =
+    Lazy::new(|| SpinLock::new(MemorySet::init_kernel_space()));
 
 /// lazily initialized kernel space token
 /// please assure it's initialized before any user space token
 pub static mut KERNEL_SPACE_ROOT_PPN: usize = 0;
-// pub static KERNEL_SPACE_TOKEN: AtomicUsize = AtomicUsize::new(0);
 
 pub fn kernel_space_activate() {
-    // debug!("KERNEL_SPACE_ROOT_PPN: {}", unsafe { KERNEL_SPACE_ROOT_PPN });
     Arch::activate(unsafe { KERNEL_SPACE_ROOT_PPN });
-    // Arch::update_pagetable(KERNEL_SPACE_TOKEN.load(Ordering::SeqCst));
     Arch::tlb_flush();
+}
+
+#[inline(always)]
+pub fn kernel_space_init() {
+    KERNEL_SPACE.lock().memory_activate();
 }
 
 /// elf load result
@@ -86,21 +88,21 @@ pub struct MemorySet {
     pub mmap_manager: MmapManager,
 }
 
-pub struct MemorySpace {
-    pub root_ppn: SyncUnsafeCell<usize>,
-    pub memory_set: Arc<SpinLock<MemorySet>>,
-}
-impl MemorySpace {
-    pub fn root_ppn(&self) -> usize {
-        *self.root_ppn.ref_mut()
-    }
-    pub fn change_root_ppn(&self, root_ppn: usize) {
-        *self.root_ppn.ref_mut() = root_ppn;
-    }
-    pub fn memory_activate(&self) {
-        memory_activate_by_ppn(self.root_ppn());
-    }
-}
+// pub struct MemorySpace {
+//     pub root_ppn: SyncUnsafeCell<usize>,
+//     pub memory_set: Arc<SpinLock<MemorySet>>,
+// }
+// impl MemorySpace {
+//     pub fn root_ppn(&self) -> usize {
+//         *self.root_ppn.ref_mut()
+//     }
+//     pub fn change_root_ppn(&self, root_ppn: usize) {
+//         *self.root_ppn.ref_mut() = root_ppn;
+//     }
+//     pub fn memory_activate(&self) {
+//         memory_activate_by_ppn(self.root_ppn());
+//     }
+// }
 
 impl MemorySet {
     /// create an new empty memory set without any allocation
@@ -387,12 +389,16 @@ impl MemorySet {
             let old_pte = self.page_table().translate_vpn(vpn).unwrap();
             let old_flags = old_pte.flags();
             if !old_flags.contains(MappingFlags::W) {
-                new_set.page_table().map(vpn, old_pte.ppn().into(), old_flags);
+                new_set
+                    .page_table()
+                    .map(vpn, old_pte.ppn().into(), old_flags);
                 new_area.frame_map.insert(vpn, frame_tracker.clone());
             } else {
                 let new_flags = flags_switch_to_cow(&old_flags);
                 self.page_table().set_flags(vpn, new_flags);
-                new_set.page_table().map(vpn, old_pte.ppn().into(), new_flags);
+                new_set
+                    .page_table()
+                    .map(vpn, old_pte.ppn().into(), new_flags);
                 new_area.frame_map.insert(vpn, frame_tracker.clone());
                 trace!("remap_cow: vpn = {:#x}, new_flags = {:?}", vpn.0, new_flags);
             }

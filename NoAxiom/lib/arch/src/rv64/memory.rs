@@ -30,6 +30,9 @@ mod sv39 {
 }
 use sv39::*;
 
+pub const PHYS_MEMORY_START: usize = 0x8020_0000;
+pub const PHYS_MEMORY_END: usize = 0x8800_0000;
+
 pub struct PageTable {
     root_ppn: usize,
 }
@@ -79,7 +82,6 @@ impl ArchPageTableEntry for PageTableEntry {
 
 impl ArchPageTable for PageTable {
     type PageTableEntry = PageTableEntry;
-    const PA_WIDTH: usize = sv39::PA_WIDTH;
     const VA_WIDTH: usize = sv39::VA_WIDTH;
     const INDEX_LEVELS: usize = sv39::INDEX_LEVELS;
     fn new(root_ppn: usize) -> Self {
@@ -152,6 +154,8 @@ impl From<PTEFlags> for MappingFlags {
 }
 
 impl ArchMemory for RV64 {
+    const PHYS_MEMORY_START: usize = PHYS_MEMORY_START;
+    const PHYS_MEMORY_END: usize = PHYS_MEMORY_END;
     type PageTable = PageTable;
     fn tlb_init() {}
     // flush all TLB
@@ -163,7 +167,7 @@ impl ArchMemory for RV64 {
     fn current_root_ppn() -> usize {
         let satp: usize;
         unsafe { asm!("csrr {}, satp", out(reg) satp) }
-        satp & ((1 << PageTable::PPN_WIDTH) - 1)
+        satp & ((1 << PPN_WIDTH) - 1)
     }
     #[inline(always)]
     fn activate(ppn: usize) {

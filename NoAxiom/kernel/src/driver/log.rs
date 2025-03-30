@@ -46,16 +46,8 @@ impl Log for SimpleLogger {
 
 pub fn log_init() {
     Arch::console_init();
-
-    // 这里跑到了，已经过loop {} 实验
-
-    println!("[init] log init start");
-
-    loop {} // 没跑到
-
     static LOGGER: SimpleLogger = SimpleLogger;
     log::set_logger(&LOGGER).unwrap();
-
     log::set_max_level(match option_env!("LOG") {
         Some("ERROR") => LevelFilter::Error,
         Some("WARN") => LevelFilter::Warn,
@@ -64,7 +56,6 @@ pub fn log_init() {
         Some("TRACE") => LevelFilter::Trace,
         _ => LevelFilter::Off,
     });
-
     unsafe { LOG_BOOTED.store(true, Ordering::SeqCst) };
     info!("[init] log init success");
 }

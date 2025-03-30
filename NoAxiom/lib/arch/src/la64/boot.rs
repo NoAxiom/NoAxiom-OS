@@ -3,9 +3,6 @@ use core::arch::asm;
 use config::{arch::CPU_NUM, mm::KERNEL_STACK_SIZE};
 use loongArch64::consts::LOONGARCH_CSR_MAIL_BUF0;
 
-use super::LA64;
-use crate::ArchTrap;
-
 extern "C" {
     fn _boot_hart_init();
     fn _other_hart_init();
@@ -50,7 +47,7 @@ pub unsafe extern "C" fn _entry() -> ! {
             la.global   $sp, {boot_stack}
             li.d        $t0, {boot_stack_size}
             add.d       $sp, $sp, $t0       # setup boot stack
-            csrrd       $a0, 0x20           # cpuid
+            csrrd       $a0, 0x20           # a0 = cpuid
             la.global   $t0, {entry}
             jirl        $zero,$t0,0
 
@@ -86,7 +83,7 @@ pub unsafe extern "C" fn _entry_other_hart() -> ! {
         li.w         $t0, {MBUF1}
         iocsrrd.d    $sp, $t0
 
-        csrrd        $a0, 0x20                  # cpuid
+        csrrd        $a0, 0x20                  # a0 = cpuid
         la.global    $t0, {entry}
 
         jirl $zero,$t0,0

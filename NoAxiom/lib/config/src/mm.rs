@@ -4,7 +4,8 @@ pub const PAGE_WIDTH: usize = 12;
 pub const PAGE_SIZE: usize = 1 << PAGE_WIDTH;
 
 /// kernel stack width
-pub const KERNEL_STACK_WIDTH: usize = 16;
+/// fixme: reset to 16 later?
+pub const KERNEL_STACK_WIDTH: usize = 20;
 /// kernel stack size: 64KB (*CPU_NUM = 128KB)
 pub const KERNEL_STACK_SIZE: usize = 1 << KERNEL_STACK_WIDTH;
 

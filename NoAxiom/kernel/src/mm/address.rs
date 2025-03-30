@@ -204,7 +204,7 @@ pub struct VpnRange {
 }
 impl VpnRange {
     pub fn new(start: VirtPageNum, end: VirtPageNum) -> Self {
-        assert!(start <= end, "start {:?} > end {:?}!", start, end);
+        assert!(start <= end, "start {:#x?} > end {:#x?}!", start, end);
         Self { start, end }
     }
     #[inline(always)]

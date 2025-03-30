@@ -212,10 +212,10 @@ impl PageTable {
     }
 }
 
-pub fn memory_activate_by_ppn(root_ppn: usize) {
-    Arch::activate(root_ppn);
-    Arch::tlb_flush();
-}
+// pub fn memory_activate_by_ppn(root_ppn: usize) {
+//     Arch::activate(root_ppn);
+//     Arch::tlb_flush();
+// }
 
 /// translate the vpn into PTE entry (sv39)
 /// it won't use memory_set to translate the vpn

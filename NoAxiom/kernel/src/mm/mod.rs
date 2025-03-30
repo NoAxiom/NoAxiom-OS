@@ -12,11 +12,6 @@ pub mod permission;
 pub mod user_ptr;
 pub mod validate;
 
-#[inline(always)]
-pub fn kernel_space_init() {
-    memory_set::KERNEL_SPACE.lock().memory_activate();
-}
-
 /// returns pte flags with multiple flag bits
 #[macro_export]
 macro_rules! pte_flags {

@@ -9,8 +9,10 @@ use crate::{
     entry::init_proc::schedule_spawn_initproc,
     fs::fs_init,
     mm::{
-        bss::bss_init, frame::frame_init, heap::heap_init, kernel_space_init,
-        memory_set::kernel_space_activate,
+        bss::bss_init,
+        frame::frame_init,
+        heap::heap_init,
+        memory_set::{kernel_space_activate, kernel_space_init},
     },
     platform::{
         base_riscv::platforminfo::platform_info_from_dtb,
@@ -66,22 +68,22 @@ pub extern "C" fn _boot_hart_init(_: usize, dtb: usize) {
     Arch::trap_init();
     log_init();
 
-    debug!("HERE");
-
     // kernel space init
     Arch::enable_user_memory_access();
     Arch::tlb_init();
     frame_init();
     kernel_space_init();
 
-    // fs init
-    Arch::enable_global_interrupt();
+    // device init
+    info!("[device init] dtb addr: {:#x}", dtb);
     let platfrom_info = platform_info_from_dtb(dtb);
     platform_init(get_hartid(), dtb);
     init_plic(platfrom_info.plic.start + KERNEL_ADDR_OFFSET);
     device_init();
     register_to_hart();
 
+    // fs init
+    Arch::enable_global_interrupt();
     block_on(fs_init());
 
     // spawn init_proc and wake other harts

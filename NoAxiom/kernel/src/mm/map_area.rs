@@ -44,7 +44,6 @@ pub struct MapArea {
     pub map_permission: MapPermission,
 
     /// area type
-    #[allow(unused)]
     pub area_type: MapAreaType,
 
     /// mapped file
@@ -107,7 +106,10 @@ impl MapArea {
 
     /// map one page at `vpn`
     pub fn map_one(&mut self, vpn: VirtPageNum, page_table: &mut PageTable) {
-        trace!("map_one: vpn = {:?}", vpn);
+        // trace!(
+        //     "map_one: vpn = {:#x}, ppn = {:#x}, flags = {:?}",
+        //     vpn.0, ppn.0, flags
+        // );
         match self.map_type {
             MapType::Identical => {
                 panic!("kernel don't support identical memory mapping");
@@ -137,7 +139,11 @@ impl MapArea {
     /// pte will be saved into page_table
     /// and data frame will be saved by self
     pub fn map_each(&mut self, page_table: &mut PageTable) {
-        trace!("map_each: vpn_range = {:?}", self.vpn_range);
+        trace!(
+            "map_each: vpn_range = {:?}, type: {:?}",
+            self.vpn_range,
+            self.map_type
+        );
         for vpn in self.vpn_range.into_iter() {
             self.map_one(vpn, page_table);
         }

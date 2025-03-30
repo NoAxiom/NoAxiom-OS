@@ -3,8 +3,8 @@ use loongArch64::ipi::{csr_mail_send, send_ipi_single};
 
 use super::{
     poly::{
-        self,
         console::{getchar, putchar},
+        la64_dev_init,
     },
     LA64,
 };
@@ -12,7 +12,7 @@ use crate::{la64::boot::BOOT_STACK, ArchSbi};
 
 impl ArchSbi for LA64 {
     fn console_init() {
-        poly::la64_dev_init();
+        la64_dev_init();
     }
     fn console_getchar() -> usize {
         getchar() as usize
