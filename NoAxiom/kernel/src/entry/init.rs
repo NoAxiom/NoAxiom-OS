@@ -66,6 +66,8 @@ pub extern "C" fn _boot_hart_init(_: usize, dtb: usize) {
     Arch::trap_init();
     log_init();
 
+    debug!("HERE");
+
     // kernel space init
     Arch::enable_user_memory_access();
     Arch::tlb_init();

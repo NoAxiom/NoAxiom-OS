@@ -148,7 +148,7 @@ endif
 
 run: sbi-qemu
 	@cp $(KERNEL_BIN) kernel-qemu
-	@echo | qemu-system-loongarch64 --version
+	make asm
 	$(QEMU) $(QFLAGS)
 
 # rm -f $(SDCARD_BAK)
@@ -173,6 +173,7 @@ gdb-server: build_kernel
 
 
 debug-client:
+# loongarch64 does not support gdb
 	@riscv64-unknown-elf-gdb -ex 'file $(KERNEL_BIN)' -ex 'set arch riscv:rv64' -ex 'target remote localhost:1234'
 
 clean:
