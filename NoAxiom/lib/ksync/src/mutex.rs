@@ -1,6 +1,7 @@
 //! spin mutex for riscv kernel
 
 use arch::{Arch, ArchAsm, ArchInt};
+use config::arch::CPU_NUM;
 
 use crate::cell::SyncUnsafeCell;
 
@@ -30,7 +31,6 @@ impl MutexTracer {
 }
 
 // #[allow(clippy::declare_interior_mutable_const)]
-const CPU_NUM: usize = config::arch::CPU_NUM; // FIXME: use extern const to config cpu_num
 const DEFAULT_CPU: SyncUnsafeCell<MutexTracer> = SyncUnsafeCell::new(MutexTracer::new());
 static HART_MUTEX_TRACERS: [SyncUnsafeCell<MutexTracer>; CPU_NUM] = [DEFAULT_CPU; CPU_NUM];
 fn current_mutex_tracer() -> &'static mut MutexTracer {

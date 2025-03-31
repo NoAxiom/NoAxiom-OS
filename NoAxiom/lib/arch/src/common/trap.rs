@@ -12,6 +12,7 @@ pub enum TrapType {
     LoadPageFault(usize),
     InstructionPageFault(usize),
     IllegalInstruction(usize),
+    None,
 }
 
 /// Trap Frame Arg Type

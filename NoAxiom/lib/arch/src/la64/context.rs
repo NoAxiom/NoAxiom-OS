@@ -102,7 +102,14 @@ pub struct UserFloatContext {
 }
 
 impl ArchUserFloatContext for UserFloatContext {
+    fn new() -> Self {
+        unsafe { core::mem::zeroed() }
+    }
     fn save(&mut self) {
+        if self.need_save == 0 {
+            return;
+        }
+        self.need_save = 0;
         todo!()
     }
     fn restore(&mut self) {
@@ -111,11 +118,9 @@ impl ArchUserFloatContext for UserFloatContext {
     fn mark_save_if_needed(&mut self) {
         todo!()
     }
-    fn new() -> Self {
-        todo!()
-    }
     fn yield_task(&mut self) {
-        todo!()
+        self.save();
+        self.need_restore = 1;
     }
 }
 

@@ -88,6 +88,5 @@ pub fn tlb_init(tlbrentry: usize) {
     set_tlb_refill_entry(tlbrentry);
     // pgdl::set_base(kernel_pgd_base);
     // pgdh::set_base(kernel_pgd_base);
-
-    tlb_flush_all();
+    // tlb_flush_all();
 }

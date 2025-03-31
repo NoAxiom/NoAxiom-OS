@@ -6,8 +6,13 @@ use core::fmt::{self, Write};
 use arch::{Arch, ArchSbi};
 use ksync::mutex::SpinLock;
 
-static PRINT_MUTEX: SpinLock<()> = SpinLock::new(());
+static PRINT_MUTEX: SpinLock<Stdout> = SpinLock::new(Stdout::new());
 struct Stdout;
+impl Stdout {
+    pub const fn new() -> Self {
+        Self
+    }
+}
 
 impl Write for Stdout {
     fn write_str(&mut self, s: &str) -> fmt::Result {
@@ -19,9 +24,7 @@ impl Write for Stdout {
 }
 
 pub fn print(args: fmt::Arguments<'_>) {
-    let _lock = PRINT_MUTEX.lock();
-    Stdout.write_fmt(args).unwrap();
-    drop(_lock);
+    PRINT_MUTEX.lock().write_fmt(args).unwrap();
 }
 
 #[macro_export]

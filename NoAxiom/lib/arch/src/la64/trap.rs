@@ -1,11 +1,17 @@
 use core::arch::global_asm;
 
+use log::error;
 use loongArch64::register::{
     badv, ecfg, eentry, era,
     estat::{self, Exception, Trap},
 };
 
-use super::{context::TrapContext, unaligned::emulate_load_store_insn, LA64};
+use super::{
+    context::TrapContext,
+    interrupt::{enable_software_interrupt, enable_timer_interrupt, set_external_interrupt},
+    unaligned::emulate_load_store_insn,
+    LA64,
+};
 use crate::{ArchInt, ArchTrap, TrapType};
 
 global_asm!(include_str!("./trap.S"));
@@ -35,7 +41,7 @@ fn get_trap_type(tf: Option<&mut TrapContext>) -> TrapType {
             Exception::Breakpoint => TrapType::Breakpoint,
             Exception::AddressNotAligned => {
                 unsafe { emulate_load_store_insn(tf.unwrap()) }
-                TrapType::Unknown
+                TrapType::None
             }
             Exception::Syscall => TrapType::SysCall,
             Exception::StorePageFault | Exception::PageModifyFault => {
@@ -47,29 +53,38 @@ fn get_trap_type(tf: Option<&mut TrapContext>) -> TrapType {
             Exception::LoadPageFault | Exception::PageNonReadableFault => {
                 TrapType::LoadPageFault(badv)
             }
-            _ => panic!(
-                "Unhandled trap {:?} @ {:#x} BADV: {:#x}:\n{:#x?}",
-                estat.cause(),
-                era::read().pc(),
-                badv,
-                tf
-            ),
+            _ => {
+                error!(
+                    "[get_trap_type] unhandled exception: {:?}, pc = {:#x}, BADV = {:#x}",
+                    e,
+                    era::read().pc(),
+                    badv,
+                );
+                error!("[get_trap_type] trap_cx: {:#x?}", tf);
+                TrapType::Unknown
+            }
         },
         Trap::Interrupt(_) => {
             let irq_num: usize = estat.is().trailing_zeros() as usize;
             match irq_num {
                 // TIMER_IRQ
                 7 => TrapType::Timer,
-                _ => panic!("unknown interrupt: {}", irq_num),
+                _ => {
+                    error!("unknown interrupt: {}", irq_num);
+                    TrapType::Unknown
+                }
             }
         }
-        _ => panic!(
-            "Unhandled trap {:?} @ {:#x} BADV: {:#x}:\n{:#x?}",
-            estat.cause(),
-            era::read().pc(),
-            badv,
-            tf
-        ),
+        _ => {
+            error!(
+                "[get_trap_type] unhandled trap type: {:?}, pc = {:#x}, BADV = {:#x}",
+                estat.cause(),
+                era::read().pc(),
+                badv,
+            );
+            error!("[get_trap_type] trap_cx: {:#x?}", tf);
+            TrapType::Unknown
+        }
     }
 }
 
@@ -83,6 +98,10 @@ impl ArchTrap for LA64 {
     }
     fn trap_init() {
         set_kernel_trap_entry();
+        set_external_interrupt(true);
+        enable_software_interrupt();
+        enable_timer_interrupt();
+        // global int isn't on
     }
     fn read_epc() -> usize {
         era::read().pc()

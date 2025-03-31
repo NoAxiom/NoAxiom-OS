@@ -6,7 +6,6 @@ use arch::{Arch, ArchInt, ArchTrap, TrapArgs, TrapType};
 
 use super::{ext_int::ext_int_handler, ipi::ipi_handler};
 use crate::{
-    // constant::register::A0,
     cpu::{current_cpu, get_hartid},
     sched::utils::block_on,
     task::Task,
@@ -31,7 +30,8 @@ fn kernel_trap_handler() {
                 // fixme: currently this block_on cannot be canceled
                 trace!(
                     "[kernel] block on memory_validate, epc: {:#x}, addr: {:#x}",
-                    epc, addr
+                    epc,
+                    addr
                 );
                 match block_on(task.memory_validate(addr, Some(trap_type))) {
                     Ok(_) => trace!("[memory_validate] success in kernel_trap_handler"),
@@ -48,7 +48,8 @@ fn kernel_trap_handler() {
             crate::time::timer::set_next_trigger();
         }
         TrapType::SupervisorSoft => ipi_handler(),
-        _ => kernel_panic("unsupported interrupt"),
+        TrapType::None => {}
+        _ => kernel_panic("unsupported trap type"),
     }
 }
 
@@ -117,8 +118,9 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
             );
             ipi_handler();
         }
+        TrapType::None => {}
         _ => {
-            user_exit("unsupported interrupt");
+            user_exit("unsupported trap type");
         }
     }
 }

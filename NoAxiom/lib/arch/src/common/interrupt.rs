@@ -12,7 +12,7 @@ pub trait ArchInt {
 
     // soft / timer interrupt
     fn enable_software_interrupt();
-    fn enable_stimer_interrupt();
+    fn enable_timer_interrupt();
 
     // user memory access
     fn enable_user_memory_access();
