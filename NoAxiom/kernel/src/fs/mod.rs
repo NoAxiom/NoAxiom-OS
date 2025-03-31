@@ -19,13 +19,13 @@ pub async fn fs_init() {
         "[fs] interrupt: {}, external interrupt: {}",
         interrupt, extertnel_interrupt
     );
-    Arch::enable_global_interrupt();
+    Arch::enable_interrupt();
     Arch::enable_external_interrupt();
     vfs::fs_init().await;
     info!("[fs] fs init done");
     if !interrupt {
         // info!("disable global interrupt");
-        // interrupt::disable_global_interrupt();
+        // interrupt::disable_interrupt();
     }
     if !extertnel_interrupt {
         // info!("disable external interrupt");

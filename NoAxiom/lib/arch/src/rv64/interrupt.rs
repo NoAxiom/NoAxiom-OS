@@ -15,7 +15,7 @@ pub fn is_interrupt_enabled() -> bool {
 
 /// set int disabled
 #[inline(always)]
-pub fn disable_global_interrupt() {
+pub fn disable_interrupt() {
     unsafe {
         riscv::register::sstatus::clear_sie();
     }
@@ -23,7 +23,7 @@ pub fn disable_global_interrupt() {
 
 /// set int enabled
 #[inline(always)]
-pub fn enable_global_interrupt() {
+pub fn enable_interrupt() {
     unsafe {
         riscv::register::sstatus::set_sie();
     }
@@ -92,12 +92,12 @@ impl ArchInt for RV64 {
 
     // global interrupt
     #[inline(always)]
-    fn disable_global_interrupt() {
-        disable_global_interrupt();
+    fn disable_interrupt() {
+        disable_interrupt();
     }
     #[inline(always)]
-    fn enable_global_interrupt() {
-        enable_global_interrupt();
+    fn enable_interrupt() {
+        enable_interrupt();
     }
 
     // external interrupt
@@ -120,7 +120,7 @@ impl ArchInt for RV64 {
         enable_software_interrupt();
     }
     #[inline(always)]
-    fn enable_stimer_interrupt() {
+    fn enable_timer_interrupt() {
         enable_stimer_interrupt();
     }
 

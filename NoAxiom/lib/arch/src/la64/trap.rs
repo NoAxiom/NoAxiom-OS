@@ -107,7 +107,7 @@ impl ArchTrap for LA64 {
         era::read().pc()
     }
     fn trap_restore(cx: &mut TrapContext) {
-        LA64::disable_global_interrupt();
+        LA64::disable_interrupt();
         set_user_trap_entry();
         unsafe { user_trapret(cx) };
     }

@@ -74,7 +74,7 @@ pub extern "C" fn _boot_hart_init(_: usize, mut dtb: usize) {
     Arch::tlb_init();
     kernel_space_init();
 
-    Arch::enable_global_interrupt();
+    Arch::enable_interrupt();
 
     #[cfg(target_arch = "loongarch64")]
     {

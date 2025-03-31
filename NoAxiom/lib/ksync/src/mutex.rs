@@ -49,7 +49,7 @@ pub struct NoIrqLockAction;
 impl LockAction for NoIrqLockAction {
     fn before_lock() {
         let old = Arch::is_interrupt_enabled();
-        Arch::disable_global_interrupt();
+        Arch::disable_interrupt();
         let cpu = current_mutex_tracer();
         if cpu.depth == 0 {
             cpu.int_record = old;
@@ -61,7 +61,7 @@ impl LockAction for NoIrqLockAction {
         cpu.depth -= 1;
         let should_enable = cpu.depth == 0 && cpu.int_record;
         if should_enable {
-            Arch::enable_global_interrupt();
+            Arch::enable_interrupt();
         }
     }
 }

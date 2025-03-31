@@ -10,12 +10,12 @@ pub(crate) fn is_interrupt_enabled() -> bool {
 }
 
 #[inline]
-pub(crate) fn enable_global_interrupt() {
+pub(crate) fn enable_interrupt() {
     crmd::set_ie(true);
 }
 
 #[inline]
-pub(crate) fn disable_global_interrupt() {
+pub(crate) fn disable_interrupt() {
     crmd::set_ie(false);
 }
 
@@ -43,11 +43,11 @@ impl ArchInt for LA64 {
     fn is_interrupt_enabled() -> bool {
         is_interrupt_enabled()
     }
-    fn enable_global_interrupt() {
-        enable_global_interrupt();
+    fn enable_interrupt() {
+        enable_interrupt();
     }
-    fn disable_global_interrupt() {
-        disable_global_interrupt();
+    fn disable_interrupt() {
+        disable_interrupt();
     }
     fn disable_external_interrupt() {
         // todo: not checked, might be wrong

@@ -31,7 +31,7 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
     type Output = F::Output;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        Arch::disable_global_interrupt();
+        Arch::disable_interrupt();
 
         let this = unsafe { self.get_unchecked_mut() };
         let task = &this.task;
@@ -61,7 +61,7 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
         current_cpu().clear_task();
 
         // always enable global interrupt before return
-        Arch::enable_global_interrupt();
+        Arch::enable_interrupt();
         ret
     }
 }
