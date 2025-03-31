@@ -2,12 +2,10 @@ use core::arch::asm;
 
 use config::{
     arch::CPU_NUM,
-    mm::{KERNEL_ADDR_OFFSET, KERNEL_STACK_SIZE, KERNEL_STACK_WIDTH, PAGE_SIZE},
+    mm::{KERNEL_STACK_SIZE, KERNEL_STACK_WIDTH, PAGE_SIZE},
 };
 
-use crate::ArchTrap;
-
-use super::{interrupt::enable_user_memory_access, RV64};
+use crate::rv64::memory::KERNEL_ADDR_OFFSET;
 
 /// temp stack for kernel booting
 #[link_section = ".bss.kstack"]
@@ -126,9 +124,4 @@ pub unsafe extern "C" fn _entry_other_hart() -> ! {
         entry = sym _other_hart_init,
         options(noreturn),
     )
-}
-
-pub fn arch_init() {
-    enable_user_memory_access();
-    RV64::trap_init();
 }

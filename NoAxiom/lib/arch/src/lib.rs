@@ -3,13 +3,14 @@
 #![feature(ascii_char)]
 #![feature(decl_macro)]
 #![feature(let_chains)]
+#![feature(lang_items)]
 #![feature(error_in_core)]
 #![feature(negative_impls)]
 #![feature(naked_functions)]
 #![feature(panic_info_message)]
 #![feature(alloc_error_handler)]
 #![feature(slice_from_ptr_range)]
-#![feature(lang_items)]
+#![allow(internal_features)]
 #![allow(deprecated)]
 
 extern crate alloc;

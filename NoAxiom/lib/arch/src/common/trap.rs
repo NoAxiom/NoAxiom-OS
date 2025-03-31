@@ -41,7 +41,7 @@ pub trait ArchTrap {
     fn set_kernel_trap_entry();
     fn set_user_trap_entry();
     fn read_epc() -> usize;
-    fn read_trap_type() -> TrapType;
+    fn read_trap_type(cx: Option<&mut <Self as ArchTrap>::TrapContext>) -> TrapType;
 }
 
 pub trait ArchTrapContext:

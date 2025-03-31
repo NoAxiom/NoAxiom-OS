@@ -15,7 +15,7 @@ use crate::{
 /// kernel trap handler
 #[no_mangle]
 fn kernel_trap_handler() {
-    let trap_type = Arch::read_trap_type();
+    let trap_type = Arch::read_trap_type(None);
     let epc = Arch::read_epc();
     let kernel_panic = |msg: &str| {
         panic!(
@@ -60,7 +60,7 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
     Arch::set_kernel_trap_entry();
     let cx = task.trap_context_mut();
     let epc = Arch::read_epc();
-    let trap_type = Arch::read_trap_type();
+    let trap_type = Arch::read_trap_type(Some(cx));
     let user_exit = |msg: &str| {
         error!(
             "[user_trap_handler] unexpected exit!!! msg: {}, sepc = {:#x}",

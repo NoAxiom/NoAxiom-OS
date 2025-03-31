@@ -78,7 +78,7 @@ impl ArchTrap for RV64 {
         sepc::read()
     }
     /// translate scause and stval to common TrapType
-    fn read_trap_type() -> TrapType {
+    fn read_trap_type(_: Option<&mut TrapContext>) -> TrapType {
         let scause = scause::read();
         let stval = stval::read();
         get_trap_type(scause, stval)

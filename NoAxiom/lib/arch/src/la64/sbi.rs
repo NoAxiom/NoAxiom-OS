@@ -28,8 +28,11 @@ impl ArchSbi for LA64 {
         send_ipi_single(1, 1);
     }
     fn shutdown() -> ! {
-        // todo: shutdown
-        loop {}
+        // [on_board] 电源管理模块设置为s5状态，软关机
+        // unsafe { ((0x1FE27000 + 0x14) as *mut u32).write_volatile(0b1111 << 10) };
+        loop {
+            unsafe { loongArch64::asm::idle() }
+        }
     }
     fn send_ipi(_hartid: usize) {
         unimplemented!()

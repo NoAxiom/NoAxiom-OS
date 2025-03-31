@@ -1,37 +1,26 @@
 use core::arch::asm;
 
 use bitflags::bitflags;
+use config::mm::PAGE_WIDTH;
 use riscv::{asm::sfence_vma_all, register::satp};
 
 use super::RV64;
 use crate::{utils::macros::bit, ArchMemory, ArchPageTable, ArchPageTableEntry, MappingFlags};
 
-mod sv39 {
-    use config::mm::PAGE_WIDTH;
-
-    /// physical address width
-    pub const PA_WIDTH: usize = 56;
-    /// virtual address width
-    pub const VA_WIDTH: usize = 39;
-    /// index level number of sv39
-    pub const INDEX_LEVELS: usize = 3;
-
-    /// physical page number width
-    pub const PPN_WIDTH: usize = PA_WIDTH - PAGE_WIDTH; // 44
-    /// ppn mask
-    pub const PPN_MASK: usize = (1 << PPN_WIDTH) - 1;
-    /// virtual page number width
-    pub const VPN_WIDTH: usize = VA_WIDTH - PAGE_WIDTH; // 27
-
-    /// raw vpn & ppn width of sv39
-    pub const PAGE_NUM_WIDTH: usize = VPN_WIDTH / INDEX_LEVELS; // 9
-    /// page table entry per page
-    pub const PTE_PER_PAGE: usize = 1 << PAGE_NUM_WIDTH; // 512
-}
-use sv39::*;
+/// physical address width
+pub const PA_WIDTH: usize = 56;
+/// virtual address width
+pub const VA_WIDTH: usize = 39;
+/// index level number of sv39
+pub const INDEX_LEVELS: usize = 3;
+/// physical page number width
+pub const PPN_WIDTH: usize = PA_WIDTH - PAGE_WIDTH; // 44
+/// ppn mask
+pub const PPN_MASK: usize = (1 << PPN_WIDTH) - 1;
 
 pub const PHYS_MEMORY_START: usize = 0x8020_0000;
 pub const PHYS_MEMORY_END: usize = 0x8800_0000;
+pub const KERNEL_ADDR_OFFSET: usize = 0xffff_ffc0_0000_0000;
 
 pub struct PageTable {
     root_ppn: usize,
@@ -82,8 +71,8 @@ impl ArchPageTableEntry for PageTableEntry {
 
 impl ArchPageTable for PageTable {
     type PageTableEntry = PageTableEntry;
-    const VA_WIDTH: usize = sv39::VA_WIDTH;
-    const INDEX_LEVELS: usize = sv39::INDEX_LEVELS;
+    const VA_WIDTH: usize = VA_WIDTH;
+    const INDEX_LEVELS: usize = INDEX_LEVELS;
     fn new(root_ppn: usize) -> Self {
         Self { root_ppn }
     }
@@ -156,6 +145,7 @@ impl From<PTEFlags> for MappingFlags {
 impl ArchMemory for RV64 {
     const PHYS_MEMORY_START: usize = PHYS_MEMORY_START;
     const PHYS_MEMORY_END: usize = PHYS_MEMORY_END;
+    const KERNEL_ADDR_OFFSET: usize = KERNEL_ADDR_OFFSET;
     type PageTable = PageTable;
     fn tlb_init() {}
     // flush all TLB
@@ -167,7 +157,7 @@ impl ArchMemory for RV64 {
     fn current_root_ppn() -> usize {
         let satp: usize;
         unsafe { asm!("csrr {}, satp", out(reg) satp) }
-        satp & ((1 << PPN_WIDTH) - 1)
+        satp & PPN_MASK
     }
     #[inline(always)]
     fn activate(ppn: usize, _is_kernel: bool) {

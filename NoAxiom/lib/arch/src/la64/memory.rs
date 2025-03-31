@@ -10,8 +10,10 @@ use crate::{utils::macros::bit, ArchMemory, ArchPageTable, ArchPageTableEntry, M
 const PA_WIDTH: usize = 56;
 const VA_WIDTH: usize = 39;
 const INDEX_LEVELS: usize = 3;
-const PHYS_MEMORY_START: usize = 0x0000_0000_9000_0000;
+const PHYS_MEMORY_START: usize = 0x9000_0000;
 const MEMORY_SIZE: usize = 0x1000_0000;
+const PHYS_MEMORY_END: usize = PHYS_MEMORY_START + MEMORY_SIZE;
+const KERNEL_ADDR_OFFSET: usize = 0x9000_0000_0000_0000;
 
 bitflags::bitflags! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -117,6 +119,7 @@ impl From<usize> for PageTableEntry {
 
 const FLAG_WIDTH: usize = 12;
 const PPN_WIDTH: usize = PA_WIDTH - PAGE_WIDTH;
+const PPN_MASK: usize = (1usize << PPN_WIDTH) - 1;
 impl ArchPageTableEntry for PageTableEntry {
     /// create a new page table entry from ppn and flags
     fn new(ppn: usize, flags: MappingFlags) -> Self {
@@ -125,7 +128,7 @@ impl ArchPageTableEntry for PageTableEntry {
     }
     /// get the physical page number
     fn ppn(&self) -> usize {
-        (self.0 >> FLAG_WIDTH) & ((1usize << PPN_WIDTH) - 1)
+        (self.0 >> FLAG_WIDTH) & PPN_MASK
     }
     /// get the pte permission flags
     fn flags(&self) -> MappingFlags {
@@ -172,7 +175,8 @@ impl ArchPageTable for PageTable {
 
 impl ArchMemory for LA64 {
     const PHYS_MEMORY_START: usize = PHYS_MEMORY_START;
-    const PHYS_MEMORY_END: usize = PHYS_MEMORY_START + MEMORY_SIZE;
+    const PHYS_MEMORY_END: usize = PHYS_MEMORY_END;
+    const KERNEL_ADDR_OFFSET: usize = KERNEL_ADDR_OFFSET;
     type PageTable = PageTable;
     fn tlb_init() {
         tlb_init(tlb_fill as _);
@@ -189,6 +193,7 @@ impl ArchMemory for LA64 {
         tlb_flush_all();
     }
     fn current_root_ppn() -> usize {
+        // todo: when in kernel space, it's incorrect
         pgdl::read().base() >> PAGE_WIDTH
     }
 }
