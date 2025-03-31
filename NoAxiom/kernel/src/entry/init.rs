@@ -60,7 +60,7 @@ pub extern "C" fn _other_hart_init(hart_id: usize, dtb: usize) {
 /// init bss, mm, console, and other drivers, then jump to rust_main,
 /// called by [`super::boot`]
 #[no_mangle]
-pub extern "C" fn _boot_hart_init(_: usize, mut dtb: usize) {
+pub extern "C" fn _boot_hart_init(_: usize, dtb: usize) {
     // data init
     bss_init();
     heap_init();
@@ -81,7 +81,7 @@ pub extern "C" fn _boot_hart_init(_: usize, mut dtb: usize) {
         /// QEMU Loongarch64 Virt Machine:
         /// https://github.com/qemu/qemu/blob/master/include/hw/loongarch/virt.h
         pub(crate) const QEMU_DTB_ADDR: usize = 0x100000;
-        dtb = (QEMU_DTB_ADDR | KERNEL_ADDR_OFFSET) as usize;
+        let dtb = (QEMU_DTB_ADDR | KERNEL_ADDR_OFFSET) as usize;
         unsafe {
             if fdt::Fdt::from_ptr((dtb) as *const u8).is_ok() {
                 info!("Loongarch64 QEMU DTB: {:#x}", dtb);

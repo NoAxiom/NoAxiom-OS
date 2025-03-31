@@ -66,14 +66,8 @@ impl ArchInt for LA64 {
     }
     fn is_external_interrupt_enabled() -> bool {
         let is = estat::read().is();
-        let mut enabled = false;
-        for i in 2..9 {
-            if bit_field::BitField::get_bit(&is, i) {
-                enabled = true;
-                break;
-            }
-        }
-        enabled
+        const MASK: usize = ((1 << 8) - 1) << 2;
+        is & MASK != 0
     }
     // user memory access is riscv specific
     fn enable_user_memory_access() {}

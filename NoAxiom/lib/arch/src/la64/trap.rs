@@ -8,11 +8,14 @@ use loongArch64::register::{
 
 use super::{
     context::TrapContext,
-    interrupt::{enable_software_interrupt, enable_timer_interrupt, set_external_interrupt},
+    interrupt::{
+        disable_interrupt, enable_software_interrupt, enable_timer_interrupt,
+        set_external_interrupt,
+    },
     unaligned::emulate_load_store_insn,
     LA64,
 };
-use crate::{ArchInt, ArchTrap, TrapType};
+use crate::{ArchTrap, TrapType};
 
 global_asm!(include_str!("./trap.S"));
 extern "C" {
@@ -107,7 +110,7 @@ impl ArchTrap for LA64 {
         era::read().pc()
     }
     fn trap_restore(cx: &mut TrapContext) {
-        LA64::disable_interrupt();
+        disable_interrupt();
         set_user_trap_entry();
         unsafe { user_trapret(cx) };
     }
