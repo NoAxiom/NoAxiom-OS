@@ -25,7 +25,7 @@ impl ArchSbi for LA64 {
             &BOOT_STACK as *const _ as usize + KERNEL_STACK_SIZE * hartid + KERNEL_STACK_SIZE - 16;
         csr_mail_send(start_addr as _, hartid, 0);
         csr_mail_send(sp_addr as _, hartid, 1);
-        send_ipi_single(1, 1);
+        send_ipi_single(hartid, 1);
     }
     fn shutdown() -> ! {
         // [on_board] 电源管理模块设置为s5状态，软关机
@@ -34,8 +34,8 @@ impl ArchSbi for LA64 {
             unsafe { loongArch64::asm::idle() }
         }
     }
-    fn send_ipi(_hartid: usize) {
-        unimplemented!()
+    fn send_ipi(hartid: usize) {
+        send_ipi_single(hartid, 1);
     }
     fn clear_ipi() {
         unimplemented!()

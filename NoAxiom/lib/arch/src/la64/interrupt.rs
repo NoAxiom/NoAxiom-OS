@@ -1,12 +1,14 @@
-use loongArch64::register::{crmd, estat};
+use loongArch64::register::{
+    crmd,
+    ecfg::{self, LineBasedInterrupt},
+};
 
 use super::LA64;
 use crate::ArchInt;
 
 #[inline]
 pub(crate) fn is_interrupt_enabled() -> bool {
-    let crmd = crmd::read();
-    crmd.ie()
+    crmd::read().ie()
 }
 
 #[inline]
@@ -20,23 +22,27 @@ pub(crate) fn disable_interrupt() {
 }
 
 #[inline]
-pub(crate) fn set_external_interrupt(value: bool) {
-    // estat::set_sw(10, true); // pmi
-    for i in 2..9 {
-        estat::set_sw(i, value); // HWI0-HWI7
-    }
-    estat::set_sw(12, value); // ipi
+pub(crate) fn enable_external_interrupt() {
+    ecfg::set_lie(LineBasedInterrupt::HWI0);
 }
 
 #[inline]
 pub(crate) fn enable_timer_interrupt() {
-    estat::set_sw(11, true); // timer
+    ecfg::set_lie(LineBasedInterrupt::TIMER);
 }
 
 #[inline]
 pub(crate) fn enable_software_interrupt() {
-    estat::set_sw(0, true); // SWI0
-    estat::set_sw(1, true); // SWI1
+    ecfg::set_lie(LineBasedInterrupt::SWI0 | LineBasedInterrupt::SWI1);
+}
+
+pub(crate) fn interrupt_init() {
+    let inter = LineBasedInterrupt::TIMER
+        | LineBasedInterrupt::SWI0
+        | LineBasedInterrupt::SWI1
+        | LineBasedInterrupt::HWI0
+        | LineBasedInterrupt::IPI;
+    ecfg::set_lie(inter);
 }
 
 impl ArchInt for LA64 {
@@ -50,12 +56,11 @@ impl ArchInt for LA64 {
         disable_interrupt();
     }
     fn disable_external_interrupt() {
-        // todo: not checked, might be wrong
-        set_external_interrupt(false);
+        unimplemented!()
     }
     // 8 hard interrupt in ESTAT.IS[9..2]
     fn enable_external_interrupt() {
-        set_external_interrupt(true);
+        enable_external_interrupt();
     }
     // 2 soft interrupt in ESTAT.IS[1..0]
     fn enable_software_interrupt() {
@@ -65,9 +70,9 @@ impl ArchInt for LA64 {
         enable_timer_interrupt();
     }
     fn is_external_interrupt_enabled() -> bool {
-        let is = estat::read().is();
+        let lie = ecfg::read().lie();
         const MASK: usize = ((1 << 8) - 1) << 2;
-        is & MASK != 0
+        lie.bits() & MASK != 0
     }
     // user memory access is riscv specific
     fn enable_user_memory_access() {}

@@ -7,7 +7,7 @@ pub fn la64_dev_init() {
             devices::try_to_add_device(&node);
         }
     } else {
-        println!("No FDT found");
+        crate::println!("[la64_dev_init] No FDT found");
     }
     // get devices and init
     devices::regist_devices_irq();

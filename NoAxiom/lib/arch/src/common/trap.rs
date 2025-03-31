@@ -70,6 +70,7 @@ pub trait ArchTrapContext:
 }
 
 pub trait ArchUserFloatContext {
+    fn freg_init();
     fn new() -> Self;
     fn save(&mut self);
     fn restore(&mut self);

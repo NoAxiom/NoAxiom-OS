@@ -3,15 +3,12 @@ use core::arch::global_asm;
 use log::error;
 use loongArch64::register::{
     badv, ecfg, eentry, era,
-    estat::{self, Exception, Trap},
+    estat::{self, Exception, Interrupt, Trap},
 };
 
 use super::{
     context::TrapContext,
-    interrupt::{
-        disable_interrupt, enable_software_interrupt, enable_timer_interrupt,
-        set_external_interrupt,
-    },
+    interrupt::{disable_interrupt, interrupt_init},
     unaligned::emulate_load_store_insn,
     LA64,
 };
@@ -50,12 +47,14 @@ fn get_trap_type(tf: Option<&mut TrapContext>) -> TrapType {
             Exception::StorePageFault | Exception::PageModifyFault => {
                 TrapType::StorePageFault(badv)
             }
-            Exception::PageNonExecutableFault | Exception::FetchPageFault => {
-                TrapType::InstructionPageFault(badv)
-            }
-            Exception::LoadPageFault | Exception::PageNonReadableFault => {
-                TrapType::LoadPageFault(badv)
-            }
+            Exception::PageNonExecutableFault
+            | Exception::FetchPageFault
+            | Exception::FetchInstructionAddressError
+            | Exception::InstructionPrivilegeIllegal => TrapType::InstructionPageFault(badv),
+            Exception::LoadPageFault
+            | Exception::PageNonReadableFault
+            | Exception::MemoryAccessAddressError
+            | Exception::PagePrivilegeIllegal => TrapType::LoadPageFault(badv),
             _ => {
                 error!(
                     "[get_trap_type] unhandled exception: {:?}, pc = {:#x}, BADV = {:#x}",
@@ -67,28 +66,47 @@ fn get_trap_type(tf: Option<&mut TrapContext>) -> TrapType {
                 TrapType::Unknown
             }
         },
-        Trap::Interrupt(_) => {
-            let irq_num: usize = estat.is().trailing_zeros() as usize;
-            match irq_num {
-                // TIMER_IRQ
-                7 => TrapType::Timer,
-                _ => {
-                    error!("unknown interrupt: {}", irq_num);
-                    TrapType::Unknown
-                }
+        Trap::Interrupt(int) => match int {
+            Interrupt::Timer => TrapType::Timer,
+            Interrupt::HWI0
+            | Interrupt::HWI1
+            | Interrupt::HWI2
+            | Interrupt::HWI3
+            | Interrupt::HWI4
+            | Interrupt::HWI5
+            | Interrupt::HWI6
+            | Interrupt::HWI7 => TrapType::SupervisorExternal,
+            Interrupt::SWI0 | Interrupt::SWI1 | Interrupt::IPI => TrapType::SupervisorSoft,
+            _ => {
+                error!(
+                    "[get_trap_type] unhandled interrupt: {:?}, pc = {:#x}, BADV = {:#x}",
+                    int,
+                    era::read().pc(),
+                    badv,
+                );
+                error!("[get_trap_type] trap_cx: {:#x?}", tf);
+                TrapType::Unknown
             }
-        }
+        },
         _ => {
             error!(
-                "[get_trap_type] unhandled trap type: {:?}, pc = {:#x}, BADV = {:#x}",
+                "[get_trap_type] unhandled trap type: {:?}, pc = {:#x}, BADV = {:#x}, raw_ecode = {}, esubcode = {}, is = {}",
                 estat.cause(),
                 era::read().pc(),
                 badv,
+                estat.ecode(),
+                estat.esubcode(),
+                estat.is()
             );
             error!("[get_trap_type] trap_cx: {:#x?}", tf);
             TrapType::Unknown
         }
     }
+}
+
+pub(crate) fn trap_init() {
+    set_kernel_trap_entry();
+    interrupt_init();
 }
 
 impl ArchTrap for LA64 {
@@ -100,11 +118,7 @@ impl ArchTrap for LA64 {
         set_kernel_trap_entry();
     }
     fn trap_init() {
-        set_kernel_trap_entry();
-        set_external_interrupt(true);
-        enable_software_interrupt();
-        enable_timer_interrupt();
-        // global int isn't on
+        trap_init();
     }
     fn read_epc() -> usize {
         era::read().pc()

@@ -1,5 +1,7 @@
 use core::ops::{Index, IndexMut};
 
+use loongArch64::register::euen;
+
 use crate::{ArchTrapContext, ArchUserFloatContext, TrapArgs};
 
 /// Saved registers when a trap (interrupt or exception) occurs.
@@ -101,7 +103,14 @@ pub struct UserFloatContext {
     pub signal_dirty: u8,
 }
 
+pub fn freg_init() {
+    euen::set_fpe(true);
+}
+
 impl ArchUserFloatContext for UserFloatContext {
+    fn freg_init() {
+        freg_init();
+    }
     fn new() -> Self {
         unsafe { core::mem::zeroed() }
     }

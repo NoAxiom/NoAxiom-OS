@@ -2,7 +2,7 @@ use config::mm::PAGE_WIDTH;
 use loongArch64::register::{pgdh, pgdl};
 
 use super::{
-    tlb::{tlb_fill, tlb_flush_all, tlb_init},
+    tlb::{tlb_refill, tlb_flush_all, tlb_init_inner},
     LA64,
 };
 use crate::{utils::macros::bit, ArchMemory, ArchPageTable, ArchPageTableEntry, MappingFlags};
@@ -173,14 +173,18 @@ impl ArchPageTable for PageTable {
     }
 }
 
+pub(crate) fn tlb_init() {
+    tlb_init_inner(tlb_refill as _);
+    tlb_flush_all();
+}
+
 impl ArchMemory for LA64 {
     const PHYS_MEMORY_START: usize = PHYS_MEMORY_START;
     const PHYS_MEMORY_END: usize = PHYS_MEMORY_END;
     const KERNEL_ADDR_OFFSET: usize = KERNEL_ADDR_OFFSET;
     type PageTable = PageTable;
     fn tlb_init() {
-        tlb_init(tlb_fill as _);
-        tlb_flush_all();
+        tlb_init();
     }
     fn tlb_flush() {
         tlb_flush_all();
