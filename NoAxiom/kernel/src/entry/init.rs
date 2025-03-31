@@ -1,4 +1,7 @@
+use core::panic;
+
 use arch::{Arch, ArchInt, ArchMemory, ArchSbi, ArchTrap, _entry_other_hart};
+use virtio_drivers::device;
 
 use crate::{
     config::{arch::CPU_NUM, mm::KERNEL_ADDR_OFFSET},
@@ -72,12 +75,26 @@ pub extern "C" fn _boot_hart_init(_: usize, dtb: usize) {
     kernel_space_init();
     Arch::tlb_init();
 
-    // let ptr = 114514 as usize as *const u8;
-    // debug!("addr: {:#x}, value: {}", ptr as usize, unsafe { *ptr });
+    let mut dtb = dtb;
+    #[cfg(target_arch = "loongarch64")]
+    {
+        /// QEMU Loongarch64 Virt Machine:
+        /// https://github.com/qemu/qemu/blob/master/include/hw/loongarch/virt.h
+        pub(crate) const QEMU_DTB_ADDR: usize = 0x100000;
+        dtb = (QEMU_DTB_ADDR | KERNEL_ADDR_OFFSET) as usize;
+        unsafe {
+            if fdt::Fdt::from_ptr((dtb) as *const u8).is_ok() {
+                info!("Loongarch64 QEMU DTB: {:#x}", dtb);
+            } else {
+                panic!("Loongarch64 QEMU DTB: {:#x} is invalid", dtb);
+            }
+        }
+    }
 
     // device init
     info!("[device init] dtb addr: {:#x}", dtb);
     let platfrom_info = platform_info_from_dtb(dtb);
+    debug!("Platform Info: {:?}", platfrom_info);
     platform_init(get_hartid(), dtb);
     init_plic(platfrom_info.plic.start + KERNEL_ADDR_OFFSET);
     device_init();

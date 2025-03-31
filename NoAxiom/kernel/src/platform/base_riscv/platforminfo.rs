@@ -1,3 +1,4 @@
+use alloc::{string::String, vec::Vec};
 use core::{cmp::min, fmt::Debug, ops::Range};
 
 use fdt::Fdt;
@@ -15,7 +16,7 @@ pub struct PlatformInfo {
     /// Number of CPUs
     pub smp: usize,
     /// Memory range
-    pub memory: Range<usize>,
+    pub memory: Vec<Range<usize>>,
     /// PLIC information
     pub plic: Range<usize>,
     /// CLINT information
@@ -38,12 +39,9 @@ impl Debug for PlatformInfo {
         )
         .unwrap();
         write!(f, "SMP:    {}\n", self.smp).unwrap();
-        write!(
-            f,
-            "Memory: {:#x}..{:#x}\n",
-            self.memory.start, self.memory.end
-        )
-        .unwrap();
+        for memory in &self.memory {
+            write!(f, "Memory: {:#x}..{:#x}\n", memory.start, memory.end).unwrap();
+        }
         write!(f, "PLIC:   {:#x}..{:#x}\n", self.plic.start, self.plic.end).unwrap();
         write!(
             f,
@@ -74,7 +72,7 @@ fn walk_dt(fdt: Fdt) -> PlatformInfo {
     let mut machine = PlatformInfo {
         model: [0; 32],
         smp: 0,
-        memory: 0..0,
+        memory: Vec::new(),
         plic: 0..0,
         clint: 0..0,
         initrd: None,
@@ -82,6 +80,7 @@ fn walk_dt(fdt: Fdt) -> PlatformInfo {
         bootargs_len: 0,
     };
     let x = fdt.root();
+    // debug!("Device tree root node: {:?}", x);
     machine.smp = fdt.cpus().count();
     let res = fdt.chosen().bootargs().map(|x| {
         let mut tmp = [0; 255];
@@ -94,19 +93,42 @@ fn walk_dt(fdt: Fdt) -> PlatformInfo {
         machine.bootargs = Some(bootargs);
         machine.bootargs_len = len;
     }
+    // debug!("Platform Hart Count {}", fdt.cpus().count());
+    // fdt.memory().regions().for_each(|mm| {
+    //     debug!(
+    //         "Platform Memory Region {:#p} - {:#018x}",
+    //         mm.starting_address,
+    //         mm.starting_address as usize + mm.size.unwrap_or(0)
+    //     )
+    // });
+    // for node in fdt.all_nodes() {
+    //     let compatible = x.compatible();
+    //     info!(
+    //         "    {}  {}",
+    //         node.name,
+    //         compatible.all().collect::<String>()
+    //     );
+    // }
+    // debug!("Boot Args {}", fdt.chosen().bootargs().unwrap_or(""));
+
+    let model = "loongarch64-qemu".as_bytes();
+    #[cfg(target_arch = "riscv64")]
     let model = x.model().as_bytes();
     let len = min(model.len(), machine.model.len());
     machine.model[0..len].copy_from_slice(&model[..len]);
+
     for node in fdt.all_nodes() {
         if node.name.starts_with(MEMORY) {
+            debug!("[fdt]: memory node {}", node.name);
             let reg = node.reg().unwrap();
             reg.for_each(|x| {
-                machine.memory = Range {
+                machine.memory.push(Range {
                     start: x.starting_address as usize,
                     end: x.starting_address as usize + x.size.unwrap(),
-                }
+                });
             })
         } else if node.name.starts_with(PLIC) {
+            debug!("[fdt]: plic node {}", node.name);
             let reg = node.reg().unwrap();
             reg.for_each(|x| {
                 machine.plic = Range {
@@ -115,6 +137,7 @@ fn walk_dt(fdt: Fdt) -> PlatformInfo {
                 }
             })
         } else if node.name.starts_with(CLINT) {
+            debug!("[fdt]: clint node {}", node.name);
             let reg = node.reg().unwrap();
             reg.for_each(|x| {
                 machine.clint = Range {
@@ -123,10 +146,13 @@ fn walk_dt(fdt: Fdt) -> PlatformInfo {
                 }
             })
         } else if node.name.starts_with(CHOSE) {
+            debug!("[fdt]: chose node {}", node.name);
             let initrd_start = node.property("linux,initrd-start");
             if initrd_start.is_none() {
+                warn!("No initrd");
                 continue;
             }
+            //这个在riscv64架构下可以运行正常，到了loongarch64架构下就
             let initrd_start = initrd_start.unwrap();
             let initrd_end = node.property("linux,initrd-end").unwrap();
             let initrd_start = initrd_start.as_usize().unwrap();
