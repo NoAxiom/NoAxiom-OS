@@ -3,7 +3,6 @@ mod boot;
 mod context;
 mod interrupt;
 mod memory;
-mod other;
 mod platform;
 pub mod poly;
 mod sbi;
@@ -16,4 +15,6 @@ pub use boot::{_entry, _entry_other_hart};
 pub mod la_libc_import;
 
 pub struct LA64;
-impl crate::FullVirtArch for LA64 {}
+impl crate::ArchFull for LA64 {
+    const ARCH_NAME: &'static str = "loongarch64";
+}

@@ -2,8 +2,8 @@
 pub trait ArchInt {
     // global interrupt
     fn is_interrupt_enabled() -> bool;
-    fn disable_global_interrupt();
-    fn enable_global_interrupt();
+    fn disable_interrupt();
+    fn enable_interrupt();
 
     // external interrupt
     fn enable_external_interrupt();
@@ -12,7 +12,7 @@ pub trait ArchInt {
 
     // soft / timer interrupt
     fn enable_software_interrupt();
-    fn enable_stimer_interrupt();
+    fn enable_timer_interrupt();
 
     // user memory access
     fn enable_user_memory_access();

@@ -3,6 +3,9 @@ use core::arch::asm;
 use config::{arch::CPU_NUM, mm::KERNEL_STACK_SIZE};
 use loongArch64::consts::LOONGARCH_CSR_MAIL_BUF0;
 
+use super::{context::freg_init, memory::tlb_init, time::time_init, trap::trap_init, LA64};
+use crate::ArchBoot;
+
 extern "C" {
     fn _boot_hart_init();
     fn _other_hart_init();
@@ -92,4 +95,13 @@ pub unsafe extern "C" fn _entry_other_hart() -> ! {
         MBUF1 = const loongArch64::consts::LOONGARCH_CSR_MAIL_BUF1,
         entry = sym _other_hart_init,
     )
+}
+
+impl ArchBoot for LA64 {
+    fn arch_init() {
+        freg_init();
+        trap_init();
+        time_init();
+        tlb_init();
+    }
 }

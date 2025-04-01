@@ -5,6 +5,7 @@ use arch::{Arch, Platform};
 use fdt::Fdt;
 use virtio_drivers::transport::{
     mmio::{MmioTransport, VirtIOHeader},
+    pci::PciTransport,
     DeviceType, Transport,
 };
 
@@ -12,7 +13,10 @@ use crate::{
     config::mm::{KERNEL_ADDR_OFFSET, VIRTIO0},
     device::block::{sata::SataBlock, BlockDevice},
     driver::{
-        block::{virtio::virtio_blk::VirtIOBlockDriver, BlockDriver},
+        block::{
+            virtio::{virtio_blk::VirtIOBlockDriver, virtio_impl::HalImpl},
+            BlockDriver,
+        },
         probe::{Probe, ProbeInfo, PROBE},
         Driver, DRIVER_MANAGER,
     },
@@ -28,9 +32,17 @@ pub fn device_init() {
             Some(virtio_mmio_devices) => {
                 debug!("Init block device start for rv");
                 let res = crate::device::pci::init();
-                if let Ok(mmio) = res {
+                if let Ok(transport) = res {
                     debug!("Init block device success");
-                    panic!("here");
+                    if let Ok(block_driver) = virtio_drivers::device::blk::VirtIOBlk::<
+                        HalImpl,
+                        PciTransport,
+                    >::new(transport)
+                    {
+                        panic!("make pci driver succeed");
+                    } else {
+                        panic!("make pci driver failed but virtio_driver runs well");
+                    }
                 }
                 init_virtio_mmio(virtio_mmio_devices);
             }

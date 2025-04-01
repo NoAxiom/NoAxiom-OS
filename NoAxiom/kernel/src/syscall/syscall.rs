@@ -22,7 +22,7 @@ impl<'a> Syscall<'a> {
             // the interrupt until cpu ertn. But if we switch to another task, the whole
             // life time is in the interrupt off state until previous task ertn.
             assert!(!Arch::is_interrupt_enabled());
-            Arch::enable_global_interrupt();
+            Arch::enable_interrupt();
         }
         match id {
             // fs

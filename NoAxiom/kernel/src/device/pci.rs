@@ -213,9 +213,11 @@ fn try_new(transport: PciTransport) -> Result<VirtIOBlk<HalImpl, PciTransport>, 
         "getting virtio blk device driver, transport: {:?}!",
         transport
     );
-    let res = VirtIOBlk::<HalImpl, PciTransport>::new(transport).map_err(|_| ());
+    let res = VirtIOBlk::<HalImpl, PciTransport>::new(transport)
+        .map_err(|e| debug!("failed to create blk driver because {e}"))?;
     debug!("got virtio blk device driver SUCCEED!");
-    res
+
+    Ok(res)
 }
 
 /// Try to probe a VirtIO PCI device from the given PCI address.

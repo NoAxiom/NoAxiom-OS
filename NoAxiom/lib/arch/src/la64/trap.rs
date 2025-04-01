@@ -1,12 +1,18 @@
 use core::arch::global_asm;
 
+use log::error;
 use loongArch64::register::{
     badv, ecfg, eentry, era,
-    estat::{self, Exception, Trap},
+    estat::{self, Exception, Interrupt, Trap},
 };
 
-use super::{context::TrapContext, unaligned::emulate_load_store_insn, LA64};
-use crate::{ArchInt, ArchTrap, TrapType};
+use super::{
+    context::TrapContext,
+    interrupt::{disable_interrupt, interrupt_init},
+    unaligned::emulate_load_store_insn,
+    LA64,
+};
+use crate::{ArchTrap, TrapType};
 
 global_asm!(include_str!("./trap.S"));
 extern "C" {
@@ -35,42 +41,72 @@ fn get_trap_type(tf: Option<&mut TrapContext>) -> TrapType {
             Exception::Breakpoint => TrapType::Breakpoint,
             Exception::AddressNotAligned => {
                 unsafe { emulate_load_store_insn(tf.unwrap()) }
-                TrapType::Unknown
+                TrapType::None
             }
             Exception::Syscall => TrapType::SysCall,
             Exception::StorePageFault | Exception::PageModifyFault => {
                 TrapType::StorePageFault(badv)
             }
-            Exception::PageNonExecutableFault | Exception::FetchPageFault => {
-                TrapType::InstructionPageFault(badv)
+            Exception::PageNonExecutableFault
+            | Exception::FetchPageFault
+            | Exception::FetchInstructionAddressError
+            | Exception::InstructionPrivilegeIllegal => TrapType::InstructionPageFault(badv),
+            Exception::LoadPageFault
+            | Exception::PageNonReadableFault
+            | Exception::MemoryAccessAddressError
+            | Exception::PagePrivilegeIllegal => TrapType::LoadPageFault(badv),
+            _ => {
+                error!(
+                    "[get_trap_type] unhandled exception: {:?}, pc = {:#x}, BADV = {:#x}",
+                    e,
+                    era::read().pc(),
+                    badv,
+                );
+                error!("[get_trap_type] trap_cx: {:#x?}", tf);
+                TrapType::Unknown
             }
-            Exception::LoadPageFault | Exception::PageNonReadableFault => {
-                TrapType::LoadPageFault(badv)
+        },
+        Trap::Interrupt(int) => match int {
+            Interrupt::Timer => TrapType::Timer,
+            Interrupt::HWI0
+            | Interrupt::HWI1
+            | Interrupt::HWI2
+            | Interrupt::HWI3
+            | Interrupt::HWI4
+            | Interrupt::HWI5
+            | Interrupt::HWI6
+            | Interrupt::HWI7 => TrapType::SupervisorExternal,
+            Interrupt::SWI0 | Interrupt::SWI1 | Interrupt::IPI => TrapType::SupervisorSoft,
+            _ => {
+                error!(
+                    "[get_trap_type] unhandled interrupt: {:?}, pc = {:#x}, BADV = {:#x}",
+                    int,
+                    era::read().pc(),
+                    badv,
+                );
+                error!("[get_trap_type] trap_cx: {:#x?}", tf);
+                TrapType::Unknown
             }
-            _ => panic!(
-                "Unhandled trap {:?} @ {:#x} BADV: {:#x}:\n{:#x?}",
+        },
+        _ => {
+            error!(
+                "[get_trap_type] unhandled trap type: {:?}, pc = {:#x}, BADV = {:#x}, raw_ecode = {}, esubcode = {}, is = {}",
                 estat.cause(),
                 era::read().pc(),
                 badv,
-                tf
-            ),
-        },
-        Trap::Interrupt(_) => {
-            let irq_num: usize = estat.is().trailing_zeros() as usize;
-            match irq_num {
-                // TIMER_IRQ
-                7 => TrapType::Timer,
-                _ => panic!("unknown interrupt: {}", irq_num),
-            }
+                estat.ecode(),
+                estat.esubcode(),
+                estat.is()
+            );
+            error!("[get_trap_type] trap_cx: {:#x?}", tf);
+            TrapType::Unknown
         }
-        _ => panic!(
-            "Unhandled trap {:?} @ {:#x} BADV: {:#x}:\n{:#x?}",
-            estat.cause(),
-            era::read().pc(),
-            badv,
-            tf
-        ),
     }
+}
+
+pub(crate) fn trap_init() {
+    set_kernel_trap_entry();
+    interrupt_init();
 }
 
 impl ArchTrap for LA64 {
@@ -82,13 +118,13 @@ impl ArchTrap for LA64 {
         set_kernel_trap_entry();
     }
     fn trap_init() {
-        set_kernel_trap_entry();
+        trap_init();
     }
     fn read_epc() -> usize {
         era::read().pc()
     }
     fn trap_restore(cx: &mut TrapContext) {
-        LA64::disable_global_interrupt();
+        disable_interrupt();
         set_user_trap_entry();
         unsafe { user_trapret(cx) };
     }

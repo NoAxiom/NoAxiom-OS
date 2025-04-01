@@ -2,7 +2,7 @@ use config::mm::PAGE_WIDTH;
 use loongArch64::register::{pwch, pwcl, stlbps, tlbidx, tlbrehi, tlbrentry::set_tlbrentry};
 
 #[naked]
-pub unsafe extern "C" fn tlb_fill() {
+pub unsafe extern "C" fn tlb_refill() {
     core::arch::asm!(
         "
         .equ LA_CSR_PGDL,          0x19    /* Page table base address when VA[47] = 0 */
@@ -59,7 +59,7 @@ pub const _PS_1G: usize = 0x1e;
 
 pub const PAGE_SIZE_SHIFT: usize = PAGE_WIDTH;
 
-pub fn tlb_init(tlbrentry: usize) {
+pub fn tlb_init_inner(tlbrentry: usize) {
     // // setup PWCTL
     // unsafe {
     // asm!(
@@ -88,6 +88,5 @@ pub fn tlb_init(tlbrentry: usize) {
     set_tlb_refill_entry(tlbrentry);
     // pgdl::set_base(kernel_pgd_base);
     // pgdh::set_base(kernel_pgd_base);
-
-    tlb_flush_all();
+    // tlb_flush_all();
 }

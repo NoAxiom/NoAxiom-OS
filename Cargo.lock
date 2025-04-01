@@ -78,6 +78,7 @@ dependencies = [
  "riscv",
  "rlibc",
  "sbi-rt 0.0.3",
+ "spin 0.9.8",
  "virtio-drivers 0.7.5",
  "volatile 0.4.6",
 ]

@@ -10,6 +10,7 @@ bitflags = { workspace = true }
 page_table_entry = "0.4"
 bit_field = "0.10"
 virtio-drivers = "0.7.5"
+spin = "0.9"
 
 [target.'cfg(target_arch = "riscv64")'.dependencies]
 riscv = { version = "0.11" }

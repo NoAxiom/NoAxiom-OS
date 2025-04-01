@@ -241,7 +241,15 @@ pub struct UserFloatContext {
     pub signal_dirty: u8,
 }
 
+pub fn freg_init() {
+    unsafe { sstatus::set_fs(FS::Initial) };
+}
+
 impl ArchUserFloatContext for UserFloatContext {
+    fn freg_init() {
+        freg_init();
+    }
+
     fn new() -> Self {
         unsafe { core::mem::zeroed() }
     }

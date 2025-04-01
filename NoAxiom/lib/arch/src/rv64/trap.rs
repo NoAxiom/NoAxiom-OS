@@ -8,7 +8,7 @@ use riscv::register::{
     stvec::{self, TrapMode},
 };
 
-use super::{context::TrapContext, interrupt::disable_global_interrupt, RV64};
+use super::{context::TrapContext, interrupt::disable_interrupt, RV64};
 use crate::{
     rv64::interrupt::{
         enable_external_interrupt, enable_software_interrupt, enable_stimer_interrupt,
@@ -45,6 +45,14 @@ pub fn set_trap_entry(addr: usize) {
     unsafe { stvec::write(addr, TrapMode::Direct) };
 }
 
+pub fn trap_init() {
+    enable_user_memory_access();
+    RV64::set_kernel_trap_entry();
+    enable_external_interrupt();
+    enable_software_interrupt();
+    enable_stimer_interrupt();
+}
+
 impl ArchTrap for RV64 {
     type TrapContext = super::context::TrapContext;
     /// set trap entry in supervisor mode
@@ -58,15 +66,11 @@ impl ArchTrap for RV64 {
     /// init trap in a single hart
     /// note that it won't turn on global interrupt
     fn trap_init() {
-        enable_user_memory_access();
-        RV64::set_kernel_trap_entry();
-        enable_external_interrupt();
-        enable_software_interrupt();
-        enable_stimer_interrupt();
+        trap_init();
     }
     /// restore trap context, with freg handled as well
     fn trap_restore(cx: &mut TrapContext) {
-        disable_global_interrupt();
+        disable_interrupt();
         RV64::set_user_trap_entry();
         cx.freg_mut().restore();
         cx.sstatus().set_fs(FS::Clean);

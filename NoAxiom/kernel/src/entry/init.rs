@@ -1,4 +1,6 @@
-use arch::{Arch, ArchInt, ArchMemory, ArchSbi, ArchTrap, Platform, _entry_other_hart};
+use core::panic;
+
+use arch::{Arch, ArchBoot, ArchInt, ArchMemory, ArchSbi, ArchTrap, Platform, _entry_other_hart};
 
 use crate::{
     config::{arch::CPU_NUM, mm::KERNEL_ADDR_OFFSET},
@@ -39,9 +41,8 @@ pub fn wake_other_hart(forbid_hart_id: usize) {
 
 #[no_mangle]
 pub extern "C" fn _other_hart_init(hart_id: usize, dtb: usize) {
-    Arch::trap_init();
+    Arch::arch_init();
     kernel_space_activate();
-    Arch::tlb_init();
     // register_to_hart(); // todo: add multipule devices interrupt support
     info!(
         "[other_init] entry init hart_id: {}, dtb_addr: {:#x}",
@@ -57,19 +58,18 @@ pub extern "C" fn _other_hart_init(hart_id: usize, dtb: usize) {
 /// init bss, mm, console, and other drivers, then jump to rust_main,
 /// called by [`super::boot`]
 #[no_mangle]
-pub extern "C" fn _boot_hart_init(_: usize, dtb: usize) {
+pub extern "C" fn _boot_hart_init(_: usize, mut dtb: usize) {
     // data init
     bss_init();
     heap_init();
 
     // log init
-    Arch::trap_init();
+    Arch::arch_init();
     log_init();
 
     // kernel space init
     frame_init();
     kernel_space_init();
-    Arch::tlb_init();
 
     let dtb = Arch::get_dtb(dtb);
 
@@ -80,7 +80,7 @@ pub extern "C" fn _boot_hart_init(_: usize, dtb: usize) {
     register_to_hart();
 
     // fs init
-    Arch::enable_global_interrupt();
+    Arch::enable_interrupt();
     block_on(fs_init());
 
     // spawn init_proc and wake other harts

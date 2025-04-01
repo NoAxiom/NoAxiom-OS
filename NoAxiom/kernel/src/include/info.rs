@@ -1,4 +1,4 @@
-use arch::{Arch, ArchInfo};
+use arch::{Arch, ArchFull};
 
 #[repr(C)]
 pub struct Utsname {

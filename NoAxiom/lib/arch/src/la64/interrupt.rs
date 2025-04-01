@@ -1,49 +1,80 @@
-use log::warn;
-use loongArch64::register::{crmd, estat};
+use loongArch64::register::{
+    crmd,
+    ecfg::{self, LineBasedInterrupt},
+};
 
 use super::LA64;
 use crate::ArchInt;
 
+#[inline]
+pub(crate) fn is_interrupt_enabled() -> bool {
+    crmd::read().ie()
+}
+
+#[inline]
+pub(crate) fn enable_interrupt() {
+    crmd::set_ie(true);
+}
+
+#[inline]
+pub(crate) fn disable_interrupt() {
+    crmd::set_ie(false);
+}
+
+#[inline]
+pub(crate) fn enable_external_interrupt() {
+    ecfg::set_lie(LineBasedInterrupt::HWI0);
+}
+
+#[inline]
+pub(crate) fn enable_timer_interrupt() {
+    ecfg::set_lie(LineBasedInterrupt::TIMER);
+}
+
+#[inline]
+pub(crate) fn enable_software_interrupt() {
+    ecfg::set_lie(LineBasedInterrupt::SWI0 | LineBasedInterrupt::SWI1);
+}
+
+pub(crate) fn interrupt_init() {
+    let inter = LineBasedInterrupt::TIMER
+        | LineBasedInterrupt::SWI0
+        | LineBasedInterrupt::SWI1
+        | LineBasedInterrupt::HWI0
+        | LineBasedInterrupt::IPI;
+    ecfg::set_lie(inter);
+}
+
 impl ArchInt for LA64 {
     fn is_interrupt_enabled() -> bool {
-        let crmd = crmd::read();
-        crmd.ie()
+        is_interrupt_enabled()
     }
-    fn enable_global_interrupt() {
-        crmd::set_ie(true);
+    fn enable_interrupt() {
+        enable_interrupt();
     }
-    fn disable_global_interrupt() {
-        crmd::set_ie(false);
+    fn disable_interrupt() {
+        disable_interrupt();
     }
-
-    // not implemented
-    fn disable_external_interrupt() {}
-    fn disable_user_memory_access() {}
-
+    fn disable_external_interrupt() {
+        unimplemented!()
+    }
     // 8 hard interrupt in ESTAT.IS[9..2]
     fn enable_external_interrupt() {
-        // now we only support external interrupt 2
-        estat::set_sw(2, true);
+        enable_external_interrupt();
     }
-
     // 2 soft interrupt in ESTAT.IS[1..0]
     fn enable_software_interrupt() {
-        // now we only support software interrupt 0
-        estat::set_sw(0, true);
+        enable_software_interrupt();
     }
-
-    fn enable_stimer_interrupt() {}
-    fn enable_user_memory_access() {}
-
+    fn enable_timer_interrupt() {
+        enable_timer_interrupt();
+    }
     fn is_external_interrupt_enabled() -> bool {
-        let is = estat::read().is();
-        let mut enabled = false;
-        for i in 2..9 {
-            if bit_field::BitField::get_bit(&is, i) {
-                enabled = true;
-                break;
-            }
-        }
-        enabled
+        let lie = ecfg::read().lie();
+        const MASK: usize = ((1 << 8) - 1) << 2;
+        lie.bits() & MASK != 0
     }
+    // user memory access is riscv specific
+    fn enable_user_memory_access() {}
+    fn disable_user_memory_access() {}
 }

@@ -1,6 +1,7 @@
 //! spin mutex for riscv kernel
 
 use arch::{Arch, ArchAsm, ArchInt};
+use config::arch::CPU_NUM;
 
 use crate::cell::SyncUnsafeCell;
 
@@ -30,7 +31,6 @@ impl MutexTracer {
 }
 
 // #[allow(clippy::declare_interior_mutable_const)]
-const CPU_NUM: usize = config::arch::CPU_NUM; // FIXME: use extern const to config cpu_num
 const DEFAULT_CPU: SyncUnsafeCell<MutexTracer> = SyncUnsafeCell::new(MutexTracer::new());
 static HART_MUTEX_TRACERS: [SyncUnsafeCell<MutexTracer>; CPU_NUM] = [DEFAULT_CPU; CPU_NUM];
 fn current_mutex_tracer() -> &'static mut MutexTracer {
@@ -49,7 +49,7 @@ pub struct NoIrqLockAction;
 impl LockAction for NoIrqLockAction {
     fn before_lock() {
         let old = Arch::is_interrupt_enabled();
-        Arch::disable_global_interrupt();
+        Arch::disable_interrupt();
         let cpu = current_mutex_tracer();
         if cpu.depth == 0 {
             cpu.int_record = old;
@@ -61,7 +61,7 @@ impl LockAction for NoIrqLockAction {
         cpu.depth -= 1;
         let should_enable = cpu.depth == 0 && cpu.int_record;
         if should_enable {
-            Arch::enable_global_interrupt();
+            Arch::enable_interrupt();
         }
     }
 }
