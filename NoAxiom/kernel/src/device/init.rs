@@ -41,7 +41,7 @@ pub fn device_init() {
                     {
                         panic!("make pci driver succeed");
                     } else {
-                        panic!("make pci driver failed but virtio_driver runs well");
+                        panic!("make pci driver failed but virtio_driver runs well!");
                     }
                 }
                 init_virtio_mmio(virtio_mmio_devices);
