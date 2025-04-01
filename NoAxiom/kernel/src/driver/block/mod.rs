@@ -1,6 +1,5 @@
 // pub mod vf2sd;
 pub mod virtio;
-
 use super::Driver;
 use crate::include::result::Errno;
 

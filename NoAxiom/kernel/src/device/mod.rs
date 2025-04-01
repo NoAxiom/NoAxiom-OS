@@ -5,6 +5,8 @@ pub mod block;
 pub mod char;
 mod config;
 pub mod init;
+mod pci;
+mod pci_driver;
 pub mod random;
 
 use alloc::{

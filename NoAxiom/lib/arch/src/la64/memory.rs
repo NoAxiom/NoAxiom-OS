@@ -13,7 +13,7 @@ const INDEX_LEVELS: usize = 3;
 const PHYS_MEMORY_START: usize = 0x9000_0000;
 const MEMORY_SIZE: usize = 0x1000_0000;
 const PHYS_MEMORY_END: usize = PHYS_MEMORY_START + MEMORY_SIZE;
-const KERNEL_ADDR_OFFSET: usize = 0x9000_0000_0000_0000;
+pub const KERNEL_ADDR_OFFSET: usize = 0x9000_0000_0000_0000;
 
 bitflags::bitflags! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

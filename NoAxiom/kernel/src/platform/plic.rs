@@ -5,9 +5,9 @@ extern crate alloc;
 // use alloc::{collections::BTreeMap, format, string::String, sync::Arc};
 
 use config::arch::CPU_NUM;
+use ksync::Once;
 // use device_interface::DeviceBase;
 use plic::{Mode, PLIC};
-use ksync::Once;
 
 // use crate::{cpu::get_hartid, device::Device};
 
@@ -29,31 +29,31 @@ pub fn register_to_hart() {
 }
 
 pub fn init_plic(plic_addr: usize) {
-    #[cfg(feature = "riscv_qemu")]
+    // #[cfg(feature = "riscv_qemu")]
+    // {
+    // privilege level for each hart, hart can run
+    // when its mode threshold <= privilege
+    let privileges = [2; CPU_NUM];
+    let plic = PLIC::new(plic_addr, privileges);
+    PLIC.call_once(|| plic);
+
+    let priority;
+    #[cfg(feature = "async_fs")]
     {
-        // privilege level for each hart, hart can run
-        // when its mode threshold <= privilege
-        let privileges = [2; CPU_NUM];
-        let plic = PLIC::new(plic_addr, privileges);
-        PLIC.call_once(|| plic);
-
-        let priority;
-        #[cfg(feature = "async_fs")]
-        {
-            priority = 2;
-        }
-        #[cfg(not(feature = "async_fs"))]
-        {
-            priority = 0;
-        }
-        // ! fixme: now is turn OFF the interrupt
-        let irq = 1;
-        let plic = PLIC.get().unwrap();
-        plic.set_priority(irq, priority);
-
-        // todo: register more devices
-        debug!("Init qemu plic success");
+        priority = 2;
     }
+    #[cfg(not(feature = "async_fs"))]
+    {
+        priority = 0;
+    }
+    // ! fixme: now is turn OFF the interrupt
+    let irq = 1;
+    let plic = PLIC.get().unwrap();
+    plic.set_priority(irq, priority);
+
+    // todo: register more devices
+    debug!("Init plic success");
+    // }
     #[cfg(any(feature = "vf2"))]
     {
         let mut privileges = [2; CPU_NUM];

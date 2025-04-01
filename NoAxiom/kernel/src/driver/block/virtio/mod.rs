@@ -11,7 +11,7 @@ use virtio_input::{InputDevice, VirtIOInputWrapper};
 
 use crate::config::mm::KERNEL_ADDR_OFFSET;
 
-mod virtio_impl;
+pub mod virtio_impl;
 
 // keyboard
 const VIRTIO5: usize = 0x10005000 + KERNEL_ADDR_OFFSET;

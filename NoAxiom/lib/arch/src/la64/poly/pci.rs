@@ -1,0 +1,106 @@
+use core::{error, ptr::NonNull};
+
+use fdt::Fdt;
+use log::{debug, info, trace};
+use virtio_drivers::{
+    device::blk::VirtIOBlk,
+    transport::{
+        mmio::{MmioTransport, VirtIOHeader},
+        pci::{
+            bus::{Cam, Command, DeviceFunction, HeaderType, PciRoot},
+            virtio_device_type, PciTransport,
+        },
+        DeviceType, Transport,
+    },
+    Hal,
+};
+
+use crate::{la64::memory::KERNEL_ADDR_OFFSET, Platform};
+
+pub fn init() -> Result<PciTransport, ()> {
+    let fdt = crate::Arch::get_dtb(0);
+    let fdt = unsafe { Fdt::from_ptr(fdt as *mut u8) }.unwrap();
+    let mut all_nodes = fdt.all_nodes();
+
+    if let Some(pci_node) = all_nodes.find(|x| x.name.starts_with("pci")) {
+        let pci_addr = pci_node.reg().map(|mut x| x.next().unwrap()).unwrap();
+        log::info!("PCI Address: {:#p}", pci_addr.starting_address);
+        enumerate_pci((pci_addr.starting_address as usize | KERNEL_ADDR_OFFSET) as *mut u8)
+    } else {
+        Err(())
+    }
+}
+
+/// Enumerate the PCI devices
+fn enumerate_pci(mmconfig_base: *mut u8) -> Result<PciTransport, ()> {
+    info!("mmconfig_base = {:#x}", mmconfig_base as usize);
+
+    let mut pci_root = unsafe { PciRoot::new(mmconfig_base, Cam::Ecam) };
+    for (device_function, info) in pci_root.enumerate_bus(0) {
+        // Skip if it is not a PCI Type0 device (Standard PCI device).
+        if info.header_type != HeaderType::Standard {
+            continue;
+        }
+        let (status, command) = pci_root.get_status_command(device_function);
+        info!(
+            "Found {} at {}, status {:?} command {:?}",
+            info, device_function, status, command
+        );
+
+        if info.vendor_id == 0x8086 && info.device_id == 0x100e {
+            // Detected E1000 Net Card
+            info!("  E1000 Net Card");
+            pci_root.set_command(
+                device_function,
+                Command::IO_SPACE | Command::MEMORY_SPACE | Command::BUS_MASTER,
+            );
+        }
+        for i in 0..6 {
+            dump_bar_contents(&mut pci_root, device_function, i);
+        }
+        if let Some(virtio_type) = virtio_device_type(&info) {
+            info!("  VirtIO {:?}", virtio_type);
+
+            // Enable the device to use its BARs.
+            pci_root.set_command(
+                device_function,
+                Command::IO_SPACE | Command::MEMORY_SPACE | Command::BUS_MASTER,
+            );
+
+            if virtio_type == DeviceType::Block {
+                match unsafe { PciTransport::new(&mut pci_root, device_function) } {
+                    Ok(mut transport) => {
+                        info!(
+                            "Detected virtio PCI device with device type {:?}, features:{:?}",
+                            transport.device_type(),
+                            transport.read_device_features(),
+                        );
+                        match transport.device_type() {
+                            DeviceType::Block => {
+                                return Ok(transport);
+                            }
+                            ty => {
+                                println!("Don't support virtio device type: {:?}", ty);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        panic!("Error creating VirtIO PCI transport: {}", e);
+                    }
+                }
+            }
+        }
+    }
+    Err(())
+}
+
+/// Dump bar Contents.
+fn dump_bar_contents(root: &mut PciRoot, device_function: DeviceFunction, bar_index: u8) {
+    let bar_info = root.bar_info(device_function, bar_index).unwrap();
+    if let Some((_addr, size)) = bar_info.memory_address_size() {
+        if size == 0 {
+            return;
+        }
+        trace!("Dumping bar {}: {:#x?}", bar_index, bar_info);
+    }
+}

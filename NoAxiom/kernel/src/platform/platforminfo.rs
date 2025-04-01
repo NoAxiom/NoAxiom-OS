@@ -1,12 +1,10 @@
 use alloc::{string::String, vec::Vec};
 use core::{cmp::min, fmt::Debug, ops::Range};
 
-use fdt::Fdt;
+use arch::{Arch, Platform};
+use fdt::{node::FdtNode, Fdt};
 
-const MEMORY: &str = "memory";
-const PLIC: &str = "plic";
-const CLINT: &str = "clint";
-const CHOSE: &str = "chosen";
+use crate::include::info;
 
 /// Platform basic information
 #[derive(Clone)]
@@ -58,6 +56,7 @@ impl Debug for PlatformInfo {
         Ok(())
     }
 }
+
 /// Get platform information from a device-tree
 pub fn platform_info_from_dtb(ptr: usize) -> PlatformInfo {
     #[cfg(feature = "vf2")]
@@ -79,7 +78,7 @@ fn walk_dt(fdt: Fdt) -> PlatformInfo {
         bootargs: None,
         bootargs_len: 0,
     };
-    let x = fdt.root();
+    // let x = fdt.root();
     // debug!("Device tree root node: {:?}", x);
     machine.smp = fdt.cpus().count();
     let res = fdt.chosen().bootargs().map(|x| {
@@ -93,33 +92,29 @@ fn walk_dt(fdt: Fdt) -> PlatformInfo {
         machine.bootargs = Some(bootargs);
         machine.bootargs_len = len;
     }
-    // debug!("Platform Hart Count {}", fdt.cpus().count());
-    // fdt.memory().regions().for_each(|mm| {
-    //     debug!(
-    //         "Platform Memory Region {:#p} - {:#018x}",
-    //         mm.starting_address,
-    //         mm.starting_address as usize + mm.size.unwrap_or(0)
-    //     )
-    // });
-    // for node in fdt.all_nodes() {
-    //     let compatible = x.compatible();
-    //     info!(
-    //         "    {}  {}",
-    //         node.name,
-    //         compatible.all().collect::<String>()
-    //     );
-    // }
-    // debug!("Boot Args {}", fdt.chosen().bootargs().unwrap_or(""));
 
+    #[cfg(target_arch = "loongarch64")]
     let model = "loongarch64-qemu".as_bytes();
     #[cfg(target_arch = "riscv64")]
-    let model = x.model().as_bytes();
+    let model = fdt.root().model().as_bytes();
+
     let len = min(model.len(), machine.model.len());
     machine.model[0..len].copy_from_slice(&model[..len]);
 
+    walk(fdt, &mut machine);
+
+    machine
+}
+
+fn walk(fdt: Fdt, machine: &mut PlatformInfo) {
     for node in fdt.all_nodes() {
-        if node.name.starts_with(MEMORY) {
-            debug!("[fdt]: memory node {}", node.name);
+        if let Some(compatible) = node.compatible() {
+            info!("   {}  {}", node.name, compatible.all().collect::<String>());
+        } else {
+            info!("   {}", node.name);
+        }
+        if node.name.starts_with(&Arch::memory_name()) {
+            trace!("[fdt]: memory node {}", node.name);
             let reg = node.reg().unwrap();
             reg.for_each(|x| {
                 machine.memory.push(Range {
@@ -127,8 +122,8 @@ fn walk_dt(fdt: Fdt) -> PlatformInfo {
                     end: x.starting_address as usize + x.size.unwrap(),
                 });
             })
-        } else if node.name.starts_with(PLIC) {
-            debug!("[fdt]: plic node {}", node.name);
+        } else if node.name.starts_with(&Arch::plic_name()) {
+            trace!("[fdt]: plic node {}", node.name);
             let reg = node.reg().unwrap();
             reg.for_each(|x| {
                 machine.plic = Range {
@@ -136,8 +131,8 @@ fn walk_dt(fdt: Fdt) -> PlatformInfo {
                     end: x.starting_address as usize + x.size.unwrap(),
                 }
             })
-        } else if node.name.starts_with(CLINT) {
-            debug!("[fdt]: clint node {}", node.name);
+        } else if node.name.starts_with(&Arch::clint_name()) {
+            trace!("[fdt]: clint node {}", node.name);
             let reg = node.reg().unwrap();
             reg.for_each(|x| {
                 machine.clint = Range {
@@ -145,14 +140,13 @@ fn walk_dt(fdt: Fdt) -> PlatformInfo {
                     end: x.starting_address as usize + x.size.unwrap(),
                 }
             })
-        } else if node.name.starts_with(CHOSE) {
-            debug!("[fdt]: chose node {}", node.name);
+        } else if node.name.starts_with(&Arch::chose_name()) {
+            trace!("[fdt]: chose node {}", node.name);
             let initrd_start = node.property("linux,initrd-start");
             if initrd_start.is_none() {
-                warn!("No initrd");
+                trace!("No initrd");
                 continue;
             }
-            //这个在riscv64架构下可以运行正常，到了loongarch64架构下就
             let initrd_start = initrd_start.unwrap();
             let initrd_end = node.property("linux,initrd-end").unwrap();
             let initrd_start = initrd_start.as_usize().unwrap();
@@ -163,5 +157,4 @@ fn walk_dt(fdt: Fdt) -> PlatformInfo {
             });
         }
     }
-    machine
 }

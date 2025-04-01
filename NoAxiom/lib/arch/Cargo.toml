@@ -9,6 +9,7 @@ config = { workspace = true }
 bitflags = { workspace = true }
 page_table_entry = "0.4"
 bit_field = "0.10"
+virtio-drivers = "0.7.5"
 
 [target.'cfg(target_arch = "riscv64")'.dependencies]
 riscv = { version = "0.11" }
@@ -23,3 +24,4 @@ polyhal = { git = "https://github.com/Byte-OS/polyhal.git", features = [
     "logger",
 ] }
 devices = { git = "https://github.com/Byte-OS/devices.git" }
+fdt = { git = "https://github.com/repnop/fdt" }

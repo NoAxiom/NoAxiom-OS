@@ -45,7 +45,6 @@ impl Log for SimpleLogger {
 }
 
 pub fn log_init() {
-    Arch::console_init();
     static LOGGER: SimpleLogger = SimpleLogger;
     log::set_logger(&LOGGER).unwrap();
     log::set_max_level(match option_env!("LOG") {

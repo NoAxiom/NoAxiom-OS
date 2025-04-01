@@ -56,13 +56,19 @@ pub const VIRTIO0: usize = 0x1000_1000 + KERNEL_ADDR_OFFSET;
 /// MMIO on Qemu of VirtIO.
 #[cfg(feature = "riscv_qemu")]
 pub const MMIO: &[(usize, usize)] = &[
-    (0x1000_1000, 0x1000), // VIRTIO0
+    // (0x1000_1000, 0x1000), // VIRTIO0
     (0xc00_0000, 0x21_0000), /* VIRT_PLIC in virt machine */
     /* (0x0010_0000, 0x00_2000), // VIRT_TEST/RTC  in virt machine
-    * (0x2000000, 0x10000),
-    * (0x1000_0000, 0x9000),   // VIRT_UART0 with GPU  in virt machine
-    * (0x3000_0000, 0x1000_0000),
-    */
+     * (0x2000000, 0x10000),
+     * (0x1000_0000, 0x9000),   // VIRT_UART0 with GPU  in virt machine
+     * (0x3000_0000, 0x1000_0000),
+     * */
+    // (0x1000_4000, 0x4000),
+    (0x0900_0000, 0x1000),
+    (0x0800_0000, 0x2_0000),
+    (0x0a00_0000, 0x4000),
+    (0x1000_0000, 0x2eff_0000),
+    (0x40_1000_0000, 0x1000_0000),
 ];
 
 // #[cfg(feature = "riscv_qemu")]

@@ -134,6 +134,8 @@ else
 	QFLAGS += -bios default
 	QFLAGS += -drive file=$(FS_IMG),if=none,format=raw,id=x0
 	QFLAGS += -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 
+	QFLAGS += -drive file=fs2.img,if=none,format=raw,id=x1
+	QFLAGS += -device virtio-blk-pci,drive=x1
 	QFLAGS += -no-reboot -device virtio-net-device,netdev=net -netdev user,id=net
 	QFLAGS += -rtc base=utc
 	# QFLAGS += -drive file=disk.img,if=none,format=raw,id=x1 

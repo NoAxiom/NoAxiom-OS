@@ -2,18 +2,12 @@ use config::mm::KERNEL_STACK_SIZE;
 use loongArch64::ipi::{csr_mail_send, send_ipi_single};
 
 use super::{
-    poly::{
-        console::{getchar, putchar},
-        la64_dev_init,
-    },
+    poly::console::{getchar, putchar},
     LA64,
 };
 use crate::{la64::boot::BOOT_STACK, ArchSbi};
 
 impl ArchSbi for LA64 {
-    fn console_init() {
-        la64_dev_init();
-    }
     fn console_getchar() -> usize {
         getchar() as usize
     }

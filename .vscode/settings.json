@@ -6,11 +6,7 @@
   // "rust-analyzer.cargo.target": "riscv64gc-unknown-none-elf",
   "rust-analyzer.cargo.target": "loongarch64-unknown-none",
   "rust-analyzer.check.allTargets": false,
-  "rust-analyzer.cargo.features": [
-    "multicore",
-    "riscv_qemu",
-    "async_fs"
-  ],
+  "rust-analyzer.cargo.features": ["multicore", "riscv_qemu", "async_fs"],
   "C_Cpp_Runner.cCompilerPath": "gcc",
   "C_Cpp_Runner.cppCompilerPath": "g++",
   "C_Cpp_Runner.debuggerPath": "gdb",
@@ -50,10 +46,7 @@
   "C_Cpp_Runner.compilerArgs": [],
   "C_Cpp_Runner.linkerArgs": [],
   "C_Cpp_Runner.includePaths": [],
-  "C_Cpp_Runner.includeSearch": [
-    "*",
-    "**/*"
-  ],
+  "C_Cpp_Runner.includeSearch": ["*", "**/*"],
   "C_Cpp_Runner.excludeSearch": [
     "**/build",
     "**/build/**",

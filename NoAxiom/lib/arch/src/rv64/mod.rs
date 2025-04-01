@@ -4,6 +4,7 @@ mod context;
 mod interrupt;
 mod memory;
 mod other;
+mod platform;
 mod sbi;
 mod time;
 mod trap;

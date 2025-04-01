@@ -66,7 +66,13 @@ libc = "0.2"
 spin = "0.7.0"
 atomic_enum = "0.3.0"
 futures = { version = "0.3", default-features = false, features = ["alloc"] }
-futures-lite = { version = "1.13.0", default-features = false, features=["alloc"] }
+futures-lite = { version = "1.13.0", default-features = false, features = [
+    "alloc",
+] }
+
+pci = { git = "https://github.com/huayuntao/dep_pci.git" }
+isomorphic_drivers = { git = "https://github.com/huayuntao/dep_iso.git" }
+
 
 # no_axiom defined libs
 ext4_rs = { git = "https://github.com/YuXuaann/ext4_rs-async-smp" }

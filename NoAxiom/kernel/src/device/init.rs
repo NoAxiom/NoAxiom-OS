@@ -1,6 +1,7 @@
 use alloc::{sync::Arc, vec::Vec};
 use core::ptr::NonNull;
 
+use arch::{Arch, Platform};
 use fdt::Fdt;
 use virtio_drivers::transport::{
     mmio::{MmioTransport, VirtIOHeader},
@@ -9,7 +10,7 @@ use virtio_drivers::transport::{
 
 use crate::{
     config::mm::{KERNEL_ADDR_OFFSET, VIRTIO0},
-    device::block::BlockDevice,
+    device::block::{sata::SataBlock, BlockDevice},
     driver::{
         block::{virtio::virtio_blk::VirtIOBlockDriver, BlockDriver},
         probe::{Probe, ProbeInfo, PROBE},
@@ -19,20 +20,30 @@ use crate::{
 };
 
 pub fn device_init() {
-    let dtb_ptr = platform::platform_dtb_ptr();
-
-    //? dtb is unused
-    let _dtb = unsafe { Fdt::from_ptr(dtb_ptr as *const u8).unwrap() };
-    Probe::init(dtb_ptr);
+    Probe::init();
 
     #[cfg(not(all(feature = "vf2", feature = "hifive")))]
     {
         match PROBE.get().unwrap().probe_virtio() {
             Some(virtio_mmio_devices) => {
+                debug!("Init block device start for rv");
+                let res = crate::device::pci::init();
+                if let Ok(mmio) = res {
+                    debug!("Init block device success");
+                    panic!("here");
+                }
                 init_virtio_mmio(virtio_mmio_devices);
             }
             None => {
-                println!("There is no virtio-mmio device");
+                // super::block::init_block_device(Arc::new(SataBlock::new()));
+                debug!("Init block device start for la64");
+                let res = crate::device::pci::init();
+                if let Ok(mmio) = res {
+                    debug!("Init block device success");
+                    panic!("here");
+                }
+                debug!("Init PCI block device success");
+                return;
             }
         }
     }

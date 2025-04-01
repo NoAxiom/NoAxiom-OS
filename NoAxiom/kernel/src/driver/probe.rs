@@ -34,7 +34,7 @@ pub struct Probe<'a> {
     dtb: Fdt<'a>,
 }
 impl Probe<'_> {
-    pub fn init(_dtb_ptr: usize) {
+    pub fn init() {
         let dtb_ptr = platform::platform_dtb_ptr();
         let fdt = unsafe { Fdt::from_ptr(dtb_ptr as *const u8).unwrap() };
         let probe = Probe { dtb: fdt };
@@ -68,7 +68,7 @@ impl Probe<'_> {
             if node.name.starts_with("virtio_mmio") {
                 let reg = node.reg()?.next()?;
                 let paddr = reg.starting_address as usize;
-                // println!("name : {} , paddr : {:x} ", node.name, paddr);
+                println!("name : {} , paddr : {:x} ", node.name, paddr);
                 let irq = node.property("interrupts")?.value;
                 let irq = u32::from_be_bytes(irq[0..4].try_into().ok()?);
 
@@ -82,8 +82,13 @@ impl Probe<'_> {
                 ));
             }
         }
-        debug!("Prob virtio success");
-        Some(virtio_devices)
+        if virtio_devices.is_empty() {
+            println!("There is no virtio-mmio device");
+            None
+        } else {
+            debug!("Prob virtio success");
+            Some(virtio_devices)
+        }
     }
     pub fn probe_common(&self, device_name: &str) -> Option<ProbeInfo> {
         let node = self

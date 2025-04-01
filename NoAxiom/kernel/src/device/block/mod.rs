@@ -1,3 +1,4 @@
+pub mod sata;
 pub mod virtio;
 use alloc::sync::Arc;
 
@@ -5,10 +6,14 @@ use ksync::Once;
 
 use crate::device::block::virtio::virtio as Virtio;
 
-/// ! fixme: Virtio to dyn BlockDevice
-pub static BLOCK_DEVICE: Once<Arc<Virtio>> = Once::new();
+#[cfg(target_arch = "riscv64")]
+type BlockDeviceImpl = Virtio;
+#[cfg(target_arch = "loongarch64")]
+type BlockDeviceImpl = Virtio;
 
-pub fn init_block_device(block_device: Arc<Virtio>) {
+pub static BLOCK_DEVICE: Once<Arc<BlockDeviceImpl>> = Once::new();
+
+pub fn init_block_device(block_device: Arc<BlockDeviceImpl>) {
     BLOCK_DEVICE.call_once(|| block_device);
 }
 use alloc::boxed::Box;

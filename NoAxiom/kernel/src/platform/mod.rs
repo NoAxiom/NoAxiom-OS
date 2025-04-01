@@ -1,44 +1,18 @@
-pub mod base_riscv;
+pub mod platforminfo;
 pub mod plic;
-pub mod qemu_riscv;
-use alloc::sync::Arc;
 
-use base_riscv::BaseRISCV;
 use ksync::Once;
-
-use crate::platform::base_riscv::platforminfo::PlatformInfo;
-
-static PLATFORM: Once<Arc<dyn BaseRISCV>> = Once::new();
+use platforminfo::platform_info_from_dtb;
 pub static DTB: Once<usize> = Once::new();
-static MACHINE_INFO: Once<PlatformInfo> = Once::new();
 
 #[no_mangle]
-pub fn platform_init(_hart_id: usize, dtb: usize) {
-    #[cfg(feature = "riscv_qemu")]
-    {
-        let riscv = qemu_riscv::QemuRISCV::new().unwrap();
-        PLATFORM.call_once(|| Arc::new(riscv));
-        PLATFORM.get().unwrap().clone().init_dtb(Some(dtb));
-    }
-
-    #[cfg(feature = "vf2")]
-    {
-        let riscv = Starfive2_Riscv::starfive2_riscv::new().unwrap();
-        PLATFORM.call_once(|| Arc::new(riscv));
-        PLATFORM.get().unwrap().clone().init_dtb(None);
-    }
-
-    let machine_info = PLATFORM.get().unwrap().clone().base_info();
-    MACHINE_INFO.call_once(|| machine_info);
+pub fn platform_init(dtb: usize) -> platforminfo::PlatformInfo {
+    DTB.call_once(|| dtb);
+    let res = platform_info_from_dtb(dtb);
+    debug!("Platform Info:\n {:?}", res);
+    res
 }
 
-// pub fn platform() -> Arc<dyn BaseRISCV> {
-//     PLATFORM.get().unwrap().clone()
-// }
-
-// pub fn platform_machine_info() -> PlatformInfo {
-//     MACHINE_INFO.get().unwrap().clone()
-// }
 pub fn platform_dtb_ptr() -> usize {
     DTB.get().unwrap().clone()
 }
