@@ -2,7 +2,7 @@
 
 use alloc::sync::Arc;
 
-use arch::{Arch, ArchInt, ArchTrap, TrapArgs, TrapType};
+use arch::{Arch, ArchBoot, ArchInt, ArchTrap, TrapArgs, TrapType};
 
 use super::{ext_int::ext_int_handler, ipi::ipi_handler};
 use crate::{
@@ -67,6 +67,7 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
             "[user_trap_handler] unexpected exit!!! msg: {}, sepc = {:#x}",
             msg, epc,
         );
+        Arch::arch_info_print();
         task.terminate(-1);
     };
     match trap_type {

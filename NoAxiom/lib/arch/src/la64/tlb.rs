@@ -1,42 +1,41 @@
 use core::arch::asm;
 
 use config::mm::PAGE_WIDTH;
-use log::info;
-use loongArch64::register::{
-    badv, era, pwch, pwcl, stlbps, tlbidx, tlbrehi, tlbrentry::set_tlbrentry,
-};
-
-// #[naked]
-// pub unsafe extern "C" fn tlb_refill() {
-//     asm!(
-//         "
-//         .equ LA_CSR_PGDL,          0x19    /* Page table base address when
-// VA[47] = 0 */         .equ LA_CSR_PGDH,          0x1a    /* Page table base
-// address when VA[47] = 1 */         .equ LA_CSR_PGD,           0x1b    /* Page
-// table base */         .equ LA_CSR_TLBRENTRY,     0x88    /* TLB refill
-// exception entry */         .equ LA_CSR_TLBRBADV,      0x89    /* TLB refill
-// badvaddr */         .equ LA_CSR_TLBRERA,       0x8a    /* TLB refill ERA */
-//         .equ LA_CSR_TLBRSAVE,      0x8b    /* KScratch for TLB refill
-// exception */         .equ LA_CSR_TLBRELO0,      0x8c    /* TLB refill
-// entrylo0 */         .equ LA_CSR_TLBRELO1,      0x8d    /* TLB refill entrylo1
-// */         .equ LA_CSR_TLBREHI,       0x8e    /* TLB refill entryhi */
-//         .balign 4096
-//             csrwr   $t0, LA_CSR_TLBRSAVE
-//             csrrd   $t0, LA_CSR_PGD
-//             lddir   $t0, $t0, 3
-//             lddir   $t0, $t0, 1
-//             ldpte   $t0, 0
-//             ldpte   $t0, 1
-//             tlbfill
-//             csrrd   $t0, LA_CSR_TLBRSAVE
-//             ertn
-//         ",
-//         options(noreturn)
-//     );
-// }
+use loongArch64::register::{pwch, pwcl, stlbps, tlbidx, tlbrehi, tlbrentry::set_tlbrentry};
 
 #[naked]
-pub unsafe extern "C" fn tlb_refill_new() {
+#[allow(unused)]
+pub unsafe extern "C" fn tlb_refill_polyhal() {
+    asm!(
+        "
+        .equ LA_CSR_PGDL,          0x19    /* Page table base address when VA[47] = 0 */
+        .equ LA_CSR_PGDH,          0x1a    /* Page table base address when VA[47] = 1 */
+        .equ LA_CSR_PGD,           0x1b    /* Page table base */
+        .equ LA_CSR_TLBRENTRY,     0x88    /* TLB refill exception entry */
+        .equ LA_CSR_TLBRBADV,      0x89    /* TLB refill badvaddr */
+        .equ LA_CSR_TLBRERA,       0x8a    /* TLB refill ERA */
+        .equ LA_CSR_TLBRSAVE,      0x8b    /* KScratch for TLB refill exception */
+        .equ LA_CSR_TLBRELO0,      0x8c    /* TLB refill entrylo0 */
+        .equ LA_CSR_TLBRELO1,      0x8d    /* TLB refill entrylo1 */
+        .equ LA_CSR_TLBREHI,       0x8e    /* TLB refill entryhi */
+        .balign 4096
+            csrwr   $t0, LA_CSR_TLBRSAVE
+            csrrd   $t0, LA_CSR_PGD
+            lddir   $t0, $t0, 3
+            lddir   $t0, $t0, 1
+            ldpte   $t0, 0
+            ldpte   $t0, 1
+            tlbfill
+            csrrd   $t0, LA_CSR_TLBRSAVE
+            ertn
+        ",
+        options(noreturn)
+    );
+}
+
+#[naked]
+#[allow(unused)]
+pub unsafe extern "C" fn tlb_refill_npu_impact() {
     asm!(
         // PGD: 0x1b CRMD:0x0 PWCL:0x1c TLBRBADV:0x89 TLBERA:0x8a TLBRSAVE:0x8b SAVE:0x30
         // TLBREHi: 0x8e STLBPS: 0x1e MERRsave:0x95
@@ -96,17 +95,17 @@ pub unsafe extern "C" fn tlb_refill_new() {
     )
 }
 
-#[repr(align(4096))]
-pub fn tlb_refill111() {
-    info!(
-        "refill, era = {}, badv = {}",
-        era::read().pc(),
-        badv::read().vaddr()
-    );
-    unsafe {
-        tlb_refill_new();
-    }
-}
+// #[repr(align(4096))]
+// pub fn tlb_refill111() {
+//     log::info!(
+//         "refill, era = {}, badv = {}",
+//         loongArch64::register::era::read().pc(),
+//         loongArch64::register::badv::read().vaddr()
+//     );
+//     unsafe {
+//         tlb_refill_polyhal();
+//     }
+// }
 
 #[inline]
 pub fn set_tlb_refill_entry(tlbrentry: usize) {
@@ -163,7 +162,7 @@ pub fn tlb_init_inner() {
     pwch::set_dir3_base(PAGE_SIZE_SHIFT + PAGE_SIZE_SHIFT - 3 + PAGE_SIZE_SHIFT - 3);
     pwch::set_dir3_width(PAGE_SIZE_SHIFT - 3);
 
-    set_tlb_refill_entry(tlb_refill111 as usize);
+    set_tlb_refill_entry(tlb_refill_polyhal as usize);
     // pgdl::set_base(kernel_pgd_base);
     // pgdh::set_base(kernel_pgd_base);
     // tlb_flush_all();

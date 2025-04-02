@@ -25,6 +25,14 @@ replace-with = "vendored-sources"
 git = "https://github.com/YuXuaann/ext4_rs-async-smp"
 replace-with = "vendored-sources"
 
+[source."git+https://github.com/huayuntao/dep_iso.git"]
+git = "https://github.com/huayuntao/dep_iso.git"
+replace-with = "vendored-sources"
+
+[source."git+https://github.com/huayuntao/dep_pci.git"]
+git = "https://github.com/huayuntao/dep_pci.git"
+replace-with = "vendored-sources"
+
 [source."git+https://github.com/os-module/kernel-sync.git"]
 git = "https://github.com/os-module/kernel-sync.git"
 replace-with = "vendored-sources"

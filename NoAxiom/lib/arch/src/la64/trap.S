@@ -22,15 +22,16 @@
     .endm
 
     .macro    STORE_GENERAL_REG
-    st.d      $ra, $sp, 1*8
-    .set      n, 3
-    .rept     29
+    st.d      $ra, $sp, 1*8            # x1 / ra (skip x0)
+    st.d      $tp, $sp, 2*8            # x2 / tp
+    .set      n, 4                     # skip x3 / sp, start from x4, sp will be saved outside from macro
+    .rept     28
     STORE_X   %n
     .set      n, n+1
     .endr
-    csrrd     $t0, CSR_PRMD            # LoongArch的PRMD寄存器(类似sstatus)
-    csrrd     $t1, CSR_ERA             # LoongArch的ERA寄存器(类似sepc)
-    csrrd     $t2, CSR_SAVE            # LoongArch的用户栈指针(类似sscratch)
+    csrrd     $t0, CSR_PRMD            # LA_PRMD   <> sstatus
+    csrrd     $t1, CSR_ERA             # LA_ERA    <> sepc
+    csrrd     $t2, CSR_SAVE            # LA_tmp_sp <> sscratch
     st.d      $t0, $sp, 32*8
     st.d      $t1, $sp, 33*8
     .endm
@@ -38,15 +39,16 @@
     .macro    LOAD_GENERAL_REG
     ld.d      $t0, $sp, 32*8
     ld.d      $t1, $sp, 33*8
-    csrwr     $t0, CSR_PRMD            # 写PRMD
-    csrwr     $t1, CSR_ERA             # 写ERA
-    ld.d      $ra, $sp, 1*8
-    .set      n, 3
-    .rept     29
+    csrwr     $t0, CSR_PRMD            # PRMD
+    csrwr     $t1, CSR_ERA             # ERA
+    ld.d      $ra, $sp, 1*8            # x1 / ra (skip x0)
+    ld.d      $tp, $sp, 2*8            # x2 / tp
+    .set      n, 4                     # skip x3 / sp, start from x4
+    .rept     28
     LOAD_X    %n
     .set      n, n+1
     .endr
-    ld.d      $sp, $sp, 2*8
+    ld.d      $sp, $sp, 3*8            # load sp finally
     .endm
 
     .section  .text.trampoline
@@ -57,26 +59,29 @@
 
 # user -> kernel
     user_trapvec:
-    csrwr     $sp, CSR_SAVE            # 交换用户栈指针和内核栈指针
+    csrwr     $sp, CSR_SAVE            # take the kernel sp
+# beq       $sp, $zero, 1f           # if kernel_sp is 0, it's a kernel trap
     STORE_GENERAL_REG
-    st.d      $t2, $sp, 2*8
-    ld.d      $ra, $sp, 35*8           # 移动到kernel_sp
-    .set      n, 0                     # 加载callee-saved寄存器
+    st.d      $t2, $sp, 3*8            # store sp (x3 in la64)
+    ld.d      $ra, $sp, 35*8           # laod kernel_sp
+    .set      n, 0                     # load callee-saved regs
     .set      offset, 36
-    .rept     10
+    .rept     10                       # only save s0~s9
     LOAD_S    %n, %offset
     .set      n, n+1
     .set      offset, offset+1
     .endr
-    ld.d      $fp, $sp, 48*8           # 加载kernel fp
-    ld.d      $tp, $sp, 49*8
-    ld.d      $sp, $sp, 34*8
-    jirl      $zero, $ra, 0            # 返回到kernel ra
+    ld.d      $fp, $sp, 48*8           # load kernel fp
+    ld.d      $tp, $sp, 49*8           # load kernel tp
+    ld.d      $sp, $sp, 34*8           # load kernel sp
+    jirl      $zero, $ra, 0            # return to kernel ra
 
 # kernel -> user
     user_trapret:
+    or        $t0, $zero, $a0
     csrwr     $a0, CSR_SAVE
-    st.d      $sp, $a0, 34*8           # 保存kernel callee-saved寄存器
+    or        $a0, $zero, $t0          # to use correct a0
+    st.d      $sp, $a0, 34*8           # save kernel callee-saved reg
     st.d      $ra, $a0, 35*8
     .set      n, 0
     .set      offset, 36
@@ -89,13 +94,13 @@
     st.d      $tp, $a0, 49*8
     or        $sp, $a0, $zero
     LOAD_GENERAL_REG
-    ertn                               # LoongArch的异常返回指令(类似sret)
+    ertn                               # la: exception return <> rv: sret
 
 # kernel -> kernel
-# 只需要保存caller-saved寄存器
-# 注意这里不保存ERA和ECFG(类似sepc & stvec)
+# only need to save caller-saved regs
+# note that we don't save ERA & ECFG or other csrs here
     kernel_trapvec:
-    addi.d    $sp, $sp, -17*8
+    addi.d    $sp, $sp, -19*8
     st.d      $ra, $sp, 1*8
     st.d      $t0, $sp, 2*8
     st.d      $t1, $sp, 3*8
@@ -103,7 +108,7 @@
     st.d      $t3, $sp, 5*8
     st.d      $t4, $sp, 6*8
     st.d      $t5, $sp, 7*8
-    st.d      $t6, $sp, 8*8
+    st.d      $t6, $sp, 8*8            # diff with rv: t7 & t8 should be saved as well
     st.d      $a0, $sp, 9*8
     st.d      $a1, $sp, 10*8
     st.d      $a2, $sp, 11*8
@@ -112,6 +117,8 @@
     st.d      $a5, $sp, 14*8
     st.d      $a6, $sp, 15*8
     st.d      $a7, $sp, 16*8
+    st.d      $t7, $sp, 17*8
+    st.d      $t8, $sp, 18*8
     bl        kernel_trap_handler
     ld.d      $ra, $sp, 1*8
     ld.d      $t0, $sp, 2*8
@@ -129,8 +136,14 @@
     ld.d      $a5, $sp, 14*8
     ld.d      $a6, $sp, 15*8
     ld.d      $a7, $sp, 16*8
-    addi.d    $sp, $sp, 17*8
+    ld.d      $t7, $sp, 17*8
+    ld.d      $t8, $sp, 18*8
+    addi.d    $sp, $sp, 19*8
     ertn
+
+    __trampoline_panic:
+    1:
+    b 1b
 
     .section  .text.signal
     .globl    user_sigreturn

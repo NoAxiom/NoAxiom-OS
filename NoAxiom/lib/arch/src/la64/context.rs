@@ -1,6 +1,6 @@
 use core::ops::{Index, IndexMut};
 
-use loongArch64::register::euen;
+use loongArch64::register::{euen, prmd};
 
 use crate::{ArchTrapContext, ArchUserFloatContext, TrapArgs};
 
@@ -30,7 +30,7 @@ pub struct TrapContext {
     /// [48]/[384~391]: reserved
     kernel_fp: usize,
 
-    /// [49]/[392~399]: tp, aka hartid
+    /// [49]/[392~399]: tp
     kernel_tp: usize,
 
     /// freg
@@ -38,7 +38,6 @@ pub struct TrapContext {
 }
 
 impl TrapContext {
-    // new trap context with priv level initialized
     #[inline]
     pub fn new() -> Self {
         Self {
@@ -50,6 +49,7 @@ impl TrapContext {
         }
     }
     pub fn set_prmd(&mut self) {
+        self.prmd = prmd::read().raw();
         self.prmd |= 0b0111;
     }
 }
@@ -155,21 +155,21 @@ impl ArchTrapContext for TrapContext {
     }
 
     fn app_init_cx(entry: usize, sp: usize) -> Self {
-        // Self::new contains priv level settings
         let mut cx = Self::new();
         use TrapArgs::*;
-        cx[RA] = entry;
+        cx.set_prmd();
+        cx[EPC] = entry;
         cx[SP] = sp;
         cx
     }
 
     fn update_cx(&mut self, entry: usize, sp: usize, argc: usize, argv: usize, envp: usize) {
         use TrapArgs::*;
-        self[RA] = entry;
+        self.set_prmd();
+        self[EPC] = entry;
         self[SP] = sp;
         self[A0] = argc;
         self[A1] = argv;
         self[A2] = envp;
-        self.set_prmd();
     }
 }

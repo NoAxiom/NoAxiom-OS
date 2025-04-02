@@ -124,6 +124,7 @@ impl ArchTrap for LA64 {
         era::read().pc()
     }
     fn trap_restore(cx: &mut TrapContext) {
+        debug!("[trap_restore] era: {:#x}, sp: {:#x}", cx.era, cx.x[3]);
         disable_interrupt();
         set_user_trap_entry();
         unsafe { user_trapret(cx) };

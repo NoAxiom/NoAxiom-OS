@@ -51,7 +51,7 @@ pub async fn validate(
             Err(Errno::EFAULT)
         } else {
             error!("unknown error in memory validate");
-            Ok(())
+            Err(Errno::EFAULT)
         }
     } else {
         let mut ms = memory_set.lock();

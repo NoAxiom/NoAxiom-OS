@@ -148,5 +148,9 @@ impl ArchBoot for LA64 {
         info!("[LA64] pgd: {:?}", pgd::read());
         info!("[LA64] pgdl: {:?}", pgdl::read());
         info!("[LA64] pgdh: {:?}", pgdh::read());
+
+        let save: usize;
+        unsafe { asm!("csrrd {}, 0x30", out(reg) save) };
+        info!("[LA64] SAVE: {:#x}", save);
     }
 }

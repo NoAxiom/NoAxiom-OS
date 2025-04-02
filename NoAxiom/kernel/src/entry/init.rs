@@ -55,7 +55,7 @@ pub extern "C" fn _other_hart_init(hart_id: usize, dtb: usize) -> ! {
 /// init bss, mm, console, and other drivers, then jump to rust_main,
 /// called by [`super::boot`]
 #[no_mangle]
-pub extern "C" fn _boot_hart_init(_: usize, dtb: usize) -> ! {
+pub extern "C" fn _boot_hart_init(_hartid: usize, _dtb: usize) -> ! {
     // data init
     bss_init();
     heap_init();

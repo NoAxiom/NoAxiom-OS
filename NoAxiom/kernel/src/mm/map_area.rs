@@ -149,31 +149,31 @@ impl MapArea {
         for vpn in self.vpn_range.into_iter() {
             self.map_one(vpn, page_table);
             // todo: remove this debug code
-            Arch::tlb_flush();
-            let addr = VirtAddr::from(vpn).0 as usize as *mut usize;
-            if self.vpn_range.start().0 == 0x9000000010000 {
-                let pte = page_table.find_pte(vpn).unwrap();
-                debug!(
-                    "[qwq1] vpn = {:#x}, ppn = {:#x}, flags = {:?}",
-                    vpn.0,
-                    pte.ppn(),
-                    pte.flags()
-                );
-                debug!(
-                    "[qwq2] translate_va_debug: {:#x}",
-                    page_table.translate_va_debug((addr as usize).into()).unwrap().0
-                );
-            }
-            assert!(
-                page_table.translate_vpn(vpn).is_some(),
-                "translation failed!!! vpn = {:#x}",
-                vpn.0
-            );
-            unsafe {
-                MAP_ADDRESS = addr as usize;
-                let value = core::ptr::read_volatile(addr);
-                core::ptr::write_volatile(addr, value);
-            };
+            // Arch::tlb_flush();
+            // let addr = VirtAddr::from(vpn).0 as usize as *mut usize;
+            // if self.vpn_range.start().0 == 0x9000000010000 {
+            //     let pte = page_table.find_pte(vpn).unwrap();
+            //     debug!(
+            //         "[qwq1] vpn = {:#x}, ppn = {:#x}, flags = {:?}",
+            //         vpn.0,
+            //         pte.ppn(),
+            //         pte.flags()
+            //     );
+            //     debug!(
+            //         "[qwq2] translate_va_debug: {:#x}",
+            //         page_table.translate_va_debug((addr as
+            // usize).into()).unwrap().0     );
+            // }
+            // assert!(
+            //     page_table.translate_vpn(vpn).is_some(),
+            //     "translation failed!!! vpn = {:#x}",
+            //     vpn.0
+            // );
+            // unsafe {
+            //     MAP_ADDRESS = addr as usize;
+            //     let value = core::ptr::read_volatile(addr);
+            //     core::ptr::write_volatile(addr, value);
+            // };
         }
     }
 

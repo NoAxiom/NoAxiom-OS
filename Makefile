@@ -122,7 +122,7 @@ ifeq ($(ARCH_NAME),loongarch64)
 	QFLAGS += -drive file=$(FS_IMG),if=none,format=raw,id=x0
 	QFLAGS += -device virtio-blk-pci,drive=x0 -no-reboot # Official says bus=virtio-mmio-bus.0, but it's wrong
 	# QFLAGS += -device virtio-net-pci,netdev=net0
-	# QFLAGS += -netdev user,id=net0,hostfwd=tcp::5555-:5555,hostfwd=udp::5555-:5555
+	QFLAGS += -netdev user,id=net0,hostfwd=tcp::5555-:5555,hostfwd=udp::5555-:5555
 	QFLAGS += -rtc base=utc
 	# QFLAGS += -drive file=disk-la.img,if=none,format=raw,id=x1
 	# QFLAGS += -device virtio-blk-pci,drive=x1,bus=virtio-mmio-bus.1
