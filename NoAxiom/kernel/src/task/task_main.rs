@@ -73,7 +73,7 @@ pub async fn task_main(task: Arc<Task>) {
     assert!(check_no_lock());
     loop {
         // kernel -> user
-        debug!("[task_main] trap_restore");
+        trace!("[task_main] trap_restore");
         Arch::trap_restore(task.trap_context_mut());
         assert!(check_no_lock());
         let mut pcb = task.pcb();
@@ -88,7 +88,7 @@ pub async fn task_main(task: Arc<Task>) {
         assert!(check_no_lock());
 
         // user -> kernel, enter the handler
-        debug!("[task_main] user_trap_handler");
+        trace!("[task_main] user_trap_handler");
         assert!(!Arch::is_interrupt_enabled());
         assert!(check_no_lock());
         user_trap_handler(&task).await;

@@ -17,12 +17,7 @@ use crate::{
 
 pub async fn init_proc_exit_handler(task: &Arc<Task>) {
     let inner = task.pcb();
-    if inner.children.is_empty() {
-        info!(
-            "[exit_handler] init_proc exited successfully, exit_code: {}",
-            inner.exit_code
-        );
-    } else {
+    if !inner.children.is_empty() {
         warn!("[exit_handler] init_proc try to exited before its children!!!");
         let ch_tid: Vec<usize> = inner.children.iter().map(|it| it.tid()).collect();
         warn!("[exit_handler] child info: {:?}", ch_tid);
@@ -32,10 +27,16 @@ pub async fn init_proc_exit_handler(task: &Arc<Task>) {
                 info!("[exit_handler] child finally exited: {:?}", pid);
             }
         }
-        info!(
+    }
+    match inner.exit_code {
+        0 => info!(
             "[exit_handler] init_proc exited successfully, exit_code: {}",
             inner.exit_code
-        );
+        ),
+        _ => error!(
+            "[exit_handler] init_proc exited unexpectedly, exit_code: {}",
+            inner.exit_code
+        ),
     }
     drop(inner);
     root_dentry().super_block().sync_all().await;

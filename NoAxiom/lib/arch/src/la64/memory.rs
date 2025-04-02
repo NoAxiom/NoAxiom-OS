@@ -1,11 +1,11 @@
 use config::mm::PAGE_WIDTH;
-use loongArch64::register::{pgdh, pgdl};
+use loongArch64::register::{pgd, pgdh, pgdl};
 
 use super::{
     tlb::{tlb_flush_all, tlb_init_inner},
     LA64,
 };
-use crate::{utils::macros::bit, ArchMemory, ArchPageTable, ArchPageTableEntry, MappingFlags};
+use crate::{ArchMemory, ArchPageTable, ArchPageTableEntry, MappingFlags};
 
 const PA_WIDTH: usize = 48;
 const VA_WIDTH: usize = 39;
@@ -18,39 +18,36 @@ pub const KERNEL_ADDR_OFFSET: usize = 0x9000_0000_0000_0000;
 bitflags::bitflags! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
     /// Possible flags for a page table entry.
-    pub struct PTEFlags: u64 {
-        /// Page Valid
-        const V = bit!(0);
-
-        /// Dirty, The page has been writed.
-        const D = bit!(1);
-
-        const PLV_USER = 0b11 << 2;
-
-        const MAT_NOCACHE = 0b01 << 4;
-
-        /// Designates a global mapping OR Whether the page is huge page.
-        const GH = bit!(6);
-
-        /// Page is existing.
-        const P = bit!(7);
-
-        /// Page is writeable.
-        const W = bit!(8);
-
-        /// Is a Global Page if using huge page(GH bit).
-        const G = bit!(12);
-
-        /// Page is not readable.
-        const NR = bit!(61);
-
-        /// Page is not executable.
-        /// Linux related url: https://github.com/torvalds/linux/blob/master/arch/loongarch/include/asm/pgtable-bits.h
-        const NX = bit!(62);
-
-        /// Whether the privilege Level is restricted. When RPLV is 0, the PTE
-        /// can be accessed by any program with privilege Level highter than PLV.
-        const RPLV = bit!(63);
+    pub struct PTEFlags: usize {
+        /// Valid Bit
+        const V = 1 << 0;
+        /// Dirty Bit, true if it is modified.
+        const D = 1 << 1;
+        /// Privilege Level field
+        const PLV0 = 0;
+        const PLV1 = 1 << 2;
+        const PLV2 = 2 << 2;
+        const PLV3 = 3 << 2;
+        /// Memory Access Type: Strongly-ordered UnCached (SUC)
+        const MAT_SUC = 0 << 4;
+        /// Memory Access Type: Coherent Cached (CC)
+        const MAT_CC = 1 << 4;
+        /// Memory Access Type: Weakly-ordered UnCached (WUC)
+        const MAT_WUC = 2 << 4;
+        /// Global Bit (Basic PTE)
+        const G = 1 << 6;
+        /// Physical Bit, whether the physical page exists
+        const P = 1 << 7;
+        /// Writable Bit
+        const W = 1 << 8;
+        /// Not Readable Bit
+        const NR = 1 << (usize::BITS - 3); // 61
+        /// Executable Bit
+        const NX = 1 << (usize::BITS - 2); // 62
+        /// Restricted Privilege LeVel enable (RPLV) for the page table.
+        /// When RPLV=0, the page table entry can be accessed by any program whose privilege level is not lower than PLV;
+        /// when RPLV=1, the page table entry can only be accessed by programs whose privilege level is equal to PLV.
+        const RPLV = 1 << (usize::BITS - 1); // 63
     }
 }
 
@@ -60,9 +57,8 @@ impl From<MappingFlags> for PTEFlags {
         // V D U P W G?? NX
         if flags.contains(MappingFlags::V) {
             res |= PTEFlags::V;
-            res |= PTEFlags::P;
         }
-        if flags.contains(MappingFlags::X) {
+        if !flags.contains(MappingFlags::X) {
             res |= PTEFlags::NX;
         }
         if flags.contains(MappingFlags::W) {
@@ -72,7 +68,7 @@ impl From<MappingFlags> for PTEFlags {
             res |= PTEFlags::D;
         }
         if flags.contains(MappingFlags::U) {
-            res |= PTEFlags::PLV_USER;
+            res |= PTEFlags::PLV3;
         }
         res
     }
@@ -83,7 +79,7 @@ impl From<PTEFlags> for MappingFlags {
         let mut res = MappingFlags::empty();
         // V D U P W G?? NX
         // log::debug!("PTEFlags: {:?}", val);
-        if val.contains(PTEFlags::V) && val.contains(PTEFlags::P) {
+        if val.contains(PTEFlags::V) {
             res |= MappingFlags::V;
         }
         if val.contains(PTEFlags::W) {
@@ -95,7 +91,7 @@ impl From<PTEFlags> for MappingFlags {
         if !val.contains(PTEFlags::NX) {
             res |= MappingFlags::X;
         }
-        if val.contains(PTEFlags::PLV_USER) {
+        if val.contains(PTEFlags::PLV3) {
             res |= MappingFlags::U;
         }
         res
@@ -120,6 +116,7 @@ impl From<usize> for PageTableEntry {
 const FLAG_WIDTH: usize = 12;
 const PPN_WIDTH: usize = PA_WIDTH - PAGE_WIDTH;
 const PPN_MASK: usize = (1usize << PPN_WIDTH) - 1;
+const FLAG_MASK: usize = !(PPN_MASK << FLAG_WIDTH);
 impl ArchPageTableEntry for PageTableEntry {
     /// create a new page table entry from ppn and flags
     fn new(ppn: usize, flags: MappingFlags) -> Self {
@@ -132,18 +129,22 @@ impl ArchPageTableEntry for PageTableEntry {
     }
     /// get the pte permission flags
     fn flags(&self) -> MappingFlags {
-        PTEFlags::from_bits((self.0 & ((1 << FLAG_WIDTH) - 1)) as u64)
-            .unwrap()
-            .into()
+        PTEFlags::from_bits(self.0 & FLAG_MASK).unwrap().into()
     }
     /// set flags
     fn set_flags(&mut self, flags: MappingFlags) {
         let flags = PTEFlags::from(flags);
-        self.0 = (self.0 & !((1 << FLAG_WIDTH) - 1)) | (flags.bits() as usize);
+        self.0 = (self.0 & FLAG_MASK) | (flags.bits() as usize);
     }
     /// clear all data
     fn reset(&mut self) {
         self.0 = 0;
+    }
+}
+
+impl PageTableEntry {
+    pub fn raw_flag(&self) -> PTEFlags {
+        PTEFlags::from_bits(self.0 & FLAG_MASK).unwrap()
     }
 }
 
@@ -197,7 +198,6 @@ impl ArchMemory for LA64 {
         tlb_flush_all();
     }
     fn current_root_ppn() -> usize {
-        // todo: when in kernel space, it's incorrect
-        pgdl::read().base() >> PAGE_WIDTH
+        pgd::read().base() >> PAGE_WIDTH
     }
 }

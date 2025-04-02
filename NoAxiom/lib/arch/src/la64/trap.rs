@@ -2,7 +2,7 @@ use core::arch::global_asm;
 
 use log::error;
 use loongArch64::register::{
-    badv, ecfg, eentry, era,
+    badi, badv, ecfg, eentry, era,
     estat::{self, Exception, Interrupt, Trap},
 };
 
@@ -37,6 +37,17 @@ fn get_trap_type(tf: Option<&mut TrapContext>) -> TrapType {
     let estat = estat::read();
     let badv = badv::read().vaddr();
     match estat.cause() {
+        Trap::Exception(Exception::Syscall) | Trap::Interrupt(Interrupt::Timer) => {}
+        _ => {
+            trace!(
+                "[get_trap_type] estat: {:#x?}, badv: {:#x}, pc: {:#x}",
+                estat.cause(),
+                badv,
+                era::read().pc(),
+            );
+        }
+    }
+    match estat.cause() {
         Trap::Exception(e) => match e {
             Exception::Breakpoint => TrapType::Breakpoint,
             Exception::AddressNotAligned => {
@@ -57,10 +68,11 @@ fn get_trap_type(tf: Option<&mut TrapContext>) -> TrapType {
             | Exception::PagePrivilegeIllegal => TrapType::LoadPageFault(badv),
             _ => {
                 error!(
-                    "[get_trap_type] unhandled exception: {:?}, pc = {:#x}, BADV = {:#x}",
+                    "[get_trap_type] unhandled exception: {:?}, pc = {:#x}, BADV = {:#x}, BADI = {:#x}",
                     e,
                     era::read().pc(),
                     badv,
+                    badi::read().inst(),
                 );
                 error!("[get_trap_type] trap_cx: {:#x?}", tf);
                 TrapType::Unknown
@@ -90,15 +102,16 @@ fn get_trap_type(tf: Option<&mut TrapContext>) -> TrapType {
         },
         _ => {
             error!(
-                "[get_trap_type] unhandled trap type: {:?}, pc = {:#x}, BADV = {:#x}, raw_ecode = {}, esubcode = {}, is = {}",
+                "[get_trap_type] unhandled trap type: {:?}, pc = {:#x}, BADV = {:#x}, raw_ecode = {:#x}, esubcode = {:#x}, badi: {:#x}, is = {}",
                 estat.cause(),
                 era::read().pc(),
                 badv,
                 estat.ecode(),
                 estat.esubcode(),
+                badi::read().inst(),
                 estat.is()
             );
-            error!("[get_trap_type] trap_cx: {:#x?}", tf);
+            // error!("[get_trap_type] trap_cx: {:#x?}", tf);
             TrapType::Unknown
         }
     }
@@ -128,6 +141,7 @@ impl ArchTrap for LA64 {
         disable_interrupt();
         set_user_trap_entry();
         unsafe { user_trapret(cx) };
+        disable_interrupt();
     }
     fn set_user_trap_entry() {
         set_user_trap_entry();

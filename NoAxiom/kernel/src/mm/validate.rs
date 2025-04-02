@@ -50,7 +50,7 @@ pub async fn validate(
             );
             Err(Errno::EFAULT)
         } else {
-            error!("unknown error in memory validate");
+            error!("unknown error in memory validate, flag: {:?}, raw: {:?}", flags, pte.raw_flag());
             Err(Errno::EFAULT)
         }
     } else {

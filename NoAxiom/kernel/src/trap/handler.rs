@@ -64,8 +64,8 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
     let trap_type = Arch::read_trap_type(Some(cx));
     let user_exit = |msg: &str| {
         error!(
-            "[user_trap_handler] unexpected exit!!! msg: {}, sepc = {:#x}",
-            msg, epc,
+            "[user_trap_handler] unexpected exit!!! msg: {}, trap_type: {:?}, sepc = {:#x}",
+            msg, trap_type, epc,
         );
         Arch::arch_info_print();
         task.terminate(-1);

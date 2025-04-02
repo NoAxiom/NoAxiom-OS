@@ -4,10 +4,14 @@ use config::mm::PAGE_WIDTH;
 use loongArch64::register::{pwch, pwcl, stlbps, tlbidx, tlbrehi, tlbrentry::set_tlbrentry};
 
 #[naked]
-#[allow(unused)]
-pub unsafe extern "C" fn tlb_refill_polyhal() {
+pub unsafe extern "C" fn tlb_refill() {
     asm!(
+        // PGD: 0x1b CRMD:0x0 PWCL:0x1c TLBRBADV:0x89 TLBERA:0x8a TLBRSAVE:0x8b SAVE:0x30
+        // TLBREHi: 0x8e STLBPS: 0x1e MERRsave:0x95
         "
+        .equ LA_CSR_TLBEHI,        0x11    /* TLB entry high */
+        .equ LA_CSR_TLBELO0,       0x12    /* TLB entry low 0 */
+        .equ LA_CSR_TLBELO1,       0x13    /* TLB entry low 1 */
         .equ LA_CSR_PGDL,          0x19    /* Page table base address when VA[47] = 0 */
         .equ LA_CSR_PGDH,          0x1a    /* Page table base address when VA[47] = 1 */
         .equ LA_CSR_PGD,           0x1b    /* Page table base */
@@ -19,42 +23,20 @@ pub unsafe extern "C" fn tlb_refill_polyhal() {
         .equ LA_CSR_TLBRELO1,      0x8d    /* TLB refill entrylo1 */
         .equ LA_CSR_TLBREHI,       0x8e    /* TLB refill entryhi */
         .balign 4096
-            csrwr   $t0, LA_CSR_TLBRSAVE
-            csrrd   $t0, LA_CSR_PGD
-            lddir   $t0, $t0, 3
-            lddir   $t0, $t0, 1
-            ldpte   $t0, 0
-            ldpte   $t0, 1
-            tlbfill
-            csrrd   $t0, LA_CSR_TLBRSAVE
-            ertn
-        ",
-        options(noreturn)
-    );
-}
+            csrwr  $t0, LA_CSR_TLBRSAVE
 
-#[naked]
-#[allow(unused)]
-pub unsafe extern "C" fn tlb_refill_npu_impact() {
-    asm!(
-        // PGD: 0x1b CRMD:0x0 PWCL:0x1c TLBRBADV:0x89 TLBERA:0x8a TLBRSAVE:0x8b SAVE:0x30
-        // TLBREHi: 0x8e STLBPS: 0x1e MERRsave:0x95
-        "
-            .balign 4096
-            csrwr  $t0, 0x8b
-
-            csrrd  $t0, 0x1b
+            csrrd  $t0, LA_CSR_PGD
             lddir  $t0, $t0, 3
             andi   $t0, $t0, 1
             beqz   $t0, 1f
 
-            csrrd  $t0, 0x1b
+            csrrd  $t0, LA_CSR_PGD
             lddir  $t0, $t0, 3
             addi.d $t0, $t0, -1
             lddir  $t0, $t0, 1
             andi   $t0, $t0, 1
             beqz   $t0, 1f
-            csrrd  $t0, 0x1b
+            csrrd  $t0, LA_CSR_PGD
             lddir  $t0, $t0, 3
             addi.d $t0, $t0, -1
             lddir  $t0, $t0, 1
@@ -62,50 +44,38 @@ pub unsafe extern "C" fn tlb_refill_npu_impact() {
 
             ldpte  $t0, 0
             ldpte  $t0, 1
-            csrrd  $t0, 0x8c
-            csrrd  $t0, 0x8d
+            csrrd  $t0, LA_CSR_TLBRELO0
+            csrrd  $t0, LA_CSR_TLBRELO1
             csrrd  $t0, 0x0
         2:
             tlbfill
-            csrrd  $t0, 0x89
+            csrrd  $t0, LA_CSR_TLBRBADV
             srli.d $t0, $t0, 13
             slli.d $t0, $t0, 13
-            csrwr  $t0, 0x11
+            csrwr  $t0, LA_CSR_TLBEHI
             tlbsrch
             tlbrd
-            csrrd  $t0, 0x12
-            csrrd  $t0, 0x13
-            csrrd  $t0, 0x8b
+            csrrd  $t0, LA_CSR_TLBELO0
+            csrrd  $t0, LA_CSR_TLBELO1
+            csrrd  $t0, LA_CSR_TLBRSAVE
             ertn
         1:
-            csrrd  $t0, 0x8e
+            csrrd  $t0, LA_CSR_TLBREHI
             ori    $t0, $t0, 0xC
-            csrwr  $t0, 0x8e
+            csrwr  $t0, LA_CSR_TLBREHI
 
             rotri.d $t0, $t0, 61
             ori    $t0, $t0, 3
             rotri.d $t0, $t0, 3
 
-            csrwr  $t0, 0x8c
-            csrrd  $t0, 0x8c
-            csrwr  $t0, 0x8d
+            csrwr  $t0, LA_CSR_TLBRELO0
+            csrrd  $t0, LA_CSR_TLBRELO0
+            csrwr  $t0, LA_CSR_TLBRELO1
             b      2b
         ",
         options(noreturn)
     )
 }
-
-// #[repr(align(4096))]
-// pub fn tlb_refill111() {
-//     log::info!(
-//         "refill, era = {}, badv = {}",
-//         loongArch64::register::era::read().pc(),
-//         loongArch64::register::badv::read().vaddr()
-//     );
-//     unsafe {
-//         tlb_refill_polyhal();
-//     }
-// }
 
 #[inline]
 pub fn set_tlb_refill_entry(tlbrentry: usize) {
@@ -125,7 +95,7 @@ pub fn flush_vaddr(va: usize) {
 #[inline]
 pub fn tlb_flush_all() {
     unsafe {
-        core::arch::asm!("invtlb 0x0, $r0, $r0");
+        core::arch::asm!("invtlb 0x0,$zero, $zero");
     }
 }
 
@@ -134,36 +104,22 @@ pub const _PS_16K: usize = 0x0e;
 pub const _PS_2M: usize = 0x15;
 pub const _PS_1G: usize = 0x1e;
 
-pub const PAGE_SIZE_SHIFT: usize = PAGE_WIDTH;
-
 pub fn tlb_init_inner() {
-    // // setup PWCTL
-    // unsafe {
-    // asm!(
-    //     "li.d     $r21,  0x4d52c",     // (9 << 15) | (21 << 10) | (9 << 5) | 12
-    //     "csrwr    $r21,  0x1c",        // LOONGARCH_CSR_PWCTL0
-    //     "li.d     $r21,  0x25e",       // (9 << 6)  | 30
-    //     "csrwr    $r21,  0x1d",         //LOONGARCH_CSR_PWCTL1
-    //     )
-    // }
-
     tlbidx::set_ps(PS_4K);
     stlbps::set_ps(PS_4K);
     tlbrehi::set_ps(PS_4K);
 
-    // set hardware
-    pwcl::set_pte_width(8); // 64-bits
-    pwcl::set_ptbase(PAGE_SIZE_SHIFT);
-    pwcl::set_ptwidth(PAGE_SIZE_SHIFT - 3);
+    const PTE_WIDTH: usize = 8;
+    const DIR_WIDTH: usize = PAGE_WIDTH - 3;
+    pwcl::set_pte_width(PTE_WIDTH); // 64-bits
+    pwcl::set_ptbase(PAGE_WIDTH);
+    pwcl::set_ptwidth(DIR_WIDTH);
 
-    pwcl::set_dir1_base(PAGE_SIZE_SHIFT + PAGE_SIZE_SHIFT - 3);
-    pwcl::set_dir1_width(PAGE_SIZE_SHIFT - 3);
+    pwcl::set_dir1_base(PAGE_WIDTH + DIR_WIDTH);
+    pwcl::set_dir1_width(DIR_WIDTH);
 
-    pwch::set_dir3_base(PAGE_SIZE_SHIFT + PAGE_SIZE_SHIFT - 3 + PAGE_SIZE_SHIFT - 3);
-    pwch::set_dir3_width(PAGE_SIZE_SHIFT - 3);
+    pwch::set_dir3_base(PAGE_WIDTH + DIR_WIDTH * 2);
+    pwch::set_dir3_width(DIR_WIDTH);
 
-    set_tlb_refill_entry(tlb_refill_polyhal as usize);
-    // pgdl::set_base(kernel_pgd_base);
-    // pgdh::set_base(kernel_pgd_base);
-    // tlb_flush_all();
+    set_tlb_refill_entry(tlb_refill as usize);
 }

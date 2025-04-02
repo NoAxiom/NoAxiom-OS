@@ -141,10 +141,6 @@
     addi.d    $sp, $sp, 19*8
     ertn
 
-    __trampoline_panic:
-    1:
-    b 1b
-
     .section  .text.signal
     .globl    user_sigreturn
     .align    12

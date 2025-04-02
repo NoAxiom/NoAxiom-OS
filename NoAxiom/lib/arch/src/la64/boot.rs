@@ -110,13 +110,15 @@ impl ArchBoot for LA64 {
         tlb_init();
     }
     fn arch_info_print() {
+        let hartid = LA64::get_hartid();
         info!("[LA64] arch: loongarch64");
-        info!("[LA64] hart id: {}", LA64::get_hartid());
-        let boot_start_top_p = ptr::from_ref(&BOOT_STACK) as usize;
+        info!("[LA64] hart id: {}", hartid);
+        let boot_start_top_0 = ptr::from_ref(&BOOT_STACK) as usize;
+        let boot_start_top_cur = boot_start_top_0 + KERNEL_STACK_SIZE * hartid;
         info!(
             "[LA64] kernel_stack addr: [{:#x}, {:#x})",
-            boot_start_top_p,
-            boot_start_top_p + KERNEL_STACK_SIZE
+            boot_start_top_cur,
+            boot_start_top_cur + KERNEL_STACK_SIZE
         );
         info!(
             "[LA64] max_valen: {}, max_palen: {}",
@@ -142,7 +144,7 @@ impl ArchBoot for LA64 {
         info!("[LA64] pwcl: {:#x}", pwcl::read().raw());
         info!("[LA64] pwch: {:#x}", pwch::read().raw());
         for i in 0..5 {
-            info!("[LA64] pwcl[{}]: {:?}", i, info[i]);
+            info!("[LA64] pwc[{}]: {:?}", i, info[i]);
         }
 
         info!("[LA64] pgd: {:?}", pgd::read());
