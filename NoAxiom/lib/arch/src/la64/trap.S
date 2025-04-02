@@ -52,13 +52,13 @@
     .endm
 
     .section  .text.trampoline
-    .globl    user_trapvec
-    .globl    user_trapret
-    .globl    kernel_trapvec
+    .globl    __user_trapvec
+    .globl    __user_trapret
+    .globl    __kernel_trapvec
     .align    2
 
 # user -> kernel
-    user_trapvec:
+    __user_trapvec:
     csrwr     $sp, CSR_SAVE            # take the kernel sp
 # beq       $sp, $zero, 1f           # if kernel_sp is 0, it's a kernel trap
     STORE_GENERAL_REG
@@ -77,7 +77,7 @@
     jirl      $zero, $ra, 0            # return to kernel ra
 
 # kernel -> user
-    user_trapret:
+    __user_trapret:
     or        $t0, $zero, $a0
     csrwr     $a0, CSR_SAVE
     or        $a0, $zero, $t0          # to use correct a0
@@ -99,7 +99,7 @@
 # kernel -> kernel
 # only need to save caller-saved regs
 # note that we don't save ERA & ECFG or other csrs here
-    kernel_trapvec:
+    __kernel_trapvec:
     addi.d    $sp, $sp, -19*8
     st.d      $ra, $sp, 1*8
     st.d      $t0, $sp, 2*8

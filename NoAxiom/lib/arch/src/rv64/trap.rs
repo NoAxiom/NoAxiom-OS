@@ -19,9 +19,9 @@ use crate::{
 
 global_asm!(include_str!("./trap.S"));
 extern "C" {
-    fn user_trapvec();
-    fn user_trapret(cx: *mut TrapContext);
-    fn kernel_trapvec();
+    fn __user_trapvec();
+    fn __user_trapret(cx: *mut TrapContext);
+    fn __kernel_trapvec();
 }
 
 pub fn get_trap_type(scause: Scause, stval: usize) -> TrapType {
@@ -57,11 +57,11 @@ impl ArchTrap for RV64 {
     type TrapContext = super::context::TrapContext;
     /// set trap entry in supervisor mode
     fn set_kernel_trap_entry() {
-        set_trap_entry(kernel_trapvec as usize);
+        set_trap_entry(__kernel_trapvec as usize);
     }
     /// set trap entry in user mode
     fn set_user_trap_entry() {
-        set_trap_entry(user_trapvec as usize);
+        set_trap_entry(__user_trapvec as usize);
     }
     /// init trap in a single hart
     /// note that it won't turn on global interrupt
@@ -74,7 +74,7 @@ impl ArchTrap for RV64 {
         RV64::set_user_trap_entry();
         cx.freg_mut().restore();
         cx.sstatus().set_fs(FS::Clean);
-        unsafe { user_trapret(cx) };
+        unsafe { __user_trapret(cx) };
         cx.freg_mut().mark_save_if_needed();
     }
     /// read exception pc

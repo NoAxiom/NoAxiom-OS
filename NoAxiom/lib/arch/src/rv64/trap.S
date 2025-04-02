@@ -54,13 +54,13 @@
     .endm
 
     .section  .text.trampoline
-    .globl    user_trapvec
-    .globl    user_trapret
-    .globl    kernel_trapvec
+    .globl    __user_trapvec
+    .globl    __user_trapret
+    .globl    __kernel_trapvec
     .align    2
 
 # user -> kernel
-    user_trapvec:
+    __user_trapvec:
     csrrw     sp, sscratch, sp
     STORE_GENERAL_REG
     sd        t2, 2*8(sp)
@@ -78,7 +78,7 @@
     ret                                # return to kernel ra
 
 # kernel -> user
-    user_trapret:
+    __user_trapret:
     csrw      sscratch, a0
     sd        sp, 34*8(a0)             # save kernel callee-saved regs
     sd        ra, 35*8(a0)
@@ -98,7 +98,7 @@
 # kernel -> kernel
 # only need to save caller-saved regs
 # note that we don't save sepc & stvec here
-    kernel_trapvec:
+    __kernel_trapvec:
     addi      sp, sp, -17*8
     sd        ra,  1*8(sp)
     sd        t0,  2*8(sp)

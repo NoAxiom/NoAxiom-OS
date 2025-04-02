@@ -16,21 +16,21 @@ use crate::{ArchTrap, TrapType};
 
 global_asm!(include_str!("./trap.S"));
 extern "C" {
-    fn user_trapvec();
-    fn user_trapret(cx: *mut TrapContext);
-    fn kernel_trapvec();
+    fn __user_trapvec();
+    fn __user_trapret(cx: *mut TrapContext);
+    fn __kernel_trapvec();
 }
 
 #[inline]
 pub fn set_user_trap_entry() {
     ecfg::set_vs(0);
-    eentry::set_eentry(user_trapvec as usize);
+    eentry::set_eentry(__user_trapvec as usize);
 }
 
 #[inline]
 pub fn set_kernel_trap_entry() {
     ecfg::set_vs(0);
-    eentry::set_eentry(kernel_trapvec as usize);
+    eentry::set_eentry(__kernel_trapvec as usize);
 }
 
 fn get_trap_type(tf: Option<&mut TrapContext>) -> TrapType {
@@ -140,7 +140,7 @@ impl ArchTrap for LA64 {
         // debug!("[trap_restore] era: {:#x}, sp: {:#x}", cx.era, cx.x[3]);
         disable_interrupt();
         set_user_trap_entry();
-        unsafe { user_trapret(cx) };
+        unsafe { __user_trapret(cx) };
         disable_interrupt();
     }
     fn set_user_trap_entry() {
