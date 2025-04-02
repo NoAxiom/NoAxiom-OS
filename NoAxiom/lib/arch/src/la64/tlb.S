@@ -64,7 +64,7 @@
 
 # will trigger page fault
     1:
-    csrrd  $t0, LA_CSR_TLBREHI
+    csrrd     $t0, LA_CSR_TLBREHI
     ori       $t0, $t0, 0xC
     csrwr     $t0, LA_CSR_TLBREHI
 
