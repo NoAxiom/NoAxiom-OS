@@ -17,37 +17,40 @@
     .equ      LA_CSR_TLBRELO0,      0x8c # TLB refill entrylo0
     .equ      LA_CSR_TLBRELO1,      0x8d # TLB refill entrylo1
     .equ      LA_CSR_TLBREHI,       0x8e # TLB refill entryhi
-    
+
     .globl    __tlb_refill
     .balign   4096
 
     __tlb_refill:
-    csrwr     $t0, LA_CSR_TLBRSAVE
+    csrwr     $t0, LA_CSR_TLBRSAVE     # store temporary data
 
+# walk the page table
     csrrd     $t0, LA_CSR_PGD
-    lddir     $t0, $t0, 3
+    lddir     $t0, $t0, 3              # load: (39, 30]
     andi      $t0, $t0, 1
-    beqz      $t0, 1f
+    beqz      $t0, 1f                  # valid check
 
     csrrd     $t0, LA_CSR_PGD
-    lddir     $t0, $t0, 3
-    addi.d    $t0, $t0, -1
-    lddir     $t0, $t0, 1
+    lddir     $t0, $t0, 3              # reload: (39, 30]
+    addi.d    $t0, $t0, -1             # sub valid flag
+    lddir     $t0, $t0, 1              # load: (30, 21]
     andi      $t0, $t0, 1
-    beqz      $t0, 1f
-    csrrd     $t0, LA_CSR_PGD
-    lddir     $t0, $t0, 3
+    beqz      $t0, 1f                  # valid check
+    csrrd     $t0, LA_CSR_PGD          # reload: (39, 30]
+    lddir     $t0, $t0, 3              # reload: (30, 21]
     addi.d    $t0, $t0, -1
-    lddir     $t0, $t0, 1
-    addi.d    $t0, $t0, -1
+    lddir     $t0, $t0, 1              # load: (21, 12]
+    addi.d    $t0, $t0, -1             # no need to check validality since we're in the lowest level
 
-    ldpte     $t0, 0
-    ldpte     $t0, 1
+    ldpte     $t0, 0                   # even page pte, will update TLBRELO0
+    ldpte     $t0, 1                   # odd page pte, will update TLBRELO1
     csrrd     $t0, LA_CSR_TLBRELO0
     csrrd     $t0, LA_CSR_TLBRELO1
-    csrrd     $t0, 0x0
+    csrrd     $t0, 0x0                 # fixme: is these instructions necessary? it just read the csr value
+
+# complete the TLB refill and return
     2:
-            tlbfill
+    tlbfill
     csrrd     $t0, LA_CSR_TLBRBADV
     srli.d    $t0, $t0, 13
     slli.d    $t0, $t0, 13
@@ -56,10 +59,12 @@
     tlbrd
     csrrd     $t0, LA_CSR_TLBELO0
     csrrd     $t0, LA_CSR_TLBELO1
-    csrrd     $t0, LA_CSR_TLBRSAVE
+    csrrd     $t0, LA_CSR_TLBRSAVE     # restore temporary data
     ertn
+
+# will trigger page fault
     1:
-            csrrd  $t0, LA_CSR_TLBREHI
+    csrrd  $t0, LA_CSR_TLBREHI
     ori       $t0, $t0, 0xC
     csrwr     $t0, LA_CSR_TLBREHI
 
