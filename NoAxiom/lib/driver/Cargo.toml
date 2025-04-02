@@ -1,0 +1,16 @@
+[package]
+name = "driver"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+async_fs = []
+
+[dependencies]
+arch = { workspace = true }
+ksync = { workspace = true }
+log = { workspace = true }
+config = { workspace = true }
+fdt = "0.1.5"
+plic = { git = "https://github.com/os-module/plic" }
+async-trait = "0.1.50"

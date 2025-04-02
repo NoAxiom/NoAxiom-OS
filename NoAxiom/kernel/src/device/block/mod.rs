@@ -3,13 +3,15 @@ pub mod virtio;
 use alloc::sync::Arc;
 
 use ksync::Once;
+use virtio::PciVirtio;
+use virtio_drivers::{device::blk::VirtIOBlk, transport::pci::PciTransport};
 
-use crate::device::block::virtio::virtio as Virtio;
+use crate::{device::block::virtio::virtio as Virtio, driver::block::virtio::virtio_impl::HalImpl};
 
 #[cfg(target_arch = "riscv64")]
 type BlockDeviceImpl = Virtio;
 #[cfg(target_arch = "loongarch64")]
-type BlockDeviceImpl = Virtio;
+type BlockDeviceImpl = PciVirtio;
 
 pub static BLOCK_DEVICE: Once<Arc<BlockDeviceImpl>> = Once::new();
 

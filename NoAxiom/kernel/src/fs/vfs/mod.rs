@@ -21,14 +21,14 @@ lazy_static::lazy_static! {
 
 pub fn chosen_device() -> Arc<dyn BlockDevice> {
     let device;
-    #[cfg(feature = "async_fs")]
+    #[cfg(all(feature = "async_fs", not(target_arch = "loongarch64")))]
     {
         use crate::driver::async_virtio_driver::virtio_mm::VIRTIO_BLOCK;
 
         info!("async_fs init");
         device = Arc::clone(&VIRTIO_BLOCK);
     }
-    #[cfg(not(feature = "async_fs"))]
+    #[cfg(not(all(feature = "async_fs", not(target_arch = "loongarch64"))))]
     {
         use crate::device::block::BLOCK_DEVICE as SYNC_BLOCK_DEVICE;
         info!("[vfs] sync_fs init");

@@ -313,6 +313,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
 
 [[package]]
+name = "driver"
+version = "0.1.0"
+dependencies = [
+ "arch",
+ "async-trait",
+ "config",
+ "fdt 0.1.5",
+ "ksync",
+ "log",
+ "plic",
+]
+
+[[package]]
 name = "embedded-hal"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -595,6 +608,7 @@ dependencies = [
  "console",
  "crate_interface",
  "downcast-rs",
+ "driver",
  "ext4_rs",
  "fatfs",
  "fdt 0.2.0-alpha1",

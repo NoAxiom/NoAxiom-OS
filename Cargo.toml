@@ -15,6 +15,7 @@ fatfs = { path = "NoAxiom/lib/fatfs", default-features = false, features = [
     "log_level_info",
 ] }
 config = { path = "NoAxiom/lib/config" }
+driver = { path = "NoAxiom/lib/driver" }
 
 [profile.release]
 debug = true
