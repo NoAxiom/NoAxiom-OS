@@ -1,0 +1,73 @@
+# fixme: `addi.d $t0, $t0, -1` asserts there's only valid bit in flags
+# PGD: 0x1b CRMD:0x0 PWCL:0x1c TLBRBADV:0x89 TLBERA:0x8a TLBRSAVE:0x8b SAVE:0x30
+# TLBREHi: 0x8e STLBPS: 0x1e MERRsave:0x95
+# reference: https://gitlab.eduxiji.net/educg-group-22027-2376549/T202410699992496-1562/-/blob/NPUcore-FF/os/src/arch/la64/trap/mod.rs#L43
+# notes: some consts are added to make the code more readable
+
+    .equ      LA_CSR_TLBEHI,        0x11 # TLB entry high
+    .equ      LA_CSR_TLBELO0,       0x12 # TLB entry low 0
+    .equ      LA_CSR_TLBELO1,       0x13 # TLB entry low 1
+    .equ      LA_CSR_PGDL,          0x19 # Page table base address when VA[47] = 0
+    .equ      LA_CSR_PGDH,          0x1a # Page table base address when VA[47] = 1
+    .equ      LA_CSR_PGD,           0x1b # Page table base
+    .equ      LA_CSR_TLBRENTRY,     0x88 # TLB refill exception entry
+    .equ      LA_CSR_TLBRBADV,      0x89 # TLB refill badvaddr
+    .equ      LA_CSR_TLBRERA,       0x8a # TLB refill ERA
+    .equ      LA_CSR_TLBRSAVE,      0x8b # KScratch for TLB refill exception
+    .equ      LA_CSR_TLBRELO0,      0x8c # TLB refill entrylo0
+    .equ      LA_CSR_TLBRELO1,      0x8d # TLB refill entrylo1
+    .equ      LA_CSR_TLBREHI,       0x8e # TLB refill entryhi
+    
+    .globl    __tlb_refill
+    .balign   4096
+
+    __tlb_refill:
+    csrwr     $t0, LA_CSR_TLBRSAVE
+
+    csrrd     $t0, LA_CSR_PGD
+    lddir     $t0, $t0, 3
+    andi      $t0, $t0, 1
+    beqz      $t0, 1f
+
+    csrrd     $t0, LA_CSR_PGD
+    lddir     $t0, $t0, 3
+    addi.d    $t0, $t0, -1
+    lddir     $t0, $t0, 1
+    andi      $t0, $t0, 1
+    beqz      $t0, 1f
+    csrrd     $t0, LA_CSR_PGD
+    lddir     $t0, $t0, 3
+    addi.d    $t0, $t0, -1
+    lddir     $t0, $t0, 1
+    addi.d    $t0, $t0, -1
+
+    ldpte     $t0, 0
+    ldpte     $t0, 1
+    csrrd     $t0, LA_CSR_TLBRELO0
+    csrrd     $t0, LA_CSR_TLBRELO1
+    csrrd     $t0, 0x0
+    2:
+            tlbfill
+    csrrd     $t0, LA_CSR_TLBRBADV
+    srli.d    $t0, $t0, 13
+    slli.d    $t0, $t0, 13
+    csrwr     $t0, LA_CSR_TLBEHI
+    tlbsrch
+    tlbrd
+    csrrd     $t0, LA_CSR_TLBELO0
+    csrrd     $t0, LA_CSR_TLBELO1
+    csrrd     $t0, LA_CSR_TLBRSAVE
+    ertn
+    1:
+            csrrd  $t0, LA_CSR_TLBREHI
+    ori       $t0, $t0, 0xC
+    csrwr     $t0, LA_CSR_TLBREHI
+
+    rotri.d   $t0, $t0, 61
+    ori       $t0, $t0, 3
+    rotri.d   $t0, $t0, 3
+
+    csrwr     $t0, LA_CSR_TLBRELO0
+    csrrd     $t0, LA_CSR_TLBRELO0
+    csrwr     $t0, LA_CSR_TLBRELO1
+    b         2b
