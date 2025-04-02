@@ -5,6 +5,7 @@ use alloc::{
 
 use async_trait::async_trait;
 use ksync::mutex::SpinLock;
+use virtio_drivers::{device::blk::VirtIOBlk, transport::pci::PciTransport};
 
 // use spin::{Mutex, MutexGuard};
 
@@ -14,7 +15,7 @@ type MutexGuard<'a, T> = ksync::mutex::SpinLockGuard<'a, T>;
 use super::BlockDevice;
 use crate::{
     device::{Device, DeviceData, DeviceType},
-    driver::Driver,
+    driver::{block::virtio::virtio_impl::HalImpl, Driver},
     include::result::Errno,
 };
 
@@ -65,6 +66,27 @@ impl BlockDevice for virtio {
             .as_blk()
             .unwrap()
             .write_block(id, buf);
+    }
+    async fn sync_all(&self) {
+        unreachable!()
+    }
+}
+
+pub struct PciVirtio(SpinLock<VirtIOBlk<HalImpl, PciTransport>>);
+
+impl PciVirtio {
+    pub fn new(blk: VirtIOBlk<HalImpl, PciTransport>) -> Self {
+        Self(SpinLock::new(blk))
+    }
+}
+
+#[async_trait]
+impl BlockDevice for PciVirtio {
+    async fn read(&self, id: usize, buf: &mut [u8]) {
+        self.0.lock().read_blocks(id, buf).unwrap();
+    }
+    async fn write(&self, id: usize, buf: &[u8]) {
+        self.0.lock().write_blocks(id, buf).unwrap();
     }
     async fn sync_all(&self) {
         unreachable!()

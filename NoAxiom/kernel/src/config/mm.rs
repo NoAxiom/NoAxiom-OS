@@ -54,9 +54,9 @@ pub const DL_INTERP_OFFSET: usize = 0x20_0000_0000;
 pub const VIRTIO0: usize = 0x1000_1000 + KERNEL_ADDR_OFFSET;
 
 /// MMIO on Qemu of VirtIO.
-#[cfg(feature = "riscv_qemu")]
+#[cfg(target_arch = "riscv64")]
 pub const MMIO: &[(usize, usize)] = &[
-    // (0x1000_1000, 0x1000), // VIRTIO0
+    (0x1000_1000, 0x1000),   // VIRTIO0
     (0xc00_0000, 0x21_0000), /* VIRT_PLIC in virt machine */
     /* (0x0010_0000, 0x00_2000), // VIRT_TEST/RTC  in virt machine
      * (0x2000000, 0x10000),
@@ -64,11 +64,14 @@ pub const MMIO: &[(usize, usize)] = &[
      * (0x3000_0000, 0x1000_0000),
      * */
     // (0x1000_4000, 0x4000),
-    (0x0900_0000, 0x1000),
-    (0x0800_0000, 0x2_0000),
-    (0x0a00_0000, 0x4000),
-    (0x1000_0000, 0x2eff_0000),
-    (0x40_1000_0000, 0x1000_0000),
+];
+
+#[cfg(target_arch = "loongarch64")]
+pub const MMIO: &[(usize, usize)] = &[
+    (0x100E_0000, 0x0000_1000), // GED
+    (0x1FE0_0000, 0x0000_1000), // UART
+    (0x2000_0000, 0x1000_0000), // PCI
+    (0x4000_0000, 0x0002_0000), /* PCI RANGES */
 ];
 
 // #[cfg(feature = "riscv_qemu")]

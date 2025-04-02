@@ -5,7 +5,7 @@ pub mod block;
 pub mod char;
 mod config;
 pub mod init;
-mod pci;
+pub mod pci;
 mod pci_driver;
 pub mod random;
 

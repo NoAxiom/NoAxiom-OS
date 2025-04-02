@@ -68,12 +68,14 @@ pub extern "C" fn _boot_hart_init(_: usize, dtb: usize) -> ! {
     frame_init();
     kernel_space_init();
 
-    let dtb = Arch::get_dtb(dtb);
-
+    let dtb = Arch::get_dtb();
+    crate::platform::DTB.call_once(|| dtb);
     // device init
     let platfrom_info = platform_init(dtb);
     init_plic(platfrom_info.plic.start + KERNEL_ADDR_OFFSET);
     device_init();
+
+    #[cfg(target_arch = "riscv64")]
     register_to_hart();
 
     // fs init

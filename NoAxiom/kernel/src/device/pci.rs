@@ -22,135 +22,29 @@ use virtio_drivers::{
 use super::pci_driver::PciRangeAllocator;
 use crate::{config::mm::KERNEL_ADDR_OFFSET, driver::block::virtio::virtio_impl::HalImpl};
 
-pub fn init() -> Result<PciTransport, ()> {
-    // probe_bus_devices();
-
-    let fdt = Arch::get_dtb(0xffffffc087000000);
+pub fn init() -> Result<VirtIOBlk<HalImpl, PciTransport>, ()> {
+    let fdt = Arch::get_dtb();
     let fdt = unsafe { Fdt::from_ptr(fdt as *mut u8) }.unwrap();
     let mut all_nodes = fdt.all_nodes();
 
     if let Some(pci_node) = all_nodes.find(|x| x.name.starts_with("pci")) {
         let pci_addr = pci_node.reg().map(|mut x| x.next().unwrap()).unwrap();
         log::info!("PCI Address: {:#p}", pci_addr.starting_address);
-        enumerate_pci((pci_addr.starting_address as usize | KERNEL_ADDR_OFFSET) as *mut u8)
+        probe_bus_devices((pci_addr.starting_address as usize | KERNEL_ADDR_OFFSET))
     } else {
         Err(())
     }
 }
 
-/// Enumerate the PCI devices
-fn enumerate_pci(mmconfig_base: *mut u8) -> Result<PciTransport, ()> {
-    info!("mmconfig_base = {:#x}", mmconfig_base as usize);
-
-    let mut pci_root = unsafe { PciRoot::new(mmconfig_base, Cam::Ecam) };
-    for (device_function, info) in pci_root.enumerate_bus(0) {
-        // Skip if it is not a PCI Type0 device (Standard PCI device).
-        if info.header_type != HeaderType::Standard {
-            continue;
-        }
-        let (status, command) = pci_root.get_status_command(device_function);
-        info!(
-            "Found {} at {}, status {:?} command {:?}",
-            info, device_function, status, command
-        );
-
-        if info.vendor_id == 0x8086 && info.device_id == 0x100e {
-            // Detected E1000 Net Card
-            info!("  E1000 Net Card");
-            pci_root.set_command(
-                device_function,
-                Command::IO_SPACE | Command::MEMORY_SPACE | Command::BUS_MASTER,
-            );
-        }
-        for i in 0..6 {
-            dump_bar_contents(&mut pci_root, device_function, i);
-        }
-
-        if let Some(virtio_type) = virtio_device_type(&info) {
-            info!("  VirtIO {:?}", virtio_type);
-
-            // Enable the device to use its BARs.
-            // pci_root.set_command(
-            //     device_function,
-            //     Command::IO_SPACE | Command::MEMORY_SPACE | Command::BUS_MASTER,
-            // );
-
-            if virtio_type == DeviceType::Block {
-                let mut allocator = PciRangeAllocator::new(0x1000_0000, 0x2eff_0000);
-
-                match config_pci_device(&mut pci_root, device_function, &mut Some(allocator)) {
-                    Ok(_) => {
-                        info!("  Configured PCI device");
-
-                        if let Some(dev) =
-                            probe_pci(&mut pci_root, device_function, virtio_type, &info)
-                        {
-                            info!(
-                                "registered a new {:?} device at {}: {:?}",
-                                DeviceType::Block,
-                                device_function,
-                                "blockdev",
-                            );
-                        }
-
-                        match unsafe {
-                            PciTransport::new::<HalImpl>(&mut pci_root, device_function)
-                        } {
-                            Ok(mut transport) => {
-                                info!(
-                                    "Detected virtio PCI device with device type {:?}, features:{:?}",
-                                    transport.device_type(),
-                                    transport.read_device_features(),
-                                );
-                                match transport.device_type() {
-                                    DeviceType::Block => {
-                                        return Ok(transport);
-                                    }
-                                    ty => {
-                                        println!("Don't support virtio device type: {:?}", ty);
-                                    }
-                                }
-                            }
-                            Err(e) => {
-                                debug!("Error creating VirtIO PCI transport: {}", e);
-                                panic!("Error creating VirtIO PCI transport: {}", e);
-                            }
-                        }
-                    }
-                    Err(_) => {
-                        panic!("Error configuring PCI device");
-                    }
-                }
-            }
-        }
-    }
-    Err(())
-}
-
-/// Dump bar Contents.
-fn dump_bar_contents(root: &mut PciRoot, device_function: DeviceFunction, bar_index: u8) {
-    let bar_info = root.bar_info(device_function, bar_index).unwrap();
-    if let Some((addr, size)) = bar_info.memory_address_size() {
-        if size == 0 {
-            return;
-        }
-        info!(
-            "BAR {}: Address = {:#x}, Size = {:#x}",
-            bar_index, addr, size
-        );
-    }
-}
-
-pub(crate) fn probe_bus_devices() {
-    let base_addr = Arch::get_dtb(0) | KERNEL_ADDR_OFFSET;
-    let mut root = unsafe { PciRoot::new(base_addr as *mut u8, Cam::Ecam) };
+pub(crate) fn probe_bus_devices(mmiobase: usize) -> Result<VirtIOBlk<HalImpl, PciTransport>, ()> {
+    let mut root = unsafe { PciRoot::new(mmiobase as *mut u8, Cam::Ecam) };
 
     // PCI 32-bit MMIO space
-    let mut allocator = Some(PciRangeAllocator::new(0x1000_0000, 0x2eff_0000));
+    let mut allocator = Some(PciRangeAllocator::new(0x4000_0000, 0x0002_0000));
 
-    for bus in 0..=0xff as u8 {
+    for bus in 0..=0 as u8 {
         for (bdf, dev_info) in root.enumerate_bus(bus) {
-            trace!("PCI {}: {}", bdf, dev_info);
+            info!("PCI {}: {}", bdf, dev_info);
             if dev_info.header_type != HeaderType::Standard {
                 continue;
             }
@@ -163,15 +57,19 @@ pub(crate) fn probe_bus_devices() {
                             bdf,
                             "blockdev",
                         );
+                        return Ok(dev);
                     }
                 }
-                Err(e) => warn!(
-                    "failed to enable PCI device at {}({}): {:?}",
-                    bdf, dev_info, e
-                ),
+                Err(e) => {
+                    warn!(
+                        "failed to enable PCI device at {}({}): {:?}",
+                        bdf, dev_info, e
+                    );
+                }
             }
         }
     }
+    Err(())
 }
 
 fn probe_pci(
@@ -214,8 +112,7 @@ fn try_new(transport: PciTransport) -> Result<VirtIOBlk<HalImpl, PciTransport>, 
         transport
     );
     let res = VirtIOBlk::<HalImpl, PciTransport>::new(transport)
-        .map_err(|e| debug!("failed to create blk driver because {e}"))?;
-    debug!("got virtio blk device driver SUCCEED!");
+        .map_err(|e| error!("failed to create blk driver because {e}"))?;
 
     Ok(res)
 }

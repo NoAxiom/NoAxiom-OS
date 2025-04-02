@@ -3,6 +3,7 @@ use core::ptr::NonNull;
 
 use arch::{Arch, Platform};
 use fdt::Fdt;
+use ksync::mutex::SpinLock;
 use virtio_drivers::transport::{
     mmio::{MmioTransport, VirtIOHeader},
     pci::PciTransport,
@@ -11,7 +12,7 @@ use virtio_drivers::transport::{
 
 use crate::{
     config::mm::{KERNEL_ADDR_OFFSET, VIRTIO0},
-    device::block::{sata::SataBlock, BlockDevice},
+    device::block::{sata::SataBlock, virtio::PciVirtio, BlockDevice},
     driver::{
         block::{
             virtio::{virtio_blk::VirtIOBlockDriver, virtio_impl::HalImpl},
@@ -30,32 +31,21 @@ pub fn device_init() {
     {
         match PROBE.get().unwrap().probe_virtio() {
             Some(virtio_mmio_devices) => {
-                debug!("Init block device start for rv");
-                let res = crate::device::pci::init();
-                if let Ok(transport) = res {
-                    debug!("Init block device success");
-                    if let Ok(block_driver) = virtio_drivers::device::blk::VirtIOBlk::<
-                        HalImpl,
-                        PciTransport,
-                    >::new(transport)
-                    {
-                        panic!("make pci driver succeed");
-                    } else {
-                        panic!("make pci driver failed but virtio_driver runs well!");
-                    }
-                }
                 init_virtio_mmio(virtio_mmio_devices);
             }
             None => {
                 // super::block::init_block_device(Arc::new(SataBlock::new()));
-                debug!("Init block device start for la64");
-                let res = crate::device::pci::init();
-                if let Ok(mmio) = res {
-                    debug!("Init block device success");
-                    panic!("here");
+                #[cfg(target_arch = "loongarch64")]
+                {
+                    let res = crate::device::pci::init();
+                    if let Ok(blk) = res {
+                        let pci_blk = PciVirtio::new(blk);
+                        super::block::init_block_device(Arc::new(pci_blk));
+                        debug!("Init PCI block device success");
+                        return;
+                    }
+                    panic!("There is no block device");
                 }
-                debug!("Init PCI block device success");
-                return;
             }
         }
     }

@@ -3,7 +3,8 @@ use alloc::string::{String, ToString};
 use virtio_drivers::transport::pci::PciTransport;
 
 pub trait Platform {
-    fn get_dtb(dtb: usize) -> usize;
+    fn model() -> Option<String>;
+    fn get_dtb() -> usize;
     fn memory_name() -> String {
         "memory".to_string()
     }
