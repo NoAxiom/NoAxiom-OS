@@ -7,7 +7,7 @@ use super::{
     vsched::{MulticoreRuntime, MulticoreScheduler, Runtime, ScheduleOrder::*},
 };
 use crate::{
-    config::arch::CPU_NUM, constant::sched::NICE_0_LOAD, cpu::get_hartid, task::status::TaskStatus,
+    config::arch::CPU_NUM, constant::sched::NICE_0_LOAD, cpu::get_hartid,
     time::sleep::current_sleep_manager,
 };
 

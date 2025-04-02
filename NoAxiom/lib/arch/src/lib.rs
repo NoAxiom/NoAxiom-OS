@@ -1,4 +1,5 @@
 #![no_std]
+#![feature(fn_align)]
 #![feature(asm_const)]
 #![feature(ascii_char)]
 #![feature(decl_macro)]

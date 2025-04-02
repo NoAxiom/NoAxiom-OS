@@ -1,6 +1,4 @@
-use core::panic;
-
-use arch::{Arch, ArchBoot, ArchInt, ArchMemory, ArchSbi, ArchTrap, Platform, _entry_other_hart};
+use arch::{Arch, ArchBoot, ArchInt, ArchSbi, Platform, _entry_other_hart};
 
 use crate::{
     config::{arch::CPU_NUM, mm::KERNEL_ADDR_OFFSET},
@@ -40,7 +38,7 @@ pub fn wake_other_hart(forbid_hart_id: usize) {
 }
 
 #[no_mangle]
-pub extern "C" fn _other_hart_init(hart_id: usize, dtb: usize) {
+pub extern "C" fn _other_hart_init(hart_id: usize, dtb: usize) -> ! {
     Arch::arch_init();
     kernel_space_activate();
     // register_to_hart(); // todo: add multipule devices interrupt support
@@ -48,8 +46,7 @@ pub extern "C" fn _other_hart_init(hart_id: usize, dtb: usize) {
         "[other_init] entry init hart_id: {}, dtb_addr: {:#x}",
         hart_id, dtb as usize,
     );
-    rust_main();
-    unreachable!();
+    rust_main()
 }
 
 // pub static BOOT_HART_ID: AtomicUsize = AtomicUsize::new(0);
@@ -58,7 +55,7 @@ pub extern "C" fn _other_hart_init(hart_id: usize, dtb: usize) {
 /// init bss, mm, console, and other drivers, then jump to rust_main,
 /// called by [`super::boot`]
 #[no_mangle]
-pub extern "C" fn _boot_hart_init(_: usize, mut dtb: usize) {
+pub extern "C" fn _boot_hart_init(_: usize, dtb: usize) -> ! {
     // data init
     bss_init();
     heap_init();
@@ -96,6 +93,5 @@ pub extern "C" fn _boot_hart_init(_: usize, mut dtb: usize) {
         dtb as usize,
     );
 
-    rust_main();
-    unreachable!();
+    rust_main()
 }

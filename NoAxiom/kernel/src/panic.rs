@@ -2,9 +2,9 @@
 
 use core::panic::PanicInfo;
 
-use arch::{Arch, ArchSbi};
+use arch::{Arch, ArchBoot, ArchSbi};
 
-use crate::cpu::get_hartid;
+use crate::{cpu::get_hartid, mm::map_area::MAP_ADDRESS};
 
 lazy_static::lazy_static! {
     static ref PANIC_FLAG: spin::Mutex<bool> = spin::Mutex::new(false);
@@ -12,6 +12,8 @@ lazy_static::lazy_static! {
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
+    debug!("[panic] DEBUG_ADDR: {:#x}", unsafe { MAP_ADDRESS });
+    Arch::arch_info_print();
     if let Some(location) = info.location() {
         println!(
             "[panic] panicked at {}:{}\n[panic] HART{}, {}",

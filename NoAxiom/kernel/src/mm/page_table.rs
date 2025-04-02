@@ -116,7 +116,7 @@ impl PageTable {
         let pte = self.create_pte(vpn);
         assert!(
             !pte.flags().contains(MappingFlags::V),
-            "{:?} is mapped before mapping",
+            "{:#x?} is mapped before mapping",
             vpn
         );
         trace!(
@@ -171,7 +171,7 @@ impl PageTable {
             let aligned_pa: PhysAddr = pte.ppn().into();
             let offset = va.offset();
             let aligned_pa_usize: usize = aligned_pa.into();
-            info!(
+            debug!(
                 "translate_va_debug: va: {:#x}, pa: {:#x}, offset: {:#x}",
                 va.0, aligned_pa_usize, offset
             );

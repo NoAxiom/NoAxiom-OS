@@ -1,6 +1,4 @@
-use log::info;
 use loongArch64::{
-    asm::idle,
     register::{tcfg, ticlr},
     time::{get_timer_freq, Time},
 };

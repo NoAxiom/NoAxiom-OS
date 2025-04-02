@@ -49,7 +49,7 @@ core::arch::global_asm!(include_str!("link_apps.S"));
 /// rust_main: only act as a task runner
 /// called by [`entry::init::_boot_hart_init`]
 #[no_mangle]
-pub fn rust_main() {
+pub fn rust_main() -> ! {
     info!("[kernel] hart id {} has been booted", cpu::get_hartid());
     loop {
         sched::runtime::run();

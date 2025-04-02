@@ -190,16 +190,6 @@ impl MemorySet {
             sbss,    ebss,    map_permission!(R, W)
             ekernel, KERNEL_VIRT_MEMORY_END, map_permission!(R, W)
         );
-        info!("mapping memory-mapped registers");
-        for (start, len) in MMIO {
-            kernel_push_area!(
-                *start + KERNEL_ADDR_OFFSET,
-                *start + *len + KERNEL_ADDR_OFFSET,
-                map_permission!(R, W)
-            );
-        }
-        // trace!("[memory_set] sp: {:#x}", crate::arch::regs::get_sp());
-        info!("[kernel] space initialized");
         info!(
             "[kernel].text [{:#x}, {:#x})",
             stext as usize, etext as usize
@@ -217,6 +207,15 @@ impl MemorySet {
             "[kernel] frame [{:#x}, {:#x})",
             ekernel as usize, KERNEL_VIRT_MEMORY_END as usize
         );
+        info!("mapping memory-mapped registers");
+        for (start, len) in MMIO {
+            let s_addr = *start + KERNEL_ADDR_OFFSET;
+            let e_addr = *start + *len + KERNEL_ADDR_OFFSET;
+            debug!("[kernel] pushing MMIO area: [{:#x},{:#x})", s_addr, e_addr);
+            kernel_push_area!(s_addr, e_addr, map_permission!(R, W));
+        }
+        // trace!("[memory_set] sp: {:#x}", crate::arch::regs::get_sp());
+        info!("[kernel] space initialized");
         unsafe {
             KERNEL_SPACE_ROOT_PPN = memory_set.root_ppn().0;
             // KERNEL_SPACE_TOKEN.store(memory_set.token(), Ordering::SeqCst);

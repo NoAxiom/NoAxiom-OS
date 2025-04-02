@@ -227,7 +227,12 @@ impl VpnRange {
 
 impl Debug for VpnRange {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "[{:#x}, {:#x})", self.start.0, self.end.0)
+        write!(
+            f,
+            "[{:#x}, {:#x})",
+            VirtAddr::from(self.start).0,
+            VirtAddr::from(self.end).0
+        )
     }
 }
 
