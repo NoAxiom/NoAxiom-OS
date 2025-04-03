@@ -5,7 +5,10 @@ use super::{
     poly::console::{getchar, putchar},
     LA64,
 };
-use crate::{la64::boot::BOOT_STACK, ArchSbi};
+use crate::{
+    la64::{boot::BOOT_STACK, memory::KERNEL_ADDR_OFFSET},
+    Arch, ArchInt, ArchSbi,
+};
 
 impl ArchSbi for LA64 {
     fn console_getchar() -> usize {
@@ -22,10 +25,19 @@ impl ArchSbi for LA64 {
         send_ipi_single(hartid, 1);
     }
     fn shutdown() -> ! {
-        // [on_board] 电源管理模块设置为s5状态，软关机
-        // unsafe { ((0x1FE27000 + 0x14) as *mut u32).write_volatile(0b1111 << 10) };
-        loop {
+        const HALT_ADDR: *mut u8 = (0x100E001C | KERNEL_ADDR_OFFSET) as *mut u8;
+
+        #[inline]
+        fn halt() {
+            Arch::disable_interrupt();
             unsafe { loongArch64::asm::idle() }
+        }
+
+        // Shutdown the whole system, including all CPUs.
+        unsafe { HALT_ADDR.write_volatile(0x34) };
+        halt();
+        loop {
+            halt();
         }
     }
     fn send_ipi(hartid: usize) {
