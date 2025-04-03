@@ -18,7 +18,7 @@ fn kernel_trap_handler() {
     let epc = Arch::read_epc();
     let kernel_panic = |msg: &str| {
         panic!(
-            "kernel trap!!! msg: {}, trap_type: {:?}, epc: {:#x} ",
+            "kernel trap!!! msg: {}, trap_type: {:#x?}, epc: {:#x} ",
             msg, trap_type, epc,
         );
     };
@@ -64,7 +64,7 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
     let trap_type = Arch::read_trap_type(Some(cx));
     let user_exit = |msg: &str| {
         error!(
-            "[user_trap_handler] unexpected exit!!! msg: {}, trap_type: {:?}, sepc = {:#x}",
+            "[user_trap_handler] unexpected exit!!! msg: {}, trap_type: {:#x?}, sepc = {:#x}",
             msg, trap_type, epc,
         );
         Arch::arch_info_print();

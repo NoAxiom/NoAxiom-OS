@@ -17,6 +17,7 @@ use crate::{
     platform::{
         platform_init,
         plic::{init_plic, register_to_hart},
+        DTB,
     },
     rust_main,
     sched::utils::block_on,
@@ -68,10 +69,8 @@ pub extern "C" fn _boot_hart_init(_hartid: usize, dtb: usize) -> ! {
     frame_init();
     kernel_space_init();
 
-    let dtb = Arch::get_dtb(dtb);
-    crate::platform::DTB.call_once(|| dtb);
     // device init
-    let platfrom_info = platform_init(dtb);
+    let platfrom_info = platform_init(Arch::get_dtb(dtb));
     init_plic(platfrom_info.plic.start + KERNEL_ADDR_OFFSET);
     device_init();
 

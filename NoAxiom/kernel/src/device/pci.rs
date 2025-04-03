@@ -20,10 +20,12 @@ use virtio_drivers::{
 };
 
 use super::pci_driver::PciRangeAllocator;
-use crate::{config::mm::KERNEL_ADDR_OFFSET, driver::block::virtio::virtio_impl::HalImpl};
+use crate::{
+    config::mm::KERNEL_ADDR_OFFSET, driver::block::virtio::virtio_impl::HalImpl, platform::DTB,
+};
 
 pub fn init() -> Result<VirtIOBlk<HalImpl, PciTransport>, ()> {
-    let fdt = Arch::get_dtb();
+    let fdt = *DTB.get().unwrap();
     let fdt = unsafe { Fdt::from_ptr(fdt as *mut u8) }.unwrap();
     let mut all_nodes = fdt.all_nodes();
 
