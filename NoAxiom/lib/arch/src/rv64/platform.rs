@@ -8,8 +8,8 @@ impl Platform for RV64 {
     fn model() -> Option<String> {
         None
     }
-    fn get_dtb() -> usize {
-        0xffffffc087000000
+    fn get_dtb(dtb: usize) -> usize {
+        dtb
     }
     fn pci_init() -> Result<PciTransport, ()> {
         unreachable!()

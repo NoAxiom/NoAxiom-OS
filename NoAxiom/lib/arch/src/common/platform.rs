@@ -4,7 +4,7 @@ use virtio_drivers::transport::pci::PciTransport;
 
 pub trait Platform {
     fn model() -> Option<String>;
-    fn get_dtb() -> usize;
+    fn get_dtb(dtb: usize) -> usize;
     fn memory_name() -> String {
         "memory".to_string()
     }

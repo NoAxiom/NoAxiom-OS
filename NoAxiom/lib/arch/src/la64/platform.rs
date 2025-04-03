@@ -11,7 +11,7 @@ impl Platform for LA64 {
     fn model() -> Option<alloc::string::String> {
         Some("loongarch64-qemu".to_string())
     }
-    fn get_dtb() -> usize {
+    fn get_dtb(_dtb: usize) -> usize {
         QEMU_DTB_ADDR | KERNEL_ADDR_OFFSET
     }
     fn plic_name() -> alloc::string::String {
