@@ -12,6 +12,7 @@ use crate::{
     constant::signal::MAX_SIGNUM,
     include::result::Errno,
     mm::user_ptr::UserPtr,
+    sched::utils::SuspendFuture,
     signal::{
         sig_action::{KSigAction, USigAction},
         sig_detail::{SigDetail, SigKillDetail},
@@ -211,5 +212,27 @@ impl Syscall<'_> {
             }
         }
         Ok(0)
+    }
+
+    pub async fn sys_sigsuspend(&self, mask: usize) -> SyscallResult {
+        let mask = UserPtr::<SigSet>::from(mask);
+        let task = self.task;
+        let mut pcb = task.pcb();
+        let mut mask = mask.read();
+        mask.remove(SigSet::SIGKILL | SigSet::SIGSTOP);
+        let old_mask = core::mem::replace(&mut pcb.sig_mask(), mask);
+        let invoke_signal = task.sa_list().get_bitmap();
+        if pcb.pending_sigs.has_expect_signals(mask | invoke_signal) {
+            return Err(Errno::EINTR);
+        } else {
+            pcb.pending_sigs.should_wake = mask | invoke_signal;
+        }
+        pcb.set_suspend();
+        drop(pcb);
+        SuspendFuture::new().await;
+        let mut pcb = task.pcb();
+        pcb.set_runnable();
+        *pcb.sig_mask_mut() = old_mask;
+        Err(Errno::EINTR)
     }
 }

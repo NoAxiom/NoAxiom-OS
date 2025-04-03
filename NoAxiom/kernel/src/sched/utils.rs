@@ -2,16 +2,15 @@
 //! - use [`take_waker`] to fetch current task's context
 //! - use [`block_on`] to block on a future
 //! - use [`suspend_now`] to suspend current task (without immediate wake)
-//! - use [`suspend_on`] to suspend current task on a future
 
 use alloc::{boxed::Box, sync::Arc, task::Wake};
 use core::{
-    future::{poll_fn, Future},
+    future::Future,
     pin::Pin,
     task::{Context, Poll, Waker},
 };
 
-use ksync::mutex::{check_no_lock, SpinLockGuard};
+use ksync::mutex::SpinLockGuard;
 
 use crate::{
     cpu::current_cpu,

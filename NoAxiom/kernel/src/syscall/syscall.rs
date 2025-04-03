@@ -75,7 +75,7 @@ impl<'a> Syscall<'a> {
             SYS_SIGRETURN => self.sys_sigreturn(),
             SYS_KILL => self.sys_kill(args[0] as isize, args[1] as i32),
             SYS_SIGPROCMASK => self.sys_sigprocmask(args[0], args[1], args[2], args[3]),
-            // SYS_SIGSUSPEND => self.sys_sigsuspend(args[0], args[1], args[2]),
+            SYS_SIGSUSPEND => self.sys_sigsuspend(args[0]).await,
 
             // mm
             SYS_BRK => self.sys_brk(args[0]),

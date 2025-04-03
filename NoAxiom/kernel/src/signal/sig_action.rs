@@ -1,7 +1,10 @@
 use array_init::array_init;
 use bitflags::bitflags;
 
-use super::{sig_num::SigNum, sig_set::SigMask};
+use super::{
+    sig_num::SigNum,
+    sig_set::{SigMask, SigSet},
+};
 use crate::constant::signal::{MAX_SIGNUM, SIG_DFL, SIG_IGN};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -125,5 +128,14 @@ impl SigActionList {
     }
     pub fn get(&self, signum: SigNum) -> Option<&KSigAction> {
         self.actions.get(signum as usize)
+    }
+    pub fn get_bitmap(&self) -> SigSet {
+        let mut res = SigSet::empty();
+        for (i, sa) in self.actions.iter().enumerate() {
+            if let SAHandlerType::User { handler: _ } = sa.handler {
+                res |= SigSet::from_bits_truncate(1 << i);
+            }
+        }
+        res
     }
 }
