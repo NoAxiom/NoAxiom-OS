@@ -55,7 +55,7 @@
     .globl    __user_trapvec
     .globl    __user_trapret
     .globl    __kernel_trapvec
-    .align    2
+    .align    4
 
 # user -> kernel
     __user_trapvec:
@@ -140,6 +140,79 @@
     ld.d      $t8, $sp, 18*8
     addi.d    $sp, $sp, 19*8
     ertn
+
+# float registers store & load macros
+    FP_START  = 0
+    .macro    SAVE_FP n, m
+    fst.d     $f\n, $a0, \m*8
+    .endm
+    .macro    LOAD_FP n, m
+    fld.d     $f\n, $a0, \m*8
+    .endm
+
+    .globl    __save_freg
+    .globl    __load_freg
+    .align    4
+
+# save float registers
+    __save_freg:
+    .set      n, 0
+    .set      m, FP_START
+    .rept     32
+    SAVE_FP   %n, %m                   # save freg
+    .set      n, n+1
+    .set      m, m+1
+    .endr
+
+    movfcsr2gr $t0, $fcsr0             # save FCSR
+    st.w      $t0, $a0, 32*8
+
+    movcf2gr  $t0, $fcc7               # save FCC
+    slli.w    $t0, $t0, 1
+    movcf2gr  $t0, $fcc6
+    slli.w    $t0, $t0, 1
+    movcf2gr  $t0, $fcc5
+    slli.w    $t0, $t0, 1
+    movcf2gr  $t0, $fcc4
+    slli.w    $t0, $t0, 1
+    movcf2gr  $t0, $fcc3
+    slli.w    $t0, $t0, 1
+    movcf2gr  $t0, $fcc2
+    slli.w    $t0, $t0, 1
+    movcf2gr  $t0, $fcc1
+    slli.w    $t0, $t0, 1
+    movcf2gr  $t0, $fcc0
+    st.b      $t0, $a0, 32*8+4         # offset: 32*freg+1*fcsr
+
+# load float registers
+    __load_freg:
+    .set      n, 0
+    .set      m, FP_START
+    .rept     32
+    LOAD_FP   %n, %m
+    .set      n, n+1
+    .set      m, m+1
+    .endr
+
+    ld.w      $t0, $a0, 32*8           # restore FCSR
+    movgr2fcsr $fcsr0, $t0
+
+    ld.b      $t0, $a0, 32*8+4         # restore FCC
+    movgr2cf  $fcc0, $t0
+    srli.w    $t0, $t0, 1
+    movgr2cf  $fcc1, $t0
+    srli.w    $t0, $t0, 1
+    movgr2cf  $fcc2, $t0
+    srli.w    $t0, $t0, 1
+    movgr2cf  $fcc3, $t0
+    srli.w    $t0, $t0, 1
+    movgr2cf  $fcc4, $t0
+    srli.w    $t0, $t0, 1
+    movgr2cf  $fcc5, $t0
+    srli.w    $t0, $t0, 1
+    movgr2cf  $fcc6, $t0
+    srli.w    $t0, $t0, 1
+    movgr2cf  $fcc7, $t0
 
     .section  .text.signal
     .globl    user_sigreturn

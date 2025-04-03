@@ -238,7 +238,6 @@ pub struct UserFloatContext {
     pub fcsr: u32,          // 32bit
     pub need_save: u8,
     pub need_restore: u8,
-    pub signal_dirty: u8,
 }
 
 pub fn freg_init() {
@@ -256,10 +255,7 @@ impl ArchUserFloatContext for UserFloatContext {
 
     fn mark_save_if_needed(&mut self) {
         let sstatus = sstatus::read();
-        if sstatus.fs() == FS::Dirty {
-            self.need_save |= 1;
-            self.signal_dirty |= 1;
-        }
+        self.need_save |= (sstatus.fs() == FS::Dirty) as u8;
     }
 
     fn yield_task(&mut self) {

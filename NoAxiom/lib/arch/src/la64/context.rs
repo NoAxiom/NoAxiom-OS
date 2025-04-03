@@ -96,8 +96,9 @@ impl IndexMut<TrapArgs> for TrapContext {
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
 pub struct UserFloatContext {
-    pub user_fx: [f64; 32], // 50 - 81
-    pub fcsr: u32,          // 32bit
+    pub user_fx: [f64; 32],
+    pub fcsr: u32,
+    pub fcc: u8, // should be u8?
     pub need_save: u8,
     pub need_restore: u8,
     pub signal_dirty: u8,
@@ -105,6 +106,11 @@ pub struct UserFloatContext {
 
 pub fn freg_init() {
     euen::set_fpe(true);
+}
+
+extern "C" {
+    fn __save_freg(cx: *mut UserFloatContext);
+    fn __load_freg(cx: *mut UserFloatContext);
 }
 
 impl ArchUserFloatContext for UserFloatContext {
@@ -119,13 +125,17 @@ impl ArchUserFloatContext for UserFloatContext {
             return;
         }
         self.need_save = 0;
-        todo!()
+        unsafe { __save_freg(self) };
     }
     fn restore(&mut self) {
-        todo!()
+        if self.need_restore == 0 {
+            return;
+        }
+        self.need_restore = 0;
+        unsafe { __load_freg(self) };
     }
     fn mark_save_if_needed(&mut self) {
-        todo!()
+        self.need_restore = 1;
     }
     fn yield_task(&mut self) {
         self.save();
