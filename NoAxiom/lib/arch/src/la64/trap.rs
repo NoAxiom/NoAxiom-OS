@@ -12,7 +12,7 @@ use super::{
     unaligned::emulate_load_store_insn,
     LA64,
 };
-use crate::{ArchTrap, TrapType};
+use crate::{ArchTrap, ArchTrapContext, ArchUserFloatContext, TrapType};
 
 global_asm!(include_str!("./trap.S"));
 extern "C" {
@@ -140,7 +140,9 @@ impl ArchTrap for LA64 {
         // debug!("[trap_restore] era: {:#x}, sp: {:#x}", cx.era, cx.x[3]);
         disable_interrupt();
         set_user_trap_entry();
+        cx.freg_mut().restore();
         unsafe { __user_trapret(cx) };
+        cx.freg_mut().mark_save_if_needed();
         disable_interrupt();
     }
     fn set_user_trap_entry() {

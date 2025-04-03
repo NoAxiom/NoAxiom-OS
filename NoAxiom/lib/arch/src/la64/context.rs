@@ -135,7 +135,7 @@ impl ArchUserFloatContext for UserFloatContext {
         unsafe { __load_freg(self) };
     }
     fn mark_save_if_needed(&mut self) {
-        self.need_restore = 1;
+        self.need_save = 1;
     }
     fn yield_task(&mut self) {
         self.save();

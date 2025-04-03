@@ -143,6 +143,7 @@
 
 # float registers store & load macros
     FP_START  = 0
+    FP_END    = 32
     .macro    SAVE_FP n, m
     fst.d     $f\n, $a0, \m*8
     .endm
@@ -165,7 +166,7 @@
     .endr
 
     movfcsr2gr $t0, $fcsr0             # save FCSR
-    st.w      $t0, $a0, 32*8
+    st.w      $t0, $a0, FP_END*8
 
     movcf2gr  $t0, $fcc7               # save FCC
     slli.w    $t0, $t0, 1
@@ -182,7 +183,7 @@
     movcf2gr  $t0, $fcc1
     slli.w    $t0, $t0, 1
     movcf2gr  $t0, $fcc0
-    st.b      $t0, $a0, 32*8+4         # offset: 32*freg+1*fcsr
+    st.b      $t0, $a0, FP_END*8+4     # offset: 32*freg+1*fcsr
 
 # load float registers
     __load_freg:
@@ -194,10 +195,10 @@
     .set      m, m+1
     .endr
 
-    ld.w      $t0, $a0, 32*8           # restore FCSR
+    ld.w      $t0, $a0, FP_END*8       # restore FCSR
     movgr2fcsr $fcsr0, $t0
 
-    ld.b      $t0, $a0, 32*8+4         # restore FCC
+    ld.b      $t0, $a0, FP_END*8+4     # restore FCC
     movgr2cf  $fcc0, $t0
     srli.w    $t0, $t0, 1
     movgr2cf  $fcc1, $t0
