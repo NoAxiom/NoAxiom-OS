@@ -7,10 +7,32 @@ edition = "2021"
 async_fs = []
 
 [dependencies]
+include = { workspace = true }
 arch = { workspace = true }
 ksync = { workspace = true }
 log = { workspace = true }
 config = { workspace = true }
+bitflags = { workspace = true }
 fdt = "0.1.5"
 plic = { git = "https://github.com/os-module/plic" }
 async-trait = "0.1.50"
+virtio-drivers = "0.7.5"
+smoltcp = { version = "0.11.0", default-features = false, features = [
+    "alloc",
+    "log",
+    "medium-ethernet",
+    "medium-ip",
+    "proto-ipv4",
+    "proto-ipv6",
+    "proto-dhcpv4",
+    "proto-ipv4-fragmentation",
+    "socket-udp",
+    "socket-tcp",
+    "socket-dhcpv4",
+    "async",
+    "log",
+] }
+cfg-if = "1.0"
+volatile = "0.2"
+spin = "0.7.0"
+lazy_static = { version = "1.4.0", features = ["spin_no_std"] }

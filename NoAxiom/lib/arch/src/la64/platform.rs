@@ -14,13 +14,13 @@ impl Platform for LA64 {
     fn get_dtb(_dtb: usize) -> usize {
         QEMU_DTB_ADDR | KERNEL_ADDR_OFFSET
     }
-    fn plic_name() -> alloc::string::String {
-        "platic".to_string()
+    fn plic_name() -> &'static str {
+        "platic"
     }
     // Core Local Interruptor
-    fn clint_name() -> alloc::string::String {
+    fn clint_name() -> &'static str {
         // "cpuic".to_string()
-        "eiointc".to_string()
+        "eiointc"
     }
     fn pci_init() -> Result<PciTransport, ()> {
         // poly::pci::init()

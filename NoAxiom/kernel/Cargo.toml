@@ -82,3 +82,4 @@ console = { workspace = true }
 fatfs = { workspace = true }
 config = { workspace = true }
 driver = { workspace = true }
+include = { workspace = true }

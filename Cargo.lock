@@ -318,11 +318,19 @@ version = "0.1.0"
 dependencies = [
  "arch",
  "async-trait",
+ "bitflags 2.6.0",
+ "cfg-if",
  "config",
  "fdt 0.1.5",
+ "include",
  "ksync",
+ "lazy_static",
  "log",
  "plic",
+ "smoltcp",
+ "spin 0.7.1",
+ "virtio-drivers 0.7.5",
+ "volatile 0.2.7",
 ]
 
 [[package]]
@@ -572,6 +580,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "include"
+version = "0.1.0"
+dependencies = [
+ "thiserror-core",
+]
+
+[[package]]
 name = "isomorphic_drivers"
 version = "0.1.0"
 source = "git+https://github.com/huayuntao/dep_iso.git#9761f75e4f551da9427bd102b2526a10365fe875"
@@ -615,6 +630,7 @@ dependencies = [
  "futures",
  "futures-lite",
  "hashbrown 0.14.5",
+ "include",
  "isomorphic_drivers",
  "ksync",
  "lazy_static",
