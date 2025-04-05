@@ -1,9 +1,5 @@
 //! memory management
 
-pub mod address;
-pub mod bss;
-pub mod frame;
-pub mod heap;
 pub mod map_area;
 pub mod memory_set;
 pub mod mmap_manager;
@@ -11,6 +7,7 @@ pub mod page_table;
 pub mod permission;
 pub mod user_ptr;
 pub mod validate;
+pub use memory::*;
 
 /// returns pte flags with multiple flag bits
 #[macro_export]

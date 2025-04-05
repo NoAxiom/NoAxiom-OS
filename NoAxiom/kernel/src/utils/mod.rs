@@ -9,16 +9,6 @@ use crossover::{Crossover, CrossoverManager};
 
 use crate::mm::user_ptr::UserPtr;
 
-/// signed extend for number without 64/32 bits width
-#[inline(always)]
-pub fn signed_extend(num: usize, width: usize) -> usize {
-    if num & (1 << (width - 1)) != 0 {
-        num | (!((1 << width) - 1))
-    } else {
-        num
-    }
-}
-
 pub fn reverse<T: Clone>(vec: &Vec<T>) -> Vec<T> {
     let mut res = vec.clone();
     res.reverse();

@@ -762,7 +762,11 @@ name = "memory"
 version = "0.1.0"
 dependencies = [
  "arch",
+ "buddy_system_allocator",
  "config",
+ "ksync",
+ "lazy_static",
+ "log",
 ]
 
 [[package]]

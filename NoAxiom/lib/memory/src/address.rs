@@ -6,9 +6,9 @@ use arch::{
     consts::{INDEX_LEVELS, KERNEL_ADDR_OFFSET, VA_WIDTH},
     PageTableEntry,
 };
-use memory::utils::{kernel_va_to_pa, kernel_vpn_to_ppn};
+use config::mm::*;
 
-use crate::{config::mm::*, utils::signed_extend};
+use crate::utils::{kernel_va_to_pa, kernel_vpn_to_ppn};
 
 /// addr type def
 /// note that the highter bits of pagenum isn't used and it can be any value
@@ -24,6 +24,16 @@ gen_new_type!(PhysAddr);
 gen_new_type!(VirtAddr);
 gen_new_type!(PhysPageNum);
 gen_new_type!(VirtPageNum);
+
+/// signed extend for number without 64/32 bits width
+#[inline(always)]
+pub fn signed_extend(num: usize, width: usize) -> usize {
+    if num & (1 << (width - 1)) != 0 {
+        num | (!((1 << width) - 1))
+    } else {
+        num
+    }
+}
 
 /// addr -> usize
 macro_rules! impl_from_types {
