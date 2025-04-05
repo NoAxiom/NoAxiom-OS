@@ -1,10 +1,9 @@
 mod asm;
 mod boot;
 mod context;
+mod dtbinfo;
 mod interrupt;
 mod memory;
-mod platform;
-pub mod poly;
 mod sbi;
 mod time;
 mod tlb;

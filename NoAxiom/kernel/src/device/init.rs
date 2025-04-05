@@ -1,7 +1,7 @@
 use alloc::{sync::Arc, vec::Vec};
 use core::ptr::NonNull;
 
-use arch::{consts::KERNEL_ADDR_OFFSET, Arch, Platform};
+use arch::{consts::KERNEL_ADDR_OFFSET, Arch, DtbInfo};
 use fdt::Fdt;
 use ksync::mutex::SpinLock;
 use virtio_drivers::transport::{
@@ -11,7 +11,6 @@ use virtio_drivers::transport::{
 };
 
 use crate::{
-    config::mm::VIRTIO0,
     device::block::{sata::SataBlock, virtio::PciVirtio, BlockDevice},
     driver::{
         block::{
@@ -84,7 +83,7 @@ pub fn init_virtio_mmio(devices: Vec<ProbeInfo>) {
         // println!("name : {}", device.name);
         let paddr = device.base_addr + KERNEL_ADDR_OFFSET;
         // println!("device.base_addr:{:x}", paddr);
-        if paddr != VIRTIO0 {
+        if paddr != ::platform::qemu::VIRTIO0 {
             // println!("paddr : {:x}", paddr);
             // todo: can be optimized
             continue;

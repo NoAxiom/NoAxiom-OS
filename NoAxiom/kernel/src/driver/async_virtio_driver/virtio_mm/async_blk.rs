@@ -5,9 +5,9 @@ use alloc::boxed::Box;
 use arch::{Arch, ArchInt};
 use async_trait::async_trait;
 use ksync::mutex::check_no_lock;
+use platform::qemu::VIRTIO0;
 
 use crate::{
-    config::mm::VIRTIO0,
     device::block::BlockDevice,
     driver::async_virtio_driver::{
         block::{InterruptRet, VirtIOBlock},

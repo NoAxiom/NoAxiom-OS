@@ -1,20 +1,20 @@
 mod asm;
 mod boot;
 pub mod consts;
+mod dtbinfo;
 mod full;
 mod interrupt;
 mod memory;
-mod platform;
 mod sbi;
 mod time;
 mod trap;
 
 pub use asm::*;
 pub use boot::*;
+pub use dtbinfo::*;
 pub use full::*;
 pub use interrupt::*;
 pub use memory::*;
-pub use platform::*;
 pub use sbi::*;
 pub use time::*;
 pub use trap::*;

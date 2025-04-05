@@ -5,6 +5,8 @@ use alloc::boxed::Box;
 use arch::ArchMemory;
 use async_trait::async_trait;
 use ksync::mutex::check_no_lock;
+#[cfg(feature = "qemu")]
+use platform::qemu::VIRTIO0 as VIRTIO0_VIRT;
 
 use crate::devices::impls::{
     block::{
@@ -17,7 +19,7 @@ use crate::devices::impls::{
     device::{DevResult, Device},
 };
 
-const VIRTIO0: usize = config::mm::VIRTIO0 | arch::Arch::KERNEL_ADDR_OFFSET;
+const VIRTIO0: usize = VIRTIO0_VIRT | arch::Arch::KERNEL_ADDR_OFFSET;
 
 /// 异步虚拟块设备接口
 ///

@@ -327,6 +327,7 @@ dependencies = [
  "lazy_static",
  "log",
  "memory",
+ "platform",
  "plic",
  "smoltcp",
  "spin 0.7.1",
@@ -645,6 +646,7 @@ dependencies = [
  "num-traits",
  "paste",
  "pci",
+ "platform",
  "plic",
  "rand_core",
  "ringbuffer",
@@ -855,6 +857,10 @@ name = "pin-utils"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
+
+[[package]]
+name = "platform"
+version = "0.1.0"
 
 [[package]]
 name = "plic"

@@ -1,10 +1,8 @@
 use config::mm::KERNEL_STACK_SIZE;
 use loongArch64::ipi::{csr_mail_send, send_ipi_single};
+use polyhal::debug_console::DebugConsole;
 
-use super::{
-    poly::console::{getchar, putchar},
-    LA64,
-};
+use super::LA64;
 use crate::{
     la64::{boot::BOOT_STACK, memory::KERNEL_ADDR_OFFSET},
     Arch, ArchInt, ArchSbi,
@@ -12,10 +10,14 @@ use crate::{
 
 impl ArchSbi for LA64 {
     fn console_getchar() -> usize {
-        getchar() as usize
+        loop {
+            if let Some(c) = DebugConsole::getchar() {
+                return c as usize;
+            }
+        }
     }
     fn console_putchar(c: usize) {
-        putchar(c as u8);
+        DebugConsole::putchar(c as u8);
     }
     fn hart_start(hartid: usize, start_addr: usize) {
         let sp_addr =

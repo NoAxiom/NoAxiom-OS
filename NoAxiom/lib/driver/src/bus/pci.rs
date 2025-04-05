@@ -1,6 +1,7 @@
 use arch::ArchMemory;
-use config::cpu::{PCI_BUS_END, PCI_RANGE};
 use include::errno::Errno;
+#[cfg(feature = "qemu")]
+use platform::qemu::{PCI_BUS_END, PCI_RANGE};
 use virtio_drivers::transport::{
     pci::{
         bus::{
@@ -48,9 +49,13 @@ impl Devices {
                         {
                             // todo: now async_fs for pci is not supported
                         }
+                        #[cfg(not(feature = "async_fs"))]
                         if let Some(transport) =
                             probe_pci(&mut root, bdf, DeviceType::Block, &dev_info)
                         {
+                            use crate::devices::impls::block::virtio_block::{
+                                VirtioBlock, VirtioBlockType,
+                            };
                             log::info!(
                                 "registered a new {:?} device at {}",
                                 DeviceType::Block,

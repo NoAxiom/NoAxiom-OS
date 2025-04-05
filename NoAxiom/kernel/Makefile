@@ -9,7 +9,7 @@ FEATURES :=
 
 # feature flags
 VF2 :=
-RISCV_QEMU := 1
+QEMU := 1
 ASYNC_FS := 1
 UART := 
 PRELIMINARY :=
@@ -53,8 +53,8 @@ ifneq ($(VF2), )
 	FEATURES += vf2
 endif
 
-ifneq ($(RISCV_QEMU), )
-	FEATURES += riscv_qemu
+ifneq ($(QEMU), )
+	FEATURES += qemu
 endif
 
 ifneq ($(BUSYBOX), )

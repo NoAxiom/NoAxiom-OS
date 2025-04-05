@@ -17,6 +17,7 @@ ramdisk = []
 uart = []
 board_qemu = []
 async_fs = []
+qemu = []
 
 [dependencies]
 # extern libs
@@ -80,7 +81,8 @@ arch = { workspace = true }
 ksync = { workspace = true }
 console = { workspace = true }
 fatfs = { workspace = true }
-config = { workspace = true }
-driver = { workspace = true }
+config = { workspace = true, features = ["multicore"] }
+driver = { workspace = true, features = ["qemu"] }
 include = { workspace = true }
 memory = { workspace = true }
+platform = { workspace = true }

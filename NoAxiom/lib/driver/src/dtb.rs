@@ -1,6 +1,6 @@
 use alloc::{string::String, vec::Vec};
 
-use arch::{Arch, Platform};
+use arch::{Arch, DtbInfo as Dtb};
 use fdt::Fdt;
 use ksync::Once;
 

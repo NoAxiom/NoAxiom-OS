@@ -1,7 +1,6 @@
 [package]
-name = "config"
+name = "platform"
 version = "0.1.0"
 edition = "2021"
 
 [features]
-multicore = []

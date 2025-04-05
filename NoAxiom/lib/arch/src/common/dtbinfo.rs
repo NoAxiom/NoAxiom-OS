@@ -1,8 +1,7 @@
-use alloc::string::{String, ToString};
+use alloc::string::String;
 
-use virtio_drivers::transport::pci::PciTransport;
-
-pub trait Platform {
+/// Arch related information for device tree blob
+pub trait DtbInfo {
     fn model() -> Option<String>;
     fn get_dtb(dtb: usize) -> usize;
     fn memory_name() -> &'static str {
@@ -23,5 +22,4 @@ pub trait Platform {
     fn virtio_mmio_name() -> &'static str {
         "virtio_mmio"
     }
-    fn pci_init() -> Result<PciTransport, ()>;
 }

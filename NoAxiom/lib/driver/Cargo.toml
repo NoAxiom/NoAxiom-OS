@@ -5,10 +5,12 @@ edition = "2021"
 
 [features]
 async_fs = []
+qemu = []
 
 [dependencies]
 include = { workspace = true }
 arch = { workspace = true }
+platform = { workspace = true }
 ksync = { workspace = true }
 log = { workspace = true }
 config = { workspace = true }

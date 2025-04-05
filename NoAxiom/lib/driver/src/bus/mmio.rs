@@ -8,7 +8,7 @@ impl Devices {
         let mut registered: [bool; Self::DEVICES] = [false; Self::DEVICES];
         for (addr, _size) in &dtb_info().mmio_regions {
             if !registered[0] {
-                #[cfg(not(all(feature = "async_fs", target_arch = "riscv64")))]
+                #[cfg(not(feature = "async_fs"))]
                 {
                     use core::ptr::NonNull;
 
@@ -24,7 +24,7 @@ impl Devices {
 
                     self.add_blk_device(blk_dev);
                 }
-                #[cfg(all(feature = "async_fs", target_arch = "riscv64"))]
+                #[cfg(feature = "async_fs")]
                 {
                     use crate::devices::impls::block::async_virtio_driver::virtio_mm::async_blk::VirtIOAsyncBlock;
                     let _ = addr;

@@ -1,13 +1,11 @@
 use alloc::string::ToString;
 
-use virtio_drivers::transport::pci::PciTransport;
-
 use super::LA64;
-use crate::{la64::memory::KERNEL_ADDR_OFFSET, Platform};
+use crate::{la64::memory::KERNEL_ADDR_OFFSET, DtbInfo};
 
 const QEMU_DTB_ADDR: usize = 0x100000;
 
-impl Platform for LA64 {
+impl DtbInfo for LA64 {
     fn model() -> Option<alloc::string::String> {
         Some("loongarch64-qemu".to_string())
     }
@@ -21,9 +19,5 @@ impl Platform for LA64 {
     fn clint_name() -> &'static str {
         // "cpuic".to_string()
         "eiointc"
-    }
-    fn pci_init() -> Result<PciTransport, ()> {
-        // poly::pci::init()
-        Err(())
     }
 }

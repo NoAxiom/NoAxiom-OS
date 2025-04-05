@@ -1,6 +1,6 @@
 use core::{error, ptr::NonNull};
 
-use arch::{consts::KERNEL_ADDR_OFFSET, Arch, Platform};
+use arch::{consts::KERNEL_ADDR_OFFSET, Arch, DtbInfo};
 use fdt::Fdt;
 use log::{debug, info, trace};
 use virtio_drivers::{

@@ -1,9 +1,9 @@
 mod asm;
 mod boot;
 mod context;
+mod dtbinfo;
 mod interrupt;
 mod memory;
-mod platform;
 mod sbi;
 mod time;
 mod trap;

@@ -1,7 +1,7 @@
 use alloc::{string::String, vec::Vec};
 use core::{cmp::min, fmt::Debug, ops::Range};
 
-use arch::{Arch, Platform};
+use arch::{Arch, DtbInfo};
 use fdt::{node::FdtNode, Fdt};
 
 use crate::include::info;

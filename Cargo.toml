@@ -18,6 +18,7 @@ config = { path = "NoAxiom/lib/config" }
 driver = { path = "NoAxiom/lib/driver" }
 include = { path = "NoAxiom/lib/include" }
 memory = { path = "NoAxiom/lib/memory" }
+platform = { path = "NoAxiom/lib/platform" }
 
 [profile.release]
 debug = true

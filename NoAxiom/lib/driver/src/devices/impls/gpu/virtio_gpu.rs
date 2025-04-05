@@ -1,7 +1,7 @@
 use core::ptr::NonNull;
 
-use config::mm::VIRTIO7;
 use ksync::mutex::SpinLock;
+use platform::qemu::VIRTIO7;
 use virtio_drivers::{
     device::gpu::VirtIOGpu,
     transport::mmio::{MmioTransport, VirtIOHeader},

@@ -4,6 +4,7 @@ use alloc::vec::Vec;
 use core::ptr::NonNull;
 
 use ksync::mutex::SpinLock;
+use platform::qemu::VIRTIO0;
 use virtio_drivers::{
     device::blk::VirtIOBlk,
     transport::mmio::{MmioTransport, VirtIOHeader},
@@ -11,7 +12,7 @@ use virtio_drivers::{
 
 use super::virtio_impl::HalImpl;
 use crate::{
-    config::{fs::BLOCK_SIZE, mm::VIRTIO0},
+    config::fs::BLOCK_SIZE,
     driver::{
         block::BlockDriver,
         probe::{ProbeInfo, PROBE},

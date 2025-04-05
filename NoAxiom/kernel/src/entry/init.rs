@@ -1,5 +1,5 @@
 use arch::{
-    Arch, ArchBoot, ArchInt, ArchSbi, Platform, _entry_other_hart, consts::KERNEL_ADDR_OFFSET,
+    Arch, ArchBoot, ArchInt, ArchSbi, DtbInfo, _entry_other_hart, consts::KERNEL_ADDR_OFFSET,
 };
 
 use crate::{
