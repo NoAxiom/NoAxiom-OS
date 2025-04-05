@@ -326,6 +326,7 @@ dependencies = [
  "ksync",
  "lazy_static",
  "log",
+ "memory",
  "plic",
  "smoltcp",
  "spin 0.7.1",

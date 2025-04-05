@@ -1,7 +1,7 @@
 use core::arch::asm;
 
 use config::{
-    arch::CPU_NUM,
+    cpu::CPU_NUM,
     mm::{KERNEL_STACK_SIZE, KERNEL_STACK_WIDTH, PAGE_SIZE},
 };
 

@@ -13,6 +13,7 @@ ksync = { workspace = true }
 log = { workspace = true }
 config = { workspace = true }
 bitflags = { workspace = true }
+memory = { workspace = true }
 fdt = "0.1.5"
 plic = { git = "https://github.com/os-module/plic" }
 async-trait = "0.1.50"
