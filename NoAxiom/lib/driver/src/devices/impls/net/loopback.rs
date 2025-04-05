@@ -1,7 +1,7 @@
 use alloc::string::String;
 use core::ops::DerefMut;
 
-use arch::ArchTime;
+use arch::{Arch, ArchTime};
 use include::errno::Errno;
 use ksync::mutex::SpinLock;
 use smoltcp::{
@@ -91,7 +91,6 @@ impl NetDevice for LoopBackDev {
 }
 
 pub fn get_time_ms() -> usize {
-    const CLOCK_FREQ: usize = 12500000;
     const MSEC_PER_SEC: usize = 1000;
-    arch::Arch::get_time() / (CLOCK_FREQ / MSEC_PER_SEC)
+    arch::Arch::get_time() / (Arch::get_freq() / MSEC_PER_SEC)
 }

@@ -16,25 +16,26 @@ pub fn get_time() -> usize {
 }
 
 pub fn get_time_s() -> usize {
-    get_time() / CLOCK_FREQ
+    get_time() / Arch::get_freq()
 }
 
 pub fn get_time_ms() -> usize {
-    get_time() / (CLOCK_FREQ / MSEC_PER_SEC)
+    get_time() / (Arch::get_freq() / MSEC_PER_SEC)
 }
 
 pub fn get_time_us() -> usize {
-    get_time() * USEC_PER_SEC / CLOCK_FREQ
+    get_time() * USEC_PER_SEC / Arch::get_freq()
 }
 
 pub fn get_time_ns() -> usize {
-    get_time() * (NSEC_PER_SEC / CLOCK_FREQ)
+    get_time() * (NSEC_PER_SEC / Arch::get_freq())
 }
 
 pub fn get_timeval() -> TimeVal {
+    let freq = Arch::get_freq();
     let ticks = get_time();
-    let sec = ticks / CLOCK_FREQ;
-    let usec = (ticks % CLOCK_FREQ) * USEC_PER_SEC / CLOCK_FREQ;
+    let sec = ticks / freq;
+    let usec = (ticks % freq) * USEC_PER_SEC / freq;
     TimeVal { sec, usec }
 }
 

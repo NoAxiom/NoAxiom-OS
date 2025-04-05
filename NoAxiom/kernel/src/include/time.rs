@@ -3,7 +3,9 @@ use core::{
     time::Duration,
 };
 
-use crate::constant::time::{CLOCK_FREQ, NSEC_PER_SEC, USEC_PER_SEC};
+use arch::{Arch, ArchTime};
+
+use crate::constant::time::{NSEC_PER_SEC, USEC_PER_SEC};
 
 #[repr(C)]
 pub struct TMS {
@@ -103,13 +105,15 @@ impl TimeVal {
     }
 
     pub fn from_ticks(tiks: usize) -> Self {
-        let sec = tiks / CLOCK_FREQ;
-        let usec = (tiks % CLOCK_FREQ) * USEC_PER_SEC / CLOCK_FREQ;
+        let freq = Arch::get_freq();
+        let sec = tiks / freq;
+        let usec = (tiks % freq) * USEC_PER_SEC / freq;
         Self { sec, usec }
     }
 
     pub fn into_ticks(&self) -> usize {
-        self.sec * CLOCK_FREQ + self.usec / USEC_PER_SEC * CLOCK_FREQ
+        let freq = Arch::get_freq();
+        self.sec * freq + self.usec / USEC_PER_SEC * freq
     }
 }
 
@@ -129,7 +133,8 @@ impl TimeSpec {
     }
 
     pub fn into_ticks(&self) -> usize {
-        self.tv_sec as usize * CLOCK_FREQ + self.tv_nsec as usize / NSEC_PER_SEC * CLOCK_FREQ
+        let freq = Arch::get_freq();
+        self.tv_sec as usize * freq + self.tv_nsec as usize / NSEC_PER_SEC * freq
     }
 
     pub fn as_bytes(&self) -> &[u8] {
@@ -142,8 +147,9 @@ impl TimeSpec {
     }
 
     pub fn from_ticks(tiks: usize) -> Self {
-        let tv_sec = tiks / CLOCK_FREQ;
-        let tv_nsec = (tiks % CLOCK_FREQ) * NSEC_PER_SEC / CLOCK_FREQ;
+        let freq = Arch::get_freq();
+        let tv_sec = tiks / freq;
+        let tv_nsec = (tiks % freq) * NSEC_PER_SEC / freq;
         Self {
             tv_sec: tv_sec as u64,
             tv_nsec: tv_nsec as u64,

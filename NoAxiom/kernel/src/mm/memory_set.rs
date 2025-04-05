@@ -2,8 +2,7 @@ use alloc::{sync::Arc, vec::Vec};
 use core::sync::atomic::{fence, Ordering};
 
 use arch::{
-    consts::{KERNEL_ADDR_OFFSET, KERNEL_VIRT_MEMORY_END, MMIO},
-    Arch, ArchMemory, ArchPageTableEntry, MappingFlags, PageTableEntry,
+    consts::{KERNEL_ADDR_OFFSET, KERNEL_VIRT_MEMORY_END, MMIO}, Arch, ArchMemory, ArchPageTableEntry, ArchTime, MappingFlags, PageTableEntry
 };
 use ksync::{cell::SyncUnsafeCell, mutex::SpinLock, Lazy};
 
@@ -16,7 +15,6 @@ use super::{
 };
 use crate::{
     config::mm::{PAGE_SIZE, PAGE_WIDTH, USER_HEAP_SIZE, USER_STACK_SIZE},
-    constant::time::CLOCK_FREQ,
     fs::{path::Path, vfs::basic::file::File},
     include::process::auxv::*,
     map_permission,
@@ -358,7 +356,7 @@ impl MemorySet {
         auxs.push(AuxEntry(AT_GID, 0 as usize));
         auxs.push(AuxEntry(AT_EGID, 0 as usize));
         auxs.push(AuxEntry(AT_HWCAP, 0 as usize));
-        auxs.push(AuxEntry(AT_CLKTCK, CLOCK_FREQ as usize));
+        auxs.push(AuxEntry(AT_CLKTCK, Arch::get_freq() as usize));
         auxs.push(AuxEntry(AT_SECURE, 0 as usize));
 
         ElfMemoryInfo {

@@ -9,10 +9,8 @@ use array_init::array_init;
 use ksync::cell::SyncUnsafeCell;
 use lazy_static::lazy_static;
 
-use super::gettime::get_time;
-use crate::{
-    config::cpu::CPU_NUM, constant::time::SLEEP_BLOCK_LIMIT_TICKS, cpu::get_hartid, task::Task,
-};
+use super::{gettime::get_time, timer::get_sleep_block_limit_ticks};
+use crate::{config::cpu::CPU_NUM, cpu::get_hartid, task::Task};
 
 pub struct SleepInfo {
     waker: Waker,
@@ -82,7 +80,7 @@ pub fn block_on_sleep(time: usize) {
 impl Task {
     pub async fn sleep(self: &Arc<Self>, interval: usize) {
         let time = get_time() + interval;
-        if interval < SLEEP_BLOCK_LIMIT_TICKS {
+        if interval < get_sleep_block_limit_ticks() {
             block_on_sleep(time);
         } else {
             let waker = self.waker().as_ref().unwrap().clone();

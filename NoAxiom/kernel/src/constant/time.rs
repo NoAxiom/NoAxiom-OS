@@ -10,14 +10,3 @@ pub const USEC_PER_SEC: usize = 100_0000;
 
 /// nanosecond per second, 1e-9 s
 pub const NSEC_PER_SEC: usize = 10_0000_0000;
-
-/// sleep block wait limitation ticks: 500us
-pub const SLEEP_BLOCK_LIMIT_TICKS: usize = 500 * CLOCK_FREQ / USEC_PER_SEC;
-
-/// clock frequency: 4MHz, ns per tick: 250ns
-#[cfg(feature = "vf2")]
-pub const CLOCK_FREQ: usize = 4000000;
-
-/// clock frequency: 12.5MHz, ns per tick: 80ns
-#[cfg(feature = "riscv_qemu")]
-pub const CLOCK_FREQ: usize = 12500000;
