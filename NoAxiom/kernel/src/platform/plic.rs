@@ -4,7 +4,7 @@ extern crate alloc;
 
 // use alloc::{collections::BTreeMap, format, string::String, sync::Arc};
 
-use config::arch::CPU_NUM;
+use config::cpu::CPU_NUM;
 use ksync::Once;
 // use device_interface::DeviceBase;
 use plic::{Mode, PLIC};

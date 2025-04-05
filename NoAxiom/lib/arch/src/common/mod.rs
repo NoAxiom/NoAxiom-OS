@@ -1,5 +1,6 @@
 mod asm;
 mod boot;
+pub mod consts;
 mod full;
 mod interrupt;
 mod memory;

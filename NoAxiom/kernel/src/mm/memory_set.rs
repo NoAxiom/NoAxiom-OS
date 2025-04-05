@@ -1,7 +1,10 @@
 use alloc::{sync::Arc, vec::Vec};
 use core::sync::atomic::{fence, Ordering};
 
-use arch::{Arch, ArchMemory, ArchPageTableEntry, MappingFlags, PageTableEntry};
+use arch::{
+    consts::{KERNEL_ADDR_OFFSET, KERNEL_VIRT_MEMORY_END, MMIO},
+    Arch, ArchMemory, ArchPageTableEntry, MappingFlags, PageTableEntry,
+};
 use ksync::{cell::SyncUnsafeCell, mutex::SpinLock, Lazy};
 
 use super::{
@@ -12,10 +15,7 @@ use super::{
     page_table::{flags_switch_to_rw, PageTable},
 };
 use crate::{
-    config::mm::{
-        KERNEL_ADDR_OFFSET, KERNEL_VIRT_MEMORY_END, MMIO, PAGE_SIZE, PAGE_WIDTH, USER_HEAP_SIZE,
-        USER_STACK_SIZE,
-    },
+    config::mm::{PAGE_SIZE, PAGE_WIDTH, USER_HEAP_SIZE, USER_STACK_SIZE},
     constant::time::CLOCK_FREQ,
     fs::{path::Path, vfs::basic::file::File},
     include::process::auxv::*,

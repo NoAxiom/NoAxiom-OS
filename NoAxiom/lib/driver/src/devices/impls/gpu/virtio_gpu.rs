@@ -20,6 +20,7 @@ impl VirtioGpu {
     pub fn new() -> Self {
         unsafe {
             let header = NonNull::new(VIRTIO7 as *mut VirtIOHeader).unwrap();
+            // fixme: | kernel addr offset
             let transport = MmioTransport::new(header).unwrap();
             let mut virtio = VirtIOGpu::new(transport).unwrap();
             let fbuffer = virtio.setup_framebuffer().unwrap();

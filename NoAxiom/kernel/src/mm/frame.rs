@@ -3,17 +3,15 @@ use alloc::{
     sync::{Arc, Weak},
     vec::Vec,
 };
+use arch::consts::KERNEL_PHYS_MEMORY_END;
 use core::fmt::{self, Debug, Formatter};
 
 use ksync::mutex::SpinLock;
 use lazy_static::lazy_static;
+use memory::utils::{kernel_ppn_to_vpn, kernel_va_to_pa};
 
 use super::address::{PhysPageNum, VirtPageNum};
-use crate::{
-    config::mm::KERNEL_PHYS_MEMORY_END,
-    mm::address::PhysAddr,
-    utils::{kernel_ppn_to_vpn, kernel_va_to_pa},
-};
+use crate::mm::address::PhysAddr;
 
 // pub fn frame_strong_count(ppn: PhysPageNum) -> usize {
 //     FRAME_MAP

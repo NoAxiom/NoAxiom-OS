@@ -1,11 +1,9 @@
 use alloc::{string::String, vec::Vec};
 
-use arch::{Arch, ArchMemory};
+use arch::{consts::KERNEL_ADDR_OFFSET, Arch, ArchMemory};
 
 use super::{address::VirtAddr, page_table::PageTable, validate::validate};
-use crate::{
-    config::mm::KERNEL_ADDR_OFFSET, cpu::current_cpu, mm::address::VpnRange, syscall::SysResult,
-};
+use crate::{cpu::current_cpu, mm::address::VpnRange, syscall::SysResult};
 
 // /// check if the slice is well-allocated
 // /// any unallocated memory access will cause a page fault

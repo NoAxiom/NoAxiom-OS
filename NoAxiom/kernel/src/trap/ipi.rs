@@ -8,7 +8,7 @@ use array_init::array_init;
 use ksync::mutex::SpinLock;
 use lazy_static::lazy_static;
 
-use crate::{config::arch::CPU_NUM, cpu::get_hartid};
+use crate::{config::cpu::CPU_NUM, cpu::get_hartid};
 
 #[derive(Clone)]
 pub enum IpiType {

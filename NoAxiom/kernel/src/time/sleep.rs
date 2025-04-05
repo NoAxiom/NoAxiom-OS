@@ -11,7 +11,7 @@ use lazy_static::lazy_static;
 
 use super::gettime::get_time;
 use crate::{
-    config::arch::CPU_NUM, constant::time::SLEEP_BLOCK_LIMIT_TICKS, cpu::get_hartid, task::Task,
+    config::cpu::CPU_NUM, constant::time::SLEEP_BLOCK_LIMIT_TICKS, cpu::get_hartid, task::Task,
 };
 
 pub struct SleepInfo {

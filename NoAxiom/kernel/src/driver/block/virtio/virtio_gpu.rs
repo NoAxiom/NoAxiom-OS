@@ -2,10 +2,9 @@ use core::any::Any;
 
 type Mutex<T> = ksync::mutex::SpinLock<T>;
 
-use crate::{
-    config::mm::KERNEL_ADDR_OFFSET,
-    driver::virtio_drivers2::{gpu::VirtIOGpu, header::VirtIOHeader},
-};
+use arch::consts::KERNEL_ADDR_OFFSET;
+
+use crate::driver::virtio_drivers2::{gpu::VirtIOGpu, header::VirtIOHeader};
 
 const VIRTIO7: usize = 0x10007000 + KERNEL_ADDR_OFFSET;
 

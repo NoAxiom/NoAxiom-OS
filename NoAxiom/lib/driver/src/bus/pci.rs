@@ -1,5 +1,5 @@
 use arch::ArchMemory;
-use config::arch::{PCI_BUS_END, PCI_RANGE};
+use config::cpu::{PCI_BUS_END, PCI_RANGE};
 use include::errno::Errno;
 use virtio_drivers::transport::{
     pci::{

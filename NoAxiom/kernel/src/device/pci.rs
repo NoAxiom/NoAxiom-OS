@@ -1,6 +1,6 @@
 use core::{error, ptr::NonNull};
 
-use arch::{Arch, Platform};
+use arch::{consts::KERNEL_ADDR_OFFSET, Arch, Platform};
 use fdt::Fdt;
 use log::{debug, info, trace};
 use virtio_drivers::{
@@ -20,9 +20,7 @@ use virtio_drivers::{
 };
 
 use super::pci_driver::PciRangeAllocator;
-use crate::{
-    config::mm::KERNEL_ADDR_OFFSET, driver::block::virtio::virtio_impl::HalImpl, platform::DTB,
-};
+use crate::{driver::block::virtio::virtio_impl::HalImpl, platform::DTB};
 
 pub fn init() -> Result<VirtIOBlk<HalImpl, PciTransport>, ()> {
     let fdt = *DTB.get().unwrap();

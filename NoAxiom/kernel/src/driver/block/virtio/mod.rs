@@ -5,11 +5,10 @@ pub mod virtio_gpu;
 pub mod virtio_input;
 use alloc::sync::Arc;
 
+use arch::consts::KERNEL_ADDR_OFFSET;
 use lazy_static::lazy_static;
 use virtio_gpu::{GpuDevice, VirtIOGpuWrapper};
 use virtio_input::{InputDevice, VirtIOInputWrapper};
-
-use crate::config::mm::KERNEL_ADDR_OFFSET;
 
 pub mod virtio_impl;
 

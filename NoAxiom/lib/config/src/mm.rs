@@ -1,3 +1,5 @@
+//! Memory management configuration
+
 /// inner page offset witdh
 pub const PAGE_WIDTH: usize = 12;
 /// page size : 4KB, 4096 bytes
@@ -11,4 +13,27 @@ pub const KERNEL_STACK_SIZE: usize = 1 << KERNEL_STACK_WIDTH;
 
 /// qemu virtio mmio, at physical address
 pub const VIRTIO0: usize = 0x1000_1000;
-pub const VIRTIO7: usize = 0x10007000;
+pub const VIRTIO7: usize = 0x1000_7000;
+
+/// raw vpn & ppn width: 9
+pub const PAGE_NUM_WIDTH: usize = PAGE_WIDTH - 3;
+/// page table entry per page: 512
+pub const PTE_PER_PAGE: usize = 1 << PAGE_NUM_WIDTH;
+
+/// kernel heap size: 32MB
+pub const KERNEL_HEAP_SIZE: usize = 0x200_0000;
+
+/// user app's stack size: 8KB
+pub const USER_STACK_SIZE: usize = PAGE_SIZE * 2;
+/// user app's heap size: 120MB
+pub const USER_HEAP_SIZE: usize = PAGE_SIZE * 30000;
+
+/// mmap start address
+pub const MMAP_BASE_ADDR: usize = 0x6000_0000;
+/// mmap area max size
+pub const MMAP_MAX_SIZE: usize = 0x1000_0000;
+/// mmap max_end address
+pub const MMAP_MAX_END_ADDR: usize = MMAP_BASE_ADDR + MMAP_MAX_SIZE;
+
+/// Dynamic linked interpreter address range in user space
+pub const DL_INTERP_OFFSET: usize = 0x20_0000_0000;

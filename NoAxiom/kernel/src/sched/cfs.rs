@@ -8,7 +8,7 @@ use super::{
     sched_info::SchedInfo,
     vsched::{MulticoreScheduler, ScheduleOrder, Scheduler},
 };
-use crate::{config::sched::LOAD_BALANCE_TICKS, time::gettime::get_time};
+use crate::time::{gettime::get_time, timer::get_load_balance_ticks};
 
 struct CfsTreeNode<R> {
     pub vruntime: SchedVruntime,
@@ -90,7 +90,7 @@ where
     }
     /// set last load balance time
     fn set_last_time(&mut self) {
-        self.time_limit = LOAD_BALANCE_TICKS;
+        self.time_limit = get_load_balance_ticks();
         self.last_time = get_time();
     }
     /// set time limit for load balance
@@ -116,7 +116,7 @@ impl Scheduler<SchedInfo> for CFS<SchedInfo> {
             load: 0,
             task_count: 0,
             last_time: 0,
-            time_limit: LOAD_BALANCE_TICKS,
+            time_limit: get_load_balance_ticks(),
             is_running: false,
         }
     }

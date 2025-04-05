@@ -1,7 +1,6 @@
-//! Memory management configuration
+use config::mm::PAGE_WIDTH;
 
-use arch::{Arch, ArchMemory, ArchPageTable, VirtPageTable};
-pub use config::mm::*;
+use crate::{Arch, ArchMemory, ArchPageTable, VirtPageTable};
 
 macro_rules! pt_const {
     ($const:ident) => {
@@ -18,37 +17,15 @@ macro_rules! mem_const {
 pub const VA_WIDTH: usize = pt_const!(VA_WIDTH);
 /// index level number
 pub const INDEX_LEVELS: usize = pt_const!(INDEX_LEVELS);
-/// raw vpn & ppn width: 9
-pub const PAGE_NUM_WIDTH: usize = PAGE_WIDTH - 3;
-/// page table entry per page: 512
-pub const PTE_PER_PAGE: usize = 1 << PAGE_NUM_WIDTH;
-
 /// kernel address offset from phys to virt
 pub const KERNEL_ADDR_OFFSET: usize = mem_const!(KERNEL_ADDR_OFFSET);
-/// kernle pagenum offset from phys to virt
-pub const KERNEL_PAGENUM_MASK: usize = (KERNEL_ADDR_OFFSET as isize >> PAGE_WIDTH) as usize;
 /// kernel phys memory end address
 pub const KERNEL_PHYS_MEMORY_END: usize = mem_const!(PHYS_MEMORY_END);
+
+/// kernle pagenum offset from phys to virt
+pub const KERNEL_PAGENUM_MASK: usize = (KERNEL_ADDR_OFFSET as isize >> PAGE_WIDTH) as usize;
 /// kernel virt memory end address
 pub const KERNEL_VIRT_MEMORY_END: usize = KERNEL_ADDR_OFFSET | KERNEL_PHYS_MEMORY_END;
-
-/// kernel heap size: 32MB
-pub const KERNEL_HEAP_SIZE: usize = 0x200_0000;
-
-/// user app's stack size: 8KB
-pub const USER_STACK_SIZE: usize = PAGE_SIZE * 2;
-/// user app's heap size: 120MB
-pub const USER_HEAP_SIZE: usize = PAGE_SIZE * 30000;
-
-/// mmap start address
-pub const MMAP_BASE_ADDR: usize = 0x6000_0000;
-/// mmap area max size
-pub const MMAP_MAX_SIZE: usize = 0x1000_0000;
-/// mmap max_end address
-pub const MMAP_MAX_END_ADDR: usize = MMAP_BASE_ADDR + MMAP_MAX_SIZE;
-
-/// Dynamic linked interpreter address range in user space
-pub const DL_INTERP_OFFSET: usize = 0x20_0000_0000;
 
 /// qemu virtio disk mmio
 pub const VIRTIO0: usize = 0x1000_1000 + KERNEL_ADDR_OFFSET;

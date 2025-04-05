@@ -1,6 +1,6 @@
 use core::{arch::asm, ptr};
 
-use config::{arch::CPU_NUM, mm::KERNEL_STACK_SIZE};
+use config::{cpu::CPU_NUM, mm::KERNEL_STACK_SIZE};
 use log::info;
 use loongArch64::{
     consts::LOONGARCH_CSR_MAIL_BUF0,

@@ -1,7 +1,7 @@
 //! spin mutex for riscv kernel
 
 use arch::{Arch, ArchAsm, ArchInt};
-use config::arch::CPU_NUM;
+use config::cpu::CPU_NUM;
 
 use crate::cell::SyncUnsafeCell;
 

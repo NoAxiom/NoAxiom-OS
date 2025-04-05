@@ -1,7 +1,7 @@
 use alloc::{sync::Arc, vec::Vec};
 use core::ptr::NonNull;
 
-use arch::{Arch, Platform};
+use arch::{consts::KERNEL_ADDR_OFFSET, Arch, Platform};
 use fdt::Fdt;
 use ksync::mutex::SpinLock;
 use virtio_drivers::transport::{
@@ -11,7 +11,7 @@ use virtio_drivers::transport::{
 };
 
 use crate::{
-    config::mm::{KERNEL_ADDR_OFFSET, VIRTIO0},
+    config::mm::VIRTIO0,
     device::block::{sata::SataBlock, virtio::PciVirtio, BlockDevice},
     driver::{
         block::{

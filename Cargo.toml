@@ -17,6 +17,7 @@ fatfs = { path = "NoAxiom/lib/fatfs", default-features = false, features = [
 config = { path = "NoAxiom/lib/config" }
 driver = { path = "NoAxiom/lib/driver" }
 include = { path = "NoAxiom/lib/include" }
+memory = { path = "NoAxiom/lib/memory" }
 
 [profile.release]
 debug = true

@@ -2,12 +2,13 @@
 
 use core::fmt::Debug;
 
-use arch::PageTableEntry;
-
-use crate::{
-    config::mm::*,
-    utils::{kernel_va_to_pa, kernel_vpn_to_ppn, signed_extend},
+use arch::{
+    consts::{INDEX_LEVELS, KERNEL_ADDR_OFFSET, VA_WIDTH},
+    PageTableEntry,
 };
+use memory::utils::{kernel_va_to_pa, kernel_vpn_to_ppn};
+
+use crate::{config::mm::*, utils::signed_extend};
 
 /// addr type def
 /// note that the highter bits of pagenum isn't used and it can be any value

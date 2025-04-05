@@ -3,6 +3,7 @@ use alloc::{sync::Arc, vec::Vec};
 
 use async_blk::VirtIOAsyncBlock;
 use lazy_static::*;
+use memory::utils::{kernel_pa_to_va, kernel_va_to_pa};
 
 use super::dma::VirtualAddress;
 use crate::{
@@ -13,7 +14,6 @@ use crate::{
         memory_set::KERNEL_SPACE,
         page_table::PageTable,
     },
-    utils::{kernel_pa_to_va, kernel_va_to_pa},
 };
 pub mod async_blk;
 

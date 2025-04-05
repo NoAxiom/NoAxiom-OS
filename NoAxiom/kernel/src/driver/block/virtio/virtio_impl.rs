@@ -4,23 +4,21 @@
 use alloc::vec::Vec;
 use core::ptr::NonNull;
 
+use arch::consts::KERNEL_ADDR_OFFSET;
 use ksync::mutex::SpinLock;
 use lazy_static::lazy_static;
+use memory::utils::{kernel_pa_to_va, kernel_va_to_pa};
 // use spin::Mutex;
 use virtio_drivers::{BufferDirection, Hal, PhysAddr as VirtioPhysAddr};
 
 type Mutex<T> = ksync::mutex::SpinLock<T>;
 // type MutexGuard<'a, T> = ksync::mutex::SpinLockGuard<'a, T>;
 
-use crate::{
-    config::mm::KERNEL_ADDR_OFFSET,
-    mm::{
-        address::{PhysAddr, PhysPageNum, StepOne, VirtAddr},
-        frame::{frame_alloc, frame_dealloc, FrameTracker},
-        memory_set::{KERNEL_SPACE, KERNEL_SPACE_ROOT_PPN},
-        page_table::PageTable,
-    },
-    utils::{kernel_pa_to_va, kernel_va_to_pa},
+use crate::mm::{
+    address::{PhysAddr, PhysPageNum, StepOne, VirtAddr},
+    frame::{frame_alloc, frame_dealloc, FrameTracker},
+    memory_set::{KERNEL_SPACE, KERNEL_SPACE_ROOT_PPN},
+    page_table::PageTable,
 };
 
 static DMA_PADDR: SpinLock<Vec<FrameTracker>> = SpinLock::new(Vec::new());

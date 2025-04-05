@@ -1,7 +1,9 @@
-use arch::{Arch, ArchBoot, ArchInt, ArchSbi, Platform, _entry_other_hart};
+use arch::{
+    Arch, ArchBoot, ArchInt, ArchSbi, Platform, _entry_other_hart, consts::KERNEL_ADDR_OFFSET,
+};
 
 use crate::{
-    config::{arch::CPU_NUM, mm::KERNEL_ADDR_OFFSET},
+    config::cpu::CPU_NUM,
     constant::banner::NOAXIOM_BANNER,
     cpu::get_hartid,
     device::init::device_init,

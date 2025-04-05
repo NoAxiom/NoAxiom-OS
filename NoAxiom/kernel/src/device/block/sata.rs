@@ -1,5 +1,6 @@
 use alloc::boxed::Box;
 
+use arch::consts::KERNEL_ADDR_OFFSET;
 use async_trait::async_trait;
 use config::mm::PAGE_SIZE;
 use isomorphic_drivers::{
@@ -11,7 +12,6 @@ use pci::*;
 use spin::Mutex;
 
 use crate::{
-    config::mm::KERNEL_ADDR_OFFSET,
     device::block::BlockDevice,
     mm::{
         address::PhysAddr,

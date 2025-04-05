@@ -4,7 +4,7 @@ use arch::{Arch, ArchAsm};
 use ksync::cell::SyncUnsafeCell;
 
 use crate::{
-    config::arch::CPU_NUM, mm::memory_set::kernel_space_activate, task::Task,
+    config::cpu::CPU_NUM, mm::memory_set::kernel_space_activate, task::Task,
     time::timer::set_next_trigger,
 };
 
