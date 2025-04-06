@@ -1,6 +1,5 @@
 use alloc::{string::String, vec::Vec};
 
-use arch::consts::KERNEL_ADDR_OFFSET;
 use fdt::Fdt;
 use ksync::Once;
 

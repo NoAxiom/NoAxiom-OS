@@ -2,7 +2,7 @@
 
 use core::panic::PanicInfo;
 
-use arch::{Arch, ArchBoot, ArchSbi};
+use arch::{Arch, ArchBoot};
 
 use crate::cpu::get_hartid;
 
@@ -29,5 +29,5 @@ fn panic(info: &PanicInfo) -> ! {
     }
     Arch::arch_info_print();
     // loop {}
-    Arch::shutdown()
+    platform::shutdown()
 }

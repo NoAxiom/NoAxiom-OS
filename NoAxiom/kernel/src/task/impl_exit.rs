@@ -41,7 +41,7 @@ pub async fn init_proc_exit_handler(task: &Arc<Task>) {
     drop(inner);
     // !PAY ATTENTION!! Now we don't sync_all the dirty data.
     // root_dentry().super_block().sync_all().await;
-    Arch::shutdown();
+    platform::shutdown();
 }
 
 impl Task {

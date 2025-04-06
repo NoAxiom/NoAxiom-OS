@@ -1,6 +1,5 @@
 use alloc::{boxed::Box, sync::Arc, vec::Vec};
 
-use arch::{Arch, ArchSbi};
 use async_trait::async_trait;
 use ksync::mutex::SpinLock;
 
@@ -34,12 +33,12 @@ impl File for Stdin {
     }
     async fn base_read(&self, _offset: usize, buf: &mut [u8]) -> SyscallResult {
         // mention that getchar is busy loop
-        let mut c = Arch::console_getchar() as i8;
+        let mut c = platform::getchar() as i8;
         loop {
             if c != -1 {
                 break;
             }
-            c = Arch::console_getchar() as i8;
+            c = platform::getchar() as i8;
         }
         buf[0] = c as u8;
         Ok(1 as isize)

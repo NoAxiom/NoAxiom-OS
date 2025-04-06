@@ -3,7 +3,6 @@
 
 use core::fmt::{self, Write};
 
-use arch::{Arch, ArchSbi};
 use ksync::mutex::SpinLock;
 
 static PRINT_MUTEX: SpinLock<Stdout> = SpinLock::new(Stdout::new());
@@ -17,7 +16,7 @@ impl Stdout {
 impl Write for Stdout {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         for c in s.chars() {
-            Arch::console_putchar(c as usize);
+            platform::putchar(c as usize);
         }
         Ok(())
     }
