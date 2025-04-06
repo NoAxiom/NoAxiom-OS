@@ -1,14 +1,14 @@
 use core::ptr::NonNull;
 
+use arch::{Arch, ArchMemory};
 use ksync::mutex::SpinLock;
-use platform::qemu::VIRTIO7;
 use virtio_drivers::{
     device::gpu::VirtIOGpu,
     transport::mmio::{MmioTransport, VirtIOHeader},
 };
 
 use super::Gpu;
-use crate::devices::impls::virtio::VirtioHalImpl;
+use crate::{devices::impls::virtio::VirtioHalImpl, dtb::dtb_info};
 
 /// Virtio GPU device at MMIO bus
 pub struct VirtioGpu {
@@ -19,7 +19,9 @@ pub struct VirtioGpu {
 impl VirtioGpu {
     pub fn new() -> Self {
         unsafe {
-            let header = NonNull::new(VIRTIO7 as *mut VirtIOHeader).unwrap();
+            let virtio7_paddr = dtb_info().virtio_mmio_regions[7].0;
+            let virtio7 = virtio7_paddr | Arch::KERNEL_ADDR_OFFSET;
+            let header = NonNull::new(virtio7 as *mut VirtIOHeader).unwrap();
             // fixme: | kernel addr offset
             let transport = MmioTransport::new(header).unwrap();
             let mut virtio = VirtIOGpu::new(transport).unwrap();

@@ -1,7 +1,7 @@
 use arch::ArchMemory;
 use include::errno::Errno;
-#[cfg(feature = "qemu")]
-use platform::qemu::{PCI_BUS_END, PCI_RANGE};
+use log::warn;
+use platform::{PCI_BUS_END, PCI_RANGE};
 use virtio_drivers::transport::{
     pci::{
         bus::{
@@ -16,11 +16,7 @@ use virtio_drivers::transport::{
 use super::pci_driver::PciRangeAllocator;
 use crate::{
     devices::{
-        impls::{
-            block::virtio_block::{VirtioBlock, VirtioBlockType},
-            device::DevResult,
-            virtio::VirtioHalImpl,
-        },
+        impls::{device::DevResult, virtio::VirtioHalImpl},
         Devices,
     },
     dtb::dtb_info,
@@ -47,7 +43,7 @@ impl Devices {
                     Ok(_) => {
                         #[cfg(feature = "async_fs")]
                         {
-                            // todo: now async_fs for pci is not supported
+                            warn!("pci_dev for async_fs is not supported");
                         }
                         #[cfg(not(feature = "async_fs"))]
                         if let Some(transport) =
@@ -157,6 +153,7 @@ fn config_pci_device(
     Ok(())
 }
 
+#[allow(unused)]
 fn probe_pci(
     root: &mut PciRoot,
     bdf: DeviceFunction,

@@ -4,6 +4,7 @@ name = "kernel"
 version = "0.1.0"
 
 [features]
+async_fs = ["driver/async_fs"]
 multicore = []
 riscv_qemu = []
 vf2 = []
@@ -16,8 +17,7 @@ uitest = []
 ramdisk = []
 uart = []
 board_qemu = []
-async_fs = []
-qemu = []
+qemu = ["platform/qemu"]
 
 [dependencies]
 # extern libs
@@ -82,7 +82,7 @@ ksync = { workspace = true }
 console = { workspace = true }
 fatfs = { workspace = true }
 config = { workspace = true, features = ["multicore"] }
-driver = { workspace = true, features = ["qemu"] }
+driver = { workspace = true }
 include = { workspace = true }
 memory = { workspace = true }
 platform = { workspace = true }

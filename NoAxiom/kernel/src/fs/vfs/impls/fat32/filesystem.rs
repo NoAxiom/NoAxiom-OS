@@ -1,8 +1,9 @@
 use alloc::{boxed::Box, string::String, sync::Arc};
 
+use driver::devices::impls::block::BlockDevice;
+
 use super::{dentry::FAT32Dentry, inode::FAT32DirInode, superblock::FAT32SuperBlock};
 use crate::{
-    device::block::BlockDevice,
     fs::{
         fat32::FAT32FIleSystem as FAT32FileSystemSpecific,
         vfs::basic::{
@@ -37,7 +38,7 @@ impl FileSystem for FAT32FIleSystem {
         parent: Option<Arc<dyn Dentry>>,
         flags: MountFlags,
         name: &str,
-        device: Option<Arc<dyn BlockDevice>>,
+        device: Option<Arc<&'static dyn BlockDevice>>,
     ) -> Arc<dyn Dentry> {
         let unbooted_fs = Arc::new(FAT32FileSystemSpecific::new(device.clone().unwrap()));
         let super_block_meta = SuperBlockMeta::new(device.clone(), self.clone());

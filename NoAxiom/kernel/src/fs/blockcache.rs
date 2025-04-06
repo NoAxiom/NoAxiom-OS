@@ -6,19 +6,20 @@ use alloc::{boxed::Box, sync::Arc, vec::Vec};
 use core::num::NonZeroUsize;
 
 use async_trait::async_trait;
+use driver::devices::impls::{
+    block::BlockDevice,
+    device::{DevResult, Device},
+};
 use ksync::mutex::check_no_lock;
 use lru::LruCache;
 type Mutex<T> = ksync::mutex::SpinLock<T>;
 
-use crate::{
-    config::fs::{BLOCK_SIZE, MAX_LRU_CACHE_SIZE},
-    device::block::BlockDevice,
-};
+use crate::config::fs::{BLOCK_SIZE, MAX_LRU_CACHE_SIZE};
 
 /// async block cache for data struct `B` with LRU strategy  
 pub struct AsyncBlockCache<B: Cache + Clone> {
     cache: Mutex<LruCache<usize, B>>, // todo: use async_mutex
-    block_device: Arc<dyn BlockDevice>,
+    block_device: Arc<&'static dyn BlockDevice>,
 }
 
 pub trait Cache {
@@ -58,7 +59,7 @@ impl Cache for CacheData {
 
 impl<B: Cache + Clone> AsyncBlockCache<B> {
     /// create a new `AsyncBlockCache` and clear the cache
-    pub fn from(device: Arc<dyn BlockDevice>) -> Self {
+    pub fn from(device: Arc<&'static dyn BlockDevice>) -> Self {
         Self {
             cache: Mutex::new(LruCache::new(
                 NonZeroUsize::new(MAX_LRU_CACHE_SIZE).unwrap(),
@@ -138,16 +139,14 @@ impl<B: Cache + Clone> AsyncBlockCache<B> {
 }
 
 #[async_trait]
-impl BlockDevice for AsyncBlockCache<CacheData> {
-    async fn read(&self, _id: usize, _buf: &mut [u8]) {
-        unreachable!()
+impl Device for AsyncBlockCache<CacheData> {
+    fn device_name(&self) -> &'static str {
+        "AsyncBlockCache"
     }
-
-    async fn write(&self, _id: usize, _buf: &[u8]) {
-        unreachable!()
-    }
-
-    async fn sync_all(&self) {
-        self.sync_all().await
+    async fn sync_all(&self) -> DevResult<()> {
+        self.sync_all().await;
+        Ok(())
     }
 }
+
+impl BlockDevice for AsyncBlockCache<CacheData> {}

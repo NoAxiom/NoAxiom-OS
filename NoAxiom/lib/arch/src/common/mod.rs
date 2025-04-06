@@ -1,7 +1,6 @@
 mod asm;
 mod boot;
 pub mod consts;
-mod dtbinfo;
 mod full;
 mod interrupt;
 mod memory;
@@ -11,7 +10,6 @@ mod trap;
 
 pub use asm::*;
 pub use boot::*;
-pub use dtbinfo::*;
 pub use full::*;
 pub use interrupt::*;
 pub use memory::*;

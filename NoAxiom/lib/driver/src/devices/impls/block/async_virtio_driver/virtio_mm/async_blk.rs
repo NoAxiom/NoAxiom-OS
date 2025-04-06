@@ -2,24 +2,24 @@
 
 use alloc::boxed::Box;
 
-use arch::ArchMemory;
+use arch::{Arch, ArchMemory};
 use async_trait::async_trait;
+use config::fs::WAKE_NUM;
 use ksync::mutex::check_no_lock;
-#[cfg(feature = "qemu")]
-use platform::qemu::VIRTIO0 as VIRTIO0_VIRT;
 
-use crate::devices::impls::{
-    block::{
-        async_virtio_driver::{
-            block::{InterruptRet, VirtIOBlock},
-            mmio::VirtIOHeader,
+use crate::{
+    devices::impls::{
+        block::{
+            async_virtio_driver::{
+                block::{InterruptRet, VirtIOBlock},
+                mmio::VirtIOHeader,
+            },
+            BlockDevice,
         },
-        BlockDevice,
+        device::{DevResult, Device},
     },
-    device::{DevResult, Device},
+    dtb::dtb_info,
 };
-
-const VIRTIO0: usize = VIRTIO0_VIRT | arch::Arch::KERNEL_ADDR_OFFSET;
 
 /// 异步虚拟块设备接口
 ///
@@ -30,13 +30,18 @@ pub struct VirtIOAsyncBlock(pub VirtIOBlock<1>);
 impl VirtIOAsyncBlock {
     #[allow(unused)]
     pub async fn async_new() -> VirtIOAsyncBlock {
-        let header = unsafe { &mut *(VIRTIO0 as *mut VirtIOHeader) };
+        let virtio0_paddr = dtb_info().virtio_mmio_regions[0].0;
+        let virtio0 = virtio0_paddr | Arch::KERNEL_ADDR_OFFSET;
+        let header = unsafe { &mut *(virtio0 as *mut VirtIOHeader) };
         let async_blk = VirtIOBlock::async_new(header).await.unwrap();
         Self(async_blk)
     }
     /// 创建一个[`VirtIOAsyncBlock`]
     pub fn new() -> Self {
-        let header = unsafe { &mut *(VIRTIO0 as *mut VirtIOHeader) };
+        let virtio0_paddr = dtb_info().virtio_mmio_regions[0].0;
+        let virtio0 = virtio0_paddr | Arch::KERNEL_ADDR_OFFSET;
+        log::debug!("virtio0_paddr: {:#x}", virtio0);
+        let header = unsafe { &mut *(virtio0 as *mut VirtIOHeader) };
         let blk = VirtIOBlock::new(header).unwrap();
         Self(blk)
     }
@@ -121,6 +126,14 @@ impl VirtIOAsyncBlock {
 impl Device for VirtIOAsyncBlock {
     fn device_name(&self) -> &'static str {
         "virtio_async_block"
+    }
+    fn handle_interrupt(&self) -> DevResult<()> {
+        unsafe {
+            self.handle_interrupt()
+                .expect("virtio handle interrupt error!");
+            self.0.wake_ops.notify(WAKE_NUM);
+        };
+        Ok(())
     }
     async fn read(&self, id: usize, buf: &mut [u8]) -> DevResult<usize> {
         assert!(check_no_lock());

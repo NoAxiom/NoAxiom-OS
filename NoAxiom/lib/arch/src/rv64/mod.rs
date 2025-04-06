@@ -1,7 +1,6 @@
 mod asm;
 mod boot;
 mod context;
-mod dtbinfo;
 mod interrupt;
 mod memory;
 mod sbi;

@@ -1,13 +1,10 @@
-use arch::{
-    Arch, ArchBoot, ArchInt, ArchSbi, DtbInfo, _entry_other_hart, consts::KERNEL_ADDR_OFFSET,
-};
+use arch::{Arch, ArchBoot, ArchInt, ArchSbi, _entry_other_hart, consts::KERNEL_ADDR_OFFSET};
 
 use crate::{
     config::cpu::CPU_NUM,
     constant::banner::NOAXIOM_BANNER,
     cpu::get_hartid,
-    device::init::device_init,
-    driver::log::log_init,
+    driver,
     entry::init_proc::schedule_spawn_initproc,
     fs::fs_init,
     mm::{
@@ -15,11 +12,6 @@ use crate::{
         frame::frame_init,
         heap::heap_init,
         memory_set::{kernel_space_activate, kernel_space_init},
-    },
-    platform::{
-        platform_init,
-        plic::{init_plic, register_to_hart},
-        DTB,
     },
     rust_main,
     sched::utils::block_on,
@@ -65,19 +57,14 @@ pub extern "C" fn _boot_hart_init(_hartid: usize, dtb: usize) -> ! {
 
     // log init
     Arch::arch_init();
-    log_init();
+    driver::log_init();
 
     // kernel space init
     frame_init();
     kernel_space_init();
 
     // device init
-    let platfrom_info = platform_init(Arch::get_dtb(dtb));
-    init_plic(platfrom_info.plic.start + KERNEL_ADDR_OFFSET);
-    device_init();
-
-    #[cfg(target_arch = "riscv64")]
-    register_to_hart();
+    driver::init(platform::get_dtb(dtb));
 
     // fs init
     Arch::enable_interrupt();

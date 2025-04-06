@@ -1,10 +1,10 @@
 use alloc::{boxed::Box, sync::Arc};
 
 use async_trait::async_trait;
+use driver::devices::impls::block::BlockDevice;
 
 use super::{dentry::Fat32Dentry, inode::Fat32DirInode, superblock::Fat32SuperBlock, IFatFs};
 use crate::{
-    device::block::BlockDevice,
     fs::{
         blockcache::AsyncBlockCache,
         vfs::{
@@ -46,7 +46,7 @@ impl FileSystem for AsyncSmpFat32 {
         parent: Option<Arc<dyn Dentry>>,
         _flags: MountFlags,
         name: &str,
-        device: Option<Arc<dyn BlockDevice>>,
+        device: Option<Arc<&'static dyn BlockDevice>>,
     ) -> Arc<dyn Dentry> {
         let super_block_meta = SuperBlockMeta::new(device.clone(), self.clone());
         let blk = AsyncBlockCache::from(device.unwrap());

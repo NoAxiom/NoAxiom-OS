@@ -5,9 +5,10 @@ use alloc::{
 };
 
 use async_trait::async_trait;
+use driver::devices::impls::block::BlockDevice;
 
 use super::{dentry::Dentry, superblock::SuperBlock};
-use crate::{device::block::BlockDevice, include::fs::MountFlags};
+use crate::include::fs::MountFlags;
 
 pub struct FileSystemMeta {
     pub name: String,
@@ -31,7 +32,7 @@ pub trait FileSystem: Send + Sync {
         parent: Option<Arc<dyn Dentry>>,
         flags: MountFlags,
         name: &str,
-        device: Option<Arc<dyn BlockDevice>>,
+        device: Option<Arc<&'static dyn BlockDevice>>,
     ) -> Arc<dyn Dentry>;
 }
 
@@ -58,7 +59,7 @@ impl FileSystem for EmptyFileSystem {
         _parent: Option<Arc<dyn Dentry>>,
         _flags: MountFlags,
         _name: &str,
-        _device: Option<Arc<dyn BlockDevice>>,
+        _device: Option<Arc<&'static dyn BlockDevice>>,
     ) -> Arc<dyn Dentry> {
         unreachable!()
     }

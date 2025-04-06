@@ -4,3 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [features]
+qemu = []
+board = []
+
+[dependencies]
+# platform shouldn't depend on any other crates
+arch = { workspace = true }

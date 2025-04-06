@@ -33,4 +33,14 @@ impl Devices {
     pub fn add_display_device(&mut self, display: DisplayDevice) {
         self.display = Some(display);
     }
+
+    pub fn get_net_device(&self) -> Option<&NetDevice> {
+        self.net.as_ref()
+    }
+    pub fn get_blk_device(&self) -> Option<&BlkDevice> {
+        self.blk.as_ref()
+    }
+    pub fn get_display_device(&self) -> Option<&DisplayDevice> {
+        self.display.as_ref()
+    }
 }

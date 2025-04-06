@@ -16,13 +16,13 @@ use arch::{Arch, ArchInt};
 use bpb::{cluster_offset_sectors, BIOSParameterBlockOffset};
 use directory::{FAT32Directory, ShortDirectory};
 use downcast_rs::{impl_downcast, DowncastSync};
+use driver::devices::impls::block::BlockDevice;
 use entry::ShortDirectoryEntry;
 use tree::NTree;
 
 use super::blockcache::{AsyncBlockCache, CacheData};
 use crate::{
     config::fs::{BLOCK_SIZE, FAT32_SECTOR_SIZE, FIRST_CLUSTER, ROOT_FAKE_ENTRY},
-    device::block::BlockDevice,
     include::fs::InodeMode,
 };
 
@@ -45,7 +45,7 @@ pub struct FAT32FIleSystem {
 
 impl FAT32FIleSystem {
     /// Load bpb and root cluster to get root entry content
-    pub async fn load_root(device: Arc<dyn BlockDevice>) -> FAT32Directory {
+    pub async fn load_root(device: Arc<&'static dyn BlockDevice>) -> FAT32Directory {
         #[cfg(feature = "async_fs")]
         {
             assert!(Arch::is_interrupt_enabled());
@@ -89,7 +89,7 @@ impl FAT32FIleSystem {
         FAT32Directory::from_short(root)
     }
     /// Get empty file system binding with `device`
-    pub fn new(device: Arc<dyn BlockDevice>) -> Self {
+    pub fn new(device: Arc<&'static dyn BlockDevice>) -> Self {
         let blk = Arc::new(AsyncBlockCache::from(device));
         let bpb = [0u8; FAT32_SECTOR_SIZE];
         let fat = Arc::new(fat::FAT::new(&bpb));

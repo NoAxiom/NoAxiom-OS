@@ -1,4 +1,8 @@
 //! 异步 virtio 前端驱动
+#![allow(unused)]
+use ::config::fs::WAKE_NUM;
+
+use crate::get_blk_dev;
 
 mod block;
 mod config;

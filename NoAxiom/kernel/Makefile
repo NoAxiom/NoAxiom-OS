@@ -7,10 +7,14 @@ endif
 
 FEATURES :=
 
-# feature flags
+# feature flags, now we only support async_fs for riscv64
 VF2 :=
 QEMU := 1
-ASYNC_FS := 1
+ifeq ($(ARCH_NAME),riscv64)
+	ASYNC_FS := 1
+else ifeq ($(ARCH_NAME),loongarch64)
+	ASYNC_FS :=
+endif
 UART := 
 PRELIMINARY :=
 BUSYBOX :=

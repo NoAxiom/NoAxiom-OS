@@ -10,7 +10,7 @@ use super::device::DevResult;
 
 pub mod loopback;
 
-pub trait NetDevice: Send + Sync {
+pub trait NetWorkDev: Send + Sync {
     /// get the MAC address of the network card
     fn mac(&self) -> EthernetAddress;
 

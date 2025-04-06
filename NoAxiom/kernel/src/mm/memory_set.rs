@@ -2,7 +2,8 @@ use alloc::{sync::Arc, vec::Vec};
 use core::sync::atomic::{fence, Ordering};
 
 use arch::{
-    consts::{KERNEL_ADDR_OFFSET, KERNEL_VIRT_MEMORY_END, MMIO}, Arch, ArchMemory, ArchPageTableEntry, ArchTime, MappingFlags, PageTableEntry
+    consts::{KERNEL_ADDR_OFFSET, KERNEL_VIRT_MEMORY_END},
+    Arch, ArchMemory, ArchPageTableEntry, ArchTime, MappingFlags, PageTableEntry,
 };
 use ksync::{cell::SyncUnsafeCell, mutex::SpinLock, Lazy};
 
@@ -206,7 +207,7 @@ impl MemorySet {
             ekernel as usize, KERNEL_VIRT_MEMORY_END as usize
         );
         info!("mapping memory-mapped registers");
-        for (start, len) in MMIO {
+        for (start, len) in platform::MMIO_REGIONS {
             let s_addr = *start + KERNEL_ADDR_OFFSET;
             let e_addr = *start + *len + KERNEL_ADDR_OFFSET;
             debug!("[kernel] pushing MMIO area: [{:#x},{:#x})", s_addr, e_addr);

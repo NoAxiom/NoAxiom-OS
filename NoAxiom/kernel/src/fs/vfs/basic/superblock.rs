@@ -5,18 +5,18 @@ use alloc::{
 
 use async_trait::async_trait;
 use downcast_rs::{impl_downcast, DowncastSync};
+use driver::devices::impls::block::BlockDevice;
 use ksync::Once;
 
 use super::{
     dentry::Dentry,
     filesystem::{EmptyFileSystem, FileSystem},
 };
-use crate::device::block::BlockDevice;
 
 /// stand for file system
 pub struct SuperBlockMeta {
     /// The device of the file system, None if it is a virtual file system
-    device: Option<Arc<dyn BlockDevice>>,
+    device: Option<Arc<&'static dyn BlockDevice>>,
     /// The file system
     file_system: Arc<dyn FileSystem>,
     /// The root of the file system, use weak to avoid reference cycle
@@ -24,7 +24,10 @@ pub struct SuperBlockMeta {
 }
 
 impl SuperBlockMeta {
-    pub fn new(device: Option<Arc<dyn BlockDevice>>, file_system: Arc<dyn FileSystem>) -> Self {
+    pub fn new(
+        device: Option<Arc<&'static dyn BlockDevice>>,
+        file_system: Arc<dyn FileSystem>,
+    ) -> Self {
         Self {
             device,
             file_system,
@@ -38,7 +41,7 @@ pub trait SuperBlock: Send + Sync + DowncastSync {
     fn meta(&self) -> &SuperBlockMeta;
     async fn sync_all(&self) {
         if let Some(dev) = &self.meta().device {
-            dev.sync_all().await;
+            dev.sync_all().await.expect("sync all failed");
         }
     }
 }

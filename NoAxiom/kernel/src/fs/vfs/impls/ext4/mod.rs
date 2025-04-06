@@ -1,10 +1,10 @@
 use alloc::sync::Arc;
 
+use driver::devices::impls::block::BlockDevice;
 use ext4_rs::{Errno as ext4Errno, Ext4Error};
 
 use super::disk_cursor::DiskCursor;
 use crate::{
-    device::block::BlockDevice,
     fs::blockcache::AsyncBlockCache,
     include::{fs::Ext4DirEntryType, result::Errno},
     sched::utils::block_on,
@@ -35,9 +35,9 @@ pub const fn fs_err(err: Ext4Error) -> Errno {
 }
 
 #[allow(dead_code, unused_variables)]
-pub async fn ext4_rs_test(device: Arc<dyn BlockDevice>) {
-    let blk = Arc::new(AsyncBlockCache::from(device));
-    let disk_cursor = DiskCursor::new(blk.clone(), 0, 0);
+pub async fn ext4_rs_test(device: Arc<&'static dyn BlockDevice>) {
+    let blk = AsyncBlockCache::from(device);
+    let disk_cursor = DiskCursor::new(Arc::new(blk), 0, 0);
     let ext4 = IExtFs::open(Arc::new(disk_cursor)).await;
 
     const ROOT_INODE: u32 = 2;

@@ -1,12 +1,13 @@
 use alloc::{boxed::Box, sync::Arc};
 
 use async_trait::async_trait;
+use driver::devices::impls::block::BlockDevice;
 use ext4_rs::ext4_defs::ROOT_INODE;
 use spin::Mutex;
+use virtio_drivers::device::blk;
 
 use super::{dentry::Ext4Dentry, inode::Ext4DirInode, superblock::Ext4SuperBlock, IExtFs};
 use crate::{
-    device::block::BlockDevice,
     fs::{
         blockcache::AsyncBlockCache,
         vfs::{
@@ -47,11 +48,11 @@ impl FileSystem for AsyncSmpExt4 {
         parent: Option<Arc<dyn Dentry>>,
         _flags: MountFlags,
         name: &str,
-        device: Option<Arc<dyn BlockDevice>>,
+        device: Option<Arc<&'static dyn BlockDevice>>,
     ) -> Arc<dyn Dentry> {
-        let blk = Arc::new(AsyncBlockCache::from(device.unwrap()));
-        let super_block_meta = SuperBlockMeta::new(Some(blk.clone()), self.clone());
-        let disk_cursor = DiskCursor::new(blk.clone(), 0, 0);
+        let blk = AsyncBlockCache::from(device.clone().unwrap());
+        let super_block_meta = SuperBlockMeta::new(Some(device.unwrap()), self.clone());
+        let disk_cursor = DiskCursor::new(Arc::new(blk), 0, 0);
         let unbooted_fs = Arc::new(Mutex::new(IExtFs::open(Arc::new(disk_cursor)).await));
         let fs_super_block = Arc::new(Ext4SuperBlock::new(super_block_meta, unbooted_fs));
 

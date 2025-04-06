@@ -6,10 +6,11 @@ use crate::{
 impl Devices {
     pub fn probe_mmiobus_devices(&mut self) -> DevResult<()> {
         let mut registered: [bool; Self::DEVICES] = [false; Self::DEVICES];
-        for (addr, _size) in &dtb_info().mmio_regions {
+        for (addr, _size) in &dtb_info().virtio_mmio_regions {
             if !registered[0] {
                 #[cfg(not(feature = "async_fs"))]
                 {
+                    log::debug!("[driver] probe sync driver");
                     use core::ptr::NonNull;
 
                     use include::errno::Errno;
@@ -26,6 +27,7 @@ impl Devices {
                 }
                 #[cfg(feature = "async_fs")]
                 {
+                    log::debug!("[driver] probe async driver");
                     use crate::devices::impls::block::async_virtio_driver::virtio_mm::async_blk::VirtIOAsyncBlock;
                     let _ = addr;
                     let blk_dev = VirtIOAsyncBlock::new();
