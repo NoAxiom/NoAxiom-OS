@@ -43,15 +43,12 @@ smoltcp = { version = "0.11.0", default-features = false, features = [
     "async",
     "log",
 ] }
-rand_core = "0.6.4"
 num-traits = { version = "0.2", default-features = false }
 num-derive = "0.3"
 managed = { version = "0.8.0", default-features = false, features = ["map"] }
-uart16550 = { version = "0.0.1" }
-uart8250 = { git = "https://github.com/os-module/uart-rs.git" }
-plic = { git = "https://github.com/os-module/plic" }
+# uart16550 = { version = "0.0.1" }
+# uart8250 = { git = "https://github.com/os-module/uart-rs.git" }
 ringbuffer = "0.15.0"
-fdt = { git = "https://github.com/repnop/fdt" }
 async-task = { version = "4", default-features = false }
 buddy_system_allocator = "0.9.0"
 thiserror = { version = "1.0", package = "thiserror-core", default-features = false }
@@ -70,9 +67,6 @@ futures = { version = "0.3", default-features = false, features = ["alloc"] }
 futures-lite = { version = "1.13.0", default-features = false, features = [
     "alloc",
 ] }
-
-pci = { git = "https://github.com/huayuntao/dep_pci.git" }
-isomorphic_drivers = { git = "https://github.com/huayuntao/dep_iso.git" }
 
 
 # no_axiom defined libs

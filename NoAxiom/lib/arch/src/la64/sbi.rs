@@ -1,6 +1,5 @@
 use config::mm::KERNEL_STACK_SIZE;
 use loongArch64::ipi::{csr_mail_send, send_ipi_single};
-use polyhal::debug_console::DebugConsole;
 
 use super::LA64;
 use crate::{
