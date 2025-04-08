@@ -85,10 +85,12 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
             match task.memory_validate(addr, Some(trap_type)).await {
                 Ok(_) => trace!("[memory_validate] success in user_trap_handler"),
                 Err(_) => {
-                    error!(
-                        "[user_trap] page fault at hart: {}, tid: {}",
+                    panic!(
+                        "[user_trap] page fault at hart: {}, tid: {}, addr: {:#x}, user_sp: {:#x}",
                         get_hartid(),
-                        task.tid()
+                        task.tid(),
+                        addr,
+                        cx[TrapArgs::SP],
                     );
                     user_exit("memory_validate failed");
                 }

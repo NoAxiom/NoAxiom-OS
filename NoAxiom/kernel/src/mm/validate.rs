@@ -57,21 +57,21 @@ pub async fn validate(
         let mut ms = memory_set.lock();
         if ms.user_stack_area.vpn_range.is_in_range(vpn) {
             info!(
-                "[memory_validate] realloc stack, tid: {}",
+                "[memory_validate] realloc stack, tid: {}, addr: {vpn:#x?}",
                 current_cpu().task.as_ref().unwrap().tid()
             );
             ms.lazy_alloc_stack(vpn);
             Ok(())
         } else if ms.user_brk_area.vpn_range.is_in_range(vpn) {
             info!(
-                "[memory_validate] realloc heap, tid: {}",
+                "[memory_validate] realloc heap, tid: {}, addr: {vpn:#x?}",
                 current_cpu().task.as_ref().unwrap().tid()
             );
             ms.lazy_alloc_brk(vpn);
             Ok(())
         } else {
             info!(
-                "[memory_validate] realloc mmap, tid: {}",
+                "[memory_validate] realloc mmap, tid: {}, addr: {vpn:#x?}",
                 current_cpu().task.as_ref().unwrap().tid()
             );
             lazy_alloc_mmap(memory_set, vpn, ms).await?;

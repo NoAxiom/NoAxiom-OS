@@ -28,6 +28,6 @@ fn panic(info: &PanicInfo) -> ! {
         );
     }
     Arch::arch_info_print();
-    // loop {}
-    platform::shutdown()
+    loop {}
+    // platform::shutdown()
 }

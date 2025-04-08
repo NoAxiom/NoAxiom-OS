@@ -4,7 +4,7 @@
 export PROJECT := NoAxiom
 export MODE ?= release
 export KERNEL ?= kernel
-export ARCH_NAME ?= loongarch64
+export ARCH_NAME ?= riscv64
 export ROOT := $(shell pwd)
 export LOG ?= DEBUG
 export TARGET_DIR := $(ROOT)/target/$(TARGET)/$(MODE)

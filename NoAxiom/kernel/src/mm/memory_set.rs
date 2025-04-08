@@ -320,20 +320,18 @@ impl MemorySet {
         let user_stack_base: usize = usize::from(end_va) + PAGE_SIZE; // stack bottom
         let user_stack_end = user_stack_base + USER_STACK_SIZE; // stack top
         memory_set.map_user_stack(user_stack_base, user_stack_end);
-        trace!(
+        info!(
             "[memory_set] user stack mapped! [{:#x}, {:#x})",
-            user_stack_base,
-            user_stack_end
+            user_stack_base, user_stack_end
         );
 
         // user heap
         let user_heap_base: usize = user_stack_end + PAGE_SIZE;
         let user_heap_end: usize = user_heap_base;
         memory_set.map_user_heap(user_heap_base, user_heap_end);
-        trace!(
+        info!(
             "[memory_set] user heap mapped! [{:#x}, {:#x})",
-            user_heap_base,
-            user_heap_end
+            user_heap_base, user_heap_end
         );
 
         // aux vector
@@ -360,10 +358,11 @@ impl MemorySet {
         auxs.push(AuxEntry(AT_CLKTCK, Arch::get_freq() as usize));
         auxs.push(AuxEntry(AT_SECURE, 0 as usize));
 
+        // fixme: temp use: -128, should be 0 or -16
         ElfMemoryInfo {
             memory_set,
             elf_entry,
-            user_sp: user_stack_end - 16, // stack grows downward, so return stack_end
+            user_sp: user_stack_end - 128, // stack grows downward, so return stack_end
             auxs,
         }
     }

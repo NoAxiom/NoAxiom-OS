@@ -28,19 +28,19 @@ pub async fn init_proc_exit_handler(task: &Arc<Task>) {
             }
         }
     }
-    match inner.exit_code {
-        0 => info!(
-            "[exit_handler] init_proc exited successfully, exit_code: {}",
-            inner.exit_code
-        ),
-        _ => error!(
-            "[exit_handler] init_proc exited unexpectedly, exit_code: {}",
-            inner.exit_code
-        ),
-    }
-    drop(inner);
+    let exit_code = inner.exit_code();
     // !PAY ATTENTION!! Now we don't sync_all the dirty data.
     // root_dentry().super_block().sync_all().await;
+    match exit_code {
+        0 => info!(
+            "[exit_handler] init_proc exited successfully, exit_code: {}",
+            exit_code
+        ),
+        _ => panic!(
+            "[exit_handler] init_proc exited unexpectedly, exit_code: {}",
+            exit_code,
+        ),
+    }
     platform::shutdown();
 }
 
