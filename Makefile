@@ -5,8 +5,15 @@ export PROJECT := NoAxiom
 export MODE ?= release
 export KERNEL ?= kernel
 export ARCH_NAME ?= loongarch64
-
 export ROOT := $(shell pwd)
+export LOG ?= DEBUG
+export TARGET_DIR := $(ROOT)/target/$(TARGET)/$(MODE)
+export ELF_PATH ?=   # This is for mk_fs.sh
+export TEST_TYPE ?= Official
+export ERROR := "\e[31m"
+export WARN := "\e[33m"
+export NORMAL := "\e[32m"
+export RESET := "\e[0m"
 
 ifeq ($(ARCH_NAME),riscv64)
 	export TARGET := riscv64gc-unknown-none-elf
@@ -22,31 +29,6 @@ else ifeq ($(ARCH_NAME),loongarch64)
 	export QEMU := qemu-system-loongarch64
 endif
 
-export TARGET_DIR := $(ROOT)/target/$(TARGET)/$(MODE)
-
-export LOG ?= DEBUG
-
-# choose Custom or Official test samples
-SAMPLE := Official
-
-# now is EXT4 fs, you can change to FAT32 in the mk_fs.sh
-
-CHOSEN_PATN := 
-
-ifeq ($(SAMPLE), Custom)
-	CHOSEN_PATN := ./target/riscv64gc-unknown-none-elf/release
-else ifeq ($(SAMPLE), Official)
-	CHOSEN_PATN := ./test/riscv-syscalls-testing/user/build/riscv64
-else 
-	CHOSEN_PATN := Please check your ELF path.
-endif
-
-export ELF_PATH ?= $(CHOSEN_PATN)
-
-# partition config
-# export ROOTFS  ?= $(ROOT)/part/img/sdcard-riscv.img
-# export TESTFS  ?= $(ROOT)/fs.img
-
 
 # kernel config
 KERNEL_O_PATH := ./target/$(TARGET)/$(MODE)
@@ -54,55 +36,22 @@ KERNEL_ELF := $(KERNEL_O_PATH)/$(KERNEL)
 KERNEL_BIN := $(KERNEL_ELF).bin
 KERNEL_SYMBOL_TABLE := $(KERNEL_ELF).txt
 
-# TFTPBOOT := /work/tftpboot/
-
-# SDCARD_BAK = $(ROOTFS).bak
-# FS_BAK = $(TESTFS).bak
-
-TEST_DIR := ./test/riscv-syscalls-testing/user
-FS_IMG := fs.img
+TEST_DIR := $(ROOT)/$(PROJECT)-OS-Test
+FS_IMG := $(TEST_DIR)/fs-$(ARCH_NAME).img
 MKFS_SH := ./mk_fs.sh
-
-
-# console output colors
-export ERROR := "\e[31m"
-export WARN := "\e[33m"
-export NORMAL := "\e[32m"
-export RESET := "\e[0m"
 
 all: build_kernel run
 	@cp $(KERNEL_BIN) kernel-qemu
 
-build_user:
-	@cd $(PROJECT)/user && make build
+# may be used in the future
+# build_user:
+# 	@cd $(PROJECT)/user && make build
 
-$(FS_IMG): build_user
-	@$(MKFS_SH)
+$(FS_IMG):
+	cd $(TEST_DIR) && make all
 
-TEST_FLAGS :=
-TEST_FLAGS += all
-TEST_FLAGS += CHAPTER=7
-
-test:
-	@rm -f $(TEST_DIR)/src/oscomp/init_proc.c
-	@rm -f $(TEST_DIR)/src/oscomp/test_points.h
-	@rm -f $(TEST_DIR)/src/oscomp/init_proc.h
-	@cp $(PROJECT)/init_proc/init_proc.c $(TEST_DIR)/src/oscomp/init_proc.c
-	@cp $(PROJECT)/init_proc/init_proc.h $(TEST_DIR)/src/oscomp/init_proc.h
-	@cp $(PROJECT)/init_proc/test_points.h $(TEST_DIR)/src/oscomp/test_points.h
-	@cd $(TEST_DIR) && make clean
-	-@cd $(TEST_DIR) && make $(TEST_FLAGS)
-	$(MKFS_SH);
-
-build_kernel:
-	@if [ $(PROJECT)/init_proc/init_proc.c -nt $(TEST_DIR)/src/oscomp/init_proc.c ] \
-	|| [ $(PROJECT)/init_proc/init_proc.h -nt $(TEST_DIR)/src/oscomp/init_proc.h ] \
-	|| [ $(PROJECT)/init_proc/test_points.h -nt $(TEST_DIR)/src/oscomp/test_points.h ]; then \
-		make test; \
-	fi
+build_kernel: $(FS_IMG)
 	@cd $(PROJECT)/kernel && make build
-
-build: $(FS_IMG) build_kernel
 
 asm: # build_kernel
 	@echo -e "Building Kernel and Generating Assembly..."
