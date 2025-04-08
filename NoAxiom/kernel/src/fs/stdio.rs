@@ -72,12 +72,13 @@ impl File for Stdout {
             stdout_buf.push(*c);
             if *c == '\n' as u8 {
                 print!(
-                    "[PRINT, HART{}, TID{}] {}",
+                    "[PRINT, HART{}, TID{} at {}ms] {}",
                     get_hartid(),
                     current_cpu()
                         .task
                         .as_ref()
                         .map_or_else(|| 0, |task| task.tid()),
+                    crate::time::gettime::get_time_ms(),
                     core::str::from_utf8(stdout_buf.as_slice()).unwrap(),
                 );
                 stdout_buf.clear();
