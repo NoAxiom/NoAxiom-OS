@@ -93,6 +93,32 @@ impl Default for TaskInner {
     }
 }
 
+/// task control block for a coroutine,
+/// a.k.a thread in current project structure
+pub struct Task {
+    // immutable
+    tid: Immutable<TidTracer>, // task id, with lifetime holded
+    tgid: Immutable<TGID>,     // task group id, aka pid
+    pgid: Immutable<PGID>,     // process group id
+
+    // mutable
+    inner: Mutable<TaskInner>, // task control block inner, protected by lock
+
+    // unsafe cell
+    waker: SyncUnsafeCell<Option<Waker>>, // waker for the task
+    trap_cx: SyncUnsafeCell<TrapContext>, // trap context
+
+    // shared
+    fd_table: Shared<FdTable>,         // file descriptor table
+    cwd: Shared<Path>,                 // current work directory
+    sa_list: Shared<SigActionList>,    // signal action list, saves signal handler
+    memory_set: Shared<MemorySet>,     // memory set for the task
+    thread_group: Shared<ThreadGroup>, // thread group
+
+    // others
+    pub sched_entity: SchedEntity, // sched entity for schedule
+}
+
 impl TaskInner {
     // task status
     #[inline(always)]
@@ -140,32 +166,6 @@ impl TaskInner {
     pub fn sig_mask_mut(&mut self) -> &mut SigMask {
         &mut self.pending_sigs.sig_mask
     }
-}
-
-/// task control block for a coroutine,
-/// a.k.a thread in current project structure
-pub struct Task {
-    // immutable
-    tid: Immutable<TidTracer>, // task id, with lifetime holded
-    tgid: Immutable<TGID>,     // task group id, aka pid
-    pgid: Immutable<PGID>,     // process group id
-
-    // mutable
-    inner: Mutable<TaskInner>, // task control block inner, protected by lock
-
-    // unsafe cell
-    waker: SyncUnsafeCell<Option<Waker>>, // waker for the task
-    trap_cx: SyncUnsafeCell<TrapContext>, // trap context
-
-    // shared
-    fd_table: Shared<FdTable>,         // file descriptor table
-    cwd: Shared<Path>,                 // current work directory
-    sa_list: Shared<SigActionList>,    // signal action list, saves signal handler
-    memory_set: Shared<MemorySet>,     // memory set for the task
-    thread_group: Shared<ThreadGroup>, // thread group
-
-    // others
-    pub sched_entity: SchedEntity, // sched entity for schedule
 }
 
 /// user tasks
@@ -340,21 +340,6 @@ impl Task {
     ) -> (usize, usize, usize, usize) {
         trace!("[init_user_stack] start");
 
-        fn push_slice<T: Copy>(user_sp: &mut usize, slice: &[T]) {
-            let mut sp = *user_sp;
-            sp -= core::mem::size_of_val(slice);
-            sp -= sp % core::mem::align_of::<T>();
-            unsafe { core::slice::from_raw_parts_mut(sp as *mut T, slice.len()) }
-                .copy_from_slice(slice);
-            *user_sp = sp;
-
-            trace!(
-                "[init_user_stack] sp {:#x}, push_slice: {:#x?}",
-                sp,
-                unsafe { core::slice::from_raw_parts(sp as *const usize, slice.len()) }
-            );
-        }
-
         // user stack pointer
         let mut user_sp = user_sp;
         trace!("user_sp: {:#x}", user_sp);
@@ -418,6 +403,21 @@ impl Task {
                 *((user_sp + i * core::mem::size_of::<AuxEntry>() + core::mem::size_of::<usize>())
                     as *mut usize) = auxs[i].1;
             }
+        }
+
+        fn push_slice<T: Copy>(user_sp: &mut usize, slice: &[T]) {
+            let mut sp = *user_sp;
+            sp -= core::mem::size_of_val(slice);
+            sp -= sp % core::mem::align_of::<T>();
+            unsafe { core::slice::from_raw_parts_mut(sp as *mut T, slice.len()) }
+                .copy_from_slice(slice);
+            *user_sp = sp;
+
+            trace!(
+                "[init_user_stack] sp {:#x}, push_slice: {:#x?}",
+                sp,
+                unsafe { core::slice::from_raw_parts(sp as *const usize, slice.len()) }
+            );
         }
 
         // construct envp

@@ -12,7 +12,7 @@ use crate::{
     constant::signal::MAX_SIGNUM,
     include::result::Errno,
     mm::user_ptr::UserPtr,
-    sched::utils::SuspendFuture,
+    sched::utils::{raw_suspend_now, SuspendFuture},
     signal::{
         sig_action::{KSigAction, USigAction},
         sig_detail::{SigDetail, SigKillDetail},
@@ -229,7 +229,7 @@ impl Syscall<'_> {
         }
         pcb.set_suspend();
         drop(pcb);
-        SuspendFuture::new().await;
+        raw_suspend_now().await;
         let mut pcb = task.pcb();
         pcb.set_runnable();
         *pcb.sig_mask_mut() = old_mask;

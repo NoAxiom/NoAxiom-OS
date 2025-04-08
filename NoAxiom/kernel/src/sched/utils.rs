@@ -119,6 +119,11 @@ impl Future for SuspendFuture {
 }
 
 #[inline(always)]
+pub async fn raw_suspend_now() {
+    SuspendFuture::new().await;
+}
+
+#[inline(always)]
 fn current_set_runnable() {
     current_cpu().task.as_ref().unwrap().pcb().set_runnable();
 }

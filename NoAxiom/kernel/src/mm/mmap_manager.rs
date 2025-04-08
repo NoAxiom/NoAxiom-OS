@@ -172,9 +172,13 @@ pub async fn lazy_alloc_mmap<'a>(
             Some(tracer) => {
                 tracer.push(take_waker().await);
                 drop(guard);
-                // fixme: kernel block_on could cause bugs here
                 debug!("[lazy_alloc_mmap] suspend_no_int_now");
-                suspend_no_int_now(current_cpu().task.as_ref().unwrap().pcb()).await;
+                loop {
+                    suspend_no_int_now(current_cpu().task.as_ref().unwrap().pcb()).await;
+                    if memory_set.lock().mmap_manager.mmap_map.get(&vpn).is_some() {
+                        break;
+                    }
+                }
                 Ok(())
             }
             None => {
