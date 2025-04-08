@@ -2,7 +2,7 @@
 //! [`UserTaskFuture`] represents a user task future,
 //! use [`spawn_utask`] to spawn user tasks
 
-use alloc::sync::Arc;
+use alloc::{string::String, sync::Arc};
 use core::future::Future;
 
 use async_task::{Builder, WithInfo};
@@ -11,6 +11,7 @@ use super::{runtime::RUNTIME, sched_entity::SchedEntity, sched_info::SchedInfo, 
 use crate::{
     cpu::get_hartid,
     fs::path::Path,
+    include::fs::InodeMode,
     task::{
         task_main::{task_main, UserTaskFuture},
         Task,
@@ -55,8 +56,10 @@ where
 }
 
 /// schedule a kernel_task to spawn a new task
-pub fn schedule_spawn_new_process(path: Path) {
+pub fn schedule_spawn_new_process(path: String) {
     spawn_ktask(async move {
+        // new process must be EXECUTABLE file, not directory
+        let path = Path::from_or_create(path, InodeMode::FILE).await;
         let task = Task::new_process(path).await;
         spawn_utask(task);
     });
