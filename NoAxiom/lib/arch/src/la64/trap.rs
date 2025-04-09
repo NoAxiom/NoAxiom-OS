@@ -37,7 +37,7 @@ fn get_trap_type(tf: Option<&mut TrapContext>) -> TrapType {
     let estat = estat::read();
     let badv = badv::read().vaddr();
     match estat.cause() {
-        Trap::Exception(Exception::Syscall) | Trap::Interrupt(Interrupt::Timer) => {}
+        Trap::Exception(Exception::Syscall) | Trap::Interrupt(_) => {}
         _ => {
             info!(
                 "[get_trap_type] estat: {:#x?}, badv: {:#x}, pc: {:#x}",

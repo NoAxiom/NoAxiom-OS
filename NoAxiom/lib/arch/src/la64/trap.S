@@ -21,7 +21,17 @@
     ld.d      $s\n, $sp, \offset*8
     .endm
 
-    .macro    STORE_GENERAL_REG
+    .section  .text.trampoline
+    .globl    __user_trapvec
+    .globl    __user_trapret
+    .globl    __kernel_trapvec
+    .align    4
+
+# user -> kernel
+    __user_trapvec:
+    csrwr     $sp, CSR_SAVE            # take the kernel sp
+
+# store user genereal regs
     st.d      $ra, $sp, 1*8            # x1 / ra (skip x0)
     st.d      $tp, $sp, 2*8            # x2 / tp
     .set      n, 4                     # skip x3 / sp, start from x4, sp will be saved outside from macro
@@ -34,36 +44,10 @@
     csrrd     $t2, CSR_SAVE            # LA_tmp_sp <> sscratch
     st.d      $t0, $sp, 32*8
     st.d      $t1, $sp, 33*8
-    .endm
-
-    .macro    LOAD_GENERAL_REG
-    ld.d      $t0, $sp, 32*8
-    ld.d      $t1, $sp, 33*8
-    csrwr     $t0, CSR_PRMD            # PRMD
-    csrwr     $t1, CSR_ERA             # ERA
-    ld.d      $ra, $sp, 1*8            # x1 / ra (skip x0)
-    ld.d      $tp, $sp, 2*8            # x2 / tp
-    .set      n, 4                     # skip x3 / sp, start from x4
-    .rept     28
-    LOAD_X    %n
-    .set      n, n+1
-    .endr
-    ld.d      $sp, $sp, 3*8            # load sp finally
-    .endm
-
-    .section  .text.trampoline
-    .globl    __user_trapvec
-    .globl    __user_trapret
-    .globl    __kernel_trapvec
-    .align    4
-
-# user -> kernel
-    __user_trapvec:
-    csrwr     $sp, CSR_SAVE            # take the kernel sp
-# beq       $sp, $zero, 1f           # if kernel_sp is 0, it's a kernel trap
-    STORE_GENERAL_REG
     st.d      $t2, $sp, 3*8            # store sp (x3 in la64)
-    ld.d      $ra, $sp, 35*8           # laod kernel_sp
+
+# load kernel regs
+    ld.d      $ra, $sp, 35*8           # load kernel_sp
     .set      n, 0                     # load callee-saved regs
     .set      offset, 36
     .rept     10                       # only save s0~s9
@@ -78,9 +62,10 @@
 
 # kernel -> user
     __user_trapret:
-    or        $t0, $zero, $a0
     csrwr     $a0, CSR_SAVE
-    or        $a0, $zero, $t0          # to use correct a0
+    csrrd     $a0, CSR_SAVE            # to use correct a0
+
+# store kernel regs
     st.d      $sp, $a0, 34*8           # save kernel callee-saved reg
     st.d      $ra, $a0, 35*8
     .set      n, 0
@@ -93,7 +78,21 @@
     st.d      $fp, $a0, 48*8
     st.d      $tp, $a0, 49*8
     or        $sp, $a0, $zero
-    LOAD_GENERAL_REG
+
+# load user general regs
+    ld.d      $t0, $sp, 32*8
+    ld.d      $t1, $sp, 33*8
+    csrwr     $t0, CSR_PRMD            # PRMD
+    csrwr     $t1, CSR_ERA             # ERA
+    ld.d      $ra, $sp, 1*8            # x1 / ra (skip x0)
+    ld.d      $tp, $sp, 2*8            # x2 / tp
+    .set      n, 4                     # skip x3 / sp, start from x4
+    .rept     28
+    LOAD_X    %n
+    .set      n, n+1
+    .endr
+    ld.d      $sp, $sp, 3*8            # load sp finally
+
     ertn                               # la: exception return <> rv: sret
 
 # kernel -> kernel

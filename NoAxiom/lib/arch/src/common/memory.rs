@@ -20,6 +20,9 @@ bitflags! {
         const Device = bit!(9);
         const Cache = bit!(10);
 
+        /// virt bit for page table
+        const PT = bit!(63);
+
         /// Read | Write | Executeable Flags
         const RWX = Self::R.bits() | Self::W.bits() | Self::X.bits();
         /// User | Read | Write Flags

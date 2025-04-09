@@ -97,7 +97,7 @@ impl PageTable {
             trace!("pte addr: {:#x}", pte as *mut PageTableEntry as usize);
             if !pte.flags().contains(MappingFlags::V) {
                 let frame = frame_alloc();
-                *pte = PageTableEntry::new(frame.ppn().0, pte_flags!(V));
+                *pte = PageTableEntry::new(frame.ppn().0, pte_flags!(V, PT));
                 self.frames.push(frame);
             }
             ppn = PhysPageNum::from(pte.ppn());

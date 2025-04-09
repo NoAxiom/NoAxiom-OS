@@ -26,7 +26,7 @@ pub fn flush_vaddr(va: usize) {
 #[inline]
 pub fn tlb_flush_all() {
     unsafe {
-        core::arch::asm!("invtlb 0x0, $zero, $zero");
+        core::arch::asm!("dbar 0; invtlb 0x0, $zero, $zero");
     }
 }
 

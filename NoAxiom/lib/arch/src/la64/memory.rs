@@ -53,14 +53,17 @@ bitflags::bitflags! {
 
 impl From<MappingFlags> for PTEFlags {
     fn from(flags: MappingFlags) -> Self {
+        if flags.contains(MappingFlags::PT) {
+            return PTEFlags::V;
+        }
         let mut res = PTEFlags::empty();
         // V D U P W G?? NX
         if flags.contains(MappingFlags::V) {
             res |= PTEFlags::V;
         }
-        if !flags.contains(MappingFlags::X) {
-            res |= PTEFlags::NX;
-        }
+        // if !flags.contains(MappingFlags::X) {
+        //     res |= PTEFlags::NX;
+        // }
         if flags.contains(MappingFlags::W) {
             res |= PTEFlags::W;
         }
