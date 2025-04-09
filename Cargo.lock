@@ -279,7 +279,7 @@ dependencies = [
  "plic",
  "smoltcp",
  "spin 0.7.1",
- "virtio-drivers",
+ "virtio-drivers-async",
  "volatile 0.2.7",
 ]
 
@@ -1006,6 +1006,18 @@ checksum = "d6a39747311dabb3d37807037ed1c3c38d39f99198d091b5b79ecd5c8d82f799"
 dependencies = [
  "bitflags 2.6.0",
  "enumn",
+ "log",
+ "zerocopy",
+]
+
+[[package]]
+name = "virtio-drivers-async"
+version = "0.7.5"
+source = "git+https://github.com/YuXuaann/virtio-drivers-async#02498516ab8727fb27ce8e51e9ab470c3ba3bf3d"
+dependencies = [
+ "bitflags 2.6.0",
+ "enumn",
+ "futures-lite",
  "log",
  "zerocopy",
 ]

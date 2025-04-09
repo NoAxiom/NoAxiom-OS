@@ -1,6 +1,7 @@
 pub mod impl_exit;
 pub mod impl_mm;
 pub mod impl_signal;
+pub mod init_proc;
 pub mod manager;
 pub mod status;
 mod task;

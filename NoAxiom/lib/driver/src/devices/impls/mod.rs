@@ -5,7 +5,7 @@ pub mod net;
 pub mod virtio;
 
 cfg_if::cfg_if! {
-    if #[cfg(feature = "async_fs")] {
+    if #[cfg(feature = "interruptable_async")] {
         use crate::devices::impls::block::async_virtio_driver::virtio_mm::async_blk::VirtIOAsyncBlock;
         pub type BlkDevice = VirtIOAsyncBlock;
     } else {

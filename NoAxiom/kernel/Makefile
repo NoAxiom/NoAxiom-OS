@@ -7,13 +7,12 @@ endif
 
 FEATURES :=
 
-# feature flags, now we only support async_fs for riscv64
 VF2 :=
 QEMU := 1
 ifeq ($(ARCH_NAME),riscv64)
-	ASYNC_FS := 1
+	INTERRUPTABLE_ASYNC := 1
 else ifeq ($(ARCH_NAME),loongarch64)
-	ASYNC_FS :=
+	ASYNC := 1
 endif
 UART := 
 PRELIMINARY :=
@@ -73,8 +72,12 @@ ifneq ($(RUNTESTS), )
 	FEATURES += runtests
 endif
 
-ifneq ($(ASYNC_FS), )
-	FEATURES += async_fs
+ifneq ($(INTERRUPTABLE_ASYNC), )
+	FEATURES += interruptable_async
+endif
+
+ifneq ($(ASYNC), )
+	FEATURES += async
 endif
 
 ifneq ($(FEATURES), )

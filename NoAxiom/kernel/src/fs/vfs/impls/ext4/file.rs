@@ -52,7 +52,10 @@ impl File for Ext4File {
 
         match inode.file_type() {
             InodeMode::FILE => {
-                Ok(ext4.read_at(self.ino, offset, buf).await.map_err(fs_err)? as isize)
+                debug!("read buf: {}", buf.len());
+                let x = ext4.read_at(self.ino, offset, buf).await.map_err(fs_err)? as isize;
+                debug!("read complete");
+                Ok(x)
             }
             InodeMode::DIR => {
                 return Err(Errno::EISDIR);

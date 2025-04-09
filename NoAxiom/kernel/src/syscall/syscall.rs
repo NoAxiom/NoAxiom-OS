@@ -16,7 +16,7 @@ impl<'a> Syscall<'a> {
     }
     pub async fn syscall(&mut self, id: usize, args: [usize; 6]) -> SyscallResult {
         trace!("syscall id: {}, args: {:?}", id, args);
-        #[cfg(feature = "async_fs")]
+        #[cfg(feature = "interruptable_async")]
         {
             // fixme: turn on the interrupt. When call trap_handler, cpu would turn off
             // the interrupt until cpu ertn. But if we switch to another task, the whole

@@ -135,19 +135,9 @@ impl dyn File {
     }
     pub async fn read(&self, buf: &mut [u8]) -> SyscallResult {
         let offset = self.pos();
-        let file_size = self.meta().inode.size();
-        if offset + buf.len() > file_size {
-            warn!("read beyond file size, truncate the buffer!!");
-            let len = file_size - offset;
-            let mut new_buf = vec![0; len];
-            let res_len = self.base_read(offset, &mut new_buf).await?;
-            buf[..len as usize].copy_from_slice(&new_buf);
-            Ok(res_len)
-        } else {
-            let len = self.base_read(offset, buf).await?;
-            self.meta().pos.fetch_add(len as usize, Ordering::Relaxed);
-            Ok(len)
-        }
+        let len = self.base_read(offset, buf).await?;
+        self.meta().pos.fetch_add(len as usize, Ordering::Relaxed);
+        Ok(len)
     }
     pub async fn write(&self, buf: &mut [u8]) -> SyscallResult {
         let offset = self.pos();

@@ -4,7 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [features]
-async_fs = []
+interruptable_async = []
+async = []
 
 [dependencies]
 include = { workspace = true }
@@ -18,7 +19,7 @@ memory = { workspace = true }
 fdt = "0.1.5"
 plic = { git = "https://github.com/os-module/plic" }
 async-trait = "0.1.50"
-virtio-drivers = "0.7.5"
+virtio-drivers-async = { git = "https://github.com/YuXuaann/virtio-drivers-async" }
 smoltcp = { version = "0.11.0", default-features = false, features = [
     "alloc",
     "log",

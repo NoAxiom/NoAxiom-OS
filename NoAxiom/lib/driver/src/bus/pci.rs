@@ -2,7 +2,8 @@ use arch::ArchMemory;
 use include::errno::Errno;
 use log::warn;
 use platform::{PCI_BUS_END, PCI_RANGE};
-use virtio_drivers::transport::{
+use spin::Mutex;
+use virtio_drivers_async::transport::{
     pci::{
         bus::{
             BarInfo, Cam, Command, DeviceFunction, DeviceFunctionInfo, HeaderType, MemoryBarType,
@@ -41,24 +42,27 @@ impl Devices {
                 }
                 match config_pci_device(&mut root, bdf, &mut allocator) {
                     Ok(_) => {
-                        #[cfg(feature = "async_fs")]
+                        #[cfg(feature = "interruptable_async")]
                         {
-                            warn!("pci_dev for async_fs is not supported");
+                            warn!("pci_dev for interruptable_async is not supported");
                         }
-                        #[cfg(not(feature = "async_fs"))]
+                        #[cfg(feature = "async")]
                         if let Some(transport) =
                             probe_pci(&mut root, bdf, DeviceType::Block, &dev_info)
                         {
-                            use crate::devices::impls::block::virtio_block::{
-                                VirtioBlock, VirtioBlockType,
+                            use spin::Mutex;
+                            use virtio_drivers_async::device::blk::VirtIOBlk;
+
+                            use crate::devices::impls::{
+                                block::virtio_block::VirtioBlockType, virtio::dev_err,
                             };
                             log::info!(
                                 "registered a new {:?} device at {}",
                                 DeviceType::Block,
                                 bdf,
                             );
-                            let blk_dev = VirtioBlock::try_new(transport)?;
-                            let blk_dev = VirtioBlockType::Pci(blk_dev);
+                            let blk_dev = VirtIOBlk::new(transport).map_err(dev_err)?;
+                            let blk_dev = VirtioBlockType::Pci(Mutex::new(blk_dev));
                             self.add_blk_device(blk_dev);
                         }
                     }

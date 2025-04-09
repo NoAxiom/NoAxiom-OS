@@ -8,7 +8,7 @@ use memory::{
     address::{PhysAddr, PhysPageNum, StepOne},
     frame::{frame_alloc, frame_dealloc, FrameTracker},
 };
-use virtio_drivers::{BufferDirection, Hal, PhysAddr as VirtioPhysAddr};
+use virtio_drivers_async::{BufferDirection, Hal, PhysAddr as VirtioPhysAddr};
 
 lazy_static::lazy_static! {
     pub static ref QUEUE_FRAMES: SyncUnsafeCell<Vec<FrameTracker>> = SyncUnsafeCell::new(Vec::new());
@@ -58,8 +58,8 @@ unsafe impl Hal for VirtioHalImpl {
 }
 
 #[allow(dead_code)]
-pub const fn dev_err(err: virtio_drivers::Error) -> Errno {
-    use virtio_drivers::Error::*;
+pub const fn dev_err(err: virtio_drivers_async::Error) -> Errno {
+    use virtio_drivers_async::Error::*;
     match err {
         QueueFull => Errno::EAGAIN,
         NotReady => Errno::EAGAIN,

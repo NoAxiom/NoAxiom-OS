@@ -46,7 +46,7 @@ pub struct FAT32FIleSystem {
 impl FAT32FIleSystem {
     /// Load bpb and root cluster to get root entry content
     pub async fn load_root(device: Arc<&'static dyn BlockDevice>) -> FAT32Directory {
-        #[cfg(feature = "async_fs")]
+        #[cfg(feature = "interruptable_async")]
         {
             assert!(Arch::is_interrupt_enabled());
             assert!(Arch::is_external_interrupt_enabled());

@@ -7,3 +7,5 @@ version = "0.1.0"
 
 [dependencies]
 buddy_system_allocator = "0.9"
+
+[workspace]

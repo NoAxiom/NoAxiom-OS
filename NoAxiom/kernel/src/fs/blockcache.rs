@@ -81,7 +81,10 @@ impl<B: Cache + Clone> AsyncBlockCache<B> {
         // else read the data from cache
         let mut data = [0; BLOCK_SIZE];
         assert!(check_no_lock());
-        self.block_device.read(sector, &mut data).await;
+        self.block_device
+            .read(sector, &mut data)
+            .await
+            .expect("read error");
         let res = B::from(data, false);
 
         let mut cache_guard = self.cache.lock();

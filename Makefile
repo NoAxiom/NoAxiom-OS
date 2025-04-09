@@ -53,6 +53,9 @@ $(FS_IMG):
 build_kernel: $(FS_IMG)
 	@cd $(PROJECT)/kernel && make build
 
+build_user:
+	@cd $(PROJECT)/user && make build
+
 asm: # build_kernel
 	@echo -e "Building Kernel and Generating Assembly..."
 	@$(OBJDUMP) -d $(KERNEL_ELF) > $(KERNEL_ELF).asm

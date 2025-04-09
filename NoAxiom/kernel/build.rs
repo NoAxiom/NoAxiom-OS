@@ -1,15 +1,64 @@
-// use std::{
-//     fs::File,
-//     io::{Read, Write},
-// };
+use std::{
+    fs::{read_dir, File},
+    io::{Result, Write},
+};
 
 fn main() {
-    // let mut f = File::open("src/linker.ld").unwrap();
-    // let mut content = String::new();
-    // f.read_to_string(&mut content).unwrap();
-    // let arch = std::env::var("CARGO_CFG_TARGET_ARCH").unwrap();
-    // let arch = format!("OUTPUT_ARCH(\"{}\")", arch);
-    // content = content.replacen(&content.lines().next().unwrap_or(""), &arch,
-    // 1); let mut f = File::create("src/linker.ld").unwrap();
-    // f.write_all(content.as_bytes()).unwrap();
+    println!("cargo:rerun-if-changed=../user/apps/");
+    println!("cargo:rerun-if-changed={}", TARGET_PATH);
+    insert_app_data().unwrap();
+}
+
+static TARGET_PATH: &str = "./NoAxiom/user/bin/";
+
+fn insert_app_data() -> Result<()> {
+    let mut f = File::create("src/link_apps.S").unwrap();
+    let mut apps: Vec<String> = read_dir("../user/bin")?
+        .filter_map(|entry| entry.ok())
+        .map(|entry| entry.file_name().into_string().unwrap())
+        .collect();
+    apps.sort();
+
+    writeln!(
+        f,
+        r#"
+    .align 3
+    .section .data
+    .global _num_app
+_num_app:
+    .quad {}"#,
+        apps.len()
+    )?;
+
+    for i in 0..apps.len() {
+        writeln!(f, r#"    .quad app_{}_start"#, i)?;
+    }
+    writeln!(f, r#"    .quad app_{}_end"#, apps.len() - 1)?;
+
+    writeln!(
+        f,
+        r#"
+    .global _app_names
+_app_names:"#
+    )?;
+    for app in apps.iter() {
+        writeln!(f, r#"    .string "{}""#, app)?;
+    }
+
+    for (idx, app) in apps.iter().enumerate() {
+        println!("app_{}: {}", idx, app);
+        writeln!(
+            f,
+            r#"
+    .section .data
+    .global app_{0}_start
+    .global app_{0}_end
+    .align 3
+app_{0}_start:
+    .incbin "{2}{1}"
+app_{0}_end:"#,
+            idx, app, TARGET_PATH
+        )?;
+    }
+    Ok(())
 }

@@ -30,11 +30,11 @@ pub fn init() {
     PLIC.call_once(|| plic);
 
     let priority;
-    #[cfg(feature = "async_fs")]
+    #[cfg(feature = "interruptable_async")]
     {
         priority = 2;
     }
-    #[cfg(not(feature = "async_fs"))]
+    #[cfg(feature = "async")]
     {
         priority = 0;
     }
@@ -56,17 +56,17 @@ pub fn init() {
         println!("Init hifive or vf2 plic success");
     }
 
-    register_to_hart();
+    for i in 0..CPU_NUM {
+        register_to_hart(i as u32);
+    }
 }
 
-pub fn register_to_hart() {
+pub fn register_to_hart(hart: u32) {
     let plic = PLIC.get().unwrap();
-    let hart = Arch::get_hartid();
-    // todo: support multiple devices
     let irq = 1;
-    plic.set_threshold(hart as u32, Mode::Machine, 1);
-    plic.set_threshold(hart as u32, Mode::Supervisor, 0);
-    plic.enable(hart as u32, Mode::Supervisor, irq);
-    plic.complete(hart as u32, Mode::Supervisor, irq);
+    plic.set_threshold(hart, Mode::Machine, 1);
+    plic.set_threshold(hart, Mode::Supervisor, 0);
+    plic.enable(hart, Mode::Supervisor, irq);
+    plic.complete(hart, Mode::Supervisor, irq);
     log::info!("Register irq {} to hart {}", irq, hart);
 }

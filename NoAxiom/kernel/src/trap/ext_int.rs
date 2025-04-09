@@ -1,11 +1,11 @@
 use driver::handle_irq;
 
 pub fn ext_int_handler() {
-    #[cfg(feature = "async_fs")]
+    #[cfg(feature = "interruptable_async")]
     {
         handle_irq();
     }
-    #[cfg(not(feature = "async_fs"))]
+    #[cfg(feature = "async")]
     {
         use arch::{Arch, ArchTrap};
         let trap_type = Arch::read_trap_type(None); // scause::read();

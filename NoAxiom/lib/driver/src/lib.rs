@@ -39,7 +39,7 @@ pub fn get_display_dev() -> Arc<&'static devices::impls::DisplayDevice> {
 }
 
 pub fn handle_irq() {
-    #[cfg(feature = "async_fs")]
+    #[cfg(feature = "interruptable_async")]
     {
         let irq = plic::claim();
         assert_eq!(irq, 1); // now we only support blk dev
@@ -48,7 +48,7 @@ pub fn handle_irq() {
             .expect("handle interrupt error");
         plic::complete(irq);
     }
-    #[cfg(not(feature = "async_fs"))]
+    #[cfg(feature = "async")]
     {
         unreachable!("sync fs shouldn't accept interrupt!");
     }

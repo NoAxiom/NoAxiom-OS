@@ -1,8 +1,9 @@
+use alloc::boxed::Box;
 use core::ptr::NonNull;
 
 use arch::{Arch, ArchMemory};
 use ksync::mutex::SpinLock;
-use virtio_drivers::{
+use virtio_drivers_async::{
     device::gpu::VirtIOGpu,
     transport::mmio::{MmioTransport, VirtIOHeader},
 };
@@ -17,7 +18,7 @@ pub struct VirtioGpu {
 }
 
 impl VirtioGpu {
-    pub fn new() -> Self {
+    pub async fn new() -> Self {
         unsafe {
             let virtio7_paddr = dtb_info().virtio_mmio_regions[7].0;
             let virtio7 = virtio7_paddr | Arch::KERNEL_ADDR_OFFSET;
@@ -25,7 +26,7 @@ impl VirtioGpu {
             // fixme: | kernel addr offset
             let transport = MmioTransport::new(header).unwrap();
             let mut virtio = VirtIOGpu::new(transport).unwrap();
-            let fbuffer = virtio.setup_framebuffer().unwrap();
+            let fbuffer = virtio.setup_framebuffer().await.unwrap();
             let len = fbuffer.len();
             let ptr = fbuffer.as_mut_ptr();
             let fb = core::slice::from_raw_parts_mut(ptr, len);
@@ -37,9 +38,10 @@ impl VirtioGpu {
     }
 }
 
+#[async_trait::async_trait]
 impl Gpu for VirtioGpu {
-    fn flush(&self) {
-        self.gpu.lock().flush().unwrap();
+    async fn flush(&self) {
+        self.gpu.lock().flush().await.unwrap();
     }
     fn get_framebuffer(&self) -> &mut [u8] {
         unsafe {

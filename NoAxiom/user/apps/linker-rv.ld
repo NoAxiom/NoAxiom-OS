@@ -1,4 +1,4 @@
-OUTPUT_ARCH("riscv")
+OUTPUT_ARCH(riscv64)
 ENTRY(_start)
 
 SECTIONS
