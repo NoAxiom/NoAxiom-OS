@@ -27,12 +27,12 @@ fn insert_app_data() -> Result<()> {
     .global _num_app
 _num_app:
     .quad {}"#,
-        apps.len()
+        apps.len() * 2
     )?;
 
     for app in apps.iter() {
-        writeln!(f, r#"    .quad app_{}_start"#, app)?;
-        writeln!(f, r#"    .quad app_{}_end"#, app)?;
+        writeln!(f, r#"    .quad {}_start"#, app)?;
+        writeln!(f, r#"    .quad {}_end"#, app)?;
     }
 
     writeln!(
@@ -51,13 +51,13 @@ _app_names:"#
             f,
             r#"
     .section .data
-    .global app_{0}_start
-    .global app_{0}_end
+    .global {0}_start
+    .global {0}_end
     .align 3
-app_{0}_start:
-    .incbin "{2}{1}"
-app_{0}_end:"#,
-            app, app, TARGET_PATH
+{0}_start:
+    .incbin "{1}{0}"
+{0}_end:"#,
+            app, TARGET_PATH
         )?;
     }
     Ok(())

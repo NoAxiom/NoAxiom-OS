@@ -276,14 +276,14 @@ impl Task {
     }
 
     /// create new process from elf
-    pub async fn new_process(path: Path) -> Arc<Self> {
+    pub fn new_process(elf: ElfMemoryInfo) -> Arc<Self> {
         trace!("[kernel] spawn new process from elf");
         let ElfMemoryInfo {
             memory_set,
             elf_entry,
             user_sp,
             auxs: _,
-        } = MemorySet::load_from_path(path.clone()).await;
+        } = elf;
         trace!("[kernel] succeed to load elf data");
         // identifier
         let tid = tid_alloc();
@@ -299,7 +299,7 @@ impl Task {
             trap_cx: SyncUnsafeCell::new(TrapContext::app_init_cx(elf_entry, user_sp)),
             sched_entity: SchedEntity::new_bare(INIT_PROCESS_ID),
             fd_table: Arc::new(SpinLock::new(FdTable::new())),
-            cwd: Arc::new(SpinLock::new(path)),
+            cwd: Arc::new(SpinLock::new(Path::from("init_proc".into()))),
             sa_list: Arc::new(SpinLock::new(SigActionList::new())),
             waker: SyncUnsafeCell::new(None),
         });

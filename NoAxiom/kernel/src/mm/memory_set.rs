@@ -265,14 +265,10 @@ impl MemorySet {
         todo!("load_dl_interp")
     }
 
-    /// load data from elf file
-    pub async fn load_from_elf(elf_file: Arc<dyn File>) -> ElfMemoryInfo {
+    pub async fn load_from_vec(file_data: Vec<u8>) -> ElfMemoryInfo {
         let mut memory_set = Self::new_with_kernel();
         let mut auxs: Vec<AuxEntry> = Vec::new(); // auxiliary vector
         let mut dl_flag = false; // dynamic link flag
-
-        // ! fixme: temp used for read all elf file
-        let file_data = elf_file.read_all().await.unwrap();
         let elf = xmas_elf::ElfFile::new(file_data.as_slice()).unwrap();
 
         // check: magic
@@ -317,7 +313,7 @@ impl MemorySet {
                 }
                 _ => {
                     warn!(
-                        "[load_elf] unsupported program header type: {:?}, area: [{:#x}, {:#x})",
+                        "[load_elf] unsupported program header type: {:#x?}, area: [{:#x}, {:#x})",
                         ph.get_type(),
                         ph.virtual_addr(),
                         ph.virtual_addr() + ph.mem_size()
@@ -380,11 +376,12 @@ impl MemorySet {
         }
     }
 
+    #[inline]
     pub async fn load_from_path(path: Path) -> ElfMemoryInfo {
         trace!("[load_elf] from path: {:?}", path);
         let elf_file = path.dentry().open().unwrap();
         trace!("[load_elf] file name: {}", elf_file.name());
-        MemorySet::load_from_elf(elf_file).await
+        Self::load_from_vec(elf_file.read_all().await.unwrap()).await
     }
 
     /// clone current memory set,

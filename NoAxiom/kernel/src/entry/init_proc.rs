@@ -1,8 +1,9 @@
-use alloc::string::ToString;
+use alloc::{string::ToString, vec::Vec};
 
 use crate::{
     fs::path::Path,
     include::fs::InodeMode,
+    mm::memory_set::MemorySet,
     sched::spawn::{spawn_ktask, spawn_utask},
     task::Task,
 };
@@ -15,17 +16,39 @@ pub fn schedule_spawn_with_path() {
     spawn_ktask(async move {
         // new process must be EXECUTABLE file, not directory
         let path = Path::from_or_create(INIT_PROC_PATH.to_string(), InodeMode::FILE).await;
-        let task = Task::new_process(path).await;
+        let elf = MemorySet::load_from_path(path.clone()).await;
+        let task = Task::new_process(elf);
         spawn_utask(task);
     });
 }
 
 #[allow(unused)]
 pub fn schedule_spawn_with_kernel_app() {
-    const INIT_PROC_NAME: &str = "run_busybox";
+    macro_rules! use_app {
+        ($name:literal) => {
+            extern "C" {
+                #[link_name = concat!($name, "_start")]
+                fn app_start();
+                #[link_name = concat!($name, "_end")]
+                fn app_end();
+            }
+            const INIT_PROC_NAME: &str = $name;
+        };
+    }
+    use_app!("run_busybox");
     info!("[init] spawn initproc with app name = {}", INIT_PROC_NAME);
     spawn_ktask(async move {
-        // push your code here
+        let start = app_start as usize;
+        let end = app_end as usize;
+        let size = end - start;
+        debug!(
+            "[kernel_app] start: {:#x}, end: {:#x}, size: {}",
+            start, end, size
+        );
+        let file_data = Vec::from(unsafe { core::slice::from_raw_parts(start as *const u8, size) });
+        let elf = MemorySet::load_from_vec(file_data).await;
+        let task = Task::new_process(elf);
+        spawn_utask(task);
     });
 }
 
