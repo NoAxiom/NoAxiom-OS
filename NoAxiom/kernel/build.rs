@@ -30,10 +30,10 @@ _num_app:
         apps.len()
     )?;
 
-    for i in 0..apps.len() {
-        writeln!(f, r#"    .quad app_{}_start"#, i)?;
+    for app in apps.iter() {
+        writeln!(f, r#"    .quad app_{}_start"#, app)?;
+        writeln!(f, r#"    .quad app_{}_end"#, app)?;
     }
-    writeln!(f, r#"    .quad app_{}_end"#, apps.len() - 1)?;
 
     writeln!(
         f,
@@ -57,7 +57,7 @@ _app_names:"#
 app_{0}_start:
     .incbin "{2}{1}"
 app_{0}_end:"#,
-            idx, app, TARGET_PATH
+            app, app, TARGET_PATH
         )?;
     }
     Ok(())

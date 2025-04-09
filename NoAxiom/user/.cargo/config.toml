@@ -1,11 +1,14 @@
 [target.riscv64gc-unknown-none-elf]
 linker = "rust-lld"
-rustflags = ["-Clink-arg=-T../linker-rv.ld", "-Cforce-frame-pointers=yes"]
+rustflags = [
+    "-Clink-arg=-TNoAxiom/lib/arch/src/linker-rv.ld",
+    "-Cforce-frame-pointers=yes",
+]
 
 [target.loongarch64-unknown-linux-gnu]
 linker = "loongarch64-linux-gnu-gcc"
 rustflags = [
-    "-Clink-arg=-TNoAxiom/user/apps/linker-la.ld",
+    "-Clink-arg=-TNoAxiom/lib/arch/src/linker-la.ld",
     "-Clink-arg=-nostdlib",
     "-Clink-arg=-static",
 ]

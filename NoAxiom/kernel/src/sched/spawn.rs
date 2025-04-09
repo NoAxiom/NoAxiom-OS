@@ -3,7 +3,7 @@
 //! use [`spawn_utask`] to spawn user tasks
 
 use alloc::{string::String, sync::Arc};
-use core::future::Future;
+use core::future::{self, Future};
 
 use async_task::{Builder, WithInfo};
 
@@ -53,14 +53,4 @@ where
     R: Send + 'static,
 {
     spawn_raw(future, SchedEntity::new_bare(0), get_hartid(), None);
-}
-
-/// schedule a kernel_task to spawn a new task
-pub fn schedule_spawn_new_process(path: String) {
-    spawn_ktask(async move {
-        // new process must be EXECUTABLE file, not directory
-        let path = Path::from_or_create(path, InodeMode::FILE).await;
-        let task = Task::new_process(path).await;
-        spawn_utask(task);
-    });
 }

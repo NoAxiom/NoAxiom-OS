@@ -5,6 +5,7 @@ build:
 	@echo -e $(NORMAL)"Building apps..."$(RESET)
 	@rm -rf $(ELF_PATH)
 	@mkdir -p $(ELF_PATH)
-	@cd apps && $(foreach dir, $(APPS), (cd $(dir) && cargo build --target $(TARGET) --release && cp target/$(TARGET)/$(MODE)/$(dir) ../../$(ELF_PATH) && cd ..);)
+	@cd apps && $(foreach dir, $(APPS), (cd $(dir) && cargo build --target $(TARGET) --release && cd ..);)
 	@echo -e $(NORMAL)"Apps build finished:"$(RESET)
 	@$(foreach dir, $(APPS), echo -e "\t"$(NORMAL)$(dir)$(RESET);)
+	@$(foreach dir, $(APPS), cp $(TARGET_DIR)/$(dir) $(ELF_PATH);)

@@ -15,4 +15,4 @@ test/
 test-2025/
 NoAxiom/init_proc/test_points.h
 qemu.log
-link_app.S
+NoAxiom/kernel/src/link_apps.S

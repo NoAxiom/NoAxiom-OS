@@ -1,9 +1,9 @@
-OUTPUT_ARCH(loongarch64)
+OUTPUT_ARCH("loongarch64")
 ENTRY(_start)
 
 SECTIONS
 {
-    . = 0x10000;
+    . = 0x120000000;
     .text : {
         *(.text.entry)
         *(.text .text.*)

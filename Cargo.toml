@@ -1,6 +1,10 @@
-# complete these after
 [workspace]
-members = ["NoAxiom/kernel"]
+members = [
+    "NoAxiom/kernel",
+    "NoAxiom/user/libd",
+    "NoAxiom/user/apps/runtests",
+    "NoAxiom/user/apps/run_busybox",
+]
 resolver = "2"
 
 [workspace.dependencies]
@@ -19,9 +23,13 @@ driver = { path = "NoAxiom/lib/driver" }
 include = { path = "NoAxiom/lib/include" }
 memory = { path = "NoAxiom/lib/memory" }
 platform = { path = "NoAxiom/lib/platform" }
+libd = { path = "NoAxiom/user/libd" }
 
 [profile.release]
 debug = true
-opt-level = 3           # 优化级别,最低是0,最高是3, 0方便debug
-overflow-checks = false # 关闭整数溢出检查
-panic = "abort"         # for loongarch64, tell the compiler to abort on panic instead of unwinding
+# 优化级别,最低是0,最高是3, 0方便debug
+opt-level = 3
+# 关闭整数溢出检查
+overflow-checks = false
+# for loongarch64, tell the compiler to abort on panic instead of unwinding
+panic = "abort"

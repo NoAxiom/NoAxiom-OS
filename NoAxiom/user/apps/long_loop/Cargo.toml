@@ -1,9 +1,0 @@
-[package]
-name = "long_loop"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-userlib = { path = "../../lib" }
-
-[workspace]

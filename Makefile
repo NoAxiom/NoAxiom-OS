@@ -4,10 +4,9 @@
 export PROJECT := NoAxiom
 export MODE ?= release
 export KERNEL ?= kernel
-export ARCH_NAME ?= riscv64
+export ARCH_NAME ?= loongarch64
 export ROOT := $(shell pwd)
 export LOG ?= DEBUG
-export TARGET_DIR := $(ROOT)/target/$(TARGET)/$(MODE)
 export ELF_PATH ?=   # This is for mk_fs.sh
 export TEST_TYPE ?= Official
 export ERROR := "\e[31m"
@@ -29,6 +28,7 @@ else ifeq ($(ARCH_NAME),loongarch64)
 	export QEMU := qemu-system-loongarch64
 endif
 
+export TARGET_DIR := $(ROOT)/target/$(TARGET)/$(MODE)
 
 # kernel config
 KERNEL_O_PATH := ./target/$(TARGET)/$(MODE)
@@ -40,12 +40,8 @@ TEST_DIR := $(ROOT)/$(PROJECT)-OS-Test
 FS_IMG := $(TEST_DIR)/fs-$(ARCH_NAME).img
 MKFS_SH := ./mk_fs.sh
 
-all: build_kernel run
+all: build_user build_kernel run
 	@cp $(KERNEL_BIN) kernel-qemu
-
-# may be used in the future
-# build_user:
-# 	@cd $(PROJECT)/user && make build
 
 $(FS_IMG):
 	cd $(TEST_DIR) && make all
@@ -195,4 +191,4 @@ docker:
 # board:
 # 	@cp $(TARGET_DIR)/$(KERNEL).bin  $(TFTPBOOT)
 
-.PHONY: all build run debug clean debug-client sbi-qemu backup sdcard build-gui board vendor count asm test
+.PHONY: all build run debug clean debug-client sbi-qemu backup sdcard build-gui board vendor count asm test build_user
