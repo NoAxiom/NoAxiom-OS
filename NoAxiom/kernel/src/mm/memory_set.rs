@@ -294,6 +294,12 @@ impl MemorySet {
                         map_permission!(U).merge_from_elf_flags(ph.flags()),
                         MapAreaType::ElfBinary,
                     );
+                    debug!(
+                        "area: range: {:?}, perm: {:?}, ph_flag: {:?}",
+                        map_area.vpn_range,
+                        map_area.map_permission,
+                        ph.flags(),
+                    );
                     if start_vpn.is_none() {
                         start_vpn = Some(map_area.vpn_range.start());
                     }
@@ -309,12 +315,19 @@ impl MemorySet {
                 xmas_elf::program::Type::Interp => {
                     dl_flag = true;
                 }
-                _ => {}
+                _ => {
+                    warn!(
+                        "[load_elf] unsupported program header type: {:?}, area: [{:#x}, {:#x})",
+                        ph.get_type(),
+                        ph.virtual_addr(),
+                        ph.virtual_addr() + ph.mem_size()
+                    );
+                }
             }
         }
         let end_va: VirtAddr = end_vpn.unwrap().into();
         let elf_entry = elf.header.pt2.entry_point() as usize;
-        trace!("[load_elf] raw_entry: {:#x}", elf_entry);
+        debug!("[load_elf] raw_entry: {:#x}", elf_entry);
 
         // user stack
         let user_stack_base: usize = usize::from(end_va) + PAGE_SIZE; // stack bottom

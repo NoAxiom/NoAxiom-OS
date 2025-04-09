@@ -56,9 +56,12 @@ pub async fn validate(
     } else {
         let mut ms = memory_set.lock();
         if ms.user_stack_area.vpn_range.is_in_range(vpn) {
+            let task = current_cpu().task.as_ref().unwrap();
             info!(
-                "[memory_validate] realloc stack, tid: {}, addr: {vpn:#x?}",
-                current_cpu().task.as_ref().unwrap().tid()
+                "[memory_validate] realloc stack, tid: {}, addr: {:#x?}, epc: {:#x}",
+                task.tid(),
+                vpn,
+                task.trap_context()[arch::TrapArgs::EPC],
             );
             ms.lazy_alloc_stack(vpn);
             Ok(())

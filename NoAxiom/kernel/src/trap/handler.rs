@@ -1,6 +1,6 @@
 //! trap handler
 
-use alloc::sync::Arc;
+use alloc::{borrow::ToOwned, sync::Arc};
 
 use arch::{Arch, ArchBoot, ArchInt, ArchTrap, TrapArgs, TrapType};
 
@@ -22,6 +22,10 @@ fn kernel_trap_handler() {
             msg, trap_type, epc,
         );
     };
+    if let Some(task) = current_cpu().task.as_ref() {
+        let cx = task.trap_context();
+        debug!("[kernel_trap_handler] cx detected: {:#x?}", cx);
+    }
     match trap_type {
         TrapType::StorePageFault(addr)
         | TrapType::LoadPageFault(addr)
@@ -64,8 +68,8 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
     let trap_type = Arch::read_trap_type(Some(cx));
     let user_exit = |msg: &str| {
         error!(
-            "[user_trap_handler] unexpected exit!!! msg: {}, trap_type: {:#x?}, sepc = {:#x}",
-            msg, trap_type, epc,
+            "[user_trap_handler] unexpected exit!!! msg: {}, trap_type: {:#x?}, sepc = {:#x}, cx: {:#x?}",
+            msg, trap_type, epc, cx
         );
         Arch::arch_info_print();
         task.terminate(-1);
@@ -85,7 +89,7 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
             match task.memory_validate(addr, Some(trap_type)).await {
                 Ok(_) => trace!("[memory_validate] success in user_trap_handler"),
                 Err(_) => {
-                    panic!(
+                    error!(
                         "[user_trap] page fault at hart: {}, tid: {}, addr: {:#x}, user_sp: {:#x}",
                         get_hartid(),
                         task.tid(),
