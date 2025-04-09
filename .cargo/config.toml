@@ -1,36 +1,12 @@
 [source.crates-io]
 replace-with = "vendored-sources"
 
-[source."git+https://github.com/Byte-OS/bit_frame_allocator.git"]
-git = "https://github.com/Byte-OS/bit_frame_allocator.git"
-replace-with = "vendored-sources"
-
-[source."git+https://github.com/Byte-OS/devices.git"]
-git = "https://github.com/Byte-OS/devices.git"
-replace-with = "vendored-sources"
-
-[source."git+https://github.com/Byte-OS/polyhal.git"]
-git = "https://github.com/Byte-OS/polyhal.git"
-replace-with = "vendored-sources"
-
-[source."git+https://github.com/Byte-OS/sync.git"]
-git = "https://github.com/Byte-OS/sync.git"
-replace-with = "vendored-sources"
-
-[source."git+https://github.com/Byte-OS/timestamp.git"]
-git = "https://github.com/Byte-OS/timestamp.git"
-replace-with = "vendored-sources"
-
 [source."git+https://github.com/YuXuaann/ext4_rs-async-smp"]
 git = "https://github.com/YuXuaann/ext4_rs-async-smp"
 replace-with = "vendored-sources"
 
-[source."git+https://github.com/huayuntao/dep_iso.git"]
-git = "https://github.com/huayuntao/dep_iso.git"
-replace-with = "vendored-sources"
-
-[source."git+https://github.com/huayuntao/dep_pci.git"]
-git = "https://github.com/huayuntao/dep_pci.git"
+[source."git+https://github.com/YuXuaann/virtio-drivers-async"]
+git = "https://github.com/YuXuaann/virtio-drivers-async"
 replace-with = "vendored-sources"
 
 [source."git+https://github.com/os-module/kernel-sync.git"]
@@ -39,19 +15,6 @@ replace-with = "vendored-sources"
 
 [source."git+https://github.com/os-module/plic"]
 git = "https://github.com/os-module/plic"
-replace-with = "vendored-sources"
-
-[source."git+https://github.com/os-module/uart-rs.git"]
-git = "https://github.com/os-module/uart-rs.git"
-replace-with = "vendored-sources"
-
-[source."git+https://github.com/rcore-os/virtio-drivers?rev=61ece50"]
-git = "https://github.com/rcore-os/virtio-drivers"
-rev = "61ece50"
-replace-with = "vendored-sources"
-
-[source."git+https://github.com/repnop/fdt"]
-git = "https://github.com/repnop/fdt"
 replace-with = "vendored-sources"
 
 [source.vendored-sources]

@@ -110,7 +110,7 @@ pub struct Task {
 
     // shared
     fd_table: Shared<FdTable>,         // file descriptor table
-    cwd: Shared<Path>,                 // current work directory
+    cwd: Option<Shared<Path>>,         // current work directory
     sa_list: Shared<SigActionList>,    // signal action list, saves signal handler
     memory_set: Shared<MemorySet>,     // memory set for the task
     thread_group: Shared<ThreadGroup>, // thread group
@@ -244,7 +244,10 @@ impl Task {
     /// get cwd
     #[inline(always)]
     pub fn cwd(&self) -> SpinLockGuard<Path> {
-        self.cwd.lock()
+        match self.cwd {
+            Some(ref cwd) => cwd.lock(),
+            None => panic!("cwd is None"),
+        }
     }
 
     /// trap context
@@ -299,7 +302,7 @@ impl Task {
             trap_cx: SyncUnsafeCell::new(TrapContext::app_init_cx(elf_entry, user_sp)),
             sched_entity: SchedEntity::new_bare(INIT_PROCESS_ID),
             fd_table: Arc::new(SpinLock::new(FdTable::new())),
-            cwd: Arc::new(SpinLock::new(Path::from("init_proc".into()))),
+            cwd: None,
             sa_list: Arc::new(SpinLock::new(SigActionList::new())),
             waker: SyncUnsafeCell::new(None),
         });
@@ -505,7 +508,7 @@ impl Task {
                 trap_cx: SyncUnsafeCell::new(self.trap_context().clone()),
                 sched_entity: self.sched_entity.data_clone(new_tgid),
                 fd_table,
-                cwd: Arc::new(SpinLock::new(self.cwd().clone())),
+                cwd: Some(Arc::new(SpinLock::new(self.cwd().clone()))),
                 sa_list: Arc::new(SpinLock::new(SigActionList::new())),
                 waker: SyncUnsafeCell::new(None),
             });

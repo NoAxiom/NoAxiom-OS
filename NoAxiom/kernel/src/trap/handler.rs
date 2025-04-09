@@ -22,10 +22,10 @@ fn kernel_trap_handler() {
             msg, trap_type, epc,
         );
     };
-    if let Some(task) = current_cpu().task.as_ref() {
-        let cx = task.trap_context();
-        debug!("[kernel_trap_handler] cx detected: {:#x?}", cx);
-    }
+    // if let Some(task) = current_cpu().task.as_ref() {
+    //     let cx = task.trap_context();
+    //     debug!("[kernel_trap_handler] cx detected: {:#x?}", cx);
+    // }
     match trap_type {
         TrapType::StorePageFault(addr)
         | TrapType::LoadPageFault(addr)

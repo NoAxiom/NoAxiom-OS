@@ -1,9 +1,8 @@
 use alloc::vec::Vec;
 use core::arch::asm;
 
-use crate::{entry::main, heap, syscall::exit};
+use crate::{heap, main, syscall::exit};
 
-#[linkage = "weak"]
 #[no_mangle]
 #[link_section = ".text.entry"]
 pub unsafe extern "C" fn _start() -> ! {

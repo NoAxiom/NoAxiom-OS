@@ -1,10 +1,6 @@
+# workspace for kernel
 [workspace]
-members = [
-    "NoAxiom/kernel",
-    "NoAxiom/user/libd",
-    "NoAxiom/user/apps/runtests",
-    "NoAxiom/user/apps/run_busybox",
-]
+members = ["NoAxiom/kernel"]
 resolver = "2"
 
 [workspace.dependencies]
@@ -23,7 +19,6 @@ driver = { path = "NoAxiom/lib/driver" }
 include = { path = "NoAxiom/lib/include" }
 memory = { path = "NoAxiom/lib/memory" }
 platform = { path = "NoAxiom/lib/platform" }
-libd = { path = "NoAxiom/user/libd" }
 
 [profile.release]
 debug = true

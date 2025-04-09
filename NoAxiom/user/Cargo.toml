@@ -1,0 +1,13 @@
+# workspace for kernel
+[workspace]
+members = ["apps/run_busybox", "apps/runtests"]
+resolver = "2"
+
+[workspace.dependencies]
+libd = { path = "./libd" }
+
+[profile.release]
+debug = true
+opt-level = 3
+overflow-checks = false
+panic = "abort"

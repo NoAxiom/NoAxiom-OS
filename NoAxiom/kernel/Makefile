@@ -97,5 +97,8 @@ build: kernel
 
 initproc:
 	@cd ../user/apps && make build
-	
-.PHONY: kernel build initproc
+
+asm:
+	cargo objdump $(CARGO_ARGS) --target $(TARGET) -- -d > $(ROOT)/log/kernel.asm
+
+.PHONY: kernel build initproc asm

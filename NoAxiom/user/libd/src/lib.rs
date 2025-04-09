@@ -8,7 +8,6 @@ extern crate alloc;
 #[macro_use]
 pub mod console;
 pub mod arch;
-pub mod entry;
 pub mod errno;
 mod heap;
 pub mod lib_client;
@@ -21,7 +20,6 @@ pub mod utils;
 pub use console::*;
 use syscall::exit;
 
-#[cfg(not(test))]
 #[panic_handler]
 fn _panic(info: &core::panic::PanicInfo) -> ! {
     let err = info.message().unwrap();
@@ -36,4 +34,10 @@ fn _panic(info: &core::panic::PanicInfo) -> ! {
         println!("Panicked: {}", err);
     }
     exit(-1)
+}
+
+#[linkage = "weak"]
+#[no_mangle]
+pub fn main(_: usize, _: &[&str]) -> isize {
+    panic!("Cannot find main!");
 }

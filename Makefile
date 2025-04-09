@@ -4,7 +4,7 @@
 export PROJECT := NoAxiom
 export MODE ?= release
 export KERNEL ?= kernel
-export ARCH_NAME ?= loongarch64
+export ARCH_NAME ?= riscv64
 export ROOT := $(shell pwd)
 export LOG ?= DEBUG
 export ELF_PATH ?=   # This is for mk_fs.sh
@@ -40,23 +40,6 @@ TEST_DIR := $(ROOT)/$(PROJECT)-OS-Test
 FS_IMG := $(TEST_DIR)/fs-$(ARCH_NAME).img
 MKFS_SH := ./mk_fs.sh
 
-all: build_user build_kernel run
-	@cp $(KERNEL_BIN) kernel-qemu
-
-$(FS_IMG):
-	cd $(TEST_DIR) && make all
-
-build_kernel: $(FS_IMG)
-	@cd $(PROJECT)/kernel && make build
-
-build_user:
-	@cd $(PROJECT)/user && make build
-
-asm: # build_kernel
-	@echo -e "Building Kernel and Generating Assembly..."
-	@$(OBJDUMP) -d $(KERNEL_ELF) > $(KERNEL_ELF).asm
-	@echo -e "Assembly saved to $(KERNEL_ELF).asm"
-
 # NOTE THAT if you want to run in single core
 # you should export this as empty
 export MULTICORE := 2
@@ -88,6 +71,31 @@ else
 	# QFLAGS += -device virtio-blk-device,drive=x1,bus=virtio-mmio-bus.1
 endif
 
+all: build_user build_kernel run
+	@cp $(KERNEL_BIN) kernel-qemu
+
+$(FS_IMG):
+	cd $(TEST_DIR) && make all
+
+build_kernel: $(FS_IMG)
+	@cd $(PROJECT)/kernel && make build
+
+build_user:
+	@cd $(PROJECT)/user && make build
+
+asm:
+	@echo -e "Building Kernel and Generating Assembly..."
+	@cd $(PROJECT)/kernel && make asm
+	@echo -e "Assembly saved to $(ROOT)/log/kernel.asm"
+
+# @$(OBJDUMP) -d $(KERNEL_ELF) > $(KERNEL_ELF).asm
+# @echo -e "Assembly saved to $(KERNEL_ELF).asm"
+# > $(ROOT)/log/kernel.asm
+
+user_asm:
+	@echo -e "Building User and Generating Assembly..."
+	@cd $(PROJECT)/user && make asm
+
 # backup: 
 # 	@cp $(ROOTFS) $(SDCARD_BAK) 
 
@@ -96,7 +104,6 @@ endif
 
 run: sbi-qemu
 	@cp $(KERNEL_BIN) kernel-qemu
-	make asm
 	$(QEMU) $(QFLAGS)
 
 # rm -f $(SDCARD_BAK)
@@ -134,8 +141,9 @@ clean:
 	cargo clean
 
 vendor:
-	cargo clean
-	cargo vendor
+	@cargo clean
+	@cargo vendor
+	@cd $(PROJECT)/user && make vendor
 
 count:
 	@echo "kernel code statistic:"
