@@ -15,12 +15,13 @@ build:
 
 vendor:
 	@cargo clean
+	@rm -rf vendor
 	@cargo vendor
 
 asm:
 	@echo -e $(NORMAL)"Generating User Assembly..."$(RESET)
-	@$(foreach dir, $(APPS), (cd apps/$(dir) && cargo objdump --target $(TARGET) --release -- -d > $(ROOT)/log/$(dir).asm);)
+	@$(foreach dir, $(APPS), (cd apps/$(dir) && cargo objdump --target $(TARGET) --release --quiet -- -d > $(ROOT)/log/$(dir).asm);)
 	@echo -e $(NORMAL)"Assembly saved to:"$(RESET)
-	@$(foreach dir, $(APPS), (echo -e "\t"$(ROOT)/log/$(dir).asm);)
+	@$(foreach dir, $(APPS), (echo -e $(NORMAL)"\t"$(ROOT)/log/$(dir).asm$(RESET));)
 
 .PHONY: all build vendor

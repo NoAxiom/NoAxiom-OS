@@ -99,6 +99,6 @@ initproc:
 	@cd ../user/apps && make build
 
 asm:
-	cargo objdump $(CARGO_ARGS) --target $(TARGET) -- -d > $(ROOT)/log/kernel.asm
+	@cargo objdump $(CARGO_ARGS) --target $(TARGET) --quiet -- -d > $(ROOT)/log/kernel.asm
 
 .PHONY: kernel build initproc asm

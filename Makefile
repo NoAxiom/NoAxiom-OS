@@ -71,7 +71,7 @@ else
 	# QFLAGS += -device virtio-blk-device,drive=x1,bus=virtio-mmio-bus.1
 endif
 
-all: build_user build_kernel run
+default: build_user build_kernel run
 	@cp $(KERNEL_BIN) kernel-qemu
 
 $(FS_IMG):
@@ -84,13 +84,9 @@ build_user:
 	@cd $(PROJECT)/user && make build
 
 asm:
-	@echo -e "Building Kernel and Generating Assembly..."
+	@echo -e $(NORMAL)"Building Kernel and Generating Assembly..."$(RESET)
 	@cd $(PROJECT)/kernel && make asm
-	@echo -e "Assembly saved to $(ROOT)/log/kernel.asm"
-
-# @$(OBJDUMP) -d $(KERNEL_ELF) > $(KERNEL_ELF).asm
-# @echo -e "Assembly saved to $(KERNEL_ELF).asm"
-# > $(ROOT)/log/kernel.asm
+	@echo -e $(NORMAL)"Assembly saved to $(ROOT)/log/kernel.asm"$(RESET)
 
 user_asm:
 	@echo -e "Building User and Generating Assembly..."
@@ -154,49 +150,24 @@ DOCKER ?= docker.educg.net/cg/os-contest:20250226
 docker:
 	docker run --rm -it -v .:/code --entrypoint bash -w /code --privileged $(DOCKER)
 
-# sdcard:
-# 	@echo "\e[49;34m\e[1m----------Making sdcard-----------\e[0m"
-# 	@rm -f $(FS_IMG)
-# 	@dd if=/dev/zero of=$(FS_IMG) count=2048 bs=1M
-# 	@sudo losetup -f $(FS_IMG)
-# 	@mkfs.ext4  -F -O ^metadata_csum_seed $(FS_IMG)
-# 	@mkdir -p mnt
-# 	@sudo mount $(FS_IMG) mnt
-# 	@sudo cp -r $(TEST_DIR)/* mnt
-# 	@sudo umount mnt
-# 	@sudo rm -rf mnt
-# 	@sudo chmod 777 $(FS_IMG)
-# 	@echo "\e[49;34m\e[1m----------Making sdcard finished-----------\e[0m"
+info:
+	@echo "TARGET: $(TARGET)"
+	@echo "ARCH_NAME: $(ARCH_NAME)"
+	@echo "MODE: $(MODE)"
+	@echo "MULTICORE: $(MULTICORE)"
+	@echo "SBI: $(SBI)"
+	@echo "QEMU: $(QEMU)"
+	@echo "TEST_DIR: $(TEST_DIR)"
+	@echo "FS_IMG: $(FS_IMG)"
+	@echo "QFLAGS: $(QFLAGS)"
 
+add_target:
+	@echo $(NORMAL)"Adding target to rustup"$(RESET)
+	@rustup target add loongarch64-unknown-none
+	@rustup target add riscv64gc-unknown-none-elf
 
-# build-gui:
-# 	@echo "\e[49;34m\e[1m----------Building user-----------\e[0m"
-# 	@cd $(PROJECT)/user/apps && make build
-# 	@echo "\e[49;34m\e[1m----------Making fs.img-----------\e[0m"
-# 	@./make_fs.sh
-# 	@echo "\e[49;34m\e[1m----------Building kernel---------\e[0m"
-# 	@cd $(PROJECT)/kernel && make kernel
+env: info add_target vendor
 
-# run-uitest: sbi-qemu
-# 	@echo "\e[49;34m\e[1m----------GUI Test-----------\e[0m"
-# 	@cp $(KERNEL_BIN) kernel-qemu
-# 	@qemu-system-riscv64 \
-# 		-machine virt \
-# 		-nographic \
-# 		-kernel kernel-qemu \
-# 		-drive file=$(TESTFS),if=none,format=raw,id=x0 \
-# 		-vnc :0\
-# 	        -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 \
-# 		-device virtio-net-device,netdev=net -netdev user,id=net\
-# 		-device virtio-gpu-device,xres=640,yres=480\
-# 		-device virtio-mouse-device\
-# 		-device virtio-keyboard-device
+all: env default
 
-# gvnc:
-# 	@echo "\e[49;34m\e[1m----------Open Viewer-----------\e[0m"
-# 	gvncviewer localhost
-
-# board:
-# 	@cp $(TARGET_DIR)/$(KERNEL).bin  $(TFTPBOOT)
-
-.PHONY: all build run debug clean debug-client sbi-qemu backup sdcard build-gui board vendor count asm test build_user
+.PHONY: all build run debug clean debug-client sbi-qemu backup sdcard build-gui board vendor count asm test build_user env info
