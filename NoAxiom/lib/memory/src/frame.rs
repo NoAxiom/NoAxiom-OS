@@ -15,28 +15,13 @@ use crate::{
     utils::{kernel_ppn_to_vpn, kernel_va_to_pa},
 };
 
-// pub fn frame_strong_count(ppn: PhysPageNum) -> usize {
-//     FRAME_MAP
-//         .lock()
-//         .get(&ppn.0)
-//         .map(|x| x.strong_count())
-//         .unwrap_or(0)
-// }
-
 /// frame tracker inner
 pub struct FrameTrackerInner {
-    pub ppn: PhysPageNum,
+    ppn: PhysPageNum,
 }
 impl FrameTrackerInner {
-    pub fn new_zero(ppn: PhysPageNum) -> Self {
-        // page cleaning
-        let bytes_array = ppn.get_bytes_array();
-        for i in bytes_array {
-            *i = 0;
-        }
-        Self { ppn }
-    }
-    pub fn new_uninit(ppn: PhysPageNum) -> Self {
+    #[inline]
+    fn new_uninit(ppn: PhysPageNum) -> Self {
         Self { ppn }
     }
 }
@@ -57,9 +42,17 @@ pub struct FrameTracker {
     inner: Arc<FrameTrackerInner>,
 }
 impl FrameTracker {
-    pub fn new(inner: FrameTrackerInner) -> Self {
+    fn new(inner: FrameTrackerInner) -> Self {
         let inner = Arc::new(inner);
         Self { inner }
+    }
+    #[inline]
+    pub fn fill_zero(&self) {
+        self.inner.ppn.get_bytes_array().fill(0);
+    }
+    #[inline]
+    pub fn fill_data(&self, src: &[u8]) {
+        self.inner.ppn.get_bytes_array().copy_from_slice(src);
     }
     #[inline(always)]
     pub fn ppn(&self) -> PhysPageNum {
@@ -75,6 +68,24 @@ impl Clone for FrameTracker {
         Self {
             inner: self.inner.clone(),
         }
+    }
+}
+
+pub struct FrameTrackerRaw(FrameTracker);
+impl FrameTrackerRaw {
+    pub fn new(ppn: PhysPageNum) -> Self {
+        Self(FrameTracker::new(FrameTrackerInner::new_uninit(ppn)))
+    }
+    pub fn zero_inited(self) -> FrameTracker {
+        self.0.fill_zero();
+        self.0
+    }
+    pub unsafe fn keep_uninited(self) -> FrameTracker {
+        self.0
+    }
+    pub fn data_inited(self, src: &[u8]) -> FrameTracker {
+        self.0.fill_data(src);
+        self.0
     }
 }
 
@@ -151,17 +162,19 @@ lazy_static! {
 pub fn frame_alloc() -> FrameTracker {
     let mut guard = FRAME_ALLOCATOR.lock();
     let ppn = guard.alloc().unwrap();
-    let frame = FrameTracker::new(FrameTrackerInner::new_zero(ppn));
+    let frame = FrameTrackerRaw::new(ppn).zero_inited();
     guard.frame_map.insert(ppn.0, Arc::downgrade(&frame.inner));
     frame
 }
 
 #[allow(unused)]
-pub fn frame_alloc_uninit() -> FrameTracker {
+pub fn frame_alloc_raw() -> FrameTrackerRaw {
     let mut guard = FRAME_ALLOCATOR.lock();
     let ppn = guard.alloc().unwrap();
-    let frame = FrameTracker::new(FrameTrackerInner::new_uninit(ppn));
-    guard.frame_map.insert(ppn.0, Arc::downgrade(&frame.inner));
+    let frame = FrameTrackerRaw::new(ppn);
+    guard
+        .frame_map
+        .insert(ppn.0, Arc::downgrade(&frame.0.inner));
     frame
 }
 
