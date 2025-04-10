@@ -139,7 +139,7 @@ impl dyn File {
         self.meta().pos.fetch_add(len as usize, Ordering::Relaxed);
         Ok(len)
     }
-    pub async fn write(&self, buf: &mut [u8]) -> SyscallResult {
+    pub async fn write(&self, buf: &[u8]) -> SyscallResult {
         let offset = self.pos();
         let len = self.base_write(offset, buf).await?;
         self.meta().pos.fetch_add(len as usize, Ordering::Relaxed);
