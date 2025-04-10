@@ -190,23 +190,24 @@ impl MapArea {
         }
     }
 
-    // TODO: offset
     /// load data from byte slice
-    pub fn load_data(&mut self, page_table: &PageTable, data: &[u8]) {
+    pub fn load_data(&mut self, page_table: &PageTable, data: &[u8], offset: usize) {
         // should only load user data
         assert_eq!(self.map_type, MapType::Framed);
-        let mut start: usize = 0;
+        let mut cur_st: usize = 0;
+        let mut cur_ed: usize = PAGE_SIZE - offset;
         let mut current_vpn = self.vpn_range.start();
         let len = data.len();
         loop {
-            let src = &data[start..len.min(start + PAGE_SIZE)];
+            let src = &data[cur_st..len.min(cur_ed)];
             let ppn = PhysPageNum::from(page_table.translate_vpn(current_vpn).unwrap().ppn());
             let dst = &mut ppn.get_bytes_array()[..src.len()];
             dst.copy_from_slice(src);
-            start += PAGE_SIZE;
-            if start >= len {
+            cur_st = cur_ed;
+            if cur_st >= len {
                 break;
             }
+            cur_ed = cur_st + PAGE_SIZE;
             current_vpn.step();
         }
     }

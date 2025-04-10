@@ -8,7 +8,7 @@ use alloc::{
 };
 use core::task::Waker;
 
-use arch::{Arch, ArchMemory, ArchTrapContext, TrapContext, TrapType};
+use arch::{Arch, ArchMemory, ArchTrapContext, TrapArgs, TrapContext, TrapType};
 use ksync::{
     cell::SyncUnsafeCell,
     mutex::{SpinLock, SpinLockGuard},
@@ -223,11 +223,19 @@ impl Task {
         self: &Arc<Self>,
         addr: usize,
         trap_type: Option<TrapType>,
+        is_blocked: bool,
     ) -> SysResult<()> {
         trace!("[memory_validate] check at addr: {:#x}", addr);
         let vpn = VirtAddr::from(addr).floor();
         let pt = PageTable::from_ppn(Arch::current_root_ppn());
-        validate(self.memory_set(), vpn, trap_type, pt.translate_vpn(vpn)).await
+        validate(
+            self.memory_set(),
+            vpn,
+            trap_type,
+            pt.translate_vpn(vpn),
+            is_blocked,
+        )
+        .await
     }
 
     /// thread group
@@ -303,6 +311,7 @@ impl Task {
             sa_list: Arc::new(SpinLock::new(SigActionList::new())),
             waker: SyncUnsafeCell::new(None),
         });
+        task.trap_context_mut()[TrapArgs::SP] -= 16;
         add_new_process(&task);
         info!("[spawn] new task spawn complete, tid {}", task.tid.0);
         task
@@ -312,9 +321,11 @@ impl Task {
     ///
     /// stack construction
     /// +---------------------------+
-    /// | Padding (16-byte align)   | <-- sp
+    /// | Padding (16-byte align)   | <-- sp (lower address)
     /// +---------------------------+
     /// | argc                      |
+    /// | *argv                     |
+    /// | *envp                     |
     /// +---------------------------+
     /// | argv[0]                   |
     /// | argv[1]                   |
@@ -329,7 +340,7 @@ impl Task {
     /// | auxv[0].key, auxv[0].val  |
     /// | auxv[1].key, auxv[1].val  |
     /// | ...                       |
-    /// | NULL (auxv terminator)    |
+    /// | NULL (auxv terminator)    | <-- stack base (higher address)
     /// +---------------------------+
     pub fn init_user_stack(
         &self,
@@ -349,7 +360,7 @@ impl Task {
         let mut envp = vec![0; envs.len() + 1];
 
         // === push args ===
-        trace!("[init_user_stack] push args: {:?}", args);
+        debug!("[init_user_stack] push args: {:?}", args);
         for (i, s) in args.iter().enumerate() {
             let len = s.len();
             user_sp -= len + 1;
@@ -363,7 +374,7 @@ impl Task {
         user_sp -= user_sp % core::mem::size_of::<usize>();
 
         // === push env ===
-        trace!("[init_user_stack] push envs: {:?}", envs);
+        debug!("[init_user_stack] push envs: {:?}", envs);
         for (i, s) in envs.iter().enumerate() {
             let len = s.len();
             user_sp -= len + 1;
@@ -390,7 +401,7 @@ impl Task {
         }
         // terminator: auxv end with AT_NULL
         auxs.push(AuxEntry(AT_NULL, 0 as usize)); // end
-        trace!("[init_user_stack] auxs: {:?}", auxs);
+        debug!("[init_user_stack] auxs: {:?}", auxs);
 
         // construct auxv
         trace!("[init_user_stack] construct auxv");
@@ -430,9 +441,9 @@ impl Task {
         push_slice(&mut user_sp, argv.as_slice());
         let argv_base = user_sp;
 
-        // push argc
-        trace!("[init_user_stack] push argc");
-        push_slice(&mut user_sp, &[args.len()]);
+        // push argc, argv, envp
+        let argc = args.len();
+        push_slice(&mut user_sp, &[argc, argv_base, envp_base]);
 
         // return value: sp, argc, argv, envp
         (user_sp, args.len(), argv_base, envp_base)

@@ -15,7 +15,7 @@ impl<'a> Syscall<'a> {
         Self { task }
     }
     pub async fn syscall(&mut self, id: usize, args: [usize; 6]) -> SyscallResult {
-        trace!("syscall id: {}, args: {:?}", id, args);
+        debug!("syscall id: {}, args: {:?}", id, args);
         #[cfg(feature = "interruptable_async")]
         {
             // fixme: turn on the interrupt. When call trap_handler, cpu would turn off

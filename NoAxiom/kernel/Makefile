@@ -24,7 +24,7 @@ DEV :=
 SH := 
 RAMDISK :=
 
-ifneq ($(MULTICORE), )
+ifneq ($(MULTICORE), 1)
 	FEATURES += multicore
 endif
 

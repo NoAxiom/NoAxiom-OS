@@ -30,6 +30,8 @@ fn main() -> i32 {
             if tid == -1 {
                 yield_();
                 continue;
+            } else {
+                break;
             }
         }
     }

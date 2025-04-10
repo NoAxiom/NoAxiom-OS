@@ -1,6 +1,6 @@
 # workspace for kernel
 [workspace]
-members = ["apps/run_busybox", "apps/runtests"]
+members = ["libd", "apps/run_busybox", "apps/runtests"]
 resolver = "2"
 
 [workspace.dependencies]

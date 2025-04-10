@@ -61,9 +61,9 @@ impl From<MappingFlags> for PTEFlags {
         if flags.contains(MappingFlags::V) {
             res |= PTEFlags::V;
         }
-        // if !flags.contains(MappingFlags::X) {
-        //     res |= PTEFlags::NX;
-        // }
+        if !flags.contains(MappingFlags::X) {
+            res |= PTEFlags::NX;
+        }
         if flags.contains(MappingFlags::W) {
             res |= PTEFlags::W;
         }

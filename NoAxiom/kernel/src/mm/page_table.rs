@@ -128,13 +128,13 @@ impl PageTable {
         );
         *pte = PageTableEntry::new(ppn.0, flags | pte_flags!(V, D, A));
 
-        // let find_res = self.find_pte(vpn).unwrap();
-        // assert!(
-        //     find_res.flags().is_valid(),
-        //     "error vpn: {:#x}, flags: {:?}",
-        //     vpn.0,
-        //     find_res.flags()
-        // );
+        let find_res = self.find_pte(vpn).unwrap();
+        assert!(
+            find_res.flags().contains(MappingFlags::V),
+            "error vpn: {:#x}, flags: {:?}",
+            vpn.0,
+            find_res.flags()
+        );
     }
 
     /// unmap a vpn

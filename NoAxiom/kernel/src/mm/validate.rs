@@ -29,6 +29,7 @@ pub async fn validate(
     vpn: VirtPageNum,
     trap_type: Option<TrapType>,
     pte: Option<PageTableEntry>,
+    is_blocked: bool,
 ) -> SysResult<()> {
     if let Some(pte) = pte {
         let flags = pte.flags();

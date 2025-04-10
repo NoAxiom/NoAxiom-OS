@@ -150,7 +150,7 @@ impl MemorySet {
 
     /// push a map area into current memory set
     /// load data if provided
-    pub fn push_area(&mut self, mut map_area: MapArea, data: Option<&[u8]>) {
+    pub fn push_area(&mut self, mut map_area: MapArea, data: Option<&[u8]>, offset: usize) {
         trace!(
             "push_area: [{:#X}, {:#X})",
             map_area.vpn_range().start().0 << PAGE_WIDTH,
@@ -158,7 +158,7 @@ impl MemorySet {
         );
         map_area.map_each(self.page_table());
         if let Some(data) = data {
-            map_area.load_data(self.page_table(), data);
+            map_area.load_data(self.page_table(), data, offset);
         }
         self.areas.push(map_area); // bind life cycle
     }
@@ -177,7 +177,8 @@ impl MemorySet {
                             $permission,
                             MapAreaType::KernelSpace,
                         ),
-                        None
+                        None,
+                        0,
                     );
                 )*
             };
@@ -283,9 +284,11 @@ impl MemorySet {
             let ph = elf.program_header(i).unwrap();
             match ph.get_type().unwrap() {
                 xmas_elf::program::Type::Load => {
+                    let start_va = VirtAddr(ph.virtual_addr() as usize);
+                    let end_va = VirtAddr((ph.virtual_addr() + ph.mem_size()) as usize);
                     let map_area = MapArea::new(
-                        (ph.virtual_addr() as usize).into(),
-                        ((ph.virtual_addr() + ph.mem_size()) as usize).into(),
+                        start_va,
+                        end_va,
                         MapType::Framed,
                         map_permission!(U).merge_from_elf_flags(ph.flags()),
                         MapAreaType::ElfBinary,
@@ -300,12 +303,20 @@ impl MemorySet {
                         start_vpn = Some(map_area.vpn_range.start());
                     }
                     end_vpn = Some(map_area.vpn_range.end());
+                    if start_va.offset() != 0 {
+                        warn!(
+                            "[load_elf] range: {:?}start_va offset: {:#x}",
+                            map_area.vpn_range,
+                            start_va.offset()
+                        );
+                    }
                     memory_set.push_area(
                         map_area,
                         Some(
                             &elf.input
                                 [ph.offset() as usize..(ph.offset() + ph.file_size()) as usize],
                         ),
+                        start_va.offset(),
                     );
                 }
                 xmas_elf::program::Type::Interp => {
@@ -355,23 +366,22 @@ impl MemorySet {
             // elf_entry = interp_entry_point.unwrap();
             unimplemented!()
         } else {
-            auxs.push(AuxEntry(AT_BASE, 0));
+            // auxs.push(AuxEntry(AT_BASE, 0));
         }
-        auxs.push(AuxEntry(AT_FLAGS, 0 as usize));
+        // auxs.push(AuxEntry(AT_FLAGS, 0 as usize));
         auxs.push(AuxEntry(AT_ENTRY, elf.header.pt2.entry_point() as usize));
-        auxs.push(AuxEntry(AT_UID, 0 as usize));
-        auxs.push(AuxEntry(AT_EUID, 0 as usize));
-        auxs.push(AuxEntry(AT_GID, 0 as usize));
-        auxs.push(AuxEntry(AT_EGID, 0 as usize));
-        auxs.push(AuxEntry(AT_HWCAP, 0 as usize));
+        // auxs.push(AuxEntry(AT_UID, 0 as usize));
+        // auxs.push(AuxEntry(AT_EUID, 0 as usize));
+        // auxs.push(AuxEntry(AT_GID, 0 as usize));
+        // auxs.push(AuxEntry(AT_EGID, 0 as usize));
+        // auxs.push(AuxEntry(AT_HWCAP, 0 as usize));
         auxs.push(AuxEntry(AT_CLKTCK, Arch::get_freq() as usize));
-        auxs.push(AuxEntry(AT_SECURE, 0 as usize));
+        // auxs.push(AuxEntry(AT_SECURE, 0 as usize));
 
-        // fixme: temp use: -128, should be 0 or -16
         ElfMemoryInfo {
             memory_set,
             elf_entry,
-            user_sp: user_stack_end - 128, // stack grows downward, so return stack_end
+            user_sp: user_stack_end, // stack grows downward, so return stack_end
             auxs,
         }
     }

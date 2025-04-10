@@ -8,6 +8,7 @@ extern crate alloc;
 #[macro_use]
 pub mod console;
 pub mod arch;
+pub mod entry;
 pub mod errno;
 mod heap;
 pub mod lib_client;

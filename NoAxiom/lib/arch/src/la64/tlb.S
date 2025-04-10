@@ -36,6 +36,7 @@
     lddir     $t0, $t0, 1              # load: (30, 21]
     andi      $t0, $t0, 1
     beqz      $t0, 1f                  # valid check
+
     csrrd     $t0, LA_CSR_PGD          # reload: (39, 30]
     lddir     $t0, $t0, 3              # reload: (30, 21]
     addi.d    $t0, $t0, -1
@@ -44,9 +45,9 @@
 
     ldpte     $t0, 0                   # even page pte, will update TLBRELO0
     ldpte     $t0, 1                   # odd page pte, will update TLBRELO1
-    csrrd     $t0, LA_CSR_TLBRELO0
-    csrrd     $t0, LA_CSR_TLBRELO1
-    csrrd     $t0, 0x0                 # fixme: is these instructions necessary? it just read the csr value
+# csrrd     $t0, LA_CSR_TLBRELO0
+# csrrd     $t0, LA_CSR_TLBRELO1
+# csrrd     $t0, 0x0                 # fixme: is these instructions necessary? it just read the csr value
 
 # complete the TLB refill and return
     2:
@@ -59,7 +60,7 @@
     tlbrd
     csrrd     $t0, LA_CSR_TLBELO0
     csrrd     $t0, LA_CSR_TLBELO1
-    csrrd     $t0, LA_CSR_TLBRSAVE     # restore temporary data
+    csrwr     $t0, LA_CSR_TLBRSAVE     # restore temporary data, use csrwr to avoid data loss
     ertn
 
 # will trigger page fault
@@ -69,7 +70,7 @@
     csrwr     $t0, LA_CSR_TLBREHI
 
     rotri.d   $t0, $t0, 61
-    ori       $t0, $t0, 3
+    ori       $t0, $t0, 3              # fixme: is 3 correct? should be 7?
     rotri.d   $t0, $t0, 3
 
     csrwr     $t0, LA_CSR_TLBRELO0

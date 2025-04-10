@@ -4,7 +4,7 @@
 export PROJECT := NoAxiom
 export MODE ?= release
 export KERNEL ?= kernel
-export ARCH_NAME ?= riscv64
+export ARCH_NAME ?= loongarch64
 export ROOT := $(shell pwd)
 export LOG ?= DEBUG
 export ELF_PATH ?=   # This is for mk_fs.sh
@@ -20,12 +20,14 @@ ifeq ($(ARCH_NAME),riscv64)
 	export OBJCOPY := rust-objcopy --binary-architecture=riscv64
 	export SBI ?= $(ROOT)/$(PROJECT)/bootloader/rustsbi-qemu.bin
 	export QEMU := qemu-system-riscv64
+	export MULTICORE := 2
 else ifeq ($(ARCH_NAME),loongarch64)
 	export TARGET := loongarch64-unknown-linux-gnu
 	export OBJDUMP := loongarch64-linux-gnu-objdump
 	export OBJCOPY := loongarch64-linux-gnu-objcopy
 	export SBI ?= $(ROOT)/$(PROJECT)/bootloader/u-boot-with-spl.bin
 	export QEMU := qemu-system-loongarch64
+	export MULTICORE := 1
 endif
 
 export TARGET_DIR := $(ROOT)/target/$(TARGET)/$(MODE)
@@ -39,10 +41,6 @@ KERNEL_SYMBOL_TABLE := $(KERNEL_ELF).txt
 TEST_DIR := $(ROOT)/$(PROJECT)-OS-Test
 FS_IMG := $(TEST_DIR)/fs-$(ARCH_NAME).img
 MKFS_SH := ./mk_fs.sh
-
-# NOTE THAT if you want to run in single core
-# you should export this as empty
-export MULTICORE := 2
 
 QFLAGS := 
 ifeq ($(ARCH_NAME),loongarch64)
@@ -72,7 +70,6 @@ else
 endif
 
 default: build_user build_kernel run
-	@cp $(KERNEL_BIN) kernel-qemu
 
 $(FS_IMG):
 	cd $(TEST_DIR) && make all

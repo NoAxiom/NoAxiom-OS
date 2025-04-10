@@ -37,7 +37,7 @@ fn kernel_trap_handler() {
                     epc,
                     addr
                 );
-                match block_on(task.memory_validate(addr, Some(trap_type))) {
+                match block_on(task.memory_validate(addr, Some(trap_type), true)) {
                     Ok(_) => trace!("[memory_validate] success in kernel_trap_handler"),
                     Err(_) => kernel_panic("memory_validate failed"),
                 }
@@ -67,11 +67,11 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
     let epc = Arch::read_epc();
     let trap_type = Arch::read_trap_type(Some(cx));
     let user_exit = |msg: &str| {
-        error!(
+        Arch::arch_info_print();
+        panic!(
             "[user_trap_handler] unexpected exit!!! msg: {}, trap_type: {:#x?}, sepc = {:#x}, cx: {:#x?}",
             msg, trap_type, epc, cx
         );
-        Arch::arch_info_print();
         task.terminate(-1);
     };
     match trap_type {
@@ -86,7 +86,7 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
         TrapType::LoadPageFault(addr)
         | TrapType::StorePageFault(addr)
         | TrapType::InstructionPageFault(addr) => {
-            match task.memory_validate(addr, Some(trap_type)).await {
+            match task.memory_validate(addr, Some(trap_type), false).await {
                 Ok(_) => trace!("[memory_validate] success in user_trap_handler"),
                 Err(_) => {
                     error!(

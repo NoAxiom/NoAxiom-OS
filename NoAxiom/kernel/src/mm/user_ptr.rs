@@ -187,7 +187,7 @@ impl UserPtr<u8> {
             VirtAddr::from(self.addr_usize() + len),
         ) {
             if page_table.translate_vpn(vpn).is_none() {
-                validate(memory_set, vpn, None, None).await?;
+                validate(memory_set, vpn, None, None, false).await?;
             }
         }
         Ok(unsafe { core::slice::from_raw_parts_mut(self.ptr, len) })
