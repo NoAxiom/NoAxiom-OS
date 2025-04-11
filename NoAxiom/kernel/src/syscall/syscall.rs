@@ -15,7 +15,7 @@ impl<'a> Syscall<'a> {
         Self { task }
     }
     pub async fn syscall(&mut self, id: usize, args: [usize; 6]) -> SyscallResult {
-        debug!("syscall id: {}, args: {:?}", id, args);
+        trace!("syscall id: {}, args: {:?}", id, args);
         #[cfg(feature = "interruptable_async")]
         {
             // fixme: turn on the interrupt. When call trap_handler, cpu would turn off
@@ -69,6 +69,10 @@ impl<'a> Syscall<'a> {
             }
             SYS_GETPID => self.sys_getpid(),
             SYS_GETPPID => self.sys_getppid(),
+            SYS_GETUID => Self::empty_syscall("getuid"),
+            SYS_GETEUID => Self::empty_syscall("geteuid"),
+            SYS_GETGID => Self::empty_syscall("getgid"),
+            SYS_GETEGID => Self::empty_syscall("getegid"),
 
             // signal
             SYS_SIGACTION => self.sys_sigaction(args[0] as i32, args[1], args[2]),
@@ -103,6 +107,11 @@ impl<'a> Syscall<'a> {
                 Err(Errno::ENOSYS)
             }
         }
+    }
+
+    fn empty_syscall(syscall: &str) -> SyscallResult {
+        info!("[sys_{}] do nothing.", syscall);
+        Ok(0)
     }
 }
 

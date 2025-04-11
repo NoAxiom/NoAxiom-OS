@@ -71,6 +71,7 @@ pub const SYS_GETPID: usize = 172;
 pub const SYS_GETPPID: usize = 173;
 pub const SYS_GETUID: usize = 174;
 pub const SYS_GETEUID: usize = 175;
+pub const SYS_GETGID: usize = 176;
 pub const SYS_GETEGID: usize = 177;
 pub const SYS_GETTID: usize = 178;
 pub const SYS_SYSINFO: usize = 179;
