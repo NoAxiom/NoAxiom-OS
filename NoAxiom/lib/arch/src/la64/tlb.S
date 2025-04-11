@@ -22,58 +22,109 @@
     .balign   4096
 
     __tlb_refill:
-    csrwr     $t0, LA_CSR_TLBRSAVE     # store temporary data
+    csrwr     $t0, 0x8b
 
-# walk the page table
-    csrrd     $t0, LA_CSR_PGD
-    lddir     $t0, $t0, 3              # load: (39, 30]
+    csrrd     $t0, 0x1b
+    lddir     $t0, $t0, 3
     andi      $t0, $t0, 1
-    beqz      $t0, 1f                  # valid check
+    beqz      $t0, 1f
 
-    csrrd     $t0, LA_CSR_PGD
-    lddir     $t0, $t0, 3              # reload: (39, 30]
-    addi.d    $t0, $t0, -1             # sub valid flag
-    lddir     $t0, $t0, 1              # load: (30, 21]
-    andi      $t0, $t0, 1
-    beqz      $t0, 1f                  # valid check
-
-    csrrd     $t0, LA_CSR_PGD          # reload: (39, 30]
-    lddir     $t0, $t0, 3              # reload: (30, 21]
+    csrrd     $t0, 0x1b
+    lddir     $t0, $t0, 3
     addi.d    $t0, $t0, -1
-    lddir     $t0, $t0, 1              # load: (21, 12]
-    addi.d    $t0, $t0, -1             # no need to check validality since we're in the lowest level
+    lddir     $t0, $t0, 1
+    andi      $t0, $t0, 1
+    beqz      $t0, 1f
+    csrrd     $t0, 0x1b
+    lddir     $t0, $t0, 3
+    addi.d    $t0, $t0, -1
+    lddir     $t0, $t0, 1
+    addi.d    $t0, $t0, -1
 
-    ldpte     $t0, 0                   # even page pte, will update TLBRELO0
-    ldpte     $t0, 1                   # odd page pte, will update TLBRELO1
-# csrrd     $t0, LA_CSR_TLBRELO0
-# csrrd     $t0, LA_CSR_TLBRELO1
-# csrrd     $t0, 0x0                 # fixme: is these instructions necessary? it just read the csr value
-
-# complete the TLB refill and return
+    ldpte     $t0, 0
+    ldpte     $t0, 1
+    csrrd     $t0, 0x8c
+    csrrd     $t0, 0x8d
+    csrrd     $t0, 0x0
     2:
     tlbfill
-    csrrd     $t0, LA_CSR_TLBRBADV
+    csrrd     $t0, 0x89
     srli.d    $t0, $t0, 13
     slli.d    $t0, $t0, 13
-    csrwr     $t0, LA_CSR_TLBEHI
+    csrwr     $t0, 0x11
     tlbsrch
     tlbrd
-    csrrd     $t0, LA_CSR_TLBELO0
-    csrrd     $t0, LA_CSR_TLBELO1
-    csrwr     $t0, LA_CSR_TLBRSAVE     # restore temporary data, use csrwr to avoid data loss
+    csrrd     $t0, 0x12
+    csrrd     $t0, 0x13
+    csrrd     $t0, 0x8b
     ertn
-
-# will trigger page fault
     1:
-    csrrd     $t0, LA_CSR_TLBREHI
+    csrrd  $t0, 0x8e
     ori       $t0, $t0, 0xC
-    csrwr     $t0, LA_CSR_TLBREHI
+    csrwr     $t0, 0x8e
 
     rotri.d   $t0, $t0, 61
-    ori       $t0, $t0, 3              # fixme: is 3 correct? should be 7?
+    ori       $t0, $t0, 3
     rotri.d   $t0, $t0, 3
 
-    csrwr     $t0, LA_CSR_TLBRELO0
-    csrrd     $t0, LA_CSR_TLBRELO0
-    csrwr     $t0, LA_CSR_TLBRELO1
+    csrwr     $t0, 0x8c
+    csrrd     $t0, 0x8c
+    csrwr     $t0, 0x8d
     b         2b
+
+#     __tlb_refill:
+#     csrwr     $t0, LA_CSR_TLBRSAVE     # store temporary data
+
+# # walk the page table
+#     csrrd     $t0, LA_CSR_PGD
+#     lddir     $t0, $t0, 3              # load: (39, 30]
+#     andi      $t0, $t0, 1
+#     beqz      $t0, 1f                  # valid check
+
+#     csrrd     $t0, LA_CSR_PGD
+#     lddir     $t0, $t0, 3              # reload: (39, 30]
+#     addi.d    $t0, $t0, -1             # sub valid flag
+#     lddir     $t0, $t0, 1              # load: (30, 21]
+#     andi      $t0, $t0, 1
+#     beqz      $t0, 1f                  # valid check
+
+#     csrrd     $t0, LA_CSR_PGD          # reload: (39, 30]
+#     lddir     $t0, $t0, 3              # reload: (30, 21]
+#     addi.d    $t0, $t0, -1
+#     lddir     $t0, $t0, 1              # load: (21, 12]
+#     addi.d    $t0, $t0, -1             # no need to check validality since we're in the lowest level
+
+#     ldpte     $t0, 0                   # even page pte, will update TLBRELO0
+#     ldpte     $t0, 1                   # odd page pte, will update TLBRELO1
+# # csrrd     $t0, LA_CSR_TLBRELO0
+# # csrrd     $t0, LA_CSR_TLBRELO1
+# # csrrd     $t0, 0x0                 # fixme: is these instructions necessary? it just read the csr value
+
+# # complete the TLB refill and return
+#     2:
+#     tlbfill
+#     csrrd     $t0, LA_CSR_TLBRBADV
+#     srli.d    $t0, $t0, 13
+#     slli.d    $t0, $t0, 13
+#     csrwr     $t0, LA_CSR_TLBEHI
+#     tlbsrch
+#     tlbrd
+#     csrrd     $t0, LA_CSR_TLBELO0
+#     csrrd     $t0, LA_CSR_TLBELO1
+#     csrwr     $t0, LA_CSR_TLBRSAVE     # restore temporary data, use csrwr to avoid data loss
+#     ertn
+
+# # will trigger page fault
+#     1:
+#     csrrd     $t0, LA_CSR_TLBREHI
+#     ori       $t0, $t0, 0xC
+#     csrwr     $t0, LA_CSR_TLBREHI
+
+#     rotri.d   $t0, $t0, 61
+#     ori       $t0, $t0, 3              # fixme: is 3 correct? should be 7?
+#     rotri.d   $t0, $t0, 3
+
+#     csrwr     $t0, LA_CSR_TLBRELO0
+#     csrrd     $t0, LA_CSR_TLBRELO0
+#     csrwr     $t0, LA_CSR_TLBRELO1
+#     b         2b

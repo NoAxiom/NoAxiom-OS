@@ -151,12 +151,20 @@ impl MemorySet {
     /// push a map area into current memory set
     /// load data if provided
     pub fn push_area(&mut self, mut map_area: MapArea, data: Option<&[u8]>, offset: usize) {
-        trace!(
+        debug!(
             "push_area: [{:#X}, {:#X})",
             map_area.vpn_range().start().0 << PAGE_WIDTH,
             map_area.vpn_range().end().0 << PAGE_WIDTH
         );
         map_area.map_each(self.page_table());
+        let pte = self
+            .page_table()
+            .translate_vpn(map_area.vpn_range().start());
+        debug!(
+            "create pte: ppn: {:#x}, flags: {:?}",
+            pte.unwrap().ppn(),
+            pte.unwrap().flags(),
+        );
         if let Some(data) = data {
             map_area.load_data(self.page_table(), data, offset);
         }
@@ -282,6 +290,7 @@ impl MemorySet {
         // map pages by loaded program header
         for i in 0..ph_count {
             let ph = elf.program_header(i).unwrap();
+            debug!("{}", ph);
             match ph.get_type().unwrap() {
                 xmas_elf::program::Type::Load => {
                     let start_va = VirtAddr(ph.virtual_addr() as usize);
@@ -294,22 +303,18 @@ impl MemorySet {
                         MapAreaType::ElfBinary,
                     );
                     debug!(
-                        "area: range: {:?}, perm: {:?}, ph_flag: {:?}",
+                        "area: range: {:?}, perm: {:?}, ph_flag: {:?}, offset: {:#x}, mem_size: {:#x}, file_size: {:#x}",
                         map_area.vpn_range,
                         map_area.map_permission,
                         ph.flags(),
+                        start_va.offset(),
+                        ph.mem_size(),
+                        ph.file_size(),
                     );
                     if start_vpn.is_none() {
                         start_vpn = Some(map_area.vpn_range.start());
                     }
                     end_vpn = Some(map_area.vpn_range.end());
-                    if start_va.offset() != 0 {
-                        warn!(
-                            "[load_elf] range: {:?}start_va offset: {:#x}",
-                            map_area.vpn_range,
-                            start_va.offset()
-                        );
-                    }
                     memory_set.push_area(
                         map_area,
                         Some(
@@ -323,11 +328,12 @@ impl MemorySet {
                     dl_flag = true;
                 }
                 _ => {
-                    warn!(
-                        "[load_elf] unsupported program header type: {:#x?}, area: [{:#x}, {:#x})",
+                    trace!(
+                        "[load_elf] unsupported program header type: {:#x?}, area: [{:#x}, {:#x}), flags: {:?}",
                         ph.get_type(),
                         ph.virtual_addr(),
-                        ph.virtual_addr() + ph.mem_size()
+                        ph.virtual_addr() + ph.mem_size(),
+                        ph.flags(),
                     );
                 }
             }

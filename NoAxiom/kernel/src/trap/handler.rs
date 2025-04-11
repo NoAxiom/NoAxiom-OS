@@ -22,10 +22,6 @@ fn kernel_trap_handler() {
             msg, trap_type, epc,
         );
     };
-    // if let Some(task) = current_cpu().task.as_ref() {
-    //     let cx = task.trap_context();
-    //     debug!("[kernel_trap_handler] cx detected: {:#x?}", cx);
-    // }
     match trap_type {
         TrapType::StorePageFault(addr)
         | TrapType::LoadPageFault(addr)
@@ -67,10 +63,9 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
     let epc = Arch::read_epc();
     let trap_type = Arch::read_trap_type(Some(cx));
     let user_exit = |msg: &str| {
-        Arch::arch_info_print();
         panic!(
-            "[user_trap_handler] unexpected exit!!! msg: {}, trap_type: {:#x?}, sepc = {:#x}, cx: {:#x?}",
-            msg, trap_type, epc, cx
+            "[user_trap_handler] unexpected exit!!! msg: {}, trap_type: {:#x?}, sepc = {:#x}",
+            msg, trap_type, epc
         );
         task.terminate(-1);
     };
@@ -89,10 +84,11 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
             match task.memory_validate(addr, Some(trap_type), false).await {
                 Ok(_) => trace!("[memory_validate] success in user_trap_handler"),
                 Err(_) => {
-                    error!(
-                        "[user_trap] page fault at hart: {}, tid: {}, addr: {:#x}, user_sp: {:#x}",
+                    panic!(
+                        "[user_trap] page fault at hart: {}, tid: {}, epc = {:#x}, addr = {:#x}, user_sp = {:#x}",
                         get_hartid(),
                         task.tid(),
+                        cx[TrapArgs::EPC],
                         addr,
                         cx[TrapArgs::SP],
                     );

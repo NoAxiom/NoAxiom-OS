@@ -57,12 +57,10 @@ impl From<MappingFlags> for PTEFlags {
             return PTEFlags::V;
         }
         let mut res = PTEFlags::empty();
-        // V D U P W G?? NX
+        // V D U P W G?? NX NR
+        // currently don't set NX and NR
         if flags.contains(MappingFlags::V) {
             res |= PTEFlags::V;
-        }
-        if !flags.contains(MappingFlags::X) {
-            res |= PTEFlags::NX;
         }
         if flags.contains(MappingFlags::W) {
             res |= PTEFlags::W;
@@ -80,10 +78,13 @@ impl From<MappingFlags> for PTEFlags {
 impl From<PTEFlags> for MappingFlags {
     fn from(val: PTEFlags) -> Self {
         let mut res = MappingFlags::empty();
-        // V D U P W G?? NX
+        // V R D U P W G?? NX
         // log::debug!("PTEFlags: {:?}", val);
         if val.contains(PTEFlags::V) {
             res |= MappingFlags::V;
+        }
+        if !val.contains(PTEFlags::NR) {
+            res |= MappingFlags::R;
         }
         if val.contains(PTEFlags::W) {
             res |= MappingFlags::W;

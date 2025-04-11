@@ -4,7 +4,7 @@ use core::panic::PanicInfo;
 
 use arch::{Arch, ArchBoot};
 
-use crate::cpu::get_hartid;
+use crate::cpu::{current_cpu, get_hartid};
 
 lazy_static::lazy_static! {
     static ref PANIC_FLAG: spin::Mutex<bool> = spin::Mutex::new(false);
@@ -12,6 +12,11 @@ lazy_static::lazy_static! {
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
+    if let Some(task) = current_cpu().task.as_ref() {
+        let cx = task.trap_context();
+        info!("[panic] cx detected: {:x?}", cx);
+    }
+    Arch::arch_info_print();
     if let Some(location) = info.location() {
         println!(
             "[panic] panicked at {}:{}\n[panic] HART{}, {}",
@@ -27,7 +32,6 @@ fn panic(info: &PanicInfo) -> ! {
             info.message().unwrap()
         );
     }
-    Arch::arch_info_print();
     loop {}
     // platform::shutdown()
 }

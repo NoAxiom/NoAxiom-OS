@@ -29,23 +29,24 @@ impl Syscall<'_> {
         tls: usize,   // TLS线程本地存储描述符
         ctid: usize,  // 子线程ID, addr
     ) -> SyscallResult {
-        trace!(
-            "[sys_fork] flags: {:x} stack: {:?} ptid: {:?} tls: {:?} ctid: {:?}",
-            flags,
-            stack,
-            ptid,
-            tls,
-            ctid
+        debug!(
+            "[sys_fork] flags: {:?} stack: {:?} ptid: {:?} tls: {:?} ctid: {:?}",
+            flags, stack, ptid, tls, ctid
         );
         let flags = CloneFlags::from_bits(flags & !0xff).unwrap();
         let task = self.task.fork(flags);
         let trap_cx = task.trap_context_mut();
-        trap_cx[TrapArgs::RES] = 0;
-        if stack != 0 {
-            trap_cx[TrapArgs::SP] = stack;
-        }
-        trace!("[sys_fork] new task context: {:?}", trap_cx);
         let tid = task.tid();
+        use TrapArgs::*;
+        if stack != 0 {
+            trap_cx[SP] = stack;
+        }
+        // TODO: PARENT_SETTID CHILD_SETTID CHILD_CLEARTID
+        if flags.contains(CloneFlags::SETTLS) {
+            trap_cx[TLS] = tls;
+        }
+        trap_cx[RES] = 0;
+        trace!("[sys_fork] new task context: {:?}", trap_cx);
         spawn_utask(task);
         Ok(tid as isize)
     }

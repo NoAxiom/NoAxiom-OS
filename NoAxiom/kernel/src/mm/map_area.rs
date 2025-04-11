@@ -45,13 +45,12 @@ pub struct MapArea {
 
     /// area type
     pub area_type: MapAreaType,
+    // /// mapped file
+    // /// we use MapArea to trace area in a file
+    // pub file: Option<Arc<dyn File>>,
 
-    /// mapped file
-    /// we use MapArea to trace area in a file
-    pub file: Option<Arc<dyn File>>,
-
-    /// offset in file
-    pub file_offset: usize,
+    // /// offset in file
+    // pub file_offset: usize,
 }
 
 impl MapArea {
@@ -62,8 +61,8 @@ impl MapArea {
             map_permission: MapPermission::empty(),
             map_type: MapType::Identical,
             area_type: MapAreaType::None,
-            file: None,
-            file_offset: 0,
+            // file: None,
+            // file_offset: 0,
         }
     }
 
@@ -81,8 +80,8 @@ impl MapArea {
             map_permission,
             map_type,
             area_type: map_area_type,
-            file: None,
-            file_offset: 0,
+            // file: None,
+            // file_offset: 0,
         }
     }
 
@@ -94,8 +93,8 @@ impl MapArea {
             map_permission: other.map_permission.clone(),
             map_type: other.map_type.clone(),
             area_type: other.area_type.clone(),
-            file: other.file.clone(),
-            file_offset: other.file_offset,
+            // file: other.file.clone(),
+            // file_offset: other.file_offset,
         }
     }
 
@@ -195,20 +194,27 @@ impl MapArea {
         // should only load user data
         assert_eq!(self.map_type, MapType::Framed);
         let mut cur_st: usize = 0;
-        let mut cur_ed: usize = PAGE_SIZE - offset;
         let mut current_vpn = self.vpn_range.start();
         let len = data.len();
-        loop {
-            let src = &data[cur_st..len.min(cur_ed)];
+        if offset != 0 {
+            let src = &data[0..len.min(PAGE_SIZE - offset)];
+            cur_st += PAGE_SIZE - offset;
             let ppn = PhysPageNum::from(page_table.translate_vpn(current_vpn).unwrap().ppn());
-            let dst = &mut ppn.get_bytes_array()[..src.len()];
+            let dst = &mut ppn.get_bytes_array()[offset..src.len() + offset];
             dst.copy_from_slice(src);
-            cur_st = cur_ed;
-            if cur_st >= len {
-                break;
-            }
-            cur_ed = cur_st + PAGE_SIZE;
             current_vpn.step();
         }
+        while cur_st < len {
+            let src = &data[cur_st..len.min(cur_st + PAGE_SIZE)];
+            cur_st += PAGE_SIZE;
+            let ppn = PhysPageNum::from(page_table.translate_vpn(current_vpn).unwrap().ppn());
+            let dst = &mut ppn.get_bytes_array()[0..src.len()];
+            dst.copy_from_slice(src);
+            current_vpn.step();
+        }
+        debug!(
+            "[load_data]: cur_st = {:#x}, area: {:?}",
+            cur_st, self.vpn_range
+        );
     }
 }
