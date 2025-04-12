@@ -8,7 +8,7 @@ use super::{ext_int::ext_int_handler, ipi::ipi_handler};
 use crate::{
     cpu::{current_cpu, get_hartid},
     sched::utils::block_on,
-    task::Task,
+    task::{exit::ExitCode, Task},
 };
 
 /// kernel trap handler
@@ -67,7 +67,7 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
             "[user_trap_handler] unexpected exit!!! msg: {}, trap_type: {:#x?}, sepc = {:#x}",
             msg, trap_type, epc
         );
-        task.terminate(-1);
+        task.terminate(ExitCode::new_raw(-1));
     };
     match trap_type {
         // syscall

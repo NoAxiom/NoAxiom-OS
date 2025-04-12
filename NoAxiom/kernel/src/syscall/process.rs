@@ -1,3 +1,5 @@
+use alloc::vec::Vec;
+
 use arch::TrapArgs;
 
 use super::{Syscall, SyscallResult};
@@ -10,14 +12,32 @@ use crate::{
     },
     mm::user_ptr::UserPtr,
     sched::spawn::spawn_utask,
-    task::wait::WaitChildFuture,
+    task::{exit::ExitCode, wait::WaitChildFuture},
 };
 
 impl Syscall<'_> {
     /// exit current task by marking it as zombie
-    pub fn sys_exit(&mut self, exit_code: usize) -> SyscallResult {
-        let exit_code = exit_code as i32;
-        self.task.terminate(exit_code);
+    pub fn sys_exit(&mut self, exit_code: i32) -> SyscallResult {
+        self.task.terminate(ExitCode::new(exit_code));
+        Ok(0)
+    }
+
+    /// exit group
+    pub fn sys_exit_group(&mut self, exit_code: i32) -> SyscallResult {
+        // terminate_all_tasks();
+        let task = self.task;
+        let tasks = task.thread_group_map(|tgroup| {
+            let mut tasks = Vec::new();
+            for (_, task) in tgroup.0.iter_mut() {
+                let task = task.upgrade().unwrap();
+                tasks.push(task);
+            }
+            tasks
+        });
+        for t in tasks {
+            t.terminate(ExitCode::new(exit_code));
+        }
+        task.terminate(ExitCode::new(exit_code));
         Ok(0)
     }
 
@@ -106,7 +126,7 @@ impl Syscall<'_> {
                 "[sys_wait4]: write exit_code at status_addr = {:#x}",
                 status.addr().0,
             );
-            status.write((exit_code & 0xff) << 8);
+            status.write(ExitCode::new(exit_code).inner());
             trace!("[sys_wait4]: write exit code {:#x}", exit_code);
         }
         Ok(tid as isize)

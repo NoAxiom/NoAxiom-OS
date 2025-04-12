@@ -15,6 +15,7 @@ use ksync::{
 };
 
 use super::{
+    exit::ExitCode,
     manager::ThreadGroup,
     status::TaskStatus,
     taskid::{TidTracer, PGID, TGID, TID},
@@ -72,8 +73,8 @@ pub struct PCB {
     pub parent: Option<Weak<Task>>,      // parent task, weak ptr
 
     // task status
-    pub status: TaskStatus, // task status
-    pub exit_code: i32,     // exit code
+    pub status: TaskStatus,  // task status
+    pub exit_code: ExitCode, // exit code
 
     // signal structs
     pub pending_sigs: SigPending,        // pending signals
@@ -88,7 +89,7 @@ impl Default for PCB {
             zombie_children: Vec::new(),
             parent: None,
             status: TaskStatus::Runnable,
-            exit_code: 0,
+            exit_code: ExitCode::default(),
             pending_sigs: SigPending::new(),
             sig_stack: None,
             ucontext_ptr: UserPtr::new_null(),
@@ -160,9 +161,9 @@ impl PCB {
 
     // exit code
     pub fn exit_code(&self) -> i32 {
-        self.exit_code
+        self.exit_code.inner()
     }
-    pub fn set_exit_code(&mut self, exit_code: i32) {
+    pub fn set_exit_code(&mut self, exit_code: ExitCode) {
         self.exit_code = exit_code;
     }
 
@@ -239,6 +240,9 @@ impl Task {
     pub fn thread_group(&self) -> SpinLockGuard<ThreadGroup> {
         self.thread_group.lock()
     }
+    pub fn thread_group_map<T>(&self, f: impl FnOnce(&mut ThreadGroup) -> T) -> T {
+        f(&mut self.thread_group.lock())
+    }
 
     /// get fd_table
     #[inline(always)]
@@ -297,7 +301,7 @@ impl Task {
     }
 
     /// exit current task
-    pub fn terminate(&self, exit_code: i32) {
+    pub fn terminate(&self, exit_code: ExitCode) {
         let mut pcb = self.pcb();
         if self.is_group_leader() {
             pcb.set_exit_code(exit_code);

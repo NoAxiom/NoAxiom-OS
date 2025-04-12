@@ -12,7 +12,7 @@ use crate::{
     constant::signal::MAX_SIGNUM,
     include::result::Errno,
     mm::user_ptr::UserPtr,
-    sched::utils::{raw_suspend_now, SuspendFuture},
+    sched::utils::raw_suspend_now,
     signal::{
         sig_action::{KSigAction, USigAction},
         sig_detail::{SigDetail, SigKillDetail},

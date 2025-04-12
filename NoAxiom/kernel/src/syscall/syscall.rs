@@ -60,7 +60,8 @@ impl<'a> Syscall<'a> {
             SYS_CONNECT => self.sys_connect(args[0], args[1], args[2]).await,
 
             // process
-            SYS_EXIT => self.sys_exit(args[0]),
+            SYS_EXIT => self.sys_exit(args[0] as i32),
+            SYS_EXIT_GROUP => self.sys_exit_group(args[0] as i32),
             SYS_CLONE => self.sys_fork(args[0], args[1], args[2], args[3], args[4]),
             SYS_EXECVE => self.sys_execve(args[0], args[1], args[2]).await,
             SYS_WAIT4 => {

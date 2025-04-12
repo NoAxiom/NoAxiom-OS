@@ -60,7 +60,10 @@ impl Task {
 
         // clear child tid
         if let Some(tidaddress) = self.clear_child_tid() {
-            info!("[handle exit] clear child tid {:#x}", tidaddress);
+            info!(
+                "[exit_handler] clear child tid {:#x}, (unimpl futex)",
+                tidaddress
+            );
             let ptr = UserPtr::<u8>::new(tidaddress);
             let res = ptr
                 .as_slice_mut_checked_raw(core::mem::size_of::<usize>())
@@ -109,5 +112,24 @@ impl Task {
 impl Drop for Task {
     fn drop(&mut self) {
         info!("task {} dropped", self.tid())
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct ExitCode(i32);
+impl ExitCode {
+    pub fn new(code: i32) -> Self {
+        Self((code & 0xFF) << 8)
+    }
+    pub fn new_raw(code: i32) -> Self {
+        Self(code)
+    }
+    pub fn inner(&self) -> i32 {
+        self.0
+    }
+}
+impl Default for ExitCode {
+    fn default() -> Self {
+        Self(0)
     }
 }
