@@ -71,16 +71,19 @@ impl File for Stdout {
         for c in buf.iter() {
             stdout_buf.push(*c);
             if *c == '\n' as u8 {
+                // only for debug
                 print!(
-                    "[PRINT, HART{}, TID{} at {}ms] {}",
+                    "[PRINT, HART{}, TID{} at {}ms] ",
                     get_hartid(),
                     current_cpu()
                         .task
                         .as_ref()
                         .map_or_else(|| 0, |task| task.tid()),
                     crate::time::gettime::get_time_ms(),
-                    core::str::from_utf8(stdout_buf.as_slice()).unwrap(),
                 );
+                for it in stdout_buf.iter() {
+                    print!("{}", *it as char);
+                }
                 stdout_buf.clear();
             }
         }
