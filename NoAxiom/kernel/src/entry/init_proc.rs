@@ -1,4 +1,7 @@
-use alloc::{string::ToString, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 
 use crate::{
     fs::path::Path,
@@ -33,11 +36,17 @@ pub fn schedule_spawn_with_kernel_app() {
                 fn app_end();
             }
             const INIT_PROC_NAME: &str = $name;
+            #[cfg(feature = "glibc")]
             const INIT_PROC_PATH: &str = concat!("/glibc/", $name);
+            #[cfg(not(feature = "glibc"))]
+            const INIT_PROC_PATH: &str = concat!("/musl/", $name);
         };
     }
     use_app!("run_busybox");
-    info!("[init] spawn initproc with app name = {}", INIT_PROC_NAME);
+    info!(
+        "[init] spawn initproc with app name = {}, path = {}",
+        INIT_PROC_NAME, INIT_PROC_PATH
+    );
     spawn_ktask(async move {
         let start = app_start as usize;
         let end = app_end as usize;

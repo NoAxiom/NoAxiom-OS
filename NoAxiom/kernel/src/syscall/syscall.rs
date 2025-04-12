@@ -62,7 +62,7 @@ impl<'a> Syscall<'a> {
             // process
             SYS_EXIT => self.sys_exit(args[0]),
             SYS_CLONE => self.sys_fork(args[0], args[1], args[2], args[3], args[4]),
-            SYS_EXECVE => self.sys_exec(args[0], args[1], args[2]).await,
+            SYS_EXECVE => self.sys_execve(args[0], args[1], args[2]).await,
             SYS_WAIT4 => {
                 self.sys_wait4(args[0] as isize, args[1], args[2], args[3])
                     .await

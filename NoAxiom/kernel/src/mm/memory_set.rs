@@ -5,6 +5,7 @@ use arch::{
     consts::{KERNEL_ADDR_OFFSET, KERNEL_VIRT_MEMORY_END},
     Arch, ArchMemory, ArchPageTableEntry, ArchTime, MappingFlags, PageTableEntry,
 };
+use config::mm::DL_INTERP_OFFSET;
 use ksync::{cell::SyncUnsafeCell, mutex::SpinLock, Lazy};
 
 use super::{
@@ -275,6 +276,7 @@ impl MemorySet {
     }
 
     pub fn load_dl_interp(&mut self, elf: &Arc<dyn File>) -> Option<usize> {
+        const DL_INTERP_PATH: &str = "/glibc/lib/libc.so";
         todo!("load_dl_interp")
     }
 
@@ -288,6 +290,7 @@ impl MemorySet {
         let magic = elf.header.pt1.magic;
         assert_eq!(magic, [0x7f, 0x45, 0x4c, 0x46], "invalid elf!");
         let ph_count = elf.header.pt2.ph_count();
+        let mut head_va = 0;
         let mut start_vpn = None;
         let mut end_vpn = None;
 
@@ -299,6 +302,9 @@ impl MemorySet {
                 xmas_elf::program::Type::Load => {
                     let start_va = VirtAddr(ph.virtual_addr() as usize);
                     let end_va = VirtAddr((ph.virtual_addr() + ph.mem_size()) as usize);
+                    if head_va == 0 {
+                        head_va = start_va.0;
+                    }
                     let map_area = MapArea::new(
                         start_va,
                         end_va,
@@ -365,7 +371,7 @@ impl MemorySet {
         );
 
         // aux vector
-        let ph_head_addr = elf.header.pt2.ph_offset() as u64;
+        let ph_head_addr = head_va as u64 + elf.header.pt2.ph_offset() as u64;
         auxs.push(AuxEntry(AT_PHDR, ph_head_addr as usize));
         auxs.push(AuxEntry(AT_PHENT, elf.header.pt2.ph_entry_size() as usize)); // ELF64 header 64bytes
         auxs.push(AuxEntry(AT_PHNUM, ph_count as usize));
@@ -376,17 +382,17 @@ impl MemorySet {
             // elf_entry = interp_entry_point.unwrap();
             unimplemented!()
         } else {
-            // auxs.push(AuxEntry(AT_BASE, 0));
+            auxs.push(AuxEntry(AT_BASE, 0));
         }
-        // auxs.push(AuxEntry(AT_FLAGS, 0 as usize));
+        auxs.push(AuxEntry(AT_FLAGS, 0 as usize));
         auxs.push(AuxEntry(AT_ENTRY, elf.header.pt2.entry_point() as usize));
-        // auxs.push(AuxEntry(AT_UID, 0 as usize));
-        // auxs.push(AuxEntry(AT_EUID, 0 as usize));
-        // auxs.push(AuxEntry(AT_GID, 0 as usize));
-        // auxs.push(AuxEntry(AT_EGID, 0 as usize));
-        // auxs.push(AuxEntry(AT_HWCAP, 0 as usize));
+        auxs.push(AuxEntry(AT_UID, 0 as usize));
+        auxs.push(AuxEntry(AT_EUID, 0 as usize));
+        auxs.push(AuxEntry(AT_GID, 0 as usize));
+        auxs.push(AuxEntry(AT_EGID, 0 as usize));
+        auxs.push(AuxEntry(AT_HWCAP, 0 as usize));
         auxs.push(AuxEntry(AT_CLKTCK, Arch::get_freq() as usize));
-        // auxs.push(AuxEntry(AT_SECURE, 0 as usize));
+        auxs.push(AuxEntry(AT_SECURE, 0 as usize));
 
         ElfMemoryInfo {
             memory_set,

@@ -528,7 +528,7 @@ impl Task {
     }
 
     /// execute
-    pub async fn exec(
+    pub async fn execve(
         self: &Arc<Self>,
         path: Path,
         args: Vec<String>,
@@ -549,7 +549,7 @@ impl Task {
         self.trap_context_mut()
             .update_cx(elf_entry, user_sp, argc, argv_base, envp_base);
         // debug!("trap_context: {:#x?}", self.trap_context());
-        // TODO: close fd table, reset sigactions
+        // FIXME: close fd table, reset sigactions
         Ok(())
     }
 

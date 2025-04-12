@@ -52,7 +52,7 @@ impl Syscall<'_> {
         Ok(tid as isize)
     }
 
-    pub async fn sys_exec(&mut self, path: usize, argv: usize, envp: usize) -> SyscallResult {
+    pub async fn sys_execve(&mut self, path: usize, argv: usize, envp: usize) -> SyscallResult {
         let path = UserPtr::new(path).get_cstr();
         let path = if !path.starts_with('/') {
             let cwd = self.task.cwd().clone().from_cd(&"..");
@@ -67,7 +67,7 @@ impl Syscall<'_> {
             "[sys_exec] path: {:?} argv: {:#x}, envp: {:#x}, arg: {:?}, env: {:?}",
             path, argv, envp, args, envs,
         );
-        self.task.exec(path, args, envs).await?;
+        self.task.execve(path, args, envs).await?;
         // On success, execve() does not return, on error -1 is returned, and errno is
         // set to indicate the error.
         Ok(self.task.trap_context()[TrapArgs::RES] as isize)

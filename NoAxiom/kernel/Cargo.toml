@@ -19,6 +19,7 @@ board_qemu = []
 qemu = ["platform/qemu"]
 interruptable_async = ["driver/interruptable_async"]
 async = ["driver/async"]
+glibc = []
 
 [dependencies]
 # extern libs
@@ -68,8 +69,6 @@ futures = { version = "0.3", default-features = false, features = ["alloc"] }
 futures-lite = { version = "1.13.0", default-features = false, features = [
     "alloc",
 ] }
-
-
 # no_axiom defined libs
 ext4_rs = { git = "https://github.com/YuXuaann/ext4_rs-async-smp" }
 arch = { workspace = true }

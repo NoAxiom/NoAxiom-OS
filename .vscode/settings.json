@@ -8,7 +8,8 @@
   "rust-analyzer.cargo.features": [
     "multicore",
     "async",
-    "qemu"
+    "qemu",
+    "glibc"
   ],
   "C_Cpp_Runner.cCompilerPath": "gcc",
   "C_Cpp_Runner.cppCompilerPath": "g++",
