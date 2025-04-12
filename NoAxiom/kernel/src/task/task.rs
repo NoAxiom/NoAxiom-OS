@@ -321,11 +321,10 @@ impl Task {
     ///
     /// stack construction
     /// +---------------------------+
-    /// | Padding (16-byte align)   | <-- sp (lower address)
-    /// +---------------------------+
-    /// | argc                      |
+    /// | argc                      | <-- sp (lower address)
     /// | *argv                     |
     /// | *envp                     |
+    /// | Padding (16-byte align)   |
     /// +---------------------------+
     /// | argv[0]                   |
     /// | argv[1]                   |

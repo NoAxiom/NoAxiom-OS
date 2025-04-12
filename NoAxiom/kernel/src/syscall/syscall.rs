@@ -69,10 +69,10 @@ impl<'a> Syscall<'a> {
             }
             SYS_GETPID => self.sys_getpid(),
             SYS_GETPPID => self.sys_getppid(),
-            SYS_GETUID => Self::empty_syscall("getuid"),
-            SYS_GETEUID => Self::empty_syscall("geteuid"),
-            SYS_GETGID => Self::empty_syscall("getgid"),
-            SYS_GETEGID => Self::empty_syscall("getegid"),
+            SYS_GETUID => Self::empty_syscall("getuid", 0),
+            SYS_GETEUID => Self::empty_syscall("geteuid", 0),
+            SYS_GETGID => Self::empty_syscall("getgid", 0),
+            SYS_GETEGID => Self::empty_syscall("getegid", 0),
 
             // signal
             SYS_SIGACTION => self.sys_sigaction(args[0] as i32, args[1], args[2]),
@@ -103,15 +103,15 @@ impl<'a> Syscall<'a> {
             // unsupported: return -1
             _ => {
                 error!("unsupported syscall id: {}, args: {:?}", id, args);
-                let _ = self.sys_exit(Errno::ENOSYS as usize);
+                // let _ = self.sys_exit(Errno::ENOSYS as usize);
                 Err(Errno::ENOSYS)
             }
         }
     }
 
-    fn empty_syscall(syscall: &str) -> SyscallResult {
-        info!("[sys_{}] do nothing.", syscall);
-        Ok(0)
+    fn empty_syscall(name: &str, res: isize) -> SyscallResult {
+        info!("[sys_{}] do nothing.", name);
+        Ok(res)
     }
 }
 
