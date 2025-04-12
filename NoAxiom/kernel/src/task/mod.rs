@@ -1,4 +1,4 @@
-pub mod impl_exit;
+pub mod exit;
 pub mod impl_mm;
 pub mod impl_signal;
 pub mod manager;
@@ -8,4 +8,4 @@ pub mod task_main;
 pub mod taskid;
 pub mod wait;
 
-pub use task::{Task, TaskInner};
+pub use task::{Task, PCB};

@@ -32,9 +32,9 @@ impl MutexTracer {
 
 // #[allow(clippy::declare_interior_mutable_const)]
 const DEFAULT_CPU: SyncUnsafeCell<MutexTracer> = SyncUnsafeCell::new(MutexTracer::new());
-static HART_MUTEX_TRACERS: [SyncUnsafeCell<MutexTracer>; CPU_NUM] = [DEFAULT_CPU; CPU_NUM];
+static mut HART_MUTEX_TRACERS: [SyncUnsafeCell<MutexTracer>; CPU_NUM] = [DEFAULT_CPU; CPU_NUM];
 fn current_mutex_tracer() -> &'static mut MutexTracer {
-    HART_MUTEX_TRACERS[Arch::get_hartid()].ref_mut()
+    unsafe { HART_MUTEX_TRACERS[Arch::get_hartid()].get_mut() }
 }
 
 pub fn current_lock_depth() -> usize {

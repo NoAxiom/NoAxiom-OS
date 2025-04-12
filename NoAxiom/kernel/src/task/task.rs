@@ -8,7 +8,7 @@ use alloc::{
 };
 use core::task::Waker;
 
-use arch::{Arch, ArchMemory, ArchTrapContext, TrapArgs, TrapContext, TrapType};
+use arch::{ArchTrapContext, TrapArgs, TrapContext};
 use ksync::{
     cell::SyncUnsafeCell,
     mutex::{SpinLock, SpinLockGuard},
@@ -32,11 +32,8 @@ use crate::{
         sched::CloneFlags,
     },
     mm::{
-        address::VirtAddr,
         memory_set::{ElfMemoryInfo, MemorySet},
-        page_table::PageTable,
         user_ptr::UserPtr,
-        validate::validate,
     },
     sched::sched_entity::SchedEntity,
     signal::{
@@ -52,16 +49,22 @@ use crate::{
 /// shared between threads
 type Shared<T> = Arc<SpinLock<T>>;
 
-/// only used in current thread, mutable resources
+/// mutable resources mostly used in current thread
+/// but, it could be accessed by other threads through process manager
+/// so lock it with spinlock
 type Mutable<T> = SpinLock<T>;
 
-/// only used in current thread, read-only resources
+/// read-only resources, could be shared safely through threads
 type Immutable<T> = T;
+
+/// only used in current thread, mutable resources without lock
+/// SAFETY: these resources won't be shared with other threads
+type ThreadOnly<T> = SyncUnsafeCell<T>;
 
 /// task control block inner
 /// it is protected by a spinlock to assure its atomicity
 /// so there's no need to use any lock in this struct
-pub struct TaskInner {
+pub struct PCB {
     // paternity
     // assertion: only when the task is group leader, it can have children
     pub children: Vec<Arc<Task>>,        // children tasks
@@ -78,7 +81,7 @@ pub struct TaskInner {
     pub ucontext_ptr: UserPtr<UContext>, // ucontext pointer
 }
 
-impl Default for TaskInner {
+impl Default for PCB {
     fn default() -> Self {
         Self {
             children: Vec::new(),
@@ -93,6 +96,18 @@ impl Default for TaskInner {
     }
 }
 
+pub struct TCB {
+    pub clear_child_tid: Option<usize>, // clear tid address
+}
+
+impl Default for TCB {
+    fn default() -> Self {
+        Self {
+            clear_child_tid: None,
+        }
+    }
+}
+
 /// task control block for a coroutine,
 /// a.k.a thread in current project structure
 pub struct Task {
@@ -102,11 +117,12 @@ pub struct Task {
     pgid: Immutable<PGID>,     // process group id
 
     // mutable
-    inner: Mutable<TaskInner>, // task control block inner, protected by lock
+    pcb: Mutable<PCB>, // task control block inner, protected by lock
 
-    // unsafe cell
-    waker: SyncUnsafeCell<Option<Waker>>, // waker for the task
-    trap_cx: SyncUnsafeCell<TrapContext>, // trap context
+    // thread only / once init
+    waker: ThreadOnly<Option<Waker>>, // waker for the task
+    trap_cx: ThreadOnly<TrapContext>, // trap context
+    tcb: ThreadOnly<TCB>,             // thread control block
 
     // shared
     fd_table: Shared<FdTable>,         // file descriptor table
@@ -119,7 +135,7 @@ pub struct Task {
     pub sched_entity: SchedEntity, // sched entity for schedule
 }
 
-impl TaskInner {
+impl PCB {
     // task status
     #[inline(always)]
     pub fn status(&self) -> TaskStatus {
@@ -173,8 +189,8 @@ impl TaskInner {
 impl Task {
     /// lock the process control block
     #[inline(always)]
-    pub fn pcb(&self) -> SpinLockGuard<TaskInner> {
-        self.inner.lock()
+    pub fn pcb(&self) -> SpinLockGuard<PCB> {
+        self.pcb.lock()
     }
 
     /// tid
@@ -217,25 +233,6 @@ impl Task {
     pub fn change_memory_set(&self, memory_set: MemorySet) {
         let mut ms = self.memory_set().lock();
         *ms = memory_set;
-    }
-
-    pub async fn memory_validate(
-        self: &Arc<Self>,
-        addr: usize,
-        trap_type: Option<TrapType>,
-        is_blocked: bool,
-    ) -> SysResult<()> {
-        trace!("[memory_validate] check at addr: {:#x}", addr);
-        let vpn = VirtAddr::from(addr).floor();
-        let pt = PageTable::from_ppn(Arch::current_root_ppn());
-        validate(
-            self.memory_set(),
-            vpn,
-            trap_type,
-            pt.translate_vpn(vpn),
-            is_blocked,
-        )
-        .await
     }
 
     /// thread group
@@ -283,6 +280,34 @@ impl Task {
         self.waker().as_ref().unwrap().wake_by_ref();
     }
 
+    /// tcb
+    pub fn tcb(&self) -> &TCB {
+        self.tcb.as_ref()
+    }
+    pub fn tcb_mut(&self) -> &mut TCB {
+        self.tcb.as_ref_mut()
+    }
+
+    /// clear child tid address
+    pub fn clear_child_tid(&self) -> Option<usize> {
+        self.tcb().clear_child_tid
+    }
+    pub fn set_clear_tid_address(&self, value: usize) {
+        self.tcb_mut().clear_child_tid = Some(value)
+    }
+
+    /// exit current task
+    pub fn terminate(&self, exit_code: i32) {
+        let mut pcb = self.pcb();
+        if self.is_group_leader() {
+            pcb.set_exit_code(exit_code);
+        }
+        pcb.set_status(TaskStatus::Terminated);
+    }
+}
+
+// process implementation
+impl Task {
     /// create new process from elf
     pub fn new_process(elf: ElfMemoryInfo) -> Arc<Self> {
         trace!("[kernel] spawn new process from elf");
@@ -301,7 +326,7 @@ impl Task {
             tid,
             tgid,
             pgid: 0,
-            inner: SpinLock::new(TaskInner::default()),
+            pcb: SpinLock::new(PCB::default()),
             thread_group: Arc::new(SpinLock::new(ThreadGroup::new())),
             memory_set: Arc::new(SpinLock::new(memory_set)),
             trap_cx: SyncUnsafeCell::new(TrapContext::app_init_cx(elf_entry, user_sp)),
@@ -310,6 +335,9 @@ impl Task {
             cwd: Arc::new(SpinLock::new(Path::from(String::from("/")))),
             sa_list: Arc::new(SpinLock::new(SigActionList::new())),
             waker: SyncUnsafeCell::new(None),
+            tcb: ThreadOnly::new(TCB {
+                ..Default::default()
+            }),
         });
         task.trap_context_mut()[TrapArgs::SP] -= 16;
         add_new_process(&task);
@@ -483,8 +511,8 @@ impl Task {
                 tgid: self.tgid.clone(),
                 pgid: self.pgid.clone(),
                 thread_group: self.thread_group.clone(),
-                inner: SpinLock::new(TaskInner {
-                    parent: self.inner.lock().parent.clone(),
+                pcb: SpinLock::new(PCB {
+                    parent: self.pcb.lock().parent.clone(),
                     ..Default::default()
                 }),
                 memory_set,
@@ -494,6 +522,9 @@ impl Task {
                 cwd: self.cwd.clone(),
                 sa_list: self.sa_list.clone(),
                 waker: SyncUnsafeCell::new(None),
+                tcb: ThreadOnly::new(TCB {
+                    ..Default::default()
+                }),
             });
             self.thread_group.lock().insert(&new_thread);
             new_thread
@@ -507,7 +538,7 @@ impl Task {
                 tgid: new_tgid,
                 pgid: self.pgid.clone(),
                 thread_group: Arc::new(SpinLock::new(ThreadGroup::new())),
-                inner: SpinLock::new(TaskInner {
+                pcb: SpinLock::new(PCB {
                     parent: Some(self.get_tg_leader()),
                     ..Default::default()
                 }),
@@ -518,6 +549,9 @@ impl Task {
                 cwd: Arc::new(SpinLock::new(self.cwd().clone())),
                 sa_list: Arc::new(SpinLock::new(SigActionList::new())),
                 waker: SyncUnsafeCell::new(None),
+                tcb: ThreadOnly::new(TCB {
+                    ..Default::default()
+                }),
             });
             add_new_process(&new_process);
             self.pcb().children.push(new_process.clone());
@@ -551,27 +585,4 @@ impl Task {
         // FIXME: close fd table, reset sigactions
         Ok(())
     }
-
-    /// exit current task
-    pub fn terminate(&self, exit_code: i32) {
-        let mut pcb = self.pcb();
-        if self.is_group_leader() {
-            pcb.set_exit_code(exit_code);
-        }
-        pcb.set_status(TaskStatus::Terminated);
-    }
 }
-
-/*
-
-永远谨记判定锁合并的方法论：
-假如一个高频原子操作中出现了两个以上的锁，那这两个锁理应被合并为同一个
-
-并且需要注意：我们的status也是被锁保护着的，很多操作需要依赖于status
-所以：假如一个操作发生了让权，那么status的锁也应该与这个操作中的锁一起合并！
-除非你能保证这个lockguard能够存活到 status.lock => status.unlock 为止
-
-不过有一种情况不需要考虑这个：假如一个操作存在严格的时间顺序，比如磁盘访问，那就不需要太考虑锁的合并了
-因为，时间会帮你排序的
-
-*/

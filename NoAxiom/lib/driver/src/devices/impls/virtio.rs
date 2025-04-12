@@ -25,7 +25,7 @@ unsafe impl Hal for VirtioHalImpl {
                 ppn_base = frame.ppn();
             }
             assert_eq!(frame.ppn().0, ppn_base.0 + i);
-            QUEUE_FRAMES.ref_mut().push(frame);
+            QUEUE_FRAMES.as_ref_mut().push(frame);
         }
         let paddr = PhysAddr::from(PhysPageNum::from(ppn_base));
         let vaddr = NonNull::new((paddr.0 | KERNEL_ADDR_OFFSET) as *mut u8).unwrap();

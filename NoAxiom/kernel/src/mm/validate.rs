@@ -1,11 +1,16 @@
 use alloc::sync::Arc;
 
-use arch::{ArchPageTableEntry, MappingFlags, PageTableEntry, TrapType};
+use arch::{Arch, ArchMemory, ArchPageTableEntry, MappingFlags, PageTableEntry, TrapType};
 use ksync::mutex::SpinLock;
+use memory::address::VirtAddr;
 
 use super::{address::VirtPageNum, memory_set::MemorySet};
 use crate::{
-    cpu::current_cpu, include::result::Errno, mm::mmap_manager::lazy_alloc_mmap, syscall::SysResult,
+    cpu::current_cpu,
+    include::result::Errno,
+    mm::{mmap_manager::lazy_alloc_mmap, page_table::PageTable},
+    syscall::SysResult,
+    task::Task,
 };
 
 // TODO: add mmap check
@@ -81,5 +86,26 @@ pub async fn validate(
             lazy_alloc_mmap(memory_set, vpn, ms).await?;
             Ok(())
         }
+    }
+}
+
+impl Task {
+    pub async fn memory_validate(
+        self: &Arc<Self>,
+        addr: usize,
+        trap_type: Option<TrapType>,
+        is_blocked: bool,
+    ) -> SysResult<()> {
+        trace!("[memory_validate] check at addr: {:#x}", addr);
+        let vpn = VirtAddr::from(addr).floor();
+        let pt = PageTable::from_ppn(Arch::current_root_ppn());
+        validate(
+            self.memory_set(),
+            vpn,
+            trap_type,
+            pt.translate_vpn(vpn),
+            is_blocked,
+        )
+        .await
     }
 }

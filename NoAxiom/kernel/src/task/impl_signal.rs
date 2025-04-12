@@ -4,7 +4,7 @@ use core::mem::size_of;
 use arch::{ArchTrapContext, ArchUserFloatContext, TrapArgs};
 use ksync::mutex::SpinLockGuard;
 
-use super::task::TaskInner;
+use super::task::PCB;
 use crate::{
     mm::user_ptr::UserPtr,
     signal::{
@@ -118,7 +118,7 @@ impl Task {
     /// siginfo receiver with thread checked
     pub fn recv_siginfo(
         self: &Arc<Self>,
-        pcb: &mut SpinLockGuard<TaskInner>,
+        pcb: &mut SpinLockGuard<PCB>,
         si: SigInfo,
         thread_only: bool,
     ) {
@@ -166,7 +166,7 @@ impl Task {
     }
 
     /// a raw siginfo receiver without thread checked
-    fn recv_siginfo_inner(self: &Arc<Task>, pcb: &mut SpinLockGuard<TaskInner>, info: SigInfo) {
+    fn recv_siginfo_inner(self: &Arc<Task>, pcb: &mut SpinLockGuard<PCB>, info: SigInfo) {
         let signum = info.signo as u32;
         pcb.pending_sigs.push(info);
         trace!(

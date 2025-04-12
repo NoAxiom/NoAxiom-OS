@@ -8,8 +8,8 @@ mod pci_driver;
 
 pub fn probe_bus() {
     debug!("[driver] probe mmio bus");
-    ALL_DEVICES.ref_mut().probe_mmiobus_devices().ok();
+    ALL_DEVICES.as_ref_mut().probe_mmiobus_devices().ok();
     debug!("[driver] probe pci bus");
-    ALL_DEVICES.ref_mut().probe_pcibus_devices().ok();
+    ALL_DEVICES.as_ref_mut().probe_pcibus_devices().ok();
     debug!("[driver] probe succeed");
 }

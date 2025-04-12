@@ -25,7 +25,7 @@ pub fn virtio_dma_alloc(pages: usize) -> PhysicalAddress {
         }
         let frame_ppn: usize = frame.ppn().into();
         assert_eq!(frame_ppn, ppn_base + i);
-        QUEUE_FRAMES.ref_mut().push(frame);
+        QUEUE_FRAMES.as_ref_mut().push(frame);
     }
     PhysAddr::from(PhysPageNum::from(ppn_base)).into()
 }
@@ -34,7 +34,7 @@ pub fn virtio_dma_alloc(pages: usize) -> PhysicalAddress {
 pub fn virtio_dma_dealloc(pa: PhysicalAddress, pages: usize) -> i32 {
     let ppn = PhysPageNum::from(PhysAddr::from(pa));
     let mut remove_idx = -1;
-    let mut q = QUEUE_FRAMES.ref_mut();
+    let mut q = QUEUE_FRAMES.as_ref_mut();
     for (idx, frame) in q.iter().enumerate() {
         if frame.ppn() == ppn {
             remove_idx = idx as i32;

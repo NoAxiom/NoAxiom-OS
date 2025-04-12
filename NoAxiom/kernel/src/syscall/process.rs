@@ -123,4 +123,10 @@ impl Syscall<'_> {
             Some(parent_process) => Ok(parent_process.upgrade().unwrap().tid() as isize),
         }
     }
+
+    pub fn sys_set_tid_address(&self, tidptr: usize) -> SyscallResult {
+        let task = self.task;
+        task.set_clear_tid_address(tidptr);
+        Ok(task.tid() as isize)
+    }
 }

@@ -6,6 +6,7 @@ use super::Task;
 use crate::{
     config::task::INIT_PROCESS_ID,
     fs::vfs::root_dentry,
+    mm::user_ptr::UserPtr,
     signal::{
         sig_detail::{SigChildDetail, SigDetail},
         sig_info::{SigCode, SigInfo},
@@ -56,6 +57,19 @@ impl Task {
         self.thread_group().remove(tid);
         TASK_MANAGER.remove(tid);
         self.delete_children();
+
+        // clear child tid
+        if let Some(tidaddress) = self.clear_child_tid() {
+            info!("[handle exit] clear child tid {:#x}", tidaddress);
+            let ptr = UserPtr::<u8>::new(tidaddress);
+            let res = ptr
+                .as_slice_mut_checked_raw(core::mem::size_of::<usize>())
+                .await
+                .unwrap();
+            res[0] = 0;
+            // FIXME: IMPL THIS AFTER FUTEX
+            // task.futex_queue.lock().wake(tidaddress as u32, 1);
+        }
 
         // send SIGCHLD to parent
         if self.is_group_leader() {

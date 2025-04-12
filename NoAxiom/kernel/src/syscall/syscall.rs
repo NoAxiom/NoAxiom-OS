@@ -73,6 +73,7 @@ impl<'a> Syscall<'a> {
             SYS_GETEUID => Self::empty_syscall("geteuid", 0),
             SYS_GETGID => Self::empty_syscall("getgid", 0),
             SYS_GETEGID => Self::empty_syscall("getegid", 0),
+            SYS_SET_TID_ADDRESS => self.sys_set_tid_address(args[0]),
 
             // signal
             SYS_SIGACTION => self.sys_sigaction(args[0] as i32, args[1], args[2]),
