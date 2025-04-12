@@ -212,7 +212,7 @@ impl MapArea {
             dst.copy_from_slice(src);
             current_vpn.step();
         }
-        debug!(
+        trace!(
             "[load_data]: cur_st = {:#x}, area: {:?}",
             cur_st, self.vpn_range
         );

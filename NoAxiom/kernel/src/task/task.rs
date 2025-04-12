@@ -360,7 +360,7 @@ impl Task {
         let mut envp = vec![0; envs.len() + 1];
 
         // === push args ===
-        debug!("[init_user_stack] push args: {:?}", args);
+        trace!("[init_user_stack] push args: {:?}", args);
         for (i, s) in args.iter().enumerate() {
             let len = s.len();
             user_sp -= len + 1;
@@ -374,7 +374,7 @@ impl Task {
         user_sp -= user_sp % core::mem::size_of::<usize>();
 
         // === push env ===
-        debug!("[init_user_stack] push envs: {:?}", envs);
+        trace!("[init_user_stack] push envs: {:?}", envs);
         for (i, s) in envs.iter().enumerate() {
             let len = s.len();
             user_sp -= len + 1;
@@ -401,7 +401,7 @@ impl Task {
         }
         // terminator: auxv end with AT_NULL
         auxs.push(AuxEntry(AT_NULL, 0 as usize)); // end
-        debug!("[init_user_stack] auxs: {:?}", auxs);
+        trace!("[init_user_stack] auxs: {:?}", auxs);
 
         // construct auxv
         trace!("[init_user_stack] construct auxv");

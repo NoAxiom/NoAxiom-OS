@@ -152,7 +152,7 @@ impl MemorySet {
     /// push a map area into current memory set
     /// load data if provided
     pub fn push_area(&mut self, mut map_area: MapArea, data: Option<&[u8]>, offset: usize) {
-        debug!(
+        trace!(
             "push_area: [{:#X}, {:#X})",
             map_area.vpn_range().start().0 << PAGE_WIDTH,
             map_area.vpn_range().end().0 << PAGE_WIDTH
@@ -161,7 +161,7 @@ impl MemorySet {
         let pte = self
             .page_table()
             .translate_vpn(map_area.vpn_range().start());
-        debug!(
+        trace!(
             "create pte: ppn: {:#x}, flags: {:?}, raw_flag: {:?}",
             pte.unwrap().ppn(),
             pte.unwrap().flags(),
@@ -297,7 +297,6 @@ impl MemorySet {
         // map pages by loaded program header
         for i in 0..ph_count {
             let ph = elf.program_header(i).unwrap();
-            debug!("{}", ph);
             match ph.get_type().unwrap() {
                 xmas_elf::program::Type::Load => {
                     let start_va = VirtAddr(ph.virtual_addr() as usize);
@@ -313,7 +312,7 @@ impl MemorySet {
                         MapAreaType::ElfBinary,
                     );
                     debug!(
-                        "area: range: {:?}, perm: {:?}, ph_flag: {:?}, offset: {:#x}, mem_size: {:#x}, file_size: {:#x}",
+                        "[load_elf]: range: {:?}, perm: {:?}, ph_flag: {:?}, offset: {:#x}, mem_size: {:#x}, file_size: {:#x}",
                         map_area.vpn_range,
                         map_area.map_permission,
                         ph.flags(),
