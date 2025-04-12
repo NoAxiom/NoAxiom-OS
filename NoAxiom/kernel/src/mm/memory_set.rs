@@ -161,9 +161,10 @@ impl MemorySet {
             .page_table()
             .translate_vpn(map_area.vpn_range().start());
         debug!(
-            "create pte: ppn: {:#x}, flags: {:?}",
+            "create pte: ppn: {:#x}, flags: {:?}, raw_flag: {:?}",
             pte.unwrap().ppn(),
             pte.unwrap().flags(),
+            pte.unwrap().raw_flag(),
         );
         if let Some(data) = data {
             map_area.load_data(self.page_table(), data, offset);
@@ -174,56 +175,59 @@ impl MemorySet {
     /// create kernel space, used in [`KERNEL_SPACE`] initialization
     pub fn init_kernel_space() -> Self {
         let mut memory_set = MemorySet::new_bare(PageTable::new_allocated());
-        macro_rules! kernel_push_area {
-            ($($start:expr, $end:expr, $permission:expr)*) => {
-                $(
-                    memory_set.push_area(
-                        MapArea::new(
-                            ($start as usize).into(),
-                            ($end as usize).into(),
-                            MapType::Direct,
-                            $permission,
-                            MapAreaType::KernelSpace,
-                        ),
-                        None,
-                        0,
-                    );
-                )*
-            };
+        #[cfg(target_arch = "riscv64")]
+        {
+            macro_rules! kernel_push_area {
+                ($($start:expr, $end:expr, $permission:expr)*) => {
+                    $(
+                        memory_set.push_area(
+                            MapArea::new(
+                                ($start as usize).into(),
+                                ($end as usize).into(),
+                                MapType::Direct,
+                                $permission,
+                                MapAreaType::KernelSpace,
+                            ),
+                            None,
+                            0,
+                        );
+                    )*
+                };
+            }
+            kernel_push_area!(
+                stext,   etext,   map_permission!(R, X)
+                srodata, erodata, map_permission!(R)
+                sdata,   edata,   map_permission!(R, W)
+                sbss,    ebss,    map_permission!(R, W)
+                ekernel, KERNEL_VIRT_MEMORY_END, map_permission!(R, W)
+            );
+            info!(
+                "[kernel].text [{:#x}, {:#x})",
+                stext as usize, etext as usize
+            );
+            info!(
+                "[kernel].rodata [{:#x}, {:#x})",
+                srodata as usize, erodata as usize
+            );
+            info!(
+                "[kernel].data [{:#x}, {:#x})",
+                sdata as usize, edata as usize
+            );
+            info!("[kernel].bss [{:#x}, {:#x})", sbss as usize, ebss as usize);
+            info!(
+                "[kernel] frame [{:#x}, {:#x})",
+                ekernel as usize, KERNEL_VIRT_MEMORY_END as usize
+            );
+            info!("mapping memory-mapped registers");
+            for (start, len) in platform::MMIO_REGIONS {
+                let s_addr = *start + KERNEL_ADDR_OFFSET;
+                let e_addr = *start + *len + KERNEL_ADDR_OFFSET;
+                debug!("[kernel] pushing MMIO area: [{:#x},{:#x})", s_addr, e_addr);
+                kernel_push_area!(s_addr, e_addr, map_permission!(R, W));
+            }
+            // trace!("[memory_set] sp: {:#x}", crate::arch::regs::get_sp());
+            info!("[kernel] space initialized");
         }
-        kernel_push_area!(
-            stext,   etext,   map_permission!(R, X)
-            srodata, erodata, map_permission!(R)
-            sdata,   edata,   map_permission!(R, W)
-            sbss,    ebss,    map_permission!(R, W)
-            ekernel, KERNEL_VIRT_MEMORY_END, map_permission!(R, W)
-        );
-        info!(
-            "[kernel].text [{:#x}, {:#x})",
-            stext as usize, etext as usize
-        );
-        info!(
-            "[kernel].rodata [{:#x}, {:#x})",
-            srodata as usize, erodata as usize
-        );
-        info!(
-            "[kernel].data [{:#x}, {:#x})",
-            sdata as usize, edata as usize
-        );
-        info!("[kernel].bss [{:#x}, {:#x})", sbss as usize, ebss as usize);
-        info!(
-            "[kernel] frame [{:#x}, {:#x})",
-            ekernel as usize, KERNEL_VIRT_MEMORY_END as usize
-        );
-        info!("mapping memory-mapped registers");
-        for (start, len) in platform::MMIO_REGIONS {
-            let s_addr = *start + KERNEL_ADDR_OFFSET;
-            let e_addr = *start + *len + KERNEL_ADDR_OFFSET;
-            debug!("[kernel] pushing MMIO area: [{:#x},{:#x})", s_addr, e_addr);
-            kernel_push_area!(s_addr, e_addr, map_permission!(R, W));
-        }
-        // trace!("[memory_set] sp: {:#x}", crate::arch::regs::get_sp());
-        info!("[kernel] space initialized");
         unsafe {
             KERNEL_SPACE_ROOT_PPN = memory_set.root_ppn().0;
             // KERNEL_SPACE_TOKEN.store(memory_set.token(), Ordering::SeqCst);
@@ -410,22 +414,28 @@ impl MemorySet {
                          new_set: &mut MemorySet,
                          new_area: &mut MapArea,
                          frame_tracker: &FrameTracker| {
-            let old_pte = self.page_table().translate_vpn(vpn).unwrap();
+            let old_pte = self.page_table().find_pte(vpn).unwrap();
             let old_flags = old_pte.flags();
-            if !old_flags.contains(MappingFlags::W) {
-                new_set
-                    .page_table()
-                    .map(vpn, old_pte.ppn().into(), old_flags);
-                new_area.frame_map.insert(vpn, frame_tracker.clone());
-            } else {
+            if old_flags.contains(MappingFlags::W) {
                 let new_flags = flags_switch_to_cow(&old_flags);
-                self.page_table().set_flags(vpn, new_flags);
+                // let old = old_pte.clone();
+                old_pte.set_flags(new_flags);
                 new_set
                     .page_table()
                     .map(vpn, old_pte.ppn().into(), new_flags);
-                new_area.frame_map.insert(vpn, frame_tracker.clone());
-                trace!("remap_cow: vpn = {:#x}, new_flags = {:?}", vpn.0, new_flags);
+                // trace!(
+                //     "remap_cow: vpn = {:#x}, new_flags = {:?}, old_pte =
+                // {:#x}, new_pte = {:#x}",     vpn.0,
+                //     new_flags,
+                //     old.0,
+                //     old_pte.0,
+                // );
+            } else {
+                new_set
+                    .page_table()
+                    .map(vpn, old_pte.ppn().into(), old_flags);
             }
+            new_area.frame_map.insert(vpn, frame_tracker.clone());
         };
 
         // normal areas
@@ -456,6 +466,7 @@ impl MemorySet {
         new_set.user_stack_area = new_area;
 
         // heap
+        // FIXME: USE REAL HEAP SIZE!!!
         trace!(
             "mapping heap as cow, range: [{:#x}, {:#x})",
             self.user_brk_start,

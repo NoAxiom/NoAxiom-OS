@@ -54,9 +54,7 @@ impl ArchPageTableEntry for PageTableEntry {
     }
     /// get the pte permission flags
     fn flags(&self) -> MappingFlags {
-        PTEFlags::from_bits((self.0 & ((1 << PTE_WIDTH) - 1)) as u64)
-            .unwrap()
-            .into()
+        self.raw_flag().into()
     }
     /// set flags
     fn set_flags(&mut self, flags: MappingFlags) {
@@ -66,6 +64,17 @@ impl ArchPageTableEntry for PageTableEntry {
     /// clear all data
     fn reset(&mut self) {
         self.0 = 0;
+    }
+    /// is valid
+    fn is_valid_dir(&self) -> bool {
+        self.raw_flag().contains(PTEFlags::V)
+    }
+}
+
+impl PageTableEntry {
+    /// raw flags
+    pub fn raw_flag(&self) -> PTEFlags {
+        PTEFlags::from_bits((self.0 & ((1 << PTE_WIDTH) - 1)) as u64).unwrap()
     }
 }
 

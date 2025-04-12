@@ -8,8 +8,8 @@ use super::{
 use crate::{ArchMemory, ArchPageTable, ArchPageTableEntry, MappingFlags};
 
 const PA_WIDTH: usize = 48;
-const VA_WIDTH: usize = 39;
-const INDEX_LEVELS: usize = 3;
+const VA_WIDTH: usize = 48;
+const INDEX_LEVELS: usize = 4;
 const PHYS_MEMORY_START: usize = 0x9000_0000;
 const MEMORY_SIZE: usize = 0x1000_0000;
 const PHYS_MEMORY_END: usize = PHYS_MEMORY_START + MEMORY_SIZE;
@@ -40,6 +40,8 @@ bitflags::bitflags! {
         const P = 1 << 7;
         /// Writable Bit
         const W = 1 << 8;
+        /// Copy On Write Bit (NoAxiom only)
+        const COW = 1 << 9;
         /// Not Readable Bit
         const NR = 1 << (usize::BITS - 3); // 61
         /// Executable Bit
@@ -54,13 +56,19 @@ bitflags::bitflags! {
 impl From<MappingFlags> for PTEFlags {
     fn from(flags: MappingFlags) -> Self {
         if flags.contains(MappingFlags::PT) {
-            return PTEFlags::V;
+            return PTEFlags::empty();
         }
-        let mut res = PTEFlags::empty();
-        // V D U P W G?? NX NR
-        // currently don't set NX and NR
+        // V D PLV P MAT W NX NR COW
+        // V R X W D U COW
+        let mut res = PTEFlags::P | PTEFlags::MAT_CC;
         if flags.contains(MappingFlags::V) {
             res |= PTEFlags::V;
+        }
+        if !flags.contains(MappingFlags::R) {
+            res |= PTEFlags::NR;
+        }
+        if !flags.contains(MappingFlags::X) {
+            res |= PTEFlags::NX;
         }
         if flags.contains(MappingFlags::W) {
             res |= PTEFlags::W;
@@ -71,6 +79,12 @@ impl From<MappingFlags> for PTEFlags {
         if flags.contains(MappingFlags::U) {
             res |= PTEFlags::PLV3;
         }
+        if flags.contains(MappingFlags::G) {
+            res |= PTEFlags::G;
+        }
+        if flags.contains(MappingFlags::COW) {
+            res |= PTEFlags::COW;
+        }
         res
     }
 }
@@ -78,25 +92,31 @@ impl From<MappingFlags> for PTEFlags {
 impl From<PTEFlags> for MappingFlags {
     fn from(val: PTEFlags) -> Self {
         let mut res = MappingFlags::empty();
-        // V R D U P W G?? NX
-        // log::debug!("PTEFlags: {:?}", val);
+        // V  NR NX W  PLV COW D  P MAT G
+        // V  R  X  W  U   COW D        G
         if val.contains(PTEFlags::V) {
             res |= MappingFlags::V;
         }
         if !val.contains(PTEFlags::NR) {
             res |= MappingFlags::R;
         }
+        if !val.contains(PTEFlags::NX) {
+            res |= MappingFlags::X;
+        }
         if val.contains(PTEFlags::W) {
             res |= MappingFlags::W;
+        }
+        if val.contains(PTEFlags::PLV3) {
+            res |= MappingFlags::U;
         }
         if val.contains(PTEFlags::D) {
             res |= MappingFlags::D;
         }
-        if !val.contains(PTEFlags::NX) {
-            res |= MappingFlags::X;
+        if val.contains(PTEFlags::G) {
+            res |= MappingFlags::G;
         }
-        if val.contains(PTEFlags::PLV3) {
-            res |= MappingFlags::U;
+        if val.contains(PTEFlags::COW) {
+            res |= MappingFlags::COW;
         }
         res
     }
@@ -137,12 +157,16 @@ impl ArchPageTableEntry for PageTableEntry {
     }
     /// set flags
     fn set_flags(&mut self, flags: MappingFlags) {
-        let flags = PTEFlags::from(flags);
-        self.0 = (self.0 & FLAG_MASK) | (flags.bits() as usize);
+        let ppn = self.ppn();
+        *self = Self::new(ppn, flags);
     }
     /// clear all data
     fn reset(&mut self) {
         self.0 = 0;
+    }
+    /// is valid
+    fn is_valid_dir(&self) -> bool {
+        self.ppn() != 0
     }
 }
 

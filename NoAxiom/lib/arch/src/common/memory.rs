@@ -45,6 +45,8 @@ pub trait ArchPageTableEntry: Into<usize> + From<usize> + Clone + Copy {
     fn set_flags(&mut self, flags: MappingFlags);
     /// clear all data
     fn reset(&mut self);
+    /// is valid dir
+    fn is_valid_dir(&self) -> bool;
 }
 
 pub trait ArchPageTable {

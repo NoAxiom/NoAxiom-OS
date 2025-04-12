@@ -106,9 +106,10 @@ impl VirtAddr {
 impl VirtPageNum {
     pub fn get_index(&self) -> [usize; INDEX_LEVELS] {
         let mut vpn = self.0;
-        let mut idx = [0; INDEX_LEVELS];
+        let mut idx = [0usize; INDEX_LEVELS];
         for i in (0..INDEX_LEVELS).rev() {
-            idx[i] = vpn & ((1 << PAGE_NUM_WIDTH) - 1);
+            const MASK: usize = (1 << PAGE_NUM_WIDTH) - 1;
+            idx[i] = vpn & MASK;
             vpn >>= PAGE_NUM_WIDTH;
         }
         idx

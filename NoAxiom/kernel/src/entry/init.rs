@@ -58,6 +58,10 @@ pub extern "C" fn _boot_hart_init(_hartid: usize, dtb: usize) -> ! {
     // log init
     Arch::arch_init();
     driver::log_init();
+    #[cfg(feature = "multicore")]
+    info!("[first_init] multicore(on): CPU_NUM = {}", CPU_NUM);
+    #[cfg(not(feature = "multicore"))]
+    info!("[first_init] multicore(off): CPUNUM = {}", CPU_NUM);
 
     // kernel space init
     frame_init();

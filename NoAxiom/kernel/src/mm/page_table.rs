@@ -2,7 +2,9 @@
 
 use alloc::vec::Vec;
 
-use arch::{Arch, ArchMemory, ArchPageTableEntry, MappingFlags, PageTableEntry};
+use arch::{
+    consts::INDEX_LEVELS, Arch, ArchMemory, ArchPageTableEntry, MappingFlags, PageTableEntry,
+};
 
 use super::{
     address::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum},
@@ -79,23 +81,18 @@ impl PageTable {
 
     /// insert new pte into the page table trie
     fn create_pte(&mut self, vpn: VirtPageNum) -> &mut PageTableEntry {
-        trace!(
-            "insert: vpn = {:#x}, root = {:#x}",
-            vpn.0,
-            Arch::current_root_ppn()
-        );
         let index = vpn.get_index();
         let mut ppn = self.root_ppn;
         let mut result: Option<&mut PageTableEntry> = None;
         for (i, idx) in index.iter().enumerate() {
             let arr = ppn.get_pte_array();
             let pte = &mut arr[*idx];
-            if i == 2 {
+            if i == INDEX_LEVELS - 1 {
                 result = Some(pte);
                 break;
             }
             trace!("pte addr: {:#x}", pte as *mut PageTableEntry as usize);
-            if !pte.flags().contains(MappingFlags::V) {
+            if !pte.is_valid_dir() {
                 let frame = frame_alloc();
                 *pte = PageTableEntry::new(frame.ppn().0, pte_flags!(V, PT));
                 self.frames.push(frame);
@@ -116,8 +113,10 @@ impl PageTable {
         let pte = self.create_pte(vpn);
         assert!(
             !pte.flags().contains(MappingFlags::V),
-            "{:#x?} is mapped before mapping",
-            vpn
+            "{:#x?} is mapped before mapping, flags: {:?}, ppn: {:#x}",
+            vpn,
+            pte.flags(),
+            pte.ppn()
         );
         trace!(
             "mapping: vpn: {:#x?}, ppn: {:#x?}, flags: {:?}, pte_addr: {:#x}",
@@ -187,7 +186,7 @@ impl PageTable {
 
     /// set flags for a vpn
     pub fn set_flags(&mut self, vpn: VirtPageNum, flags: MappingFlags) {
-        self.create_pte(vpn).set_flags(flags);
+        self.find_pte(vpn).unwrap().set_flags(flags);
     }
 
     /// switch into this page table,
@@ -229,10 +228,10 @@ pub fn translate_vpn_into_pte<'a>(
     let mut result: Option<&mut PageTableEntry> = None;
     for (i, idx) in index.iter().enumerate() {
         let pte = &mut ppn.get_pte_array()[*idx];
-        if !pte.flags().contains(MappingFlags::V) {
+        if !pte.is_valid_dir() {
             return None;
         }
-        if i == 2 {
+        if i == INDEX_LEVELS - 1 {
             result = Some(pte);
             break;
         }

@@ -48,6 +48,7 @@ impl Syscall<'_> {
         trap_cx[RES] = 0;
         trace!("[sys_fork] new task context: {:?}", trap_cx);
         spawn_utask(task);
+        debug!("[sys_fork] done");
         Ok(tid as isize)
     }
 
@@ -60,12 +61,12 @@ impl Syscall<'_> {
         } else {
             Path::from(path)
         };
-        info!(
-            "[sys_exec] path: {:?} argv: {:#x}, envp: {:#x}",
-            path, argv, envp
-        );
         let args = UserPtr::<UserPtr<u8>>::new(argv).get_string_vec();
         let envs = UserPtr::<UserPtr<u8>>::new(envp).get_string_vec();
+        info!(
+            "[sys_exec] path: {:?} argv: {:#x}, envp: {:#x}, arg: {:?}, env: {:?}",
+            path, argv, envp, args, envs,
+        );
         self.task.exec(path, args, envs).await?;
         // On success, execve() does not return, on error -1 is returned, and errno is
         // set to indicate the error.
