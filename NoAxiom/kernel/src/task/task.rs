@@ -24,7 +24,7 @@ use crate::{
     config::task::INIT_PROCESS_ID,
     constant::fs::{STD_ERR, STD_IN, STD_OUT},
     fs::{
-        fdtable::FdTable,
+        fdtable::{FdTable, FdTableEntry},
         path::Path,
         stdio::{Stdin, Stdout},
     },
@@ -336,7 +336,7 @@ impl Task {
             trap_cx: SyncUnsafeCell::new(TrapContext::app_init_cx(elf_entry, user_sp)),
             sched_entity: SchedEntity::new_bare(INIT_PROCESS_ID),
             fd_table: Arc::new(SpinLock::new(FdTable::new())),
-            cwd: Arc::new(SpinLock::new(Path::from(String::from("/")))),
+            cwd: Arc::new(SpinLock::new(Path::try_from(String::from("/")).unwrap())),
             sa_list: Arc::new(SpinLock::new(SigActionList::new())),
             waker: SyncUnsafeCell::new(None),
             tcb: ThreadOnly::new(TCB {
@@ -498,9 +498,9 @@ impl Task {
             let tmp = Arc::new(SpinLock::new(self.fd_table.lock().clone()));
             let mut guard = tmp.lock();
             // todo: maybe needn't to realloc STD_IN
-            guard.table[STD_IN] = Some(Arc::new(Stdin));
-            guard.table[STD_OUT] = Some(Arc::new(Stdout::new()));
-            guard.table[STD_ERR] = Some(Arc::new(Stdout::new()));
+            guard.table[STD_IN] = Some(FdTableEntry::std_in());
+            guard.table[STD_OUT] = Some(FdTableEntry::std_out());
+            guard.table[STD_ERR] = Some(FdTableEntry::std_err());
             drop(guard);
             tmp
         };

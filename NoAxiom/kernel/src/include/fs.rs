@@ -5,23 +5,18 @@ bitflags! {
     pub struct FileFlags: u32 {
         // TODO do not use 0
         // NOTE: bitflags do not encourage zero bit flag, we should not directly check `O_RDONLY`
-        const O_RDONLY = 0x000;
-        const O_WRONLY = 0x001;
-        const O_RDWR = 0x002 ;// 可读可写
-        const O_CREATE = 0x40;
-        const O_DIRECTORY= 0x0200000;
-        // const O_RDONLY    = 0;
-        // const O_WRONLY    = 1 << 0;
-        // const O_RDWR      = 1 << 1;
-        // const O_CREATE    = 1 << 6;
+        const O_RDONLY    = 0;
+        const O_WRONLY    = 1 << 0;
+        const O_RDWR      = 1 << 1;
+        const O_CREATE    = 1 << 6;
         const O_EXCL      = 1 << 7;
-        // const O_TRUNC     = 1 << 9;
-        // const O_APPEND    = 1 << 10;
-        // const O_NONBLOCK  = 1 << 11;
-        // const O_LARGEFILE = 1 << 15;
-        // const O_DIRECTROY = 1 << 16;
-        // const O_NOFOLLOW  = 1 << 17;
-        // const O_CLOEXEC   = 1 << 19;
+        const O_TRUNC     = 1 << 9;
+        const O_APPEND    = 1 << 10;
+        const O_NONBLOCK  = 1 << 11;
+        const O_LARGEFILE = 1 << 15;
+        const O_DIRECTORY = 1 << 16;
+        const O_NOFOLLOW  = 1 << 17;
+        const O_CLOEXEC   = 1 << 19;
     }
 
     /// User group read and write permissions
@@ -280,5 +275,61 @@ bitflags! {
         const EXT4_DE_FIFO = 5;
         const EXT4_DE_SOCK = 6;
         const EXT4_DE_SYMLINK = 7;
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct Iovec {
+    pub iov_base: usize,
+    pub iov_len: usize,
+}
+
+impl Iovec {
+    pub const fn size() -> usize {
+        core::mem::size_of::<Iovec>()
+    }
+}
+
+bitflags! {
+    #[derive(PartialEq, Eq, Debug)]
+    pub struct FcntlFlags: usize {
+        const F_DUPFD = 0;
+        const F_GETFD = 1;
+        const F_SETFD = 2;
+        const F_GETFL = 3;
+        const F_SETFL = 4;
+        const F_GETLK = 5;
+        const F_SETLK = 6;
+        const F_SETLKW = 7;
+        const F_SETOWN = 8;
+        const F_GETOWN = 9;
+        const F_SETSIG = 10;
+        const F_GETSIG = 11;
+        const F_SETOWN_EX = 15;
+        const F_GETOWN_EX = 16;
+        const F_GETOWNER_UIDS = 17;
+
+        // 发现 F_UNLCK = 2 , 这个标记分类待研究
+        const F_DUPFD_CLOEXEC = 1030;
+    }
+
+    #[derive(PartialEq, Eq, Debug, Clone)]
+    pub struct FcntlArgFlags: u32 {
+        const FD_CLOEXEC = 1;
+        const AT_EMPTY_PATH = 1 << 0;
+        const AT_SYMLINK_NOFOLLOW = 1 << 8;
+        const AT_EACCESS = 1 << 9;
+        const AT_NO_AUTOMOUNT = 1 << 11;
+        const AT_DUMMY = 1 << 12;
+    }
+}
+
+impl FcntlArgFlags {
+    pub fn from_arg(arg: FileFlags) -> Self {
+        if arg.contains(FileFlags::O_CLOEXEC) {
+            FcntlArgFlags::FD_CLOEXEC
+        } else {
+            FcntlArgFlags::empty()
+        }
     }
 }

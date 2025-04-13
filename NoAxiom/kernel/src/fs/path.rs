@@ -6,7 +6,7 @@ use alloc::{
 use core::fmt::Debug;
 
 use super::vfs::{basic::dentry::Dentry, root_dentry};
-use crate::include::fs::InodeMode;
+use crate::{include::fs::InodeMode, syscall::SysResult};
 
 #[derive(Clone)]
 pub struct Path {
@@ -16,18 +16,18 @@ pub struct Path {
 
 impl Path {
     /// Get the path from absolute path, the path should exist
-    pub fn from(abs_path: String) -> Self {
+    pub fn try_from(abs_path: String) -> SysResult<Self> {
         assert!(abs_path.starts_with('/'));
         trace!("Path::from: {}", abs_path);
         let mut split_path = abs_path.split('/').collect::<Vec<&str>>();
         if split_path.ends_with(&[""]) {
             split_path.pop();
         }
-        let dentry = root_dentry().find_path(&split_path).unwrap();
-        Self {
+        let dentry = root_dentry().find_path(&split_path)?;
+        Ok(Self {
             inner: abs_path,
             dentry,
-        }
+        })
     }
 
     /// Get the path from absolute path, create the path if not exist
@@ -77,8 +77,8 @@ impl Path {
     }
 
     /// Get the path from relative path, the path should exist
-    pub fn from_cd(&self, path: &str) -> Self {
-        Self::from(self.cd(path))
+    pub fn from_cd(&self, path: &str) -> SysResult<Self> {
+        Self::try_from(self.cd(path))
     }
 
     /// Get the path from relative path, create the path if not exist

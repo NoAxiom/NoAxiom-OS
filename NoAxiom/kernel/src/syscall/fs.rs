@@ -2,17 +2,19 @@ use alloc::{sync::Arc, vec::Vec};
 
 use ksync::mutex::check_no_lock;
 
-use super::{Syscall, SyscallResult};
+use super::{SysResult, Syscall, SyscallResult};
 use crate::{
     constant::fs::AT_FDCWD,
     fs::{
+        fdtable::RLimit,
         manager::FS_MANAGER,
         path::Path,
         pipe::PipeFile,
         vfs::{chosen_device, root_dentry},
     },
     include::{
-        fs::{FileFlags, InodeMode, Kstat, MountFlags},
+        fs::{FcntlArgFlags, FcntlFlags, FileFlags, InodeMode, Iovec, Kstat, MountFlags},
+        resource::Resource,
         result::Errno,
     },
     mm::user_ptr::UserPtr,
@@ -51,11 +53,11 @@ impl Syscall<'_> {
 
         let mut fd_table = self.task.fd_table();
         let read_fd = fd_table.alloc_fd()?;
-        fd_table.set(read_fd as usize, read_end);
+        fd_table.set(read_fd, read_end);
         buf_slice[0] = read_fd as i32;
 
         let write_fd = fd_table.alloc_fd()?;
-        fd_table.set(write_fd as usize, write_end);
+        fd_table.set(write_fd, write_end);
         buf_slice[1] = write_fd as i32;
 
         info!("[sys_pipe]: read fd {}, write fd {}", read_fd, write_fd);
@@ -72,7 +74,7 @@ impl Syscall<'_> {
         }
 
         let new_fd = fd_table.alloc_fd()?;
-        fd_table.copyfrom(fd, new_fd as usize)
+        fd_table.copyfrom(fd, new_fd)
     }
 
     // Duplicate a file descriptor to a specific fd
@@ -85,7 +87,7 @@ impl Syscall<'_> {
         }
 
         fd_table.fill_to(new_fd)?;
-        fd_table.copyfrom(old_fd, new_fd as usize)
+        fd_table.copyfrom(old_fd, new_fd)
     }
 
     /// Switch to a new work directory
@@ -99,7 +101,7 @@ impl Syscall<'_> {
         root_dentry().find_path(&split_path)?;
 
         let mut cwd_guard = self.task.cwd();
-        *cwd_guard = cwd_guard.clone().from_cd(&"..").from_cd(&path);
+        *cwd_guard = cwd_guard.clone().from_cd(&"..")?.from_cd(&path)?;
         Ok(0)
     }
 
@@ -155,10 +157,10 @@ impl Syscall<'_> {
         file.set_flags(flags);
         let mut fd_table = self.task.fd_table();
         let fd = fd_table.alloc_fd()?;
-        fd_table.set(fd as usize, file);
+        fd_table.set(fd, file);
 
         trace!("[sys_openat] succeed fd: {}, path: {:?}", fd, file_path);
-        Ok(fd)
+        Ok(fd as isize)
     }
 
     /// Read data from a file descriptor
@@ -190,9 +192,32 @@ impl Syscall<'_> {
             return Err(Errno::EINVAL);
         }
 
-        let read_size = file.read(buf_slice).await?;
+        file.read(buf_slice).await
+    }
 
-        Ok(read_size as isize)
+    /// Read the file associated with the file descriptor fd to iovcnt buffers
+    /// of data described by iov
+    pub async fn sys_readv(&self, fd: usize, iovp: usize, iovcnt: usize) -> SyscallResult {
+        info!(
+            "[sys_readv] fd: {}, iovp: {:#x}, iovcnt: {}",
+            fd, iovp, iovcnt
+        );
+        let fd_table = self.task.fd_table();
+        let file = fd_table.get(fd).ok_or(Errno::EBADF)?;
+        drop(fd_table);
+
+        let mut read_size = 0;
+        for i in 0..iovcnt {
+            let iov_ptr = UserPtr::<Iovec>::new(iovp + i * Iovec::size());
+            // todo: check lazy?
+            iov_ptr.as_slice_mut_checked(Iovec::size()).await?;
+
+            let iov = iov_ptr.read();
+            let buf_ptr = UserPtr::<u8>::new(iov.iov_base);
+            let buf_slice = buf_ptr.as_slice_mut_checked(iov.iov_len).await?;
+            read_size += file.read(buf_slice).await?;
+        }
+        Ok(read_size)
     }
 
     /// Write data to a file descriptor
@@ -219,9 +244,32 @@ impl Syscall<'_> {
             return Err(Errno::EINVAL);
         }
 
-        let write_size = file.write(buf_slice).await?;
+        file.write(buf_slice).await
+    }
 
-        Ok(write_size as isize)
+    /// Write iovcnt buffers of data described by iov to the file associated
+    /// with the file descriptor fd
+    pub async fn sys_writev(&self, fd: usize, iovp: usize, iovcnt: usize) -> SyscallResult {
+        info!(
+            "[sys_writev] fd: {}, iovp: {:#x}, iovcnt: {}",
+            fd, iovp, iovcnt
+        );
+        let fd_table = self.task.fd_table();
+        let file = fd_table.get(fd).ok_or(Errno::EBADF)?;
+        drop(fd_table);
+
+        let mut write_size = 0;
+        for i in 0..iovcnt {
+            let iov_ptr = UserPtr::<Iovec>::new(iovp + i * Iovec::size());
+            // todo: check lazy?
+            iov_ptr.as_slice_mut_checked(Iovec::size()).await?;
+
+            let iov = iov_ptr.read();
+            let buf_ptr = UserPtr::<u8>::new(iov.iov_base);
+            let buf_slice = buf_ptr.as_slice_mut_checked(iov.iov_len).await?;
+            write_size += file.write(buf_slice).await?;
+        }
+        Ok(write_size)
     }
 
     /// Create a directory
@@ -256,7 +304,28 @@ impl Syscall<'_> {
         let file = fd_table.get(fd).ok_or(Errno::EBADF)?;
         let kstat = Kstat::from_stat(file.inode().stat()?);
         let ptr = UserPtr::<Kstat>::new(stat_buf as usize);
-        ptr.write_volatile(kstat);
+        ptr.write(kstat);
+        Ok(0)
+    }
+
+    pub async fn sys_newfstat(
+        &self,
+        dirfd: isize,
+        path: usize,
+        stat_buf: usize,
+        _flags: usize,
+    ) -> SyscallResult {
+        let path = get_path_or_create(
+            self.task.clone(),
+            path,
+            dirfd,
+            InodeMode::empty(),
+            "sys_newfstat",
+        )
+        .await?;
+        let kstat = Kstat::from_stat(path.dentry().inode()?.stat()?);
+        let ptr = UserPtr::<Kstat>::new(stat_buf as usize);
+        ptr.write(kstat);
         Ok(0)
     }
 
@@ -353,6 +422,90 @@ impl Syscall<'_> {
         dentry.unlink().await?;
         Ok(0)
     }
+
+    /// Get and set resource limits
+    pub fn sys_prlimit64(
+        &self,
+        pid: usize,
+        resource: u32,
+        new_limit: usize,
+        old_limit: usize,
+    ) -> SyscallResult {
+        info!("[sys_prlimit64] pid: {}", pid);
+        let task = if pid == 0 {
+            self.task.clone()
+        } else if let Some(task) = crate::task::manager::TASK_MANAGER.get(pid) {
+            task
+        } else {
+            Err(Errno::ESRCH)?
+        };
+
+        let mut fd_table = task.fd_table();
+        let resource = Resource::from_u32(resource)?;
+        let new_limit = UserPtr::<RLimit>::new(new_limit);
+        let old_limit = UserPtr::<RLimit>::new(old_limit);
+
+        if !old_limit.is_null() {
+            old_limit.write(match resource {
+                Resource::NOFILE => fd_table.rlimit().clone(),
+                Resource::STACK => RLimit::default(),
+                _ => todo!(),
+            });
+        }
+
+        if !new_limit.is_null() {
+            // todo: check before read??
+            *fd_table.rlimit_mut() = new_limit.read();
+        }
+
+        Ok(0)
+    }
+
+    /// Manipulate file descriptor. It performs one of the operations described
+    /// below on the open file descriptor fd.
+    pub fn sys_fcntl(&self, fd: usize, cmd: usize, arg: usize) -> SyscallResult {
+        info!("[sys_fcntl] fd: {fd}, cmd: {cmd:?}, arg: {arg}");
+        let task = self.task;
+        let flags = FileFlags::from_bits(arg as u32).ok_or(Errno::EINVAL)?;
+        let mut fd_table = task.fd_table();
+        let file = fd_table.get(fd).ok_or(Errno::EBADF)?;
+
+        let op = FcntlFlags::from_bits(cmd).unwrap();
+        match op {
+            FcntlFlags::F_SETFL => {
+                file.set_flags(flags);
+                Ok(0)
+            }
+            FcntlFlags::F_SETFD => {
+                let arg = FileFlags::from_bits_retain(arg as u32);
+                let fd_flags = FcntlArgFlags::from_arg(arg);
+                fd_table.set_fdflag(fd, fd_flags);
+                Ok(0)
+            }
+            FcntlFlags::F_GETFD => {
+                let fd_flags = fd_table.get_fdflag(fd).ok_or(Errno::EBADF)?;
+                Ok(fd_flags.bits() as isize)
+            }
+            FcntlFlags::F_GETFL => {
+                let file_flag = file.flags();
+                Ok(file_flag.bits() as isize)
+            }
+            FcntlFlags::F_DUPFD => {
+                let new_fd = fd_table.alloc_fd_after(fd)?;
+                assert!(new_fd > fd);
+                fd_table.copyfrom(fd, new_fd)
+            }
+            FcntlFlags::F_DUPFD_CLOEXEC => {
+                let new_fd = fd_table.alloc_fd_after(fd)?;
+                assert!(new_fd > fd);
+                fd_table.set_fdflag(new_fd, FcntlArgFlags::FD_CLOEXEC);
+                fd_table.copyfrom(fd, new_fd)
+            }
+            _ => {
+                unimplemented!("fcntl cmd: {op:?} not implemented");
+            }
+        }
+    }
 }
 
 async fn get_path_or_create(
@@ -361,12 +514,12 @@ async fn get_path_or_create(
     fd: isize,
     mode: InodeMode,
     debug_syscall_name: &str,
-) -> Result<Path, Errno> {
+) -> SysResult<Path> {
     let path_str = get_string_from_ptr(&UserPtr::<u8>::new(rawpath));
 
     if !path_str.starts_with('/') {
         if fd == AT_FDCWD {
-            let cwd = task.cwd().clone().from_cd(&"..");
+            let cwd = task.cwd().clone().from_cd(&"..")?;
             trace!("[{debug_syscall_name}] cwd: {:?}", cwd);
             Ok(cwd.from_cd_or_create(&path_str, mode).await)
         } else {
@@ -380,7 +533,7 @@ async fn get_path_or_create(
             Ok(cwd.from_cd_or_create(&path_str, mode).await)
         }
     } else {
-        Ok(Path::from(path_str))
+        Path::try_from(path_str)
     }
 }
 
@@ -389,14 +542,14 @@ fn get_path(
     rawpath: usize,
     fd: isize,
     debug_syscall_name: &str,
-) -> Result<Path, Errno> {
+) -> SysResult<Path> {
     let path_str = get_string_from_ptr(&UserPtr::<u8>::new(rawpath));
 
     if !path_str.starts_with('/') {
         if fd == AT_FDCWD {
-            let cwd = task.cwd().clone().from_cd(&"..");
+            let cwd = task.cwd().clone().from_cd(&"..")?;
             trace!("[{debug_syscall_name}] cwd: {:?}", cwd);
-            Ok(cwd.from_cd(&path_str))
+            cwd.from_cd(&path_str)
         } else {
             let cwd = task
                 .fd_table()
@@ -405,9 +558,9 @@ fn get_path(
                 .dentry()
                 .path();
             trace!("[{debug_syscall_name}] cwd: {:?}", cwd);
-            Ok(cwd.from_cd(&path_str))
+            cwd.from_cd(&path_str)
         }
     } else {
-        Ok(Path::from(path_str))
+        Path::try_from(path_str)
     }
 }

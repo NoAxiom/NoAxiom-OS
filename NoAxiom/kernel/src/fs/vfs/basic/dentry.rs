@@ -192,7 +192,7 @@ impl dyn Dentry {
         if path.len() > 1 {
             path.remove(0);
         }
-        Path::from(path)
+        Path::try_from(path).unwrap()
     }
 
     /// Find the dentry with `name` in the **WHOLE** sub-tree of the dentry.

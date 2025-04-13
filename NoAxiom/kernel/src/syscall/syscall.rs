@@ -1,6 +1,6 @@
 use alloc::sync::Arc;
 
-use arch::{Arch, ArchInt, ArchTrapContext, TrapContext};
+use arch::{ArchTrapContext, TrapContext};
 
 use super::SyscallResult;
 use crate::{constant::syscall::*, include::result::Errno, task::Task};
@@ -27,7 +27,9 @@ impl<'a> Syscall<'a> {
         match id {
             // fs
             SYS_READ => self.sys_read(args[0], args[1], args[2]).await,
+            SYS_READV => self.sys_readv(args[0], args[1], args[2]).await,
             SYS_WRITE => self.sys_write(args[0], args[1], args[2]).await,
+            SYS_WRITEV => self.sys_writev(args[0], args[1], args[2]).await,
             SYS_CLOSE => self.sys_close(args[0]),
             SYS_MKDIRAT => {
                 self.sys_mkdirat(args[0] as isize, args[1], args[2] as u32)
@@ -51,6 +53,9 @@ impl<'a> Syscall<'a> {
             SYS_UMOUNT2 => self.sys_umount2(args[0], args[1]),
             SYS_LINKAT => self.sys_linkat(args[0], args[1], args[2], args[3], args[4]),
             SYS_UNLINKAT => self.sys_unlinkat(args[0], args[1], args[2]).await,
+            SYS_FCHMODAT => Self::empty_syscall("fchmodat", 0),
+            SYS_PRLIMIT64 => self.sys_prlimit64(args[0], args[1] as u32, args[2], args[3]),
+            SYS_FCNTL => self.sys_fcntl(args[0], args[1], args[2]),
 
             // net
             SYS_SOCKET => self.sys_socket(args[0], args[1], args[2]),

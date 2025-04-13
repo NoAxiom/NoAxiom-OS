@@ -148,6 +148,9 @@ impl dyn File {
     pub fn name(&self) -> String {
         self.dentry().name()
     }
+    pub fn flags(&self) -> spin::MutexGuard<'_, FileFlags> {
+        self.meta().flags.lock()
+    }
     pub fn set_flags(&self, flags: FileFlags) {
         *self.meta().flags.lock() = flags;
     }

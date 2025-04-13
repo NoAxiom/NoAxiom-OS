@@ -3,6 +3,7 @@ pub mod info;
 pub mod mm;
 pub mod net;
 pub mod process;
+pub mod resource;
 pub mod result;
 pub mod sched;
 pub mod time;

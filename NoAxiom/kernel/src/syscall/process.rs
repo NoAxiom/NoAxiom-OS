@@ -75,11 +75,11 @@ impl Syscall<'_> {
     pub async fn sys_execve(&mut self, path: usize, argv: usize, envp: usize) -> SyscallResult {
         let path = UserPtr::new(path).get_cstr();
         let path = if !path.starts_with('/') {
-            let cwd = self.task.cwd().clone().from_cd(&"..");
+            let cwd = self.task.cwd().clone().from_cd(&"..")?;
             trace!("[sys_exec] cwd: {:?}", cwd);
-            cwd.from_cd(&path)
+            cwd.from_cd(&path)?
         } else {
-            Path::from(path)
+            Path::try_from(path)?
         };
         let args = UserPtr::<UserPtr<u8>>::new(argv).get_string_vec();
         let envs = UserPtr::<UserPtr<u8>>::new(envp).get_string_vec();
