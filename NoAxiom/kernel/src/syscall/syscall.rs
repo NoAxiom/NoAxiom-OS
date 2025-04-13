@@ -21,8 +21,9 @@ impl<'a> Syscall<'a> {
             // fixme: turn on the interrupt. When call trap_handler, cpu would turn off
             // the interrupt until cpu ertn. But if we switch to another task, the whole
             // life time is in the interrupt off state until previous task ertn.
-            assert!(!Arch::is_interrupt_enabled());
-            Arch::enable_interrupt();
+            use arch::ArchInt;
+            assert!(!arch::Arch::is_interrupt_enabled());
+            arch::Arch::enable_interrupt();
         }
         match id {
             // fs
