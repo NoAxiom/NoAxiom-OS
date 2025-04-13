@@ -96,3 +96,24 @@ pub mod auxv {
     pub const AT_SECURE: usize = 23; // secure mode boolean
     pub const AT_RANDOM: usize = 25; // address of 16 random bytes
 }
+
+pub mod robust_list {
+    #[derive(Clone, Copy, Debug)]
+    pub struct RobustList {
+        pub head: usize,
+        pub len: usize,
+    }
+
+    impl RobustList {
+        pub const HEAD_SIZE: usize = 24;
+    }
+
+    impl Default for RobustList {
+        fn default() -> Self {
+            Self {
+                head: 0,
+                len: Self::HEAD_SIZE,
+            }
+        }
+    }
+}

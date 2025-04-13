@@ -132,8 +132,12 @@ impl Syscall<'_> {
         Ok(tid as isize)
     }
 
-    pub fn sys_getpid(&self) -> SyscallResult {
+    pub fn sys_gettid(&self) -> SyscallResult {
         Ok(self.task.tid() as isize)
+    }
+
+    pub fn sys_getpid(&self) -> SyscallResult {
+        Ok(self.task.tgid() as isize)
     }
 
     pub fn sys_getppid(&self) -> SyscallResult {

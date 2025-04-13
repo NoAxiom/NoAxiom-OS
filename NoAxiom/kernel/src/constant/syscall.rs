@@ -54,6 +54,7 @@ pub const SYS_SCHED_GETAFFINITY: usize = 123;
 pub const SYS_SCHED_YIELD: usize = 124;
 pub const SYS_KILL: usize = 129;
 pub const SYS_TKILL: usize = 130;
+pub const SYS_TGKILL: usize = 131;
 pub const SYS_SIGSUSPEND: usize = 133;
 pub const SYS_SIGACTION: usize = 134;
 pub const SYS_SIGPROCMASK: usize = 135;

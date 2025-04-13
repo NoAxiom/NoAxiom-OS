@@ -29,7 +29,10 @@ use crate::{
         stdio::{Stdin, Stdout},
     },
     include::{
-        process::auxv::{AuxEntry, AT_EXECFN, AT_NULL, AT_RANDOM},
+        process::{
+            auxv::{AuxEntry, AT_EXECFN, AT_NULL, AT_RANDOM},
+            robust_list::RobustList,
+        },
         sched::CloneFlags,
     },
     mm::{
@@ -80,6 +83,9 @@ pub struct PCB {
     pub pending_sigs: SigPending,        // pending signals
     pub sig_stack: Option<SigAltStack>,  // signal alternate stack
     pub ucontext_ptr: UserPtr<UContext>, // ucontext pointer
+
+    // futex & robust list
+    pub robust_list: RobustList,
 }
 
 impl Default for PCB {
@@ -93,6 +99,7 @@ impl Default for PCB {
             pending_sigs: SigPending::new(),
             sig_stack: None,
             ucontext_ptr: UserPtr::new_null(),
+            robust_list: RobustList::default(),
         }
     }
 }

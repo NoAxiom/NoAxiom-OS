@@ -39,7 +39,7 @@ pub async fn validate(
     if let Some(pte) = pte {
         let flags = pte.flags();
         if flags.contains(MappingFlags::COW) {
-            trace!(
+            info!(
                 "[memory_validate] realloc COW at vpn: {:#x}, pte: {:#x}, flags: {:?}, tid: {}",
                 vpn.0,
                 pte.0,

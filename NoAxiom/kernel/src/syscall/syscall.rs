@@ -73,6 +73,7 @@ impl<'a> Syscall<'a> {
                 self.sys_wait4(args[0] as isize, args[1], args[2], args[3])
                     .await
             }
+            SYS_GETTID => self.sys_gettid(),
             SYS_GETPID => self.sys_getpid(),
             SYS_GETPPID => self.sys_getppid(),
             SYS_GETUID => Self::empty_syscall("getuid", 0),
@@ -80,6 +81,10 @@ impl<'a> Syscall<'a> {
             SYS_GETGID => Self::empty_syscall("getgid", 0),
             SYS_GETEGID => Self::empty_syscall("getegid", 0),
             SYS_SET_TID_ADDRESS => self.sys_set_tid_address(args[0]),
+
+            // futex
+            SYS_GET_ROBUST_LIST => self.sys_get_robust_list(args[0], args[1], args[2]),
+            SYS_SET_ROBUST_LIST => self.sys_set_robust_list(args[0], args[1]),
 
             // signal
             SYS_SIGACTION => self.sys_sigaction(args[0] as i32, args[1], args[2]),
