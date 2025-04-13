@@ -19,7 +19,10 @@ impl Path {
     pub fn from(abs_path: String) -> Self {
         assert!(abs_path.starts_with('/'));
         trace!("Path::from: {}", abs_path);
-        let split_path = abs_path.split('/').collect::<Vec<&str>>();
+        let mut split_path = abs_path.split('/').collect::<Vec<&str>>();
+        if split_path.ends_with(&[""]) {
+            split_path.pop();
+        }
         let dentry = root_dentry().find_path(&split_path).unwrap();
         Self {
             inner: abs_path,
@@ -31,7 +34,10 @@ impl Path {
     pub async fn from_or_create(abs_path: String, mode: InodeMode) -> Self {
         assert!(abs_path.starts_with('/'));
         trace!("Path::from_or_create: {}", abs_path);
-        let split_path = abs_path.split('/').collect::<Vec<&str>>();
+        let mut split_path = abs_path.split('/').collect::<Vec<&str>>();
+        if split_path.ends_with(&[""]) {
+            split_path.pop();
+        }
         let dentry = root_dentry().find_path_or_create(&split_path, mode).await; // todo: don't walk from root
         Self {
             inner: abs_path,

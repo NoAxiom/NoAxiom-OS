@@ -14,6 +14,7 @@ ifeq ($(ARCH_NAME),riscv64)
 else ifeq ($(ARCH_NAME),loongarch64)
 	ASYNC := 1
 endif
+GLIBC := 1
 UART := 
 PRELIMINARY :=
 BUSYBOX :=
@@ -70,6 +71,10 @@ endif
 
 ifneq ($(RUNTESTS), )
 	FEATURES += runtests
+endif
+
+ifneq ($(GLIBC), )
+	FEATURES += glibc
 endif
 
 ifneq ($(INTERRUPTABLE_ASYNC), )
