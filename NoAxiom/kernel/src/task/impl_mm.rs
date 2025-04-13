@@ -7,7 +7,7 @@ use crate::{
         mm::{MmapFlags, MmapProts},
         result::Errno,
     },
-    mm::address::VirtAddr,
+    mm::{address::VirtAddr, user_ptr::UserPtr},
     return_errno,
     syscall::{SysResult, SyscallResult},
 };
@@ -18,9 +18,7 @@ impl Task {
         let grow_size = new_brk - memory_set.user_brk;
         debug!(
             "[grow_brk] start: {:#x}, old_brk: {:#x}, new_brk: {:#x}",
-            memory_set.user_brk_start,
-            memory_set.user_brk,
-            new_brk
+            memory_set.user_brk_start, memory_set.user_brk, new_brk
         );
         if grow_size > 0 {
             trace!("[grow_brk] expanded");

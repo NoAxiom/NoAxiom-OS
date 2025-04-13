@@ -76,6 +76,10 @@ impl<'a> Syscall<'a> {
             SYS_GETEGID => Self::empty_syscall("getegid", 0),
             SYS_SET_TID_ADDRESS => self.sys_set_tid_address(args[0]),
 
+            // futex
+            SYS_GET_ROBUST_LIST => self.sys_get_robust_list(args[0], args[1], args[2]),
+            SYS_SET_ROBUST_LIST => self.sys_set_robust_list(args[0], args[1]),
+
             // signal
             SYS_SIGACTION => self.sys_sigaction(args[0] as i32, args[1], args[2]),
             SYS_SIGRETURN => self.sys_sigreturn(),
