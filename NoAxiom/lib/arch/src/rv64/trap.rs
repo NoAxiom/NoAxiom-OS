@@ -36,7 +36,7 @@ pub fn get_trap_type(scause: Scause, stval: usize) -> TrapType {
         Trap::Exception(Exception::LoadPageFault) => TrapType::LoadPageFault(stval),
         Trap::Interrupt(Interrupt::SupervisorExternal) => TrapType::SupervisorExternal,
         Trap::Interrupt(Interrupt::SupervisorSoft) => TrapType::SupervisorSoft,
-        _ => panic!("unknown trap type"),
+        _ => panic!("unknown trap type: {:?}", scause.cause()),
     }
 }
 

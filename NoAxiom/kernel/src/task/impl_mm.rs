@@ -7,7 +7,7 @@ use crate::{
         mm::{MmapFlags, MmapProts},
         result::Errno,
     },
-    mm::{address::VirtAddr, user_ptr::UserPtr},
+    mm::address::VirtAddr,
     return_errno,
     syscall::{SysResult, SyscallResult},
 };

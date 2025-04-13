@@ -68,6 +68,7 @@ impl<'a> Syscall<'a> {
                 self.sys_wait4(args[0] as isize, args[1], args[2], args[3])
                     .await
             }
+            SYS_GETTID => self.sys_gettid(),
             SYS_GETPID => self.sys_getpid(),
             SYS_GETPPID => self.sys_getppid(),
             SYS_GETUID => Self::empty_syscall("getuid", 0),

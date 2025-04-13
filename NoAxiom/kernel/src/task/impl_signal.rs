@@ -104,6 +104,7 @@ impl Task {
                     // flow: kernel (restore) -> handler -> ..
                     // -> user_sigreturn -> (syscall) kernel
                     // fixme: should we update gp & tp?
+                    // fixme: memory mapping is incorrect for no U flag used
                     cx[EPC] = handler;
                     cx[RA] = user_sigreturn as usize;
                     cx[SP] = new_sp;
