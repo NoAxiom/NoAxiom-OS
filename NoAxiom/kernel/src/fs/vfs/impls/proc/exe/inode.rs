@@ -16,7 +16,7 @@ pub struct ExeInode {
 impl ExeInode {
     pub fn new(superblock: Arc<dyn SuperBlock>) -> Self {
         Self {
-            meta: InodeMeta::new(superblock, InodeMode::FILE, BLOCK_SIZE),
+            meta: InodeMeta::new(superblock, InodeMode::LINK, BLOCK_SIZE),
         }
     }
 }
