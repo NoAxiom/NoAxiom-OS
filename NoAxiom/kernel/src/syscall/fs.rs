@@ -407,27 +407,28 @@ impl Syscall<'_> {
         Ok(0)
     }
 
-    pub fn sys_readlinkat(
+    pub async fn sys_readlinkat(
         &self,
         dirfd: isize,
         path: usize,
         buf: usize,
-        bufsize: usize,
+        buflen: usize,
     ) -> SyscallResult {
-        info!("[sys_readlinkat]");
         let path = get_path(self.task.clone(), path, dirfd, "sys_readlinkat")?;
         info!(
             "[sys_readlinkat] dirfd: {}, path: {:?}, buf: {:#x}, bufsize: {}",
-            dirfd, path, buf, bufsize,
+            dirfd, path, buf, buflen,
         );
         let dentry = path.dentry();
         if dentry.inode()?.file_type() != InodeMode::LINK {
             return Err(Errno::EINVAL);
         }
         // todo: read, now just do nothing
-        let _ = buf;
-        let _ = bufsize;
-        Ok(0)
+        let user_ptr = UserPtr::<u8>::new(buf);
+        let buf_slice = user_ptr.as_slice_mut_checked(buflen).await?;
+        let file = dentry.open()?;
+        let res = file.base_readlink(buf_slice).await;
+        res
     }
 
     /// Unlink a file, also delete the file if nlink is 0
