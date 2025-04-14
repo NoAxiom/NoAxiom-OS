@@ -3,7 +3,10 @@ use alloc::sync::Arc;
 use arch::{ArchTrapContext, TrapContext};
 
 use super::SyscallResult;
-use crate::{constant::syscall::*, include::result::Errno, task::Task};
+use crate::{
+    include::{result::Errno, syscall::SyscallID},
+    task::Task,
+};
 
 /// system call tracer for a task
 pub struct Syscall<'a> {
@@ -25,6 +28,11 @@ impl<'a> Syscall<'a> {
             assert!(!arch::Arch::is_interrupt_enabled());
             arch::Arch::enable_interrupt();
         }
+        let id = SyscallID::from_repr(id as usize).ok_or_else(|| {
+            error!("invalid syscall id: {}", id);
+            Errno::ENOSYS
+        })?;
+        use SyscallID::*;
         match id {
             // fs
             SYS_READ => self.sys_read(args[0], args[1], args[2]).await,
@@ -115,7 +123,7 @@ impl<'a> Syscall<'a> {
 
             // unsupported: return -1
             _ => {
-                error!("unsupported syscall id: {}, args: {:?}", id, args);
+                error!("unsupported syscall id: {:?}, args: {:#x?}", id, args);
                 // let _ = self.sys_exit(Errno::ENOSYS as usize);
                 Err(Errno::ENOSYS)
             }

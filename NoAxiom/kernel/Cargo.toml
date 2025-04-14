@@ -69,6 +69,7 @@ futures = { version = "0.3", default-features = false, features = ["alloc"] }
 futures-lite = { version = "1.13.0", default-features = false, features = [
     "alloc",
 ] }
+strum = { version = "0.26", default_features = false, features = ["derive"] }
 # no_axiom defined libs
 ext4_rs = { git = "https://github.com/YuXuaann/ext4_rs-async-smp" }
 arch = { workspace = true }
