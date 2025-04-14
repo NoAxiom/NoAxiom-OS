@@ -4,7 +4,7 @@ use crate::{
     mm::user_ptr::UserPtr,
     sched::utils::yield_now,
     time::{
-        gettime::{get_time_ms, get_time_us, get_timeval},
+        gettime::{get_time_ms, get_time_ns, get_time_us, get_timeval},
         time_val::{TimeSpec, TimeVal},
         tms::TMS,
     },
