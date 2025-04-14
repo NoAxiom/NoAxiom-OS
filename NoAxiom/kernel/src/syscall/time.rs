@@ -12,7 +12,7 @@ use crate::{
 impl Syscall<'_> {
     pub fn sys_times(&self, tms: usize) -> SyscallResult {
         let tms = UserPtr::<TMS>::new(tms);
-        let res = self.task.tcb().time_stat.into();
+        let res = self.task.tcb().time_stat.into_tms();
         tms.write(res);
         Ok(0)
     }

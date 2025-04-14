@@ -33,40 +33,32 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         Arch::disable_interrupt();
 
+        // ===== before executing task future =====
         let this = unsafe { self.get_unchecked_mut() };
         let task = &this.task;
         let future = &mut this.future;
         let time_in = get_time_us();
-
-        // set task to current cpu, set task status to Running
+        task.tcb_mut().time_stat.record_switch_in();
         current_cpu().set_task(task);
+        // ===== before executing task future =====
 
-        // execute task future
         let ret = unsafe { Pin::new_unchecked(future).poll(cx) };
 
-        // update vruntime
+        // ===== after executing task future =====
         let time_out = get_time_us();
-        task.sched_entity.update_vruntime(time_out - time_in);
-        trace!(
-            "task {} yielded, wall_time: {} us, vruntime: {}",
-            task.tid(),
-            time_out - time_in,
-            task.sched_entity.inner().vruntime.0
-        );
-
-        // mark current task's freg as should restore
+        task.tcb_mut().time_stat.record_switch_out();
         task.trap_context_mut().freg_mut().yield_task();
-
-        // clear current task
+        task.sched_entity().update_vruntime(time_out - time_in);
         current_cpu().clear_task();
+        // ===== after executing task future =====
 
-        // always enable global interrupt before return
         Arch::enable_interrupt();
         ret
     }
 }
 
 /// user task main
+/// called by [`UserTaskFuture`]
 pub async fn task_main(task: Arc<Task>) {
     task.set_waker(take_waker().await);
     let mut old_mask = None;
@@ -74,7 +66,9 @@ pub async fn task_main(task: Arc<Task>) {
     loop {
         // kernel -> user
         trace!("[task_main] trap_restore, cx: {:#x?}", task.trap_context());
+        task.tcb_mut().time_stat.record_trap_in();
         Arch::trap_restore(task.trap_context_mut());
+        task.tcb_mut().time_stat.record_trap_out();
         assert!(check_no_lock());
         let mut pcb = task.pcb();
         if let Some(old_mask) = old_mask.take() {

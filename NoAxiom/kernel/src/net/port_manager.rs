@@ -78,7 +78,7 @@ impl PortManager {
             Err(Errno::EADDRINUSE)
         } else {
             let current_task = crate::cpu::current_cpu().task.clone().unwrap();
-            let waker = current_task.waker().clone().unwrap();
+            let waker = current_task.waker();
             inner[port as usize] = Some(PortItem::new(waker));
             Ok(())
         }

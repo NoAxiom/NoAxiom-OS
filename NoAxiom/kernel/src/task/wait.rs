@@ -48,7 +48,14 @@ impl Future for WaitChildFuture {
         let mut pcb = self.task.pcb();
         let res = match &self.target {
             None => match pcb.zombie_children.pop() {
-                Some(task) => Poll::Ready(Ok((pcb.exit_code(), task.tid()))),
+                Some(child) => {
+                    // time statistic
+                    self.task
+                        .tcb_mut()
+                        .time_stat
+                        .add_child_time(child.tcb().time_stat.child_time());
+                    Poll::Ready(Ok((pcb.exit_code(), child.tid())))
+                }
                 None => Poll::Pending,
             },
             Some(child) => {
@@ -57,9 +64,16 @@ impl Future for WaitChildFuture {
                     TaskStatus::Zombie => {
                         let target_tid = child.tid();
                         let exit_code = ch_pcb.exit_code();
+                        // since we already collected exit info
+                        // so just delete it from zombie children
                         ch_pcb
                             .zombie_children
                             .retain(|task| task.tid() != target_tid);
+                        // update time statistic
+                        self.task
+                            .tcb_mut()
+                            .time_stat
+                            .add_child_time(child.tcb().time_stat.child_time());
                         Poll::Ready(Ok((exit_code, target_tid)))
                     }
                     _ => Poll::Pending,

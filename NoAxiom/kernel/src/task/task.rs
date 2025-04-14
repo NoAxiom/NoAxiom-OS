@@ -12,6 +12,7 @@ use arch::{ArchTrapContext, TrapArgs, TrapContext};
 use ksync::{
     cell::SyncUnsafeCell,
     mutex::{SpinLock, SpinLockGuard},
+    Once,
 };
 
 use super::{
@@ -126,10 +127,11 @@ pub struct Task {
     // mutable
     pcb: Mutable<PCB>, // task control block inner, protected by lock
 
-    // thread only / once init
+    // thread only / once initialization
     tcb: ThreadOnly<TCB>,             // thread control block
-    waker: ThreadOnly<Option<Waker>>, // waker for the task
     trap_cx: ThreadOnly<TrapContext>, // trap context
+    sched_entity: SchedEntity,        // sched entity, shared with scheduler
+    waker: Once<Waker>,               // waker for the task
 
     // immutable
     tid: Immutable<TidTracer>, // task id, with lifetime holded
@@ -142,9 +144,6 @@ pub struct Task {
     sa_list: Shared<SigActionList>,    // signal action list, saves signal handler
     memory_set: Shared<MemorySet>,     // memory set for the task
     thread_group: Shared<ThreadGroup>, // thread group
-
-    // others
-    pub sched_entity: SchedEntity, // sched entity for schedule
 }
 
 impl PCB {
@@ -270,11 +269,11 @@ impl Task {
     /// trap context
     #[inline(always)]
     pub fn trap_context(&self) -> &TrapContext {
-        unsafe { &(*self.trap_cx.get()) }
+        self.trap_cx.as_ref()
     }
     #[inline(always)]
     pub fn trap_context_mut(&self) -> &mut TrapContext {
-        unsafe { &mut (*self.trap_cx.get()) }
+        self.trap_cx.as_ref_mut()
     }
 
     /// signal info: sigaction list
@@ -283,16 +282,16 @@ impl Task {
     }
 
     /// get waker
-    pub fn waker(&self) -> &Option<Waker> {
-        unsafe { &(*self.waker.get()) }
+    pub fn waker(&self) -> Waker {
+        self.waker.get().unwrap().clone()
     }
     /// set waker
     pub fn set_waker(&self, waker: Waker) {
-        unsafe { (*self.waker.get()) = Some(waker) };
+        self.waker.call_once(|| waker);
     }
     /// wake self up
     pub fn wake_unchecked(&self) {
-        self.waker().as_ref().unwrap().wake_by_ref();
+        self.waker.get().unwrap().wake_by_ref();
     }
 
     /// tcb
@@ -301,6 +300,14 @@ impl Task {
     }
     pub fn tcb_mut(&self) -> &mut TCB {
         self.tcb.as_ref_mut()
+    }
+
+    /// sched entity
+    pub fn sched_entity_ref_cloned(&self) -> SchedEntity {
+        self.sched_entity.ref_clone(self.tid())
+    }
+    pub fn sched_entity(&self) -> &SchedEntity {
+        &self.sched_entity
     }
 
     /// clear child tid address
@@ -349,7 +356,7 @@ impl Task {
             fd_table: Arc::new(SpinLock::new(FdTable::new())),
             cwd: Arc::new(SpinLock::new(Path::try_from(String::from("/")).unwrap())),
             sa_list: Arc::new(SpinLock::new(SigActionList::new())),
-            waker: ThreadOnly::new(None),
+            waker: Once::new(),
             tcb: ThreadOnly::new(TCB {
                 ..Default::default()
             }),
@@ -536,7 +543,7 @@ impl Task {
                 fd_table,
                 cwd: self.cwd.clone(),
                 sa_list: self.sa_list.clone(),
-                waker: ThreadOnly::new(None),
+                waker: Once::new(),
                 tcb: ThreadOnly::new(TCB {
                     ..Default::default()
                 }),
@@ -563,7 +570,7 @@ impl Task {
                 fd_table,
                 cwd: Arc::new(SpinLock::new(self.cwd().clone())),
                 sa_list: Arc::new(SpinLock::new(SigActionList::new())),
-                waker: ThreadOnly::new(None),
+                waker: Once::new(),
                 tcb: ThreadOnly::new(TCB {
                     ..Default::default()
                 }),

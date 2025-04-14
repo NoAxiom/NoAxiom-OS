@@ -1,6 +1,6 @@
 use core::time::Duration;
 
-use super::{gettime::get_time_duration, time_slice::TIME_SLICE_DURATION};
+use super::{gettime::get_time_duration, time_slice::TIME_SLICE_DURATION, tms::TMS};
 
 #[derive(Debug, Clone, Copy)]
 pub struct KernelDuration {
@@ -74,6 +74,14 @@ impl TimeInfo {
     pub fn stime(&self) -> Duration {
         self.time.stime
     }
+    pub fn into_tms(self) -> TMS {
+        TMS {
+            tms_utime: self.time.utime.as_micros() as usize,
+            tms_stime: self.time.stime.as_micros() as usize,
+            tms_cutime: self.child_time.utime.as_micros() as usize,
+            tms_cstime: self.child_time.stime.as_micros() as usize,
+        }
+    }
 
     #[inline(always)]
     pub fn add_stime(&mut self, stime: Duration) {
@@ -101,16 +109,18 @@ impl TimeInfo {
         let stime_slice = get_time_duration() - self.system_time_start;
         self.add_stime(stime_slice);
     }
-    pub fn record_trap(&mut self) {
+    pub fn record_trap_out(&mut self) {
         let current_time = get_time_duration();
         self.system_time_start = current_time;
         let utime_slice = current_time - self.user_time_start;
         self.add_utime(utime_slice);
     }
-    pub fn record_trap_return(&mut self) {
+    pub fn record_trap_in(&mut self) {
         let current_time = get_time_duration();
         let stime_slice = current_time - self.user_time_start;
-        self.add_stime(stime_slice);
+        if self.user_time_start != Duration::ZERO {
+            self.add_utime(stime_slice);
+        }
         self.user_time_start = current_time;
     }
     pub fn need_schedule(&self) -> bool {

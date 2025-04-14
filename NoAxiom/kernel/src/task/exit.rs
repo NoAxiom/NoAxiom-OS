@@ -1,11 +1,8 @@
 use alloc::{sync::Arc, vec::Vec};
 
-use arch::{Arch, ArchSbi};
-
 use super::Task;
 use crate::{
     config::task::INIT_PROCESS_ID,
-    fs::vfs::root_dentry,
     mm::user_ptr::UserPtr,
     signal::{
         sig_detail::{SigChildDetail, SigDetail},

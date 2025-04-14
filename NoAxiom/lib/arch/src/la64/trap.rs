@@ -144,6 +144,7 @@ impl ArchTrap for LA64 {
         unsafe { __user_trapret(cx) };
         cx.freg_mut().mark_save_if_needed();
         disable_interrupt();
+        set_kernel_trap_entry();
     }
     fn set_user_trap_entry() {
         set_user_trap_entry();

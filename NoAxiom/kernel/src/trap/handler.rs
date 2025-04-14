@@ -7,7 +7,7 @@ use arch::{Arch, ArchInt, ArchTrap, TrapArgs, TrapType};
 use super::{ext_int::ext_int_handler, ipi::ipi_handler};
 use crate::{
     cpu::{current_cpu, get_hartid},
-    sched::utils::block_on,
+    sched::utils::{block_on, yield_now},
     task::{exit::ExitCode, Task},
 };
 
@@ -58,10 +58,23 @@ fn kernel_trap_handler() {
 pub async fn user_trap_handler(task: &Arc<Task>) {
     assert!(!Arch::is_interrupt_enabled());
     trace!("[trap_handler] call trap handler");
-    Arch::set_kernel_trap_entry();
+
+    // check if need schedule
+    if task.tcb().time_stat.need_schedule() {
+        debug!(
+            "task {} yield in user trap handler by time = {:?}",
+            task.tid(),
+            task.tcb().time_stat
+        );
+        yield_now().await;
+    }
+
+    // def: context, user trap pc, trap type
     let cx = task.trap_context_mut();
     let epc = Arch::read_epc();
     let trap_type = Arch::read_trap_type(Some(cx));
+
+    // user exit when detect unexpected trap
     let user_exit = |msg: &str| {
         panic!(
             "[user_trap_handler] unexpected exit!!! msg: {}, trap_type: {:#x?}, sepc = {:#x}",
@@ -69,6 +82,8 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
         );
         task.terminate(ExitCode::new_raw(-1));
     };
+
+    // user trap handler vector
     match trap_type {
         // syscall
         TrapType::SysCall => {

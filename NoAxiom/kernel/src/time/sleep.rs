@@ -83,6 +83,7 @@ impl SleepManager {
 
 impl Task {
     pub async fn sleep(self: &Arc<Self>, interval: Duration) {
+        warn!("called unimplemented sleep: interval = {:?}", interval);
         let time = get_time_duration() + interval;
         if interval < Duration::from_micros(500) {
             return;

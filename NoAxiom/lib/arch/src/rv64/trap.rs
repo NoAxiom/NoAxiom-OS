@@ -45,9 +45,16 @@ pub fn set_trap_entry(addr: usize) {
     unsafe { stvec::write(addr, TrapMode::Direct) };
 }
 
+fn set_kernel_trap_entry() {
+    set_trap_entry(__kernel_trapvec as usize);
+}
+fn set_user_trap_entry() {
+    set_trap_entry(__user_trapvec as usize);
+}
+
 pub fn trap_init() {
     enable_user_memory_access();
-    RV64::set_kernel_trap_entry();
+    set_kernel_trap_entry();
     enable_external_interrupt();
     enable_software_interrupt();
     enable_stimer_interrupt();
@@ -57,11 +64,11 @@ impl ArchTrap for RV64 {
     type TrapContext = super::context::TrapContext;
     /// set trap entry in supervisor mode
     fn set_kernel_trap_entry() {
-        set_trap_entry(__kernel_trapvec as usize);
+        set_kernel_trap_entry();
     }
     /// set trap entry in user mode
     fn set_user_trap_entry() {
-        set_trap_entry(__user_trapvec as usize);
+        set_user_trap_entry();
     }
     /// init trap in a single hart
     /// note that it won't turn on global interrupt
@@ -71,10 +78,11 @@ impl ArchTrap for RV64 {
     /// restore trap context, with freg handled as well
     fn trap_restore(cx: &mut TrapContext) {
         disable_interrupt();
-        RV64::set_user_trap_entry();
+        set_user_trap_entry();
         cx.freg_mut().restore();
         cx.sstatus().set_fs(FS::Clean);
         unsafe { __user_trapret(cx) };
+        set_kernel_trap_entry();
         cx.freg_mut().mark_save_if_needed();
     }
     /// read exception pc

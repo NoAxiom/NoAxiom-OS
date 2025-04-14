@@ -40,7 +40,7 @@ pub fn spawn_raw<F, R>(
 pub fn spawn_utask(task: Arc<Task>) {
     spawn_raw(
         UserTaskFuture::new(task.clone(), task_main(task.clone())),
-        task.sched_entity.ref_clone(task.tid()),
+        task.sched_entity_ref_cloned(),
         get_hartid(),
         Some(&task),
     );
