@@ -9,7 +9,7 @@ use array_init::array_init;
 use ksync::cell::SyncUnsafeCell;
 use lazy_static::lazy_static;
 
-use super::{gettime::get_time, timer::get_sleep_block_limit_ticks};
+use super::{gettime::get_time, time_slice::get_sleep_block_limit_ticks};
 use crate::{config::cpu::CPU_NUM, cpu::get_hartid, task::Task};
 
 pub struct SleepInfo {
@@ -17,6 +17,7 @@ pub struct SleepInfo {
     time: usize,
 }
 
+#[repr(align(64))]
 pub struct SleepManager {
     info: Option<SleepInfo>,
     queue: VecDeque<SleepInfo>,

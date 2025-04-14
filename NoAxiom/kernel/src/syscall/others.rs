@@ -1,12 +1,13 @@
 use super::{Syscall, SyscallResult};
 use crate::{
-    include::{
-        info::Utsname,
-        time::{TimeSpec, TimeVal, TMS},
-    },
+    include::info::Utsname,
     mm::user_ptr::UserPtr,
     sched::utils::yield_now,
-    time::gettime::{get_time_ms, get_time_us, get_timeval},
+    time::{
+        gettime::{get_time_ms, get_time_us, get_timeval},
+        time_val::{TimeSpec, TimeVal},
+        tms::TMS,
+    },
 };
 
 impl Syscall<'_> {

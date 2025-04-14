@@ -1,8 +1,8 @@
 //! trap handler
 
-use alloc::{borrow::ToOwned, sync::Arc};
+use alloc::sync::Arc;
 
-use arch::{Arch, ArchBoot, ArchInt, ArchTrap, TrapArgs, TrapType};
+use arch::{Arch, ArchInt, ArchTrap, TrapArgs, TrapType};
 
 use super::{ext_int::ext_int_handler, ipi::ipi_handler};
 use crate::{
@@ -45,7 +45,7 @@ fn kernel_trap_handler() {
         TrapType::Timer => {
             // trace!("[SupervisorTimer] kernel Timer");
             // fixme: now is just reset timer
-            crate::time::timer::set_next_trigger();
+            crate::time::time_slice::set_next_trigger();
         }
         TrapType::SupervisorSoft => ipi_handler(),
         TrapType::None => {}

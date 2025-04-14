@@ -8,7 +8,7 @@ use super::{
     sched_info::SchedInfo,
     vsched::{MulticoreScheduler, ScheduleOrder, Scheduler},
 };
-use crate::time::{gettime::get_time, timer::get_load_balance_ticks};
+use crate::time::{gettime::get_time, time_slice::get_load_balance_ticks};
 
 struct CfsTreeNode<R> {
     pub vruntime: SchedVruntime,
@@ -41,6 +41,7 @@ impl<R> Ord for CfsTreeNode<R> {
 }
 
 /// completely fair scheduler for single core
+#[repr(align(64))]
 pub struct CFS<R> {
     /// cfs tree
     normal: BTreeSet<CfsTreeNode<R>>,

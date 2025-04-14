@@ -7,4 +7,3 @@ pub mod resource;
 pub mod result;
 pub mod sched;
 pub mod syscall;
-pub mod time;

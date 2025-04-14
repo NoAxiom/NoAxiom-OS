@@ -5,7 +5,7 @@ use ksync::cell::SyncUnsafeCell;
 
 use crate::{
     config::cpu::CPU_NUM, mm::memory_set::kernel_space_activate, task::Task,
-    time::timer::set_next_trigger,
+    time::time_slice::set_next_trigger,
 };
 
 #[inline(always)]
@@ -13,6 +13,7 @@ pub fn get_hartid() -> usize {
     Arch::get_hartid()
 }
 
+#[repr(align(64))]
 pub struct Cpu {
     /// pointer of current task on this hart
     pub task: Option<Arc<Task>>,

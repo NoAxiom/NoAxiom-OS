@@ -14,6 +14,7 @@ use super::{
 
 type Info = SchedInfo;
 
+#[repr(align(64))]
 pub struct SimpleScheduler {
     queue: VecDeque<Runnable<Info>>,
 }

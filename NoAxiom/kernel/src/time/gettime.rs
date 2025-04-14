@@ -6,7 +6,8 @@ use core::time::Duration;
 
 use arch::{Arch, ArchTime};
 
-use crate::{constant::time::*, include::time::TimeVal};
+use super::time_val::TimeVal;
+use crate::constant::time::*;
 
 /// fetch time from `mtime` counter,
 /// which records the number of clock cycles since the system booted

@@ -20,7 +20,7 @@ fn panic(info: &PanicInfo) -> ! {
     Arch::arch_info_print();
     if let Some(location) = info.location() {
         println!(
-            "[PANIC] panicked at {}:{}\n[panic] HART{}, {}",
+            "[PANIC] panicked at {}:{}\n[PANIC] HART{}, {}",
             location.file(),
             location.line(),
             get_hartid(),

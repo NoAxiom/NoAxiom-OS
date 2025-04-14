@@ -26,7 +26,6 @@ use crate::{
     fs::{
         fdtable::{FdTable, FdTableEntry},
         path::Path,
-        stdio::{Stdin, Stdout},
     },
     include::{
         process::{
@@ -68,6 +67,7 @@ type ThreadOnly<T> = SyncUnsafeCell<T>;
 /// task control block inner
 /// it is protected by a spinlock to assure its atomicity
 /// so there's no need to use any lock in this struct
+#[repr(align(64))]
 pub struct PCB {
     // paternity
     // assertion: only when the task is group leader, it can have children
@@ -118,14 +118,15 @@ impl Default for TCB {
 
 /// task control block for a coroutine,
 /// a.k.a thread in current project structure
+#[repr(C, align(64))]
 pub struct Task {
+    // mutable
+    pcb: Mutable<PCB>, // task control block inner, protected by lock
+
     // immutable
     tid: Immutable<TidTracer>, // task id, with lifetime holded
     tgid: Immutable<TGID>,     // task group id, aka pid
     pgid: Immutable<PGID>,     // process group id
-
-    // mutable
-    pcb: Mutable<PCB>, // task control block inner, protected by lock
 
     // thread only / once init
     waker: ThreadOnly<Option<Waker>>, // waker for the task

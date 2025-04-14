@@ -1,9 +1,7 @@
-use driver::handle_irq;
-
 pub fn ext_int_handler() {
     #[cfg(feature = "interruptable_async")]
     {
-        handle_irq();
+        driver::handle_irq();
     }
     #[cfg(feature = "async")]
     {

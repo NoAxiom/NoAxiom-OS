@@ -17,6 +17,7 @@ pub enum IpiType {
     TlbShootdown,
 }
 
+#[repr(align(64))]
 pub struct IpiInfo {
     pub ipi_type: IpiType,
     pub from_hartid: usize,
