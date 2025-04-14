@@ -130,6 +130,9 @@ impl File for SocketFile {
 
         Ok(res as isize)
     }
+    async fn base_readlink(&self, buf: &mut [u8]) -> SyscallResult {
+        unreachable!()
+    }
     async fn base_write(&self, _offset: usize, buf: &[u8]) -> SyscallResult {
         let sock = self.socket();
         let res;

@@ -32,6 +32,5 @@ fn panic(info: &PanicInfo) -> ! {
             info.message().unwrap()
         );
     }
-    loop {}
-    // platform::shutdown()
+    platform::shutdown()
 }

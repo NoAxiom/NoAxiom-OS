@@ -60,17 +60,21 @@ impl FileSystem for AsyncSmpFat32 {
         );
         let fs_super_block = Arc::new(Fat32SuperBlock::new(super_block_meta, unbooted_fs));
 
-        let root_dentry = Fat32Dentry::new(parent.clone(), name, fs_super_block.clone());
+        let root_dentry = Arc::new(Fat32Dentry::new(
+            parent.clone(),
+            name,
+            fs_super_block.clone(),
+        ));
         let root_inode = Arc::new(Fat32DirInode::new(
             fs_super_block.clone(),
             fs_super_block.clone().inner.root_dir(),
         ));
+        root_dentry.set_inode(root_inode);
 
         if let Some(parent) = parent {
-            parent.add_child(name, root_inode.clone());
+            parent.add_child_directly(root_dentry.clone());
         }
 
-        root_dentry.set_inode(root_inode);
-        Arc::new(root_dentry)
+        root_dentry
     }
 }

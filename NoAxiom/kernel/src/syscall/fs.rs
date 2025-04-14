@@ -5,13 +5,7 @@ use ksync::mutex::check_no_lock;
 use super::{SysResult, Syscall, SyscallResult};
 use crate::{
     constant::fs::AT_FDCWD,
-    fs::{
-        fdtable::RLimit,
-        manager::FS_MANAGER,
-        path::Path,
-        pipe::PipeFile,
-        vfs::{chosen_device, root_dentry},
-    },
+    fs::{fdtable::RLimit, manager::FS_MANAGER, path::Path, pipe::PipeFile, vfs::root_dentry},
     include::{
         fs::{FcntlArgFlags, FcntlFlags, FileFlags, InodeMode, Iovec, Kstat, MountFlags},
         resource::Resource,
@@ -323,6 +317,10 @@ impl Syscall<'_> {
             "sys_newfstat",
         )
         .await?;
+        info!(
+            "[sys_newfstat] dirfd: {}, path: {:?}, stat_buf: {:#x}",
+            dirfd, path, stat_buf
+        );
         let kstat = Kstat::from_stat(path.dentry().inode()?.stat()?);
         let ptr = UserPtr::<Kstat>::new(stat_buf as usize);
         ptr.write(kstat);
@@ -364,7 +362,7 @@ impl Syscall<'_> {
 
         // normally, we should choose the device by special
         // but now we just use the default device
-        let device = chosen_device();
+        let device = driver::get_blk_dev();
 
         let mut split_path = dir.split('/').collect::<Vec<&str>>();
         let name = split_path.pop().unwrap();
@@ -409,6 +407,29 @@ impl Syscall<'_> {
         Ok(0)
     }
 
+    pub fn sys_readlinkat(
+        &self,
+        dirfd: isize,
+        path: usize,
+        buf: usize,
+        bufsize: usize,
+    ) -> SyscallResult {
+        info!("[sys_readlinkat]");
+        let path = get_path(self.task.clone(), path, dirfd, "sys_readlinkat")?;
+        info!(
+            "[sys_readlinkat] dirfd: {}, path: {:?}, buf: {:#x}, bufsize: {}",
+            dirfd, path, buf, bufsize,
+        );
+        let dentry = path.dentry();
+        if dentry.inode()?.file_type() != InodeMode::LINK {
+            return Err(Errno::EINVAL);
+        }
+        // todo: read, now just do nothing
+        let _ = buf;
+        let _ = bufsize;
+        Ok(0)
+    }
+
     /// Unlink a file, also delete the file if nlink is 0
     pub async fn sys_unlinkat(&self, dirfd: usize, path: usize, _flags: usize) -> SyscallResult {
         info!(
@@ -431,7 +452,6 @@ impl Syscall<'_> {
         new_limit: usize,
         old_limit: usize,
     ) -> SyscallResult {
-        info!("[sys_prlimit64] pid: {}", pid);
         let task = if pid == 0 {
             self.task.clone()
         } else if let Some(task) = crate::task::manager::TASK_MANAGER.get(pid) {
@@ -454,10 +474,16 @@ impl Syscall<'_> {
         }
 
         if !new_limit.is_null() {
+            info!(
+                "[sys_prlimit64] pid: {}, resource: {:?}, new_limit: {:?}",
+                pid,
+                resource,
+                new_limit.read()
+            );
             // todo: check before read??
             *fd_table.rlimit_mut() = new_limit.read();
         }
-
+        info!("[sys_prlimit64] pid: {}, resource: {:?}", pid, resource);
         Ok(0)
     }
 
@@ -544,7 +570,10 @@ fn get_path(
     debug_syscall_name: &str,
 ) -> SysResult<Path> {
     let path_str = get_string_from_ptr(&UserPtr::<u8>::new(rawpath));
-
+    debug!(
+        "[{debug_syscall_name}] path_str: {}, fd: {fd}, AT_FDCWD: {AT_FDCWD}",
+        path_str
+    );
     if !path_str.starts_with('/') {
         if fd == AT_FDCWD {
             let cwd = task.cwd().clone().from_cd(&"..")?;

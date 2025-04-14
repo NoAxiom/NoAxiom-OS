@@ -43,6 +43,9 @@ impl File for Stdin {
         buf[0] = c as u8;
         Ok(1 as isize)
     }
+    async fn base_readlink(&self, _buf: &mut [u8]) -> SyscallResult {
+        unreachable!()
+    }
     async fn base_write(&self, _offset: usize, _buf: &[u8]) -> SyscallResult {
         Err(Errno::ENOSYS)
     }
@@ -64,6 +67,9 @@ impl File for Stdout {
     }
     async fn base_read(&self, _offset: usize, _buf: &mut [u8]) -> SyscallResult {
         Err(Errno::ENOSYS)
+    }
+    async fn base_readlink(&self, _buf: &mut [u8]) -> SyscallResult {
+        unreachable!()
     }
     async fn base_write(&self, _offset: usize, buf: &[u8]) -> SyscallResult {
         // print!("{}", core::str::from_utf8(buf).unwrap());

@@ -125,6 +125,7 @@ impl dyn Dentry {
         self.meta().children.lock().get(name).cloned()
     }
 
+    /// use self.create() to generate child dentry
     /// Add a child dentry with `name` and `child_inode`, for realfs only.
     pub fn add_child(self: &Arc<Self>, name: &str, child_inode: Arc<dyn Inode>) -> Arc<dyn Dentry> {
         let mut children = self.meta().children.lock();
@@ -141,6 +142,23 @@ impl dyn Dentry {
         res
     }
 
+    /// use child dentry directly
+    /// Add a child dentry with `child` directly, for fs which doesn't
+    /// support create or used in different type fs (like mount). Basicly like
+    /// `add_dir_child`.
+    pub fn add_child_directly(self: &Arc<Self>, child: Arc<dyn Dentry>) {
+        let mut children = self.meta().children.lock();
+        let name = child.name();
+        if let Some(old) = children.insert(name.clone(), child) {
+            warn!(
+                "add child {} to {} already has child {}, replace it",
+                name,
+                self.name(),
+                old.name()
+            );
+        }
+    }
+
     // pub fn delete_self(self: &Arc<Self>) {
     //     if let Some(parent) = self.parent() {
     //         parent.remove_child(&self.name());
@@ -155,25 +173,6 @@ impl dyn Dentry {
     /// Remove a child dentry with `name`.
     pub fn remove_child(self: &Arc<Self>, name: &str) -> Option<Arc<dyn Dentry>> {
         self.meta().children.lock().remove(name)
-    }
-
-    /// Add a child to directory dentry with `name` and `mode`, for syscall
-    /// only.
-    pub async fn add_dir_child(
-        self: &Arc<Self>,
-        name: &str,
-        mode: &InodeMode,
-    ) -> Result<Arc<dyn Dentry>, Errno> {
-        if self.inode().unwrap().file_type() != InodeMode::DIR {
-            return Err(Errno::ENOTDIR);
-        }
-        assert!(check_no_lock());
-        let child = self.clone().create(name, *mode).await?;
-        self.meta()
-            .children
-            .lock()
-            .insert(name.to_string(), child.clone());
-        Ok(child)
     }
 
     /// Get super block of the dentry

@@ -52,6 +52,9 @@ impl File for FAT32File {
 
         self.file.lock().read_from(offset, buf).await
     }
+    async fn base_readlink(&self, _buf: &mut [u8]) -> SyscallResult {
+        unreachable!()
+    }
     async fn base_write(&self, offset: usize, buf: &[u8]) -> SyscallResult {
         let file_size = self.size();
 
@@ -96,6 +99,9 @@ impl File for FAT32Directory {
         let _ = offset;
         let _ = buf;
         Err(Errno::ENOSYS)
+    }
+    async fn base_readlink(&self, _buf: &mut [u8]) -> SyscallResult {
+        unreachable!()
     }
     async fn base_write(&self, offset: usize, buf: &[u8]) -> SyscallResult {
         let _ = offset;

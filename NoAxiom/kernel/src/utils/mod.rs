@@ -7,7 +7,7 @@ use alloc::{string::String, vec::Vec};
 
 use crossover::{Crossover, CrossoverManager};
 
-use crate::mm::user_ptr::UserPtr;
+use crate::{mm::user_ptr::UserPtr, task::Task};
 
 pub fn reverse<T: Clone>(vec: &Vec<T>) -> Vec<T> {
     let mut res = vec.clone();
@@ -44,4 +44,8 @@ pub fn intermit(f: impl FnOnce()) {
 pub fn lowbit(x: usize) -> usize {
     let x = x as isize;
     (x & -x) as usize
+}
+
+pub fn current_task() -> alloc::sync::Arc<Task> {
+    crate::cpu::current_cpu().task.clone().unwrap()
 }

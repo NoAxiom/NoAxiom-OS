@@ -4,7 +4,6 @@ use async_trait::async_trait;
 use driver::devices::impls::block::BlockDevice;
 use ext4_rs::ext4_defs::ROOT_INODE;
 use spin::Mutex;
-use virtio_drivers::device::blk;
 
 use super::{dentry::Ext4Dentry, inode::Ext4DirInode, superblock::Ext4SuperBlock, IExtFs};
 use crate::{
@@ -56,7 +55,11 @@ impl FileSystem for AsyncSmpExt4 {
         let unbooted_fs = Arc::new(Mutex::new(IExtFs::open(Arc::new(disk_cursor)).await));
         let fs_super_block = Arc::new(Ext4SuperBlock::new(super_block_meta, unbooted_fs));
 
-        let root_dentry = Ext4Dentry::new(parent.clone(), name, fs_super_block.clone());
+        let root_dentry = Arc::new(Ext4Dentry::new(
+            parent.clone(),
+            name,
+            fs_super_block.clone(),
+        ));
 
         let ext4 = fs_super_block.get_fs();
 
@@ -64,12 +67,11 @@ impl FileSystem for AsyncSmpExt4 {
             fs_super_block.clone(),
             ext4.get_inode_ref(ROOT_INODE).await,
         ));
+        root_dentry.set_inode(root_inode);
 
         if let Some(parent) = parent {
-            parent.add_child(name, root_inode.clone());
+            parent.add_child_directly(root_dentry.clone());
         }
-
-        root_dentry.set_inode(root_inode);
-        Arc::new(root_dentry)
+        root_dentry
     }
 }

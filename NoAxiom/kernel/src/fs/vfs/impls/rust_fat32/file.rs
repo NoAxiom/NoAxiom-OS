@@ -63,6 +63,10 @@ impl File for Fat32File {
         }
     }
 
+    async fn base_readlink(&self, _buf: &mut [u8]) -> SyscallResult {
+        unreachable!()
+    }
+
     /// write all the buf content, extend the file if necessary
     async fn base_write(&self, offset: usize, buf: &[u8]) -> SyscallResult {
         let inode = &self.meta.inode;
@@ -125,6 +129,10 @@ impl File for Fat32Dir {
 
     async fn base_read(&self, _offset: usize, _buf: &mut [u8]) -> SyscallResult {
         Err(Errno::EISDIR)
+    }
+
+    async fn base_readlink(&self, _buf: &mut [u8]) -> SyscallResult {
+        unreachable!()
     }
 
     async fn base_write(&self, _offset: usize, _buf: &[u8]) -> SyscallResult {

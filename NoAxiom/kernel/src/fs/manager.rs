@@ -28,4 +28,9 @@ impl FileSystemManager {
         let fs_map = self.fs_map.lock();
         fs_map.get(name).cloned()
     }
+
+    pub fn get_list(&self) -> alloc::vec::Vec<String> {
+        let fs_map = self.fs_map.lock();
+        fs_map.keys().cloned().collect()
+    }
 }
