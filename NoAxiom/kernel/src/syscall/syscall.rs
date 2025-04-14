@@ -65,6 +65,10 @@ impl<'a> Syscall<'a> {
             SYS_FCHMODAT => Self::empty_syscall("fchmodat", 0),
             SYS_PRLIMIT64 => self.sys_prlimit64(args[0], args[1] as u32, args[2], args[3]),
             SYS_FCNTL => self.sys_fcntl(args[0], args[1], args[2]),
+            SYS_READLINKAT => {
+                self.sys_readlinkat(args[0] as isize, args[1], args[2], args[3])
+                    .await
+            }
 
             // net
             SYS_SOCKET => self.sys_socket(args[0], args[1], args[2]),
@@ -120,6 +124,7 @@ impl<'a> Syscall<'a> {
             SYS_UNAME => Self::sys_uname(args[0]),
             SYS_GETTIMEOFDAY => Self::sys_gettimeofday(args[0]),
             SYS_NANOSLEEP => self.sys_nanosleep(args[0]).await,
+            SYS_GETRANDOM => self.sys_getrandom(args[0], args[1], args[2]).await,
 
             // unsupported: return -1
             _ => {

@@ -75,6 +75,8 @@ pub trait File: Send + Sync + DowncastSync {
     fn meta(&self) -> &FileMeta;
     /// Read data from file at `offset` to `buf`
     async fn base_read(&self, offset: usize, buf: &mut [u8]) -> SyscallResult;
+    /// Readlink data from file at `offset` to `buf`
+    async fn base_readlink(&self, buf: &mut [u8]) -> SyscallResult;
     /// Write data to file at `offset` from `buf`
     async fn base_write(&self, offset: usize, buf: &[u8]) -> SyscallResult;
     /// Load directory into memory, must be called before read/write explicitly,
@@ -226,6 +228,9 @@ impl File for EmptyFile {
         &self.meta
     }
     async fn base_read(&self, _offset: usize, _buf: &mut [u8]) -> SyscallResult {
+        unreachable!()
+    }
+    async fn base_readlink(&self, _buf: &mut [u8]) -> SyscallResult {
         unreachable!()
     }
     async fn base_write(&self, _offset: usize, _buf: &[u8]) -> SyscallResult {

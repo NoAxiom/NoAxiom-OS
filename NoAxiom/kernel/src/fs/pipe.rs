@@ -316,6 +316,9 @@ impl File for PipeFile {
         buffer.notify_write_wakers();
         Ok(ret as isize)
     }
+    async fn base_readlink(&self, _buf: &mut [u8]) -> SyscallResult {
+        unreachable!()
+    }
     async fn base_write(&self, _offset: usize, buf: &[u8]) -> SyscallResult {
         assert!(self.is_write_end());
         let len = buf.len();
