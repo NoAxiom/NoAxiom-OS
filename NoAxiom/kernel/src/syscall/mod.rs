@@ -10,6 +10,7 @@ pub mod others;
 pub mod process;
 pub mod signal;
 pub mod syscall;
+pub mod time;
 
 #[macro_use]
 pub mod macros;

@@ -5,7 +5,7 @@ use core::{
 
 use arch::{Arch, ArchTime};
 
-use crate::constant::time::{NSEC_PER_SEC, USEC_PER_SEC};
+use crate::constant::time::USEC_PER_SEC;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct TimeVal {
@@ -102,45 +102,5 @@ impl TimeVal {
     pub fn into_ticks(&self) -> usize {
         let freq = Arch::get_freq();
         self.sec * freq + self.usec / USEC_PER_SEC * freq
-    }
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct TimeSpec {
-    pub tv_sec: u64,  // 秒
-    pub tv_nsec: u64, // 纳秒
-}
-
-impl TimeSpec {
-    pub fn empty() -> Self {
-        Self {
-            tv_sec: 0,
-            tv_nsec: 0,
-        }
-    }
-
-    pub fn into_ticks(&self) -> usize {
-        let freq = Arch::get_freq();
-        self.tv_sec as usize * freq + self.tv_nsec as usize / NSEC_PER_SEC * freq
-    }
-
-    pub fn as_bytes(&self) -> &[u8] {
-        let size = core::mem::size_of::<Self>();
-        unsafe { core::slice::from_raw_parts(self as *const _ as usize as *const u8, size) }
-    }
-
-    pub fn into_ns(&self) -> usize {
-        self.tv_sec as usize * NSEC_PER_SEC + self.tv_nsec as usize
-    }
-
-    pub fn from_ticks(tiks: usize) -> Self {
-        let freq = Arch::get_freq();
-        let tv_sec = tiks / freq;
-        let tv_nsec = (tiks % freq) * NSEC_PER_SEC / freq;
-        Self {
-            tv_sec: tv_sec as u64,
-            tv_nsec: tv_nsec as u64,
-        }
     }
 }

@@ -47,6 +47,7 @@ use crate::{
     },
     syscall::SysResult,
     task::{manager::add_new_process, taskid::tid_alloc},
+    time::time_info::TimeInfo,
 };
 
 /// shared between threads
@@ -106,12 +107,14 @@ impl Default for PCB {
 
 pub struct TCB {
     pub clear_child_tid: Option<usize>, // clear tid address
+    pub time_stat: TimeInfo,            // task time
 }
 
 impl Default for TCB {
     fn default() -> Self {
         Self {
             clear_child_tid: None,
+            time_stat: TimeInfo::default(),
         }
     }
 }
@@ -123,15 +126,15 @@ pub struct Task {
     // mutable
     pcb: Mutable<PCB>, // task control block inner, protected by lock
 
+    // thread only / once init
+    tcb: ThreadOnly<TCB>,             // thread control block
+    waker: ThreadOnly<Option<Waker>>, // waker for the task
+    trap_cx: ThreadOnly<TrapContext>, // trap context
+
     // immutable
     tid: Immutable<TidTracer>, // task id, with lifetime holded
     tgid: Immutable<TGID>,     // task group id, aka pid
     pgid: Immutable<PGID>,     // process group id
-
-    // thread only / once init
-    waker: ThreadOnly<Option<Waker>>, // waker for the task
-    trap_cx: ThreadOnly<TrapContext>, // trap context
-    tcb: ThreadOnly<TCB>,             // thread control block
 
     // shared
     fd_table: Shared<FdTable>,         // file descriptor table
@@ -341,12 +344,12 @@ impl Task {
             pcb: SpinLock::new(PCB::default()),
             thread_group: Arc::new(SpinLock::new(ThreadGroup::new())),
             memory_set: Arc::new(SpinLock::new(memory_set)),
-            trap_cx: SyncUnsafeCell::new(TrapContext::app_init_cx(elf_entry, user_sp)),
+            trap_cx: ThreadOnly::new(TrapContext::app_init_cx(elf_entry, user_sp)),
             sched_entity: SchedEntity::new_bare(INIT_PROCESS_ID),
             fd_table: Arc::new(SpinLock::new(FdTable::new())),
             cwd: Arc::new(SpinLock::new(Path::try_from(String::from("/")).unwrap())),
             sa_list: Arc::new(SpinLock::new(SigActionList::new())),
-            waker: SyncUnsafeCell::new(None),
+            waker: ThreadOnly::new(None),
             tcb: ThreadOnly::new(TCB {
                 ..Default::default()
             }),
@@ -528,12 +531,12 @@ impl Task {
                     ..Default::default()
                 }),
                 memory_set,
-                trap_cx: SyncUnsafeCell::new(self.trap_context().clone()),
+                trap_cx: ThreadOnly::new(self.trap_context().clone()),
                 sched_entity: self.sched_entity.data_clone(tid_val),
                 fd_table,
                 cwd: self.cwd.clone(),
                 sa_list: self.sa_list.clone(),
-                waker: SyncUnsafeCell::new(None),
+                waker: ThreadOnly::new(None),
                 tcb: ThreadOnly::new(TCB {
                     ..Default::default()
                 }),
@@ -555,12 +558,12 @@ impl Task {
                     ..Default::default()
                 }),
                 memory_set,
-                trap_cx: SyncUnsafeCell::new(self.trap_context().clone()),
+                trap_cx: ThreadOnly::new(self.trap_context().clone()),
                 sched_entity: self.sched_entity.data_clone(new_tgid),
                 fd_table,
                 cwd: Arc::new(SpinLock::new(self.cwd().clone())),
                 sa_list: Arc::new(SpinLock::new(SigActionList::new())),
-                waker: SyncUnsafeCell::new(None),
+                waker: ThreadOnly::new(None),
                 tcb: ThreadOnly::new(TCB {
                     ..Default::default()
                 }),

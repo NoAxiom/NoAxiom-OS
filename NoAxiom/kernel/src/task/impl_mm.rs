@@ -16,9 +16,9 @@ impl Task {
     pub fn grow_brk(self: &Arc<Self>, new_brk: usize) -> SyscallResult {
         let mut memory_set = self.memory_set().lock();
         let grow_size = new_brk - memory_set.user_brk;
-        debug!(
-            "[grow_brk] start: {:#x}, old_brk: {:#x}, new_brk: {:#x}",
-            memory_set.user_brk_start, memory_set.user_brk, new_brk
+        info!(
+            "[grow_brk] start: {:#x}, old_brk: {:#x}, new_brk: {:#x}, grow_size: {:#x}",
+            memory_set.user_brk_start, memory_set.user_brk, new_brk, grow_size
         );
         if grow_size > 0 {
             trace!("[grow_brk] expanded");

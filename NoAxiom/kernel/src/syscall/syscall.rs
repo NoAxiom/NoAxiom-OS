@@ -18,7 +18,6 @@ impl<'a> Syscall<'a> {
         Self { task }
     }
     pub async fn syscall(&mut self, id: usize, args: [usize; 6]) -> SyscallResult {
-        trace!("syscall id: {}, args: {:?}", id, args);
         #[cfg(feature = "interruptable_async")]
         {
             // fixme: turn on the interrupt. When call trap_handler, cpu would turn off
@@ -32,6 +31,7 @@ impl<'a> Syscall<'a> {
             error!("invalid syscall id: {}", id);
             Errno::ENOSYS
         })?;
+        info!("[syscall] id: {:?}, args: {:X?}", id, args);
         use SyscallID::*;
         match id {
             // fs
@@ -119,14 +119,14 @@ impl<'a> Syscall<'a> {
             SYS_MUNMAP => self.sys_munmap(args[0], args[1]),
 
             // others
-            SYS_TIMES => Self::sys_times(args[0]),
+            SYS_TIMES => self.sys_times(args[0]),
             SYS_SCHED_YIELD => self.sys_yield().await,
             SYS_UNAME => Self::sys_uname(args[0]),
             SYS_GETTIMEOFDAY => Self::sys_gettimeofday(args[0]),
             SYS_NANOSLEEP => self.sys_nanosleep(args[0]).await,
             SYS_GETRANDOM => self.sys_getrandom(args[0], args[1], args[2]).await,
 
-            // unsupported: return -1
+            // unsupported
             _ => {
                 error!("unsupported syscall id: {:?}, args: {:#x?}", id, args);
                 // let _ = self.sys_exit(Errno::ENOSYS as usize);
