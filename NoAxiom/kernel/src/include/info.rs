@@ -13,12 +13,12 @@ pub struct Utsname {
 impl Utsname {
     pub fn get() -> Self {
         Self {
-            sysname: Utsname::str2u8("NoAxiom"),
-            nodename: Utsname::str2u8("NoAxiom-host"),
-            release: Utsname::str2u8("1.0.0"),
-            version: Utsname::str2u8("NoAxiom-OS SMP 1.0.0"),
+            sysname: Utsname::str2u8("Linux"),
+            nodename: Utsname::str2u8("NoAxiom"),
+            release: Utsname::str2u8("5.0"),
+            version: Utsname::str2u8("5.13"),
             machine: Utsname::str2u8(Arch::ARCH_NAME),
-            domainname: Utsname::str2u8("none"),
+            domainname: Utsname::str2u8("Rust"),
         }
     }
 
