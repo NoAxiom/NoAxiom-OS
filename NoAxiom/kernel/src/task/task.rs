@@ -420,6 +420,7 @@ impl Task {
                 *((p as usize + len) as *mut u8) = 0;
             }
         }
+        argv[args.len()] = 0; // argv end with NULL
         user_sp -= user_sp % core::mem::size_of::<usize>();
 
         // === push env ===
@@ -464,6 +465,7 @@ impl Task {
                     as *mut usize) = auxs[i].1;
             }
         }
+        user_sp -= user_sp % core::mem::align_of::<usize>();
 
         fn push_slice<T: Copy>(user_sp: &mut usize, slice: &[T]) {
             let mut sp = *user_sp;

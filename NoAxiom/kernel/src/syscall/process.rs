@@ -1,4 +1,4 @@
-use alloc::vec::Vec;
+use alloc::{string::String, vec::Vec};
 
 use arch::TrapArgs;
 
@@ -73,21 +73,39 @@ impl Syscall<'_> {
     }
 
     pub async fn sys_execve(&mut self, path: usize, argv: usize, envp: usize) -> SyscallResult {
-        let path = UserPtr::new(path).get_cstr();
-        let path = if !path.starts_with('/') {
+        let mut path = UserPtr::new(path).get_cstr();
+        let mut args = Vec::new();
+        let mut envs = Vec::new();
+
+        // args and envs init
+        if path.contains(".sh") {
+            path = String::from("busybox");
+            args.push(String::from("busybox"));
+            args.push(String::from("sh"));
+        } else if path.ends_with("ls") || path.ends_with("sleep") {
+            path = String::from("/busybox");
+            args.push(String::from("busybox"));
+        }
+        envs.push(String::from("PATH=/"));
+        envs.push(String::from("LD_LIBRARY_PATH=/"));
+
+        let file_path = if !path.starts_with('/') {
             let cwd = self.task.cwd().clone().from_cd(&"..")?;
-            trace!("[sys_exec] cwd: {:?}", cwd);
+            debug!("[sys_exec] cwd: {:?}", cwd);
             cwd.from_cd(&path)?
         } else {
             Path::try_from(path)?
         };
-        let args = UserPtr::<UserPtr<u8>>::new(argv).get_string_vec();
-        let envs = UserPtr::<UserPtr<u8>>::new(envp).get_string_vec();
+        // append args and envs from user provided
+        args.append(&mut UserPtr::<UserPtr<u8>>::new(argv).get_string_vec());
+        envs.append(&mut UserPtr::<UserPtr<u8>>::new(envp).get_string_vec());
+
         info!(
             "[sys_exec] path: {:?} argv: {:#x}, envp: {:#x}, arg: {:?}, env: {:?}",
-            path, argv, envp, args, envs,
+            file_path, argv, envp, args, envs,
         );
-        self.task.execve(path, args, envs).await?;
+        self.task.execve(file_path, args, envs).await?;
+
         // On success, execve() does not return, on error -1 is returned, and errno is
         // set to indicate the error.
         Ok(self.task.trap_context()[TrapArgs::RES] as isize)
