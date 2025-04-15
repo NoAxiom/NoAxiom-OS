@@ -177,6 +177,11 @@ impl Syscall<'_> {
         let user_ptr = UserPtr::<u8>::new(buf);
         let buf_slice = user_ptr.as_slice_mut_checked(len).await?;
 
+        if file.is_stdio() {
+            let read_size = file.base_read(0, buf_slice).await?;
+            return Ok(read_size as isize);
+        }
+
         if !file.meta().readable() {
             return Err(Errno::EINVAL);
         }
@@ -223,6 +228,11 @@ impl Syscall<'_> {
         //     "[sys_write] buf as string: {}",
         //     String::from_utf8_lossy(buf_slice)
         // );
+
+        if file.is_stdio() {
+            let write_size = file.base_write(0, buf_slice).await?;
+            return Ok(write_size as isize);
+        }
 
         if !file.meta().writable() {
             return Err(Errno::EINVAL);
