@@ -83,14 +83,14 @@ impl Syscall<'_> {
             args.push(String::from("busybox"));
             args.push(String::from("sh"));
         } else if path.ends_with("ls") || path.ends_with("sleep") {
-            path = String::from("/busybox");
+            path = String::from("/glibc/busybox");
             args.push(String::from("busybox"));
         }
-        envs.push(String::from("PATH=/"));
-        envs.push(String::from("LD_LIBRARY_PATH=/"));
+        envs.push(String::from("PATH=/glibc/"));
+        envs.push(String::from("LD_LIBRARY_PATH=/glibc/"));
 
         let file_path = if !path.starts_with('/') {
-            let cwd = self.task.cwd().clone().from_cd(&"..")?;
+            let cwd = self.task.cwd();
             debug!("[sys_exec] cwd: {:?}", cwd);
             cwd.from_cd(&path)?
         } else {
