@@ -105,6 +105,9 @@ impl File for Fat32File {
     async fn delete_child(&self, _name: &str) -> Result<(), Errno> {
         Err(Errno::ENOSYS)
     }
+    fn ioctl(&self, _cmd: usize, _arg: usize) -> SyscallResult {
+        Err(Errno::ENOTTY)
+    }
 }
 
 pub struct Fat32Dir {
@@ -165,5 +168,8 @@ impl File for Fat32Dir {
         let inner = self.inner.lock();
         inner.remove(name).await.map_err(fs_err)?;
         Ok(())
+    }
+    fn ioctl(&self, _cmd: usize, _arg: usize) -> SyscallResult {
+        Err(Errno::ENOTTY)
     }
 }

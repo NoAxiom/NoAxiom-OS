@@ -96,6 +96,9 @@ impl File for Ext4File {
     async fn delete_child(&self, _name: &str) -> Result<(), Errno> {
         Err(Errno::ENOSYS)
     }
+    fn ioctl(&self, _cmd: usize, _arg: usize) -> SyscallResult {
+        Err(Errno::ENOTTY)
+    }
 }
 
 pub struct Ext4Dir {
@@ -185,6 +188,10 @@ impl File for Ext4Dir {
             .await
             .map_err(fs_err)?;
         Ok(())
+    }
+
+    fn ioctl(&self, _cmd: usize, _arg: usize) -> SyscallResult {
+        Err(Errno::ENOTTY)
     }
 }
 

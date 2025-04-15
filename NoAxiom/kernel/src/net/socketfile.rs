@@ -158,4 +158,8 @@ impl File for SocketFile {
     async fn delete_child(&self, _name: &str) -> Result<(), Errno> {
         unreachable!("Socket file is not a directory");
     }
+    fn ioctl(&self, _cmd: usize, _arg: usize) -> SyscallResult {
+        warn!("[Socket::ioctl] not supported now, return 0 instead");
+        Ok(0)
+    }
 }

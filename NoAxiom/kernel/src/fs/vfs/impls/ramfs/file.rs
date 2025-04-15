@@ -61,6 +61,9 @@ impl File for RamFsFile {
     async fn delete_child(&self, _name: &str) -> SysResult<()> {
         Err(Errno::ENOSYS)
     }
+    fn ioctl(&self, _cmd: usize, _arg: usize) -> SyscallResult {
+        Err(Errno::ENOTTY)
+    }
 }
 
 pub struct RamFsDir {
@@ -100,5 +103,8 @@ impl File for RamFsDir {
     /// Ram fs does not really has child or parent
     async fn delete_child(&self, _name: &str) -> SysResult<()> {
         Ok(())
+    }
+    fn ioctl(&self, _cmd: usize, _arg: usize) -> SyscallResult {
+        Err(Errno::ENOTTY)
     }
 }

@@ -5,6 +5,7 @@ use include::errno::Errno;
 
 use crate::{
     fs::vfs::basic::file::{File, FileMeta},
+    include::fs::RtcTime,
     syscall::{SysResult, SyscallResult},
 };
 
@@ -42,5 +43,12 @@ impl File for RtcFile {
     }
     async fn delete_child(&self, _name: &str) -> SysResult<()> {
         Err(Errno::ENOSYS)
+    }
+
+    fn ioctl(&self, _cmd: usize, arg: usize) -> SyscallResult {
+        unsafe {
+            *(arg as *mut RtcTime) = RtcTime::default();
+        }
+        Ok(0)
     }
 }

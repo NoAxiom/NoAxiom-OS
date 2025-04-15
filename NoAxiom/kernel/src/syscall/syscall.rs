@@ -69,6 +69,7 @@ impl<'a> Syscall<'a> {
                 self.sys_readlinkat(args[0] as isize, args[1], args[2], args[3])
                     .await
             }
+            SYS_IOCTL => self.sys_ioctl(args[0], args[1], args[2]),
 
             // net
             SYS_SOCKET => self.sys_socket(args[0], args[1], args[2]),

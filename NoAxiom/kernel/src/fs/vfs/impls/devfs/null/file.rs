@@ -42,4 +42,8 @@ impl File for NullFile {
     async fn delete_child(&self, _name: &str) -> SysResult<()> {
         Err(Errno::ENOSYS)
     }
+
+    fn ioctl(&self, _cmd: usize, _arg: usize) -> SyscallResult {
+        Err(Errno::ENOTTY)
+    }
 }

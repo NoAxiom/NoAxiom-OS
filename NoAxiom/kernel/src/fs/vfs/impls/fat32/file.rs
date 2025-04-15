@@ -74,6 +74,9 @@ impl File for FAT32File {
     async fn delete_child(&self, _name: &str) -> Result<(), Errno> {
         Err(Errno::ENOSYS)
     }
+    fn ioctl(&self, _cmd: usize, _arg: usize) -> SyscallResult {
+        Err(Errno::ENOTTY)
+    }
 }
 
 pub struct FAT32Directory {
@@ -139,5 +142,9 @@ impl File for FAT32Directory {
     }
     async fn delete_child(&self, _name: &str) -> Result<(), Errno> {
         todo!()
+    }
+
+    fn ioctl(&self, _cmd: usize, _arg: usize) -> SyscallResult {
+        Err(Errno::ENOTTY)
     }
 }

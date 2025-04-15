@@ -84,6 +84,8 @@ pub trait File: Send + Sync + DowncastSync {
     async fn load_dir(&self) -> Result<(), Errno>;
     /// Delete dentry, only for directories
     async fn delete_child(&self, name: &str) -> Result<(), Errno>;
+    /// IOCTL command
+    fn ioctl(&self, cmd: usize, arg: usize) -> SyscallResult;
 }
 
 impl_downcast!(sync File);
@@ -246,6 +248,9 @@ impl File for EmptyFile {
         unreachable!()
     }
     async fn delete_child(&self, _name: &str) -> Result<(), Errno> {
+        unreachable!()
+    }
+    fn ioctl(&self, _cmd: usize, _arg: usize) -> SyscallResult {
         unreachable!()
     }
 }

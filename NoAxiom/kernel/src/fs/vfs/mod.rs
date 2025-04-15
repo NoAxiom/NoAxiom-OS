@@ -3,7 +3,7 @@ use alloc::sync::Arc;
 use basic::dentry::Dentry;
 use driver::devices::impls::block::BlockDevice;
 use impls::{
-    ext4::filesystem::AsyncSmpExt4, proc::filesystem::ProcDevFs,
+    devfs::filesystem::DevFs, ext4::filesystem::AsyncSmpExt4, proc::filesystem::ProcDevFs,
     rust_fat32::filesystem::AsyncSmpFat32,
 };
 use ksync::Once;
@@ -35,6 +35,7 @@ pub async fn fs_init() {
     FS_MANAGER.register(Arc::new(AsyncSmpExt4::new(AsyncSmpExt4::name())));
     FS_MANAGER.register(Arc::new(AsyncSmpFat32::new(AsyncSmpFat32::name())));
     FS_MANAGER.register(Arc::new(ProcDevFs::new(ProcDevFs::name())));
+    FS_MANAGER.register(Arc::new(DevFs::new(DevFs::name())));
 
     info!("[vfs] [{}] mounting", RootRealFs::name());
     let device = driver::get_blk_dev();
@@ -49,6 +50,11 @@ pub async fn fs_init() {
     let proc_fs = FS_MANAGER.get(ProcDevFs::name()).unwrap();
     let _proc_root = proc_fs
         .root(Some(root.clone()), MountFlags::empty(), "proc", None)
+        .await;
+
+    let dev_fs = FS_MANAGER.get(DevFs::name()).unwrap();
+    let _dev_root = dev_fs
+        .root(Some(root.clone()), MountFlags::empty(), "dev", None)
         .await;
 
     // Load the root dentry

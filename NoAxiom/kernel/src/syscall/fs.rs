@@ -302,6 +302,29 @@ impl Syscall<'_> {
         Ok(0)
     }
 
+    /// Get file io control
+    pub fn sys_ioctl(&self, fd: usize, request: usize, arg: usize) -> SyscallResult {
+        info!(
+            "[sys_ioctl]: fd: {}, request: {:#x}, argp: {:#x}",
+            fd, request, arg
+        );
+        let fd_table = self.task.fd_table();
+        fd_table.get(fd).ok_or(Errno::EBADF)?;
+
+        let arg_ptr = UserPtr::<u8>::new(arg);
+        use crate::include::fs::TtyIoctlCmd::{self, *};
+        let cmd = TtyIoctlCmd::from_repr(request).unwrap();
+        match cmd {
+            TCGETS => {}
+            TCSETS => {}
+            TIOCGPGRP => arg_ptr.write(0),
+            TIOCSPGRP => {}
+            TIOCGWINSZ => arg_ptr.write(0),
+            _ => return Err(Errno::EINVAL),
+        }
+        Ok(0)
+    }
+
     pub async fn sys_newfstat(
         &self,
         dirfd: isize,
@@ -493,7 +516,7 @@ impl Syscall<'_> {
     pub fn sys_fcntl(&self, fd: usize, cmd: usize, arg: usize) -> SyscallResult {
         info!("[sys_fcntl] fd: {fd}, cmd: {cmd:?}, arg: {arg}");
         let task = self.task;
-        let flags = FileFlags::from_bits(arg as u32).ok_or(Errno::EINVAL)?;
+        let flags = FileFlags::from_bits_retain(arg as u32);
         let mut fd_table = task.fd_table();
         let file = fd_table.get(fd).ok_or(Errno::EBADF)?;
 
