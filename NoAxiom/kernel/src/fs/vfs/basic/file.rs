@@ -136,12 +136,18 @@ impl dyn File {
         Ok(buf)
     }
     pub async fn read(&self, buf: &mut [u8]) -> SyscallResult {
+        if self.is_stdio() {
+            return self.base_read(0, buf).await;
+        }
         let offset = self.pos();
         let len = self.base_read(offset, buf).await?;
         self.meta().pos.fetch_add(len as usize, Ordering::Relaxed);
         Ok(len)
     }
     pub async fn write(&self, buf: &[u8]) -> SyscallResult {
+        if self.is_stdio() {
+            return self.base_write(0, buf).await;
+        }
         let offset = self.pos();
         let len = self.base_write(offset, buf).await?;
         self.meta().pos.fetch_add(len as usize, Ordering::Relaxed);

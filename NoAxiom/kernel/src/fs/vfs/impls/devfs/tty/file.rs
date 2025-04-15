@@ -1,0 +1,52 @@
+use alloc::boxed::Box;
+
+use async_trait::async_trait;
+use include::errno::Errno;
+
+use crate::{
+    fs::vfs::basic::file::{File, FileMeta},
+    syscall::{SysResult, SyscallResult},
+};
+
+pub struct TtyFile {
+    meta: FileMeta,
+}
+
+impl TtyFile {
+    pub fn new(meta: FileMeta) -> Self {
+        Self { meta }
+    }
+}
+
+#[async_trait]
+impl File for TtyFile {
+    fn meta(&self) -> &FileMeta {
+        &self.meta
+    }
+
+    async fn base_readlink(&self, buf: &mut [u8]) -> SyscallResult {
+        let exe = crate::utils::current_task().cwd().as_string();
+        if buf.len() < exe.len() + 1 {
+            warn!("readlink buf not big enough");
+            return Err(Errno::EINVAL);
+        }
+        buf[0..exe.len()].copy_from_slice(exe.as_bytes());
+        buf[exe.len()] = '\0' as u8;
+        Ok((exe.len() + 1) as isize)
+    }
+
+    async fn base_read(&self, _offset: usize, _buf: &mut [u8]) -> SyscallResult {
+        unreachable!("read from exe");
+    }
+
+    async fn base_write(&self, _offset: usize, _buf: &[u8]) -> SyscallResult {
+        unreachable!("write to exe");
+    }
+
+    async fn load_dir(&self) -> SysResult<()> {
+        Err(Errno::ENOSYS)
+    }
+    async fn delete_child(&self, _name: &str) -> SysResult<()> {
+        Err(Errno::ENOSYS)
+    }
+}

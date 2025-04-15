@@ -6,7 +6,7 @@ use crate::{
     cpu::get_hartid,
     driver,
     entry::init_proc::schedule_spawn_with_kernel_app,
-    fs::fs_init,
+    fs::{self},
     mm::{
         bss::bss_init,
         frame::frame_init,
@@ -72,7 +72,7 @@ pub extern "C" fn _boot_hart_init(_hartid: usize, dtb: usize) -> ! {
 
     // fs init
     Arch::enable_interrupt();
-    block_on(fs_init());
+    block_on(fs::init());
 
     // spawn init_proc and wake other harts
     // crate::entry::init_proc::schedule_spawn_all_apps();
