@@ -7,9 +7,8 @@ use arch::{Arch, ArchInt, ArchTrap, TrapArgs, TrapType};
 use super::{ext_int::ext_int_handler, ipi::ipi_handler};
 use crate::{
     cpu::{current_cpu, get_hartid},
-    sched::utils::{block_on, yield_now},
+    sched::utils::block_on,
     task::{exit::ExitCode, Task},
-    time::time_slice::TIME_SLICE_DURATION,
 };
 
 /// kernel trap handler
@@ -60,17 +59,6 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
     assert!(!Arch::is_interrupt_enabled());
     trace!("[trap_handler] call trap handler");
 
-    // check if need schedule
-    if task.tcb().time_stat.need_schedule() {
-        debug!(
-            "task {} yield in user trap handler by time = {:?}, time_slice = {:?}",
-            task.tid(),
-            task.tcb().time_stat,
-            TIME_SLICE_DURATION,
-        );
-        yield_now().await;
-    }
-
     // def: context, user trap pc, trap type
     let cx = task.trap_context_mut();
     let epc = Arch::read_epc();
@@ -102,12 +90,13 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
                 Ok(_) => trace!("[memory_validate] success in user_trap_handler"),
                 Err(_) => {
                     panic!(
-                        "[user_trap] page fault at hart: {}, tid: {}, epc = {:#x}, addr = {:#x}, user_sp = {:#x}",
+                        "[user_trap] page fault at hart: {}, tid: {}, epc = {:#x}, addr = {:#x}, user_sp = {:#x}, ra = {:#x}",
                         get_hartid(),
                         task.tid(),
                         cx[TrapArgs::EPC],
                         addr,
                         cx[TrapArgs::SP],
+                        cx[TrapArgs::RA],
                     );
                     user_exit("memory_validate failed");
                 }

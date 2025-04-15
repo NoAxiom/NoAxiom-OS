@@ -10,9 +10,9 @@ use ksync::mutex::check_no_lock;
 
 use crate::{
     cpu::current_cpu,
-    sched::utils::{suspend_now, take_waker},
+    sched::utils::{suspend_now, take_waker, yield_now},
     task::{status::TaskStatus, Task},
-    time::gettime::get_time_us,
+    time::{gettime::get_time_us, time_slice::TIME_SLICE_DURATION},
     trap::handler::user_trap_handler,
 };
 
@@ -96,6 +96,17 @@ pub async fn task_main(task: Arc<Task>) {
             _ => drop(pcb),
         }
         assert!(check_no_lock());
+
+        // check if need schedule
+        if task.tcb().time_stat.need_schedule() {
+            debug!(
+                "task {} yield in user trap handler by time = {:?}, time_slice = {:?}",
+                task.tid(),
+                task.tcb().time_stat,
+                TIME_SLICE_DURATION,
+            );
+            yield_now().await;
+        }
 
         // check signal before return to user
         trace!("[task_main] check_signal");

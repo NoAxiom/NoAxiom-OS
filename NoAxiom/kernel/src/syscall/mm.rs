@@ -81,8 +81,8 @@ impl Syscall<'_> {
                 let flags = pte.flags().union(mapping_flags);
                 pte.set_flags(flags);
                 debug!(
-                    "[sys_mprotect] set flags in page table, vpn: {:#x}, flags: {:?}",
-                    vpn.0, flags
+                    "[sys_mprotect] set flags in page table, vpn: {:#x}, flags: {:?}, pte_raw: {:#x}",
+                    vpn.0, flags, pte.0
                 );
             } else {
                 let task = self.task;

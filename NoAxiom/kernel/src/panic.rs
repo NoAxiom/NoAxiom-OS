@@ -13,10 +13,10 @@ lazy_static::lazy_static! {
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
     println!("[PANIC] kernel triggered panic!!!");
-    // if let Some(task) = current_cpu().task.as_ref() {
-    //     let cx = task.trap_context();
-    //     trace!("[PANIC] cx detected: {:#x?}", cx);
-    // }
+    if let Some(task) = current_cpu().task.as_ref() {
+        let cx = task.trap_context();
+        trace!("[PANIC] cx detected: {:#x?}", cx);
+    }
     Arch::arch_info_print();
     if let Some(location) = info.location() {
         println!(
