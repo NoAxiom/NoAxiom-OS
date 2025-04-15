@@ -155,7 +155,7 @@ pub async fn lazy_alloc_mmap<'a>(
             let pte_flags: MappingFlags = MappingFlags::from(mmap_page.prot) | MappingFlags::U;
             mmap_page.lazy_map_page(kernel_vpn).await?;
             let mut ms = memory_set.lock();
-            ms.page_table().map(vpn, ppn, pte_flags);
+            ms.page_table().map(vpn, ppn, pte_flags, false);
             if let Some(tracer) = ms.mmap_manager.alloc_tracer.get_mut(&vpn) {
                 for waker in tracer.iter() {
                     waker.wake_by_ref();

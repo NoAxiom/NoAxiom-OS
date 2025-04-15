@@ -122,14 +122,14 @@ impl MapArea {
                 }
                 self.frame_map.insert(vpn, frame);
                 let flags = self.map_permission.into();
-                page_table.map(vpn, ppn, flags);
+                page_table.map(vpn, ppn, flags, false);
                 assert!(page_table.find_pte(vpn).is_some());
             }
             // direct: kernel space
             MapType::Direct => {
                 let ppn = vpn.kernel_translate_into_ppn();
                 let flags = self.map_permission.into();
-                page_table.map(vpn, ppn, flags);
+                page_table.map(vpn, ppn, flags, false);
             }
         }
     }
@@ -214,7 +214,8 @@ impl MapArea {
         }
         trace!(
             "[load_data]: cur_st = {:#x}, area: {:?}",
-            cur_st, self.vpn_range
+            cur_st,
+            self.vpn_range
         );
     }
 }

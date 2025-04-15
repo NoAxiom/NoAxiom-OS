@@ -9,6 +9,7 @@ use crate::{
     cpu::{current_cpu, get_hartid},
     sched::utils::{block_on, yield_now},
     task::{exit::ExitCode, Task},
+    time::time_slice::TIME_SLICE_DURATION,
 };
 
 /// kernel trap handler
@@ -62,9 +63,10 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
     // check if need schedule
     if task.tcb().time_stat.need_schedule() {
         debug!(
-            "task {} yield in user trap handler by time = {:?}",
+            "task {} yield in user trap handler by time = {:?}, time_slice = {:?}",
             task.tid(),
-            task.tcb().time_stat
+            task.tcb().time_stat,
+            TIME_SLICE_DURATION,
         );
         yield_now().await;
     }

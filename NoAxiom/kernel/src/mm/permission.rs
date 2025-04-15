@@ -20,7 +20,7 @@ bitflags! {
     /// map permission contains kernel-associated pte flags,
     /// and don't contain hardware-associated pte flags
     #[derive(Clone, Copy, Debug)]
-    pub struct MapPermission: u64 {
+    pub struct MapPermission: usize {
         /// readable
         const R = 1 << 1;
         /// writable

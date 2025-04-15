@@ -117,6 +117,7 @@ impl<'a> Syscall<'a> {
                 args[5],
             ),
             SYS_MUNMAP => self.sys_munmap(args[0], args[1]),
+            SYS_MPROTECT => self.sys_mprotect(args[0], args[1], args[2]),
 
             // others
             SYS_TIMES => self.sys_times(args[0]),

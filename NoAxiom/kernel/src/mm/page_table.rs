@@ -109,12 +109,13 @@ impl PageTable {
     }
 
     /// map vpn -> ppn
-    pub fn map(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: MappingFlags) {
+    pub fn map(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: MappingFlags, is_remap: bool) {
         let pte = self.create_pte(vpn);
         assert!(
-            !pte.flags().contains(MappingFlags::V),
-            "{:#x?} is mapped before mapping, flags: {:?}, ppn: {:#x}",
+            (!pte.flags().contains(MappingFlags::V)) ^ is_remap,
+            "{:#x?} {} mapped before mapping, flags: {:?}, ppn: {:#x}",
             vpn,
+            if is_remap { "isn't" } else { "is" },
             pte.flags(),
             pte.ppn()
         );

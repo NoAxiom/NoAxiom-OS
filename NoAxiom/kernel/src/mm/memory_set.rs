@@ -5,7 +5,6 @@ use arch::{
     consts::{KERNEL_ADDR_OFFSET, KERNEL_VIRT_MEMORY_END},
     Arch, ArchMemory, ArchPageTableEntry, ArchTime, MappingFlags, PageTableEntry,
 };
-use config::mm::DL_INTERP_OFFSET;
 use ksync::{cell::SyncUnsafeCell, mutex::SpinLock, Lazy};
 
 use super::{
@@ -427,7 +426,7 @@ impl MemorySet {
                 old_pte.set_flags(new_flags);
                 new_set
                     .page_table()
-                    .map(vpn, old_pte.ppn().into(), new_flags);
+                    .map(vpn, old_pte.ppn().into(), new_flags, false);
                 // trace!(
                 //     "remap_cow: vpn = {:#x}, new_flags = {:?}, old_pte =
                 // {:#x}, new_pte = {:#x}",     vpn.0,
@@ -438,7 +437,7 @@ impl MemorySet {
             } else {
                 new_set
                     .page_table()
-                    .map(vpn, old_pte.ppn().into(), old_flags);
+                    .map(vpn, old_pte.ppn().into(), old_flags, false);
             }
             new_area.frame_map.insert(vpn, frame_tracker.clone());
         };
