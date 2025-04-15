@@ -59,6 +59,7 @@ pub fn schedule_spawn_with_kernel_app() {
         let elf = MemorySet::load_from_vec(file_data).await;
         let task = Task::new_process(elf);
         let path = Path::from_or_create(INIT_PROC_PATH.to_string(), InodeMode::FILE).await;
+        let path = path.from_cd("..").expect("directory not found");
         let mut guard = task.cwd();
         *guard = path;
         drop(guard);

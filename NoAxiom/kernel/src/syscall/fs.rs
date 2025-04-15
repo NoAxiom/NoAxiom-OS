@@ -546,7 +546,7 @@ async fn get_path_or_create(
 
     if !path_str.starts_with('/') {
         if fd == AT_FDCWD {
-            let cwd = task.cwd().clone().from_cd(&"..")?;
+            let cwd = task.cwd().clone();
             trace!("[{debug_syscall_name}] cwd: {:?}", cwd);
             Ok(cwd.from_cd_or_create(&path_str, mode).await)
         } else {
@@ -573,7 +573,7 @@ fn get_path(
     let path_str = get_string_from_ptr(&UserPtr::<u8>::new(rawpath));
     if !path_str.starts_with('/') {
         if fd == AT_FDCWD {
-            let cwd = task.cwd().clone().from_cd(&"..")?;
+            let cwd = task.cwd().clone();
             trace!("[{debug_syscall_name}] cwd: {:?}", cwd);
             cwd.from_cd(&path_str)
         } else {
