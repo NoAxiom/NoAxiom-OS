@@ -47,6 +47,7 @@ pub async fn validate(
                 current_cpu().task.as_ref().unwrap().tid()
             );
             memory_set.lock().realloc_cow(vpn, pte);
+            Arch::tlb_flush();
             Ok(())
         } else if trap_type.is_some() && matches!(trap_type.unwrap(), TrapType::StorePageFault(_)) {
             error!(
@@ -66,17 +67,20 @@ pub async fn validate(
             info!(
                 "[memory_validate] realloc stack, tid: {}, addr: {:#x?}, epc: {:#x}",
                 task.tid(),
-                vpn,
+                vpn.0,
                 task.trap_context()[arch::TrapArgs::EPC],
             );
             ms.lazy_alloc_stack(vpn);
+            Arch::tlb_flush();
             Ok(())
         } else if ms.user_brk_area.vpn_range.is_in_range(vpn) {
             info!(
-                "[memory_validate] realloc heap, tid: {}, addr: {vpn:#x?}",
-                current_cpu().task.as_ref().unwrap().tid()
+                "[memory_validate] realloc heap, tid: {}, addr: {:#x?}",
+                current_cpu().task.as_ref().unwrap().tid(),
+                vpn.0
             );
             ms.lazy_alloc_brk(vpn);
+            Arch::tlb_flush();
             Ok(())
         } else {
             info!(
@@ -84,6 +88,7 @@ pub async fn validate(
                 current_cpu().task.as_ref().unwrap().tid()
             );
             lazy_alloc_mmap(memory_set, vpn, ms).await?;
+            Arch::tlb_flush();
             Ok(())
         }
     }

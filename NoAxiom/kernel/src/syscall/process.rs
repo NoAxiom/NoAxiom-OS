@@ -86,8 +86,8 @@ impl Syscall<'_> {
             path = String::from("/glibc/busybox");
             args.push(String::from("busybox"));
         }
-        envs.push(String::from("PATH=/glibc/"));
-        envs.push(String::from("LD_LIBRARY_PATH=/glibc/"));
+        envs.push(String::from("PATH=/glibc"));
+        envs.push(String::from("LD_LIBRARY_PATH=/glibc"));
 
         let file_path = if !path.starts_with('/') {
             let cwd = self.task.cwd();

@@ -6,9 +6,9 @@ use alloc::{
     sync::{Arc, Weak},
     vec::Vec,
 };
-use core::task::Waker;
+use core::{ptr::null, task::Waker};
 
-use arch::{ArchTrapContext, TrapArgs, TrapContext};
+use arch::{Arch, ArchFull, ArchTrapContext, TrapArgs, TrapContext};
 use ksync::{
     cell::SyncUnsafeCell,
     mutex::{SpinLock, SpinLockGuard},
@@ -398,65 +398,66 @@ impl Task {
         envs: Vec<String>,        // env vec
         auxs: &mut Vec<AuxEntry>, // aux vec
     ) -> (usize, usize, usize, usize) {
-        trace!("[init_user_stack] start");
-
-        // user stack pointer
+        fn push_slice<T: Copy>(user_sp: &mut usize, slice: &[T]) {
+            let mut sp = *user_sp;
+            sp -= core::mem::size_of_val(slice);
+            sp -= sp % core::mem::align_of::<T>();
+            unsafe { core::slice::from_raw_parts_mut(sp as *mut T, slice.len()) }
+                .copy_from_slice(slice);
+            *user_sp = sp
+        }
         let mut user_sp = user_sp;
-        trace!("user_sp: {:#x}", user_sp);
-        // argument vector
-        let mut argv = vec![0; args.len() + 1];
-        // environment pointer, end with NULL
-        let mut envp = vec![0; envs.len() + 1];
 
-        // === push args ===
-        trace!("[init_user_stack] push args: {:?}", args);
-        for (i, s) in args.iter().enumerate() {
-            let len = s.len();
-            user_sp -= len + 1;
-            let p = user_sp as *mut u8;
-            argv[i] = user_sp;
+        // argv is a vector of each arg's addr
+        let mut argv = vec![0; args.len()];
+        // envp is a vector of each env's addr
+        let mut envp = vec![0; envs.len()];
+        // Copy each env to the newly allocated stack
+        for i in 0..envs.len() {
+            // Here we leave one byte to store a '\0' as a terminator
+            user_sp -= envs[i].len() + 1;
+            let p: *mut u8 = user_sp as *mut u8;
             unsafe {
-                p.copy_from(s.as_ptr(), len);
-                *((p as usize + len) as *mut u8) = 0;
+                envp[i] = user_sp;
+                p.copy_from(envs[i].as_ptr(), envs[i].len());
+                *((p as usize + envs[i].len()) as *mut u8) = 0;
             }
         }
-        argv[args.len()] = 0; // argv end with NULL
         user_sp -= user_sp % core::mem::size_of::<usize>();
 
-        // === push env ===
-        trace!("[init_user_stack] push envs: {:?}", envs);
-        for (i, s) in envs.iter().enumerate() {
-            let len = s.len();
-            user_sp -= len + 1;
-            let p: *mut u8 = user_sp as *mut u8;
-            envp[i] = user_sp;
+        // Copy each arg to the newly allocated stack
+        for i in 0..args.len() {
+            user_sp -= args[i].len() + 1;
+            let p = user_sp as *mut u8;
             unsafe {
-                p.copy_from(s.as_ptr(), len);
-                *((p as usize + len) as *mut u8) = 0;
+                argv[i] = user_sp;
+                p.copy_from(args[i].as_ptr(), args[i].len());
+                *((p as usize + args[i].len()) as *mut u8) = 0;
             }
         }
-        // terminator: envp end with NULL
-        envp[envs.len()] = 0;
-        user_sp -= user_sp % core::mem::align_of::<usize>();
+        user_sp -= user_sp % core::mem::size_of::<usize>();
 
-        // === push auxs ===
-        trace!("[init_user_stack] push auxs");
-        // random (16 bytes aligned, always 0 here)
+        // Copy `platform`
+        let platform = Arch::ARCH_NAME;
+        user_sp -= platform.len() + 1;
+        user_sp -= user_sp % core::mem::size_of::<usize>();
+        let p = user_sp as *mut u8;
+        unsafe {
+            p.copy_from(platform.as_ptr(), platform.len());
+            *((p as usize + platform.len()) as *mut u8) = 0;
+        }
+
+        // Copy 16 random bytes(here is 0)
         user_sp -= 16;
         auxs.push(AuxEntry(AT_RANDOM, user_sp as usize));
+        // Padding
         user_sp -= user_sp % 16;
-        // execfn, file name
-        if !argv.is_empty() {
-            auxs.push(AuxEntry(AT_EXECFN, argv[0] as usize)); // file name
-        }
-        // terminator: auxv end with AT_NULL
-        auxs.push(AuxEntry(AT_NULL, 0 as usize)); // end
-        trace!("[init_user_stack] auxs: {:?}", auxs);
+        auxs.push(AuxEntry(AT_NULL, 0 as usize));
 
-        // construct auxv
-        trace!("[init_user_stack] construct auxv");
-        let auxs_len = auxs.len() * core::mem::size_of::<AuxEntry>();
-        user_sp -= auxs_len;
+        // Construct auxv
+        debug!("auxv len {}", auxs.len());
+        let len = auxs.len() * core::mem::size_of::<AuxEntry>();
+        user_sp -= len;
         // let auxv_base = user_sp;
         for i in 0..auxs.len() {
             unsafe {
@@ -465,38 +466,22 @@ impl Task {
                     as *mut usize) = auxs[i].1;
             }
         }
-        user_sp -= user_sp % core::mem::align_of::<usize>();
 
-        fn push_slice<T: Copy>(user_sp: &mut usize, slice: &[T]) {
-            let mut sp = *user_sp;
-            sp -= core::mem::size_of_val(slice);
-            sp -= sp % core::mem::align_of::<T>();
-            unsafe { core::slice::from_raw_parts_mut(sp as *mut T, slice.len()) }
-                .copy_from_slice(slice);
-            *user_sp = sp;
-
-            trace!(
-                "[init_user_stack] sp {:#x}, push_slice: {:#x?}",
-                sp,
-                unsafe { core::slice::from_raw_parts(sp as *const usize, slice.len()) }
-            );
-        }
-
-        // construct envp
-        trace!("[init_user_stack] construct envp, data: {:#x?}", envp);
-        push_slice(&mut user_sp, envp.as_slice());
+        // Construct envp
+        let len = (envs.len() + 1) * core::mem::size_of::<usize>();
+        user_sp -= len;
         let envp_base = user_sp;
+        for i in 0..envs.len() {
+            unsafe { *((envp_base + i * core::mem::size_of::<usize>()) as *mut usize) = envp[i] };
+        }
+        unsafe { *((envp_base + envs.len() * core::mem::size_of::<usize>()) as *mut usize) = 0 };
 
-        // push argv
-        trace!("[init_user_stack] push argv, data: {:#x?}", argv);
+        // push argv, argc
+        push_slice(&mut user_sp, &[null::<u8>()]);
         push_slice(&mut user_sp, argv.as_slice());
         let argv_base = user_sp;
+        push_slice(&mut user_sp, &[args.len()]);
 
-        // push argc, argv, envp
-        let argc = args.len();
-        push_slice(&mut user_sp, &[argc, argv_base, envp_base]);
-
-        // return value: sp, argc, argv, envp
         (user_sp, args.len(), argv_base, envp_base)
     }
 

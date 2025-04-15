@@ -80,7 +80,7 @@ impl Syscall<'_> {
             if let Some(pte) = page_table.find_pte(vpn) {
                 let flags = pte.flags().union(mapping_flags);
                 pte.set_flags(flags);
-                debug!(
+                trace!(
                     "[sys_mprotect] set flags in page table, vpn: {:#x}, flags: {:?}, pte_raw: {:#x}",
                     vpn.0, flags, pte.0
                 );

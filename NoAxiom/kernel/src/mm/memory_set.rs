@@ -501,13 +501,11 @@ impl MemorySet {
     pub fn lazy_alloc_stack(&mut self, vpn: VirtPageNum) {
         self.user_stack_area
             .map_one(vpn, unsafe { &mut (*self.page_table.get()) });
-        Arch::tlb_flush();
     }
 
     pub fn lazy_alloc_brk(&mut self, vpn: VirtPageNum) {
         self.user_brk_area
             .map_one(vpn, unsafe { &mut (*self.page_table.get()) });
-        Arch::tlb_flush();
     }
 
     pub fn brk_grow(&mut self, new_brk_vpn: VirtPageNum) {
@@ -547,7 +545,6 @@ impl MemorySet {
             }
             self.page_table()
                 .remap_cow(vpn, new_ppn, old_ppn, new_flags);
-            Arch::tlb_flush();
             trace!(
                 "[realloc_cow] done!!! refcount: old: [{:#x}: {:#x}], new: [{:#x}: {:#x}]",
                 old_ppn.0,
