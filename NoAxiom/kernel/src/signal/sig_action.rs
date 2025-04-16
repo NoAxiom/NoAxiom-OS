@@ -7,7 +7,7 @@ use super::{
 };
 use crate::constant::signal::{MAX_SIGNUM, SIG_DFL, SIG_IGN};
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum SAHandlerType {
     Ignore,
     Kill,

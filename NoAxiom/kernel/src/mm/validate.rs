@@ -75,7 +75,7 @@ pub async fn validate(
             Ok(())
         } else if ms.user_brk_area.vpn_range.is_in_range(vpn) {
             info!(
-                "[memory_validate] realloc heap, tid: {}, addr: {:#x?}",
+                "[memory_validate] realloc heap, tid: {}, addr: {:x?}",
                 current_cpu().task.as_ref().unwrap().tid(),
                 vpn.0
             );
@@ -84,8 +84,9 @@ pub async fn validate(
             Ok(())
         } else {
             info!(
-                "[memory_validate] realloc mmap, tid: {}, addr: {vpn:#x?}",
-                current_cpu().task.as_ref().unwrap().tid()
+                "[memory_validate] realloc mmap, tid: {}, addr: {:x?}",
+                current_cpu().task.as_ref().unwrap().tid(),
+                vpn.0
             );
             lazy_alloc_mmap(memory_set, vpn, ms).await?;
             Arch::tlb_flush();

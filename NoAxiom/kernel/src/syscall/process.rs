@@ -177,30 +177,30 @@ impl Syscall<'_> {
     }
 
     pub fn sys_getpgid(&self, pid: usize) -> SyscallResult {
-        if pid == 0 {
-            let pgid = self.task.get_pgid();
-            Ok(pgid as isize)
+        let target_task = if pid == 0 {
+            self.task.clone()
         } else {
-            let proc = TASK_MANAGER.get(pid);
-            if proc.is_none() {
-                Err(Errno::ESRCH)
-            } else {
-                let proc = proc.unwrap();
-                let pgid = proc.get_pgid();
-                Ok(pgid as isize)
-            }
-        }
+            TASK_MANAGER.get(pid).ok_or(Errno::ESRCH)?
+        };
+        let pgid = target_task.get_pgid();
+        info!("[sys_getpgid] tid: {}, pgid: {}", target_task.tid(), pgid);
+        Ok(pgid as isize)
     }
 
     pub fn sys_setpgid(&self, pid: usize, pgid: usize) -> SyscallResult {
         if (pgid as isize) < 0 {
             return Err(Errno::EINVAL);
         }
+
+        // If pid is zero, then the process ID of the calling process is used
         let target_task = if pid == 0 {
             self.task.clone()
         } else {
             TASK_MANAGER.get(pid).ok_or(Errno::ESRCH)?
         };
+
+        // If pgid is zero, then the PGID of the process specified by pid is
+        // made the same as its process ID.
         if pgid == 0 {
             PROCESS_GROUP_MANAGER.insert_new_group(&target_task);
         } else {

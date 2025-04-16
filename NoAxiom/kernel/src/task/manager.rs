@@ -4,14 +4,13 @@ use alloc::{
     vec::Vec,
 };
 
-use include::errno::Errno;
 use ksync::{mutex::SpinLock, Lazy};
 
 use super::{
     taskid::{PGID, TID},
     Task,
 };
-use crate::{config::task::INIT_PROCESS_ID, syscall::SyscallResult};
+use crate::config::task::INIT_PROCESS_ID;
 
 pub struct TaskManager(pub SpinLock<BTreeMap<TID, Weak<Task>>>);
 impl TaskManager {
@@ -50,6 +49,7 @@ impl ProcessGroupManager {
     pub fn insert_new_group(&self, group_leader: &Arc<Task>) {
         let pgid = group_leader.tid();
         group_leader.set_pgid(pgid);
+        debug!("[pgid] insert new process group {}", pgid);
         let mut group = Vec::new();
         group.push(Arc::downgrade(group_leader));
         self.0.lock().insert(pgid, group);
@@ -58,12 +58,17 @@ impl ProcessGroupManager {
     pub fn insert_process(&self, pgid: PGID, process: &Arc<Task>) {
         if !process.is_group_leader() {
             error!(
-                "[pg_manager] process {} is not a group leader",
+                "[pgid] process {} is not a group leader",
                 process.tid()
             );
             return;
         }
         process.set_pgid(pgid);
+        debug!(
+            "[pgid] insert process {} to group {}",
+            process.tid(),
+            pgid
+        );
         let mut inner = self.0.lock();
         let vec = inner.get_mut(&pgid).unwrap();
         vec.push(Arc::downgrade(process));
@@ -102,13 +107,6 @@ impl ThreadGroup {
 
 pub static TASK_MANAGER: Lazy<TaskManager> = Lazy::new(TaskManager::new);
 pub static PROCESS_GROUP_MANAGER: Lazy<ProcessGroupManager> = Lazy::new(ProcessGroupManager::new);
-
-pub fn add_new_process(new_process: &Arc<Task>) {
-    assert!(new_process.is_group_leader());
-    new_process.thread_group().insert(new_process);
-    TASK_MANAGER.insert(&new_process);
-    PROCESS_GROUP_MANAGER.insert_new_group(&new_process);
-}
 
 impl Task {
     pub fn delete_children(&self) {

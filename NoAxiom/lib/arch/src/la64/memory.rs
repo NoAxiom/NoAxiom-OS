@@ -145,7 +145,7 @@ impl ArchPageTableEntry for PageTableEntry {
     /// create a new page table entry from ppn and flags
     fn new(ppn: usize, flags: MappingFlags) -> Self {
         let flags = PTEFlags::from(flags);
-        Self((ppn << FLAG_WIDTH) | flags.bits() as usize)
+        Self(((ppn << FLAG_WIDTH) & !FLAG_MASK) | flags.bits() as usize)
     }
     /// get the physical page number
     fn ppn(&self) -> usize {

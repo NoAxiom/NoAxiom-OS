@@ -2,7 +2,7 @@ use alloc::{sync::Arc, vec::Vec};
 use core::sync::atomic::{fence, Ordering};
 
 use arch::{
-    consts::{KERNEL_ADDR_OFFSET, KERNEL_VIRT_MEMORY_END},
+    consts::{HIGH_ADDR_OFFSET, KERNEL_ADDR_OFFSET, KERNEL_VIRT_MEMORY_END},
     Arch, ArchMemory, ArchPageTableEntry, ArchTime, MappingFlags, PageTableEntry,
 };
 use ksync::{cell::SyncUnsafeCell, mutex::SpinLock, Lazy};
@@ -29,6 +29,8 @@ use crate::{
 
 extern "C" {
     fn stext();
+    fn ssignal();
+    fn esignal();
     fn etext();
     fn srodata();
     fn erodata();
@@ -175,27 +177,29 @@ impl MemorySet {
     /// create kernel space, used in [`KERNEL_SPACE`] initialization
     pub fn init_kernel_space() -> Self {
         let mut memory_set = MemorySet::new_bare(PageTable::new_allocated());
+        macro_rules! kernel_push_area {
+            ($($start:expr, $end:expr, $permission:expr)*) => {
+                $(
+                    memory_set.push_area(
+                        MapArea::new(
+                            ($start as usize).into(),
+                            ($end as usize).into(),
+                            MapType::Direct,
+                            $permission,
+                            MapAreaType::KernelSpace,
+                        ),
+                        None,
+                        0,
+                    );
+                )*
+            };
+        }
         #[cfg(target_arch = "riscv64")]
         {
-            macro_rules! kernel_push_area {
-                ($($start:expr, $end:expr, $permission:expr)*) => {
-                    $(
-                        memory_set.push_area(
-                            MapArea::new(
-                                ($start as usize).into(),
-                                ($end as usize).into(),
-                                MapType::Direct,
-                                $permission,
-                                MapAreaType::KernelSpace,
-                            ),
-                            None,
-                            0,
-                        );
-                    )*
-                };
-            }
             kernel_push_area!(
-                stext,   etext,   map_permission!(R, X)
+                stext,   ssignal, map_permission!(R, X)
+                ssignal, esignal, map_permission!(R, X, U)
+                esignal, etext,   map_permission!(R, X)
                 srodata, erodata, map_permission!(R)
                 sdata,   edata,   map_permission!(R, W)
                 sbss,    ebss,    map_permission!(R, W)
@@ -227,6 +231,11 @@ impl MemorySet {
             }
             // trace!("[memory_set] sp: {:#x}", crate::arch::regs::get_sp());
             info!("[kernel] space initialized");
+        }
+        #[cfg(target_arch = "loongarch64")] {
+            let ssignal = ssignal as usize | HIGH_ADDR_OFFSET;
+            let esignal = esignal as usize | HIGH_ADDR_OFFSET;
+            kernel_push_area!(ssignal, esignal, map_permission!(R, X, U));
         }
         unsafe {
             KERNEL_SPACE_ROOT_PPN = memory_set.root_ppn().0;

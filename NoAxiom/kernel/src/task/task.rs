@@ -6,7 +6,7 @@ use alloc::{
     sync::{Arc, Weak},
     vec::Vec,
 };
-use core::{marker::PhantomData, ptr::null, sync::atomic::AtomicUsize, task::Waker};
+use core::{marker::PhantomData, ptr::null, task::Waker};
 
 use arch::{Arch, ArchFull, ArchTrapContext, TrapArgs, TrapContext};
 use ksync::{
@@ -47,7 +47,10 @@ use crate::{
         sig_stack::{SigAltStack, UContext},
     },
     syscall::SysResult,
-    task::{manager::add_new_process, taskid::tid_alloc},
+    task::{
+        manager::{PROCESS_GROUP_MANAGER, TASK_MANAGER},
+        taskid::tid_alloc,
+    },
     time::time_info::TimeInfo,
 };
 
@@ -227,6 +230,7 @@ impl Task {
     }
     pub fn set_pgid(&self, pgid: usize) {
         *self.pgid.lock() = pgid;
+        // self.pgid = SharedMutable::new(pgid);
     }
     pub fn get_tg_leader(&self) -> Weak<Task> {
         self.thread_group
@@ -375,7 +379,9 @@ impl Task {
             }),
         });
         task.trap_context_mut()[TrapArgs::SP] -= 16;
-        add_new_process(&task);
+        task.thread_group().insert(&task);
+        TASK_MANAGER.insert(&task);
+        PROCESS_GROUP_MANAGER.insert_new_group(&task);
         info!("[spawn] new task spawn complete, tid {}", task.tid.0);
         task
     }
@@ -575,7 +581,9 @@ impl Task {
                     ..Default::default()
                 }),
             });
-            add_new_process(&new_process);
+            new_process.thread_group().insert(&new_process);
+            TASK_MANAGER.insert(&new_process);
+            PROCESS_GROUP_MANAGER.insert_process(new_pgid, &new_process);
             self.pcb().children.push(new_process.clone());
             new_process
         };

@@ -1,5 +1,6 @@
 use alloc::{sync::Arc, vec::Vec};
 
+use config::task::INIT_PROCESS_ID;
 use ksync::mutex::check_no_lock;
 
 use super::{SysResult, Syscall, SyscallResult};
@@ -304,20 +305,20 @@ impl Syscall<'_> {
 
     /// Get file io control
     pub fn sys_ioctl(&self, fd: usize, request: usize, arg: usize) -> SyscallResult {
-        info!(
-            "[sys_ioctl]: fd: {}, request: {:#x}, argp: {:#x}",
-            fd, request, arg
-        );
         let fd_table = self.task.fd_table();
         fd_table.get(fd).ok_or(Errno::EBADF)?;
 
         let arg_ptr = UserPtr::<u8>::new(arg);
         use crate::include::fs::TtyIoctlCmd::{self, *};
         let cmd = TtyIoctlCmd::from_repr(request).unwrap();
+        info!(
+            "[sys_ioctl]: fd: {}, request: {:#x}, argp: {:#x}, cmd: {:?}",
+            fd, request, arg, cmd
+        );
         match cmd {
             TCGETS => {}
             TCSETS => {}
-            TIOCGPGRP => arg_ptr.write(0),
+            TIOCGPGRP => arg_ptr.write(INIT_PROCESS_ID as u8),
             TIOCSPGRP => {}
             TIOCGWINSZ => arg_ptr.write(0),
             _ => return Err(Errno::EINVAL),

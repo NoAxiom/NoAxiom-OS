@@ -1,7 +1,7 @@
 use alloc::sync::Arc;
 use core::mem::size_of;
 
-use arch::{ArchTrapContext, ArchUserFloatContext, TrapArgs};
+use arch::{consts::HIGH_ADDR_OFFSET, ArchTrapContext, ArchUserFloatContext, TrapArgs};
 use ksync::mutex::SpinLockGuard;
 
 use super::task::PCB;
@@ -34,10 +34,10 @@ impl Task {
         while let Some(si) = pcb.pending_sigs.pop_with_mask(old_mask) {
             trace!("[check_signal] find a signal {}", si.signo);
             // successfully recived signal, handle it
-            info!("[check_signal] sig {}: start to handle", si.signo);
             let sa_list = self.sa_list();
             let signum = SigNum::from(si.signo);
             let action = sa_list.get(signum).unwrap().clone();
+            info!("[check_signal] sig {}: start to handle, handler: {:?}", si.signo, action.handler);
             match action.handler {
                 SAHandlerType::Ignore => self.sig_default_ignore(),
                 SAHandlerType::Kill => self.sig_default_terminate(),
@@ -106,7 +106,7 @@ impl Task {
                     // fixme: should we update gp & tp?
                     // fixme: memory mapping is incorrect for no U flag used
                     cx[EPC] = handler;
-                    cx[RA] = user_sigreturn as usize;
+                    cx[RA] = user_sigreturn as usize | HIGH_ADDR_OFFSET;
                     cx[SP] = new_sp;
 
                     return Some(old_mask);

@@ -33,7 +33,7 @@ impl<'a> Syscall<'a> {
         })?;
         info!("[syscall] id: {:?}, args: {:X?}", id, args);
         use SyscallID::*;
-        match id {
+        let res = match id {
             // fs
             SYS_READ => self.sys_read(args[0], args[1], args[2]).await,
             SYS_READV => self.sys_readv(args[0], args[1], args[2]).await,
@@ -136,7 +136,9 @@ impl<'a> Syscall<'a> {
                 // let _ = self.sys_exit(Errno::ENOSYS as usize);
                 Err(Errno::ENOSYS)
             }
-        }
+        };
+        trace!("[syscall(out)] syscall id: {:?}, res: {:?}", id, res);
+        res
     }
 
     fn empty_syscall(name: &str, res: isize) -> SyscallResult {
