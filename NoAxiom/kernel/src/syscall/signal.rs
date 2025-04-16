@@ -126,12 +126,14 @@ impl Syscall<'_> {
         if sig == SigNum::INVALID {
             return Err(Errno::EINVAL);
         }
+        debug!("[sys_kill] signo: {}, pid: {}, sig_name: {:?}", signo, pid, sig);
         match pid {
             0 => {
                 // process group
-                let pgid = self.task.pgid();
+                let pgid = self.task.get_pgid();
                 for task in PROCESS_GROUP_MANAGER
-                    .get(pgid)
+                    .get_group(pgid)
+                    .unwrap()
                     .into_iter()
                     .map(|t| t.upgrade().unwrap())
                 {
@@ -188,9 +190,10 @@ impl Syscall<'_> {
             _ => {
                 // pid < -1
                 // sig is sent to every process in the process group whose ID is -pid.
-                let pgid = self.task.pgid();
+                let pgid = self.task.get_pgid();
                 for task in PROCESS_GROUP_MANAGER
-                    .get(pgid)
+                    .get_group(pgid)
+                    .unwrap()
                     .into_iter()
                     .map(|t| t.upgrade().unwrap())
                 {

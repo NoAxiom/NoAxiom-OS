@@ -12,7 +12,11 @@ use crate::{
     },
     mm::user_ptr::UserPtr,
     sched::spawn::spawn_utask,
-    task::{exit::ExitCode, wait::WaitChildFuture},
+    task::{
+        exit::ExitCode,
+        manager::{PROCESS_GROUP_MANAGER, TASK_MANAGER},
+        wait::WaitChildFuture,
+    },
 };
 
 impl Syscall<'_> {
@@ -170,5 +174,41 @@ impl Syscall<'_> {
         let task = self.task;
         task.set_clear_tid_address(tidptr);
         Ok(task.tid() as isize)
+    }
+
+    pub fn sys_getpgid(&self, pid: usize) -> SyscallResult {
+        if pid == 0 {
+            let pgid = self.task.get_pgid();
+            Ok(pgid as isize)
+        } else {
+            let proc = TASK_MANAGER.get(pid);
+            if proc.is_none() {
+                Err(Errno::ESRCH)
+            } else {
+                let proc = proc.unwrap();
+                let pgid = proc.get_pgid();
+                Ok(pgid as isize)
+            }
+        }
+    }
+
+    pub fn sys_setpgid(&self, pid: usize, pgid: usize) -> SyscallResult {
+        if (pgid as isize) < 0 {
+            return Err(Errno::EINVAL);
+        }
+        let target_task = if pid == 0 {
+            self.task.clone()
+        } else {
+            TASK_MANAGER.get(pid).ok_or(Errno::ESRCH)?
+        };
+        if pgid == 0 {
+            PROCESS_GROUP_MANAGER.insert_new_group(&target_task);
+        } else {
+            match PROCESS_GROUP_MANAGER.get_group(pgid) {
+                Some(_) => PROCESS_GROUP_MANAGER.insert_process(pgid, &target_task),
+                None => PROCESS_GROUP_MANAGER.insert_new_group(&target_task),
+            }
+        }
+        Ok(0)
     }
 }

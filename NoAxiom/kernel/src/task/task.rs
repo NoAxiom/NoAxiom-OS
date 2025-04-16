@@ -6,7 +6,7 @@ use alloc::{
     sync::{Arc, Weak},
     vec::Vec,
 };
-use core::{ptr::null, task::Waker};
+use core::{marker::PhantomData, ptr::null, sync::atomic::AtomicUsize, task::Waker};
 
 use arch::{Arch, ArchFull, ArchTrapContext, TrapArgs, TrapContext};
 use ksync::{
@@ -30,7 +30,7 @@ use crate::{
     },
     include::{
         process::{
-            auxv::{AuxEntry, AT_EXECFN, AT_NULL, AT_RANDOM},
+            auxv::{AuxEntry, AT_NULL, AT_RANDOM},
             robust_list::RobustList,
         },
         sched::CloneFlags,
@@ -53,10 +53,17 @@ use crate::{
 
 /// shared between threads
 type Shared<T> = Arc<SpinLock<T>>;
+struct SharedMutable<T>(PhantomData<T>);
+impl<T> SharedMutable<T> {
+    pub fn new(data: T) -> Shared<T> {
+        Arc::new(SpinLock::new(data))
+    }
+}
 
 /// mutable resources mostly used in current thread
 /// but, it could be accessed by other threads through process manager
 /// so lock it with spinlock
+/// p.s. we can also use atomic if the data is small enough
 type Mutable<T> = SpinLock<T>;
 
 /// read-only resources, could be shared safely through threads
@@ -136,7 +143,6 @@ pub struct Task {
     // immutable
     tid: Immutable<TidTracer>, // task id, with lifetime holded
     tgid: Immutable<TGID>,     // task group id, aka pid
-    pgid: Immutable<PGID>,     // process group id
 
     // shared
     fd_table: Shared<FdTable>,         // file descriptor table
@@ -144,6 +150,7 @@ pub struct Task {
     sa_list: Shared<SigActionList>,    // signal action list, saves signal handler
     memory_set: Shared<MemorySet>,     // memory set for the task
     thread_group: Shared<ThreadGroup>, // thread group
+    pgid: Shared<PGID>,                // process group id
 }
 
 impl PCB {
@@ -212,8 +219,14 @@ impl Task {
     pub fn tgid(&self) -> TGID {
         self.tgid
     }
-    pub fn pgid(&self) -> PGID {
-        self.pgid
+    pub fn pgid(&self) -> SpinLockGuard<PGID> {
+        self.pgid.lock()
+    }
+    pub fn get_pgid(&self) -> PGID {
+        *self.pgid.lock()
+    }
+    pub fn set_pgid(&self, pgid: usize) {
+        *self.pgid.lock() = pgid;
     }
     pub fn get_tg_leader(&self) -> Weak<Task> {
         self.thread_group
@@ -347,15 +360,15 @@ impl Task {
         let task = Arc::new(Self {
             tid,
             tgid,
-            pgid: 0,
+            pgid: SharedMutable::new(tgid),
             pcb: SpinLock::new(PCB::default()),
-            thread_group: Arc::new(SpinLock::new(ThreadGroup::new())),
-            memory_set: Arc::new(SpinLock::new(memory_set)),
+            thread_group: SharedMutable::new(ThreadGroup::new()),
+            memory_set: SharedMutable::new(memory_set),
             trap_cx: ThreadOnly::new(TrapContext::app_init_cx(elf_entry, user_sp)),
             sched_entity: SchedEntity::new_bare(INIT_PROCESS_ID),
-            fd_table: Arc::new(SpinLock::new(FdTable::new())),
-            cwd: Arc::new(SpinLock::new(Path::try_from(String::from("/")).unwrap())),
-            sa_list: Arc::new(SpinLock::new(SigActionList::new())),
+            fd_table: SharedMutable::new(FdTable::new()),
+            cwd: SharedMutable::new(Path::try_from(String::from("/")).unwrap()),
+            sa_list: SharedMutable::new(SigActionList::new()),
             waker: Once::new(),
             tcb: ThreadOnly::new(TCB {
                 ..Default::default()
@@ -455,7 +468,6 @@ impl Task {
         auxs.push(AuxEntry(AT_NULL, 0 as usize));
 
         // Construct auxv
-        debug!("auxv len {}", auxs.len());
         let len = auxs.len() * core::mem::size_of::<AuxEntry>();
         user_sp -= len;
         // let auxv_base = user_sp;
@@ -491,7 +503,7 @@ impl Task {
             self.memory_set().clone()
         } else {
             let (ms, _) = self.memory_set().lock().clone_cow();
-            Arc::new(SpinLock::new(ms))
+            SharedMutable::new(ms)
         };
 
         // TODO: CloneFlags::SIGHAND
@@ -500,7 +512,7 @@ impl Task {
             self.fd_table.clone()
         } else {
             trace!("fd table info cloned");
-            let tmp = Arc::new(SpinLock::new(self.fd_table.lock().clone()));
+            let tmp = SharedMutable::new(self.fd_table.lock().clone());
             let mut guard = tmp.lock();
             // todo: maybe needn't to realloc STD_IN
             guard.table[STD_IN] = Some(FdTableEntry::std_in());
@@ -541,12 +553,13 @@ impl Task {
             // fork as a new process
             let new_tid = tid_alloc();
             let new_tgid = new_tid.0;
+            let new_pgid = *self.pgid(); // use parent's pgid
             trace!("fork new process, tgid: {}", new_tgid);
             let new_process = Arc::new(Self {
                 tid: new_tid,
                 tgid: new_tgid,
-                pgid: self.pgid.clone(),
-                thread_group: Arc::new(SpinLock::new(ThreadGroup::new())),
+                pgid: SharedMutable::new(new_pgid),
+                thread_group: SharedMutable::new(ThreadGroup::new()),
                 pcb: SpinLock::new(PCB {
                     parent: Some(self.get_tg_leader()),
                     ..Default::default()
@@ -555,8 +568,8 @@ impl Task {
                 trap_cx: ThreadOnly::new(self.trap_context().clone()),
                 sched_entity: self.sched_entity.data_clone(new_tgid),
                 fd_table,
-                cwd: Arc::new(SpinLock::new(self.cwd().clone())),
-                sa_list: Arc::new(SpinLock::new(SigActionList::new())),
+                cwd: SharedMutable::new(self.cwd().clone()),
+                sa_list: SharedMutable::new(SigActionList::new()),
                 waker: Once::new(),
                 tcb: ThreadOnly::new(TCB {
                     ..Default::default()

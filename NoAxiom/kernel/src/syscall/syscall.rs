@@ -95,6 +95,8 @@ impl<'a> Syscall<'a> {
             SYS_GETGID => Self::empty_syscall("getgid", 0),
             SYS_GETEGID => Self::empty_syscall("getegid", 0),
             SYS_SET_TID_ADDRESS => self.sys_set_tid_address(args[0]),
+            SYS_GETPGID => self.sys_getpgid(args[0]),
+            SYS_SETPGID => self.sys_setpgid(args[0], args[1]),
 
             // futex
             SYS_GET_ROBUST_LIST => self.sys_get_robust_list(args[0], args[1], args[2]),

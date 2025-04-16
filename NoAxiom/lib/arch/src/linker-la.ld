@@ -11,12 +11,10 @@ SECTIONS
     .text : {
         *(.text.entry)
         . = ALIGN(4K);
-        /*
         ssignal = .;
         *(.text.signal);
         . = ALIGN(4K);
         esignal = .;
-        */
         *(.text .text.*)
     }
 

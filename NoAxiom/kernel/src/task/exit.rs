@@ -10,7 +10,7 @@ use crate::{
         sig_num::SigNum,
     },
     syscall::Syscall,
-    task::{manager::TASK_MANAGER, status::TaskStatus},
+    task::{manager::{PROCESS_GROUP_MANAGER, TASK_MANAGER}, status::TaskStatus},
 };
 
 pub async fn init_proc_exit_handler(task: &Arc<Task>) {
@@ -53,6 +53,7 @@ impl Task {
         // thread resources clean up
         self.thread_group().remove(tid);
         TASK_MANAGER.remove(tid);
+        PROCESS_GROUP_MANAGER.remove(self);
         self.delete_children();
 
         // clear child tid
