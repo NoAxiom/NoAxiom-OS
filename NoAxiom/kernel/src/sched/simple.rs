@@ -7,9 +7,12 @@ use alloc::collections::vec_deque::VecDeque;
 use async_task::Runnable;
 use ksync::mutex::SpinLock;
 
-use super::vsched::{Runtime, ScheduleOrder, Scheduler};
+use super::{
+    sched_info::SchedInfo,
+    vsched::{Runtime, ScheduleOrder, Scheduler},
+};
 
-type Info = ();
+type Info = SchedInfo;
 
 #[repr(align(64))]
 pub struct SimpleScheduler {

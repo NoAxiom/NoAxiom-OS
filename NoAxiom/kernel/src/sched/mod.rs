@@ -5,7 +5,6 @@
 //! - [`utils`] contains useful func for async tasks execution
 
 mod cfs;
-mod multicore;
 pub mod runtime;
 pub mod sched_entity;
 pub mod sched_info;
