@@ -1,6 +1,8 @@
 use arch::MappingFlags;
 use bitflags::bitflags;
 
+use super::fs::CreateMode;
+
 bitflags! {
 #[derive(Clone, Copy, Debug)]
     /// see [man mmap](https://man7.org/linux/man-pages/man2/mmap.2.html)
@@ -58,13 +60,13 @@ bitflags! {
     }
 }
 
-// pub struct SharedMemoryIdentifierDs {
-//     pub shm_perm: CreateMode, /* Ownership and permissions */
-//     pub shm_size: usize,      /* Size of segment (bytes) */
-//     pub shm_atime: usize,     /* Last attach time */
-//     pub shm_dtime: usize,     /* Last detach time */
-//     pub shm_ctime: usize,     /* Creation time/time of last modification via
-// shmctl() */     pub shm_cpid: usize,      /* PID of creator */
-//     pub shm_lpid: usize,      /* PID of last shmat(2)/shmdt(2) */
-//     pub shm_nattch: usize,    /* Number of current attaches */
-// }
+pub struct SharedMemoryIdentifierDs {
+    pub shm_perm: CreateMode, /* Ownership and permissions */
+    pub shm_size: usize,      /* Size of segment (bytes) */
+    pub shm_atime: usize,     /* Last attach time */
+    pub shm_dtime: usize,     /* Last detach time */
+    pub shm_ctime: usize,     /* Creation time/time of last modification via shmctl() */
+    pub shm_cpid: usize,      /* PID of creator */
+    pub shm_lpid: usize,      /* PID of last shmat(2)/shmdt(2) */
+    pub shm_nattch: usize,    /* Number of current attaches */
+}
