@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use include::errno::Errno;
 
 use crate::{
+    cpu::current_task,
     fs::vfs::basic::file::{File, FileMeta},
     syscall::{SysResult, SyscallResult},
 };
@@ -25,7 +26,7 @@ impl File for ExeFile {
     }
 
     async fn base_readlink(&self, buf: &mut [u8]) -> SyscallResult {
-        let exe = crate::utils::current_task().cwd().as_string();
+        let exe = current_task().cwd().as_string();
         if buf.len() < exe.len() + 1 {
             warn!("readlink buf not big enough");
             return Err(Errno::EINVAL);

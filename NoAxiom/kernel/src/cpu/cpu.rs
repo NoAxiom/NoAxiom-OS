@@ -32,6 +32,9 @@ impl Cpu {
         kernel_space_activate();
         self.task = None;
     }
+    pub fn current_task(&self) -> &Arc<Task> {
+        &self.task.as_ref().unwrap()
+    }
 }
 
 const DEFAULT_CPU: SyncUnsafeCell<Cpu> = SyncUnsafeCell::new(Cpu::new());
@@ -39,4 +42,8 @@ pub static mut CPUS: [SyncUnsafeCell<Cpu>; CPU_NUM] = [DEFAULT_CPU; CPU_NUM];
 
 pub fn current_cpu() -> &'static mut Cpu {
     unsafe { &mut CPUS[get_hartid()] }.get_mut()
+}
+
+pub fn current_task() -> &'static Arc<Task> {
+    current_cpu().current_task()
 }

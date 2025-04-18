@@ -3,7 +3,7 @@ use alloc::{string::String, vec::Vec};
 use arch::{consts::KERNEL_ADDR_OFFSET, Arch, ArchMemory};
 
 use super::{address::VirtAddr, page_table::PageTable, validate::validate};
-use crate::{cpu::current_cpu, mm::address::VpnRange, syscall::SysResult};
+use crate::{cpu::current_task, mm::address::VpnRange, syscall::SysResult};
 
 // /// check if the slice is well-allocated
 // /// any unallocated memory access will cause a page fault
@@ -181,7 +181,7 @@ impl UserPtr<u8> {
     /// convert ptr into an slice
     pub async fn as_slice_mut_checked_raw<'a>(&self, len: usize) -> SysResult<&mut [u8]> {
         let page_table = PageTable::from_ppn(Arch::current_root_ppn());
-        let memory_set = current_cpu().task.as_ref().unwrap().memory_set();
+        let memory_set = current_task().memory_set();
         for vpn in VpnRange::new_from_va(
             VirtAddr::from(self.addr_usize()),
             VirtAddr::from(self.addr_usize() + len),

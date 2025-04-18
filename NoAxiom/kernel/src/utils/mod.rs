@@ -45,7 +45,3 @@ pub fn lowbit(x: usize) -> usize {
     let x = x as isize;
     (x & -x) as usize
 }
-
-pub fn current_task() -> alloc::sync::Arc<Task> {
-    crate::cpu::current_cpu().task.clone().unwrap()
-}

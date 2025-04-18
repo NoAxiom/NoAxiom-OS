@@ -2,8 +2,8 @@ use alloc::{sync::Arc, vec::Vec};
 use core::sync::atomic::{fence, Ordering};
 
 use arch::{
-    consts::{HIGH_ADDR_OFFSET, KERNEL_ADDR_OFFSET, KERNEL_VIRT_MEMORY_END},
-    Arch, ArchMemory, ArchPageTableEntry, ArchTime, MappingFlags, PageTableEntry,
+    consts::KERNEL_VIRT_MEMORY_END, Arch, ArchMemory, ArchPageTableEntry, ArchTime, MappingFlags,
+    PageTableEntry,
 };
 use ksync::{cell::SyncUnsafeCell, mutex::SpinLock, Lazy};
 
@@ -196,6 +196,7 @@ impl MemorySet {
         }
         #[cfg(target_arch = "riscv64")]
         {
+            use arch::consts::KERNEL_ADDR_OFFSET;
             kernel_push_area!(
                 stext,   ssignal, map_permission!(R, X)
                 ssignal, esignal, map_permission!(R, X, U)
@@ -232,7 +233,9 @@ impl MemorySet {
             // trace!("[memory_set] sp: {:#x}", crate::arch::regs::get_sp());
             info!("[kernel] space initialized");
         }
-        #[cfg(target_arch = "loongarch64")] {
+        #[cfg(target_arch = "loongarch64")]
+        {
+            use arch::consts::HIGH_ADDR_OFFSET;
             let ssignal = ssignal as usize | HIGH_ADDR_OFFSET;
             let esignal = esignal as usize | HIGH_ADDR_OFFSET;
             kernel_push_area!(ssignal, esignal, map_permission!(R, X, U));

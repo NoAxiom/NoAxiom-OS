@@ -8,11 +8,7 @@ use ksync::mutex::SpinLock;
 use super::{
     sched_entity::SchedVruntime,
     sched_info::SchedInfo,
-    vsched::{
-        Runtime,
-        ScheduleOrder::{self, *},
-        Scheduler,
-    },
+    vsched::{Runtime, ScheduleOrder, Scheduler},
 };
 use crate::{
     config::cpu::CPU_NUM,
@@ -209,6 +205,8 @@ impl CfsRuntime {
     }
     #[allow(unused)]
     fn load_balance(&self) -> bool {
+        // I made this shit
+        // the worst performance ever
         #[derive(Clone, Copy, Default)]
         struct LoadInfo {
             hart: usize,
@@ -265,7 +263,7 @@ impl CfsRuntime {
             other.is_running()
         );
         while local.load() + NICE_0_LOAD < other.load() + addition && other.task_count() > 0 {
-            let runnable = other.pop(NormalFirst);
+            let runnable = other.pop(ScheduleOrder::NormalFirst);
             if let Some(runnable) = runnable {
                 local.push_normal(runnable);
             } else {
@@ -316,7 +314,7 @@ impl Runtime<CFS<SchedInfo>, SchedInfo> for CfsRuntime {
         let mut local = self.current_scheduler().lock();
         local.set_running(false);
         // run task
-        let runnable = local.pop(UrgentFirst);
+        let runnable = local.pop(ScheduleOrder::UrgentFirst);
         if let Some(runnable) = runnable {
             local.set_running(true);
             drop(local);
