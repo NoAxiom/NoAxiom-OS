@@ -6,7 +6,7 @@ use memory::address::VirtAddr;
 
 use super::{address::VirtPageNum, memory_set::MemorySet};
 use crate::{
-    cpu::current_cpu,
+    cpu::current_task,
     include::result::Errno,
     mm::{mmap_manager::lazy_alloc_mmap, page_table::PageTable},
     syscall::SysResult,
@@ -44,7 +44,7 @@ pub async fn validate(
                 vpn.0,
                 pte.0,
                 pte.flags(),
-                current_cpu().task.as_ref().unwrap().tid()
+                current_task().tid()
             );
             memory_set.lock().realloc_cow(vpn, pte);
             Arch::tlb_flush();
@@ -53,7 +53,7 @@ pub async fn validate(
             error!(
                 "[memory_validate] store at invalid area, flags: {:?}, tid: {}",
                 flags,
-                current_cpu().task.as_ref().unwrap().tid()
+                current_task().tid()
             );
             Err(Errno::EFAULT)
         } else {
@@ -63,7 +63,7 @@ pub async fn validate(
     } else {
         let mut ms = memory_set.lock();
         if ms.user_stack_area.vpn_range.is_in_range(vpn) {
-            let task = current_cpu().task.as_ref().unwrap();
+            let task = current_task();
             info!(
                 "[memory_validate] realloc stack, tid: {}, addr: {:#x?}, epc: {:#x}",
                 task.tid(),
@@ -76,7 +76,7 @@ pub async fn validate(
         } else if ms.user_brk_area.vpn_range.is_in_range(vpn) {
             info!(
                 "[memory_validate] realloc heap, tid: {}, addr: {:x?}",
-                current_cpu().task.as_ref().unwrap().tid(),
+                current_task().tid(),
                 vpn.0
             );
             ms.lazy_alloc_brk(vpn);
@@ -85,7 +85,7 @@ pub async fn validate(
         } else {
             info!(
                 "[memory_validate] realloc mmap, tid: {}, addr: {:x?}",
-                current_cpu().task.as_ref().unwrap().tid(),
+                current_task().tid(),
                 vpn.0
             );
             lazy_alloc_mmap(memory_set, vpn, ms).await?;

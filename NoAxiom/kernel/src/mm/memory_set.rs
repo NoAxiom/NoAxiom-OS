@@ -2,8 +2,8 @@ use alloc::{sync::Arc, vec::Vec};
 use core::sync::atomic::{fence, Ordering};
 
 use arch::{
-    consts::{HIGH_ADDR_OFFSET, KERNEL_ADDR_OFFSET, KERNEL_VIRT_MEMORY_END},
-    Arch, ArchMemory, ArchPageTableEntry, ArchTime, MappingFlags, PageTableEntry,
+    consts::KERNEL_VIRT_MEMORY_END, Arch, ArchMemory, ArchPageTableEntry, ArchTime, MappingFlags,
+    PageTableEntry,
 };
 use ksync::{cell::SyncUnsafeCell, mutex::SpinLock, Lazy};
 
@@ -13,6 +13,7 @@ use super::{
     map_area::MapArea,
     mmap_manager::MmapManager,
     page_table::{flags_switch_to_rw, PageTable},
+    shm::{shm_get_address_and_size, shm_get_nattch, ShmInfo, ShmTracker},
 };
 use crate::{
     config::mm::{PAGE_SIZE, PAGE_WIDTH, USER_HEAP_SIZE, USER_STACK_SIZE},
@@ -25,6 +26,7 @@ use crate::{
         page_table::flags_switch_to_cow,
         permission::MapType,
     },
+    pte_flags,
 };
 
 extern "C" {
@@ -87,7 +89,11 @@ pub struct MemorySet {
     pub user_brk: usize,
 
     /// mmap manager
+    /// fixme: add cow copy with mmap areas
     pub mmap_manager: MmapManager,
+
+    /// shm manager
+    pub shm: ShmInfo,
 }
 
 // pub struct MemorySpace {
@@ -122,6 +128,7 @@ impl MemorySet {
             user_brk_start: 0,
             user_brk: 0,
             mmap_manager: MmapManager::new_bare(),
+            shm: ShmInfo::new(),
         }
     }
 
@@ -196,6 +203,7 @@ impl MemorySet {
         }
         #[cfg(target_arch = "riscv64")]
         {
+            use arch::consts::KERNEL_ADDR_OFFSET;
             kernel_push_area!(
                 stext,   ssignal, map_permission!(R, X)
                 ssignal, esignal, map_permission!(R, X, U)
@@ -232,7 +240,9 @@ impl MemorySet {
             // trace!("[memory_set] sp: {:#x}", crate::arch::regs::get_sp());
             info!("[kernel] space initialized");
         }
-        #[cfg(target_arch = "loongarch64")] {
+        #[cfg(target_arch = "loongarch64")]
+        {
+            use arch::consts::HIGH_ADDR_OFFSET;
             let ssignal = ssignal as usize | HIGH_ADDR_OFFSET;
             let esignal = esignal as usize | HIGH_ADDR_OFFSET;
             kernel_push_area!(ssignal, esignal, map_permission!(R, X, U));
@@ -435,7 +445,7 @@ impl MemorySet {
                 old_pte.set_flags(new_flags);
                 new_set
                     .page_table()
-                    .map(vpn, old_pte.ppn().into(), new_flags, false);
+                    .map(vpn, old_pte.ppn().into(), new_flags);
                 // trace!(
                 //     "remap_cow: vpn = {:#x}, new_flags = {:?}, old_pte =
                 // {:#x}, new_pte = {:#x}",     vpn.0,
@@ -446,7 +456,7 @@ impl MemorySet {
             } else {
                 new_set
                     .page_table()
-                    .map(vpn, old_pte.ppn().into(), old_flags, false);
+                    .map(vpn, old_pte.ppn().into(), old_flags);
             }
             new_area.frame_map.insert(vpn, frame_tracker.clone());
         };
@@ -562,6 +572,52 @@ impl MemorySet {
                 frame_refcount(new_ppn),
             );
         }
+    }
+
+    pub fn attach_shm(&mut self, key: usize, start_va: VirtAddr) {
+        let (start_pa, size) = shm_get_address_and_size(key);
+        // println!("attach_shm start_pa {:#x}", start_pa.0);
+        // println!("attach_shm start_va {:#x}", start_va.0);
+        let flags = pte_flags!(V, U, W, R);
+        let mut offset = 0;
+
+        while offset < size {
+            let va: VirtAddr = (start_va.0 + offset).into();
+            let pa: PhysAddr = (start_pa.0 + offset).into();
+            // println!("attach map va:{:x?} to pa{:x?}",va,pa);
+            self.page_table().map(va.into(), pa.into(), flags);
+            offset += PAGE_SIZE;
+        }
+        self.shm.shm_top = self.shm.shm_top.max(start_va.0 + size);
+        let shm_tracker = ShmTracker::new(key);
+
+        self.shm.shm_trackers.insert(start_va, shm_tracker);
+        let vma = MapArea::new(
+            start_va,
+            (start_va.0 + size).into(),
+            MapType::Framed,
+            map_permission!(R, W),
+            MapAreaType::Shared,
+        );
+        self.shm.shm_areas.push(vma);
+    }
+
+    pub fn detach_shm(&mut self, start_va: VirtAddr) -> usize {
+        // println!("detach start_va:{:?}",start_va);
+        let key = self.shm.shm_trackers.get(&start_va).unwrap().key;
+        let (_, size) = shm_get_address_and_size(key);
+        // println!("detach size:{:?}",size);
+        let mut offset = 0;
+        while offset < size {
+            let va: VirtAddr = (start_va.0 + offset).into();
+            // println!("detach va:{:?}",va);
+            unsafe { &mut (*self.page_table.get()) }.unmap(va.into());
+            offset += PAGE_SIZE
+        }
+        self.shm.shm_trackers.remove(&start_va);
+        let vpn: VirtPageNum = start_va.into();
+        self.shm.shm_areas.retain(|x| x.vpn_range.start() != vpn);
+        shm_get_nattch(key)
     }
 }
 

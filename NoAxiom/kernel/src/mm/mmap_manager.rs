@@ -11,7 +11,7 @@ use super::{
 };
 use crate::{
     config::mm::{MMAP_BASE_ADDR, PAGE_SIZE},
-    cpu::current_cpu,
+    cpu::current_task,
     fs::vfs::basic::file::File,
     include::{
         mm::{MmapFlags, MmapProts},
@@ -155,7 +155,7 @@ pub async fn lazy_alloc_mmap<'a>(
             let pte_flags: MappingFlags = MappingFlags::from(mmap_page.prot) | MappingFlags::U;
             mmap_page.lazy_map_page(kernel_vpn).await?;
             let mut ms = memory_set.lock();
-            ms.page_table().map(vpn, ppn, pte_flags, false);
+            ms.page_table().map(vpn, ppn, pte_flags);
             if let Some(tracer) = ms.mmap_manager.alloc_tracer.get_mut(&vpn) {
                 for waker in tracer.iter() {
                     waker.wake_by_ref();
@@ -174,7 +174,7 @@ pub async fn lazy_alloc_mmap<'a>(
                 drop(guard);
                 debug!("[lazy_alloc_mmap] suspend_no_int_now");
                 loop {
-                    suspend_no_int_now(current_cpu().task.as_ref().unwrap().pcb()).await;
+                    suspend_no_int_now(current_task().pcb()).await;
                     if memory_set.lock().mmap_manager.mmap_map.get(&vpn).is_some() {
                         break;
                     }

@@ -1,6 +1,7 @@
 pub mod fs;
 pub mod info;
 pub mod io;
+pub mod ipc;
 pub mod mm;
 pub mod net;
 pub mod process;

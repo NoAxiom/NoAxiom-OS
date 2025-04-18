@@ -5,10 +5,16 @@ use super::SyscallResult;
 use crate::{
     config::mm::PAGE_SIZE,
     include::{
+        ipc::{IPC_PRIVATE, IPC_RMID},
         mm::{MmapFlags, MmapProts},
         result::Errno,
     },
-    mm::{address::VirtAddr, page_table::PageTable, permission::MapPermission},
+    mm::{
+        address::VirtAddr,
+        page_table::PageTable,
+        permission::MapPermission,
+        shm::{create_shm, remove_shm},
+    },
     return_errno,
     syscall::Syscall,
     utils::align_up,
@@ -106,5 +112,52 @@ impl Syscall<'_> {
         }
         Arch::tlb_flush();
         Ok(0)
+    }
+
+    pub fn sys_shmget(&self, key: usize, size: usize, shmflg: usize) -> SyscallResult {
+        info!("create shm");
+        let size = (size + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE;
+        assert!(size % PAGE_SIZE == 0);
+        let new_key;
+        if key == IPC_PRIVATE {
+            new_key = create_shm(key, size, shmflg);
+        } else {
+            unimplemented!();
+        }
+        Ok(new_key as isize)
+    }
+
+    pub fn sys_shmctl(&self, key: usize, cmd: usize, _buf: *const u8) -> SyscallResult {
+        info!("remove shm");
+        if cmd == IPC_RMID {
+            remove_shm(key);
+        } else {
+            unimplemented!();
+        }
+        Ok(0)
+    }
+
+    pub fn sys_shmat(&self, key: usize, address: usize, _shmflg: usize) -> SyscallResult {
+        info!("attach shm key {:?} shm address {:#x}", key, address);
+        let task = self.task;
+        let mut memory_set = task.memory_set().lock();
+        let address = if address == 0 {
+            memory_set.shm.shm_top
+        } else {
+            address
+        };
+        memory_set.attach_shm(key, address.into());
+        drop(memory_set);
+        Ok(address as isize)
+    }
+
+    pub fn sys_shmdt(&self, address: usize) -> SyscallResult {
+        info!("detach shm address {:#x}", address);
+        let task = self.task;
+        let mut memory_set = task.memory_set().lock();
+        let nattch = memory_set.detach_shm(address.into());
+        drop(memory_set);
+        // detach_shm called when drop SharedMemoryTracker
+        Ok(nattch as isize)
     }
 }

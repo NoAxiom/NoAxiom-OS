@@ -13,7 +13,7 @@ use core::{
 use ksync::mutex::SpinLockGuard;
 
 use crate::{
-    cpu::current_cpu,
+    cpu::current_task,
     signal::sig_set::SigSet,
     task::{status::TaskStatus, Task, PCB},
 };
@@ -125,7 +125,7 @@ pub async fn raw_suspend_now() {
 
 #[inline(always)]
 fn current_set_runnable() {
-    current_cpu().task.as_ref().unwrap().pcb().set_runnable();
+    current_task().pcb().set_runnable();
 }
 
 pub async fn suspend_no_int_now(mut pcb: SpinLockGuard<'_, PCB>) {
