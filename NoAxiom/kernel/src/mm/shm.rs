@@ -1,40 +1,40 @@
 use alloc::{collections::BTreeMap, vec::Vec};
 
-use ksync::{mutex::SpinLock, Lazy};
+use ksync::mutex::SpinLock;
+use lazy_static::lazy_static;
 use memory::address::{PhysAddr, VirtAddr};
 
 use crate::{
     cpu::current_task,
-    include::{fs::CreateMode, mm::SharedMemoryIdentifierDs},
+    include::{fs::CreateMode, mm::ShmIdDs},
     time::gettime::get_time,
 };
 
-pub static SHM_MANAGER: Lazy<SpinLock<SharedMemoryManager>> = Lazy::new(|| {
-    let manager = SharedMemoryManager::new();
-    SpinLock::new(manager)
-});
-pub struct SharedMemoryManager {
-    shm_areas: BTreeMap<usize, SharedMemoryArea>,
+lazy_static! {
+    pub static ref SHM_MANAGER: SpinLock<ShmManager> = SpinLock::new(ShmManager::new());
 }
-pub struct SharedMemoryArea {
-    shmid_ds: SharedMemoryIdentifierDs,
+pub struct ShmManager {
+    shm_areas: BTreeMap<usize, ShmArea>,
+}
+pub struct ShmArea {
+    shmid_ds: ShmIdDs,
     buffer: Vec<u8>,
 }
-pub struct SharedMemoryTracker {
+pub struct ShmTracker {
     pub key: usize,
 }
-impl SharedMemoryTracker {
+impl ShmTracker {
     pub fn new(key: usize) -> Self {
         attach_shm(key);
         Self { key }
     }
 }
-impl Drop for SharedMemoryTracker {
+impl Drop for ShmTracker {
     fn drop(&mut self) {
         detach_shm(self.key);
     }
 }
-impl SharedMemoryManager {
+impl ShmManager {
     pub fn new() -> Self {
         Self {
             shm_areas: BTreeMap::new(),
@@ -52,7 +52,7 @@ impl SharedMemoryManager {
         };
         let pid = current_task().tid();
         let perm = CreateMode::from_bits((shmflags & 0o777) as u32).unwrap();
-        let shmid_ds = SharedMemoryIdentifierDs {
+        let shmid_ds = ShmIdDs {
             shm_perm: perm,
             shm_size: size,
             shm_atime: 0,
@@ -63,7 +63,7 @@ impl SharedMemoryManager {
             shm_nattch: 0,
         };
         let buffer: Vec<u8> = vec![0 as u8; size];
-        let shm_area = SharedMemoryArea { shmid_ds, buffer };
+        let shm_area = ShmArea { shmid_ds, buffer };
         assert!(self.shm_areas.get(&key).is_none());
         self.shm_areas.insert(key, shm_area);
         key

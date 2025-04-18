@@ -4,7 +4,7 @@ use bitflags::bitflags;
 use super::fs::CreateMode;
 
 bitflags! {
-#[derive(Clone, Copy, Debug)]
+    #[derive(Clone, Copy, Debug)]
     /// see [man mmap](https://man7.org/linux/man-pages/man2/mmap.2.html)
     /// The prot argument describes the desired memory protection of the
     /// mapping (and must not conflict with the open mode of the file).
@@ -37,7 +37,7 @@ impl From<MmapProts> for MappingFlags {
 }
 
 bitflags! {
-#[derive(Clone, Copy, Debug)]
+    #[derive(Clone, Copy, Debug)]
     pub struct MmapFlags: usize {
         /// File mapping. Used for file initialization.(for compatibility, can be ignored)
         const MAP_FILE = 0;
@@ -60,7 +60,7 @@ bitflags! {
     }
 }
 
-pub struct SharedMemoryIdentifierDs {
+pub struct ShmIdDs {
     pub shm_perm: CreateMode, /* Ownership and permissions */
     pub shm_size: usize,      /* Size of segment (bytes) */
     pub shm_atime: usize,     /* Last attach time */
