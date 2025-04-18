@@ -31,7 +31,7 @@ impl<'a> Syscall<'a> {
             error!("invalid syscall id: {}", id);
             Errno::ENOSYS
         })?;
-        info!("[syscall] id: {:?}, args: {:X?}", id, args);
+        trace!("[syscall] id: {:?}, args: {:X?}", id, args);
         use SyscallID::*;
         let res = match id {
             // fs

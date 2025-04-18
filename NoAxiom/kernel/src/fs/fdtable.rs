@@ -184,7 +184,7 @@ impl FdTable {
     /// Copy the file descriptor from `old_fd` to `new_fd`
     pub fn copyfrom(&mut self, old_fd: usize, new_fd: usize) -> SyscallResult {
         // self.fill_to(core::cmp::max(old_fd, new_fd))?;
-        self.table[new_fd as usize] = self.table[old_fd].clone();
+        self.table[new_fd] = self.table[old_fd].clone();
         Ok(new_fd as isize)
     }
 

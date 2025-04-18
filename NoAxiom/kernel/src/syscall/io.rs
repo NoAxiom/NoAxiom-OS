@@ -95,7 +95,7 @@ impl Syscall<'_> {
             let fd_ptr = fds_ptr + i * core::mem::size_of::<PollFd>();
             let fd_ptr = UserPtr::<PollFd>::new(fd_ptr);
             let poll_fd = fd_ptr.read();
-            debug!("[sys_ppoll]: before poll: poll_fd {:#x?}", poll_fd);
+            trace!("[sys_ppoll]: before poll: poll_fd {:#x?}", poll_fd);
             let file = fd_table.get(poll_fd.fd as usize).ok_or(Errno::EBADF)?;
             let events = poll_fd.events;
             poll_items.push(PpollItem::new(i, events, file));
@@ -124,7 +124,7 @@ impl Syscall<'_> {
             let mut poll_fd = fds[id].1;
             poll_fd.revents |= result;
             fds[id].0.write(poll_fd);
-            debug!("[sys_ppoll]: after poll: poll_fd {:#x?}", fds[id].0.read());
+            trace!("[sys_ppoll]: after poll: poll_fd {:#x?}", fds[id].0.read());
         }
 
         if let Some(old_mask) = old_mask {
