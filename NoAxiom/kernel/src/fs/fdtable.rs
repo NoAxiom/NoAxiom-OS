@@ -1,9 +1,6 @@
 use alloc::{sync::Arc, vec::Vec};
 
-use super::{
-    stdio::{Stdin, Stdout},
-    vfs::basic::file::File,
-};
+use super::vfs::{basic::file::File, TTYFILE};
 use crate::{
     constant::fs::{RLIMIT_HARD_MAX, RLIMIT_SOFT_MAX},
     include::{fs::FcntlArgFlags, result::Errno},
@@ -36,23 +33,23 @@ pub struct FdTableEntry {
 }
 
 impl FdTableEntry {
+    fn tty_file() -> Arc<dyn File> {
+        TTYFILE.get().unwrap().clone()
+    }
     pub fn std_in() -> Self {
         Self {
             flags: FcntlArgFlags::empty(),
-            file: Arc::new(Stdin),
+            file: Self::tty_file(),
         }
     }
     pub fn std_out() -> Self {
         Self {
             flags: FcntlArgFlags::empty(),
-            file: Arc::new(Stdout::new()),
+            file: Self::tty_file(),
         }
     }
     pub fn std_err() -> Self {
-        Self {
-            flags: FcntlArgFlags::empty(),
-            file: Arc::new(Stdout::new()),
-        }
+        Self::std_out()
     }
     pub fn from_file(file: Arc<dyn File>) -> Self {
         let file_flag = file.flags();

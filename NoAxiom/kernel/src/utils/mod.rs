@@ -2,6 +2,7 @@
 
 mod crossover;
 pub mod event;
+pub mod futures;
 
 use alloc::{string::String, vec::Vec};
 

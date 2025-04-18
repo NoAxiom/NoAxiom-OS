@@ -17,15 +17,15 @@ mod riscv64_board;
 pub type Base = riscv64_qemu::Base;
 
 pub trait BaseFu {
-    fn putchar(c: usize);
-    fn getchar() -> usize;
+    fn putchar(c: u8);
+    fn getchar() -> u8;
     fn shutdown() -> !;
 }
 
-pub fn putchar(c: usize) {
+pub fn putchar(c: u8) {
     Base::putchar(c);
 }
-pub fn getchar() -> usize {
+pub fn getchar() -> u8 {
     Base::getchar()
 }
 pub fn shutdown() -> ! {

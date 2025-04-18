@@ -36,19 +36,19 @@ impl Base {
 
 impl BaseFu for Base {
     #[inline]
-    fn putchar(c: usize) {
-        if c as u8 == b'\n' {
+    fn putchar(c: u8) {
+        if c == b'\n' {
             Base::base_putchar(b'\r');
         }
-        Base::base_putchar(c as u8)
+        Base::base_putchar(c)
     }
 
     /// read a byte, return -1 if nothing exists.
     #[inline]
-    fn getchar() -> usize {
+    fn getchar() -> u8 {
         loop {
             if let Some(c) = Base::base_getchar() {
-                return c as usize;
+                return c;
             }
         }
     }

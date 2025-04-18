@@ -178,11 +178,6 @@ impl Syscall<'_> {
         let user_ptr = UserPtr::<u8>::new(buf);
         let buf_slice = user_ptr.as_slice_mut_checked(len).await?;
 
-        if file.is_stdio() {
-            let read_size = file.base_read(0, buf_slice).await?;
-            return Ok(read_size as isize);
-        }
-
         if !file.meta().readable() {
             return Err(Errno::EINVAL);
         }
@@ -224,16 +219,6 @@ impl Syscall<'_> {
 
         let user_ptr = UserPtr::<u8>::new(buf);
         let buf_slice = user_ptr.as_slice_mut_checked(len).await?;
-
-        // debug!(
-        //     "[sys_write] buf as string: {}",
-        //     String::from_utf8_lossy(buf_slice)
-        // );
-
-        if file.is_stdio() {
-            let write_size = file.base_write(0, buf_slice).await?;
-            return Ok(write_size as isize);
-        }
 
         if !file.meta().writable() {
             return Err(Errno::EINVAL);
@@ -303,30 +288,8 @@ impl Syscall<'_> {
         Ok(0)
     }
 
-    /// Get file io control
-    pub fn sys_ioctl(&self, fd: usize, request: usize, arg: usize) -> SyscallResult {
-        let fd_table = self.task.fd_table();
-        fd_table.get(fd).ok_or(Errno::EBADF)?;
-
-        let arg_ptr = UserPtr::<u8>::new(arg);
-        use crate::include::fs::TtyIoctlCmd::{self, *};
-        let cmd = TtyIoctlCmd::from_repr(request).unwrap();
-        info!(
-            "[sys_ioctl]: fd: {}, request: {:#x}, argp: {:#x}, cmd: {:?}",
-            fd, request, arg, cmd
-        );
-        match cmd {
-            TCGETS => {}
-            TCSETS => {}
-            TIOCGPGRP => arg_ptr.write(INIT_PROCESS_ID as u8),
-            TIOCSPGRP => {}
-            TIOCGWINSZ => arg_ptr.write(0),
-            _ => return Err(Errno::EINVAL),
-        }
-        Ok(0)
-    }
-
-    pub async fn sys_newfstat(
+    /// Get file status
+    pub async fn sys_newfstatat(
         &self,
         dirfd: isize,
         path: usize,
@@ -348,6 +311,29 @@ impl Syscall<'_> {
         let kstat = Kstat::from_stat(path.dentry().inode()?.stat()?);
         let ptr = UserPtr::<Kstat>::new(stat_buf as usize);
         ptr.write(kstat);
+        Ok(0)
+    }
+
+    /// Get file io control
+    pub fn sys_ioctl(&self, fd: usize, request: usize, arg: usize) -> SyscallResult {
+        let fd_table = self.task.fd_table();
+        fd_table.get(fd).ok_or(Errno::EBADF)?;
+
+        let arg_ptr = UserPtr::<u8>::new(arg);
+        use crate::include::fs::TtyIoctlCmd::{self, *};
+        let cmd = TtyIoctlCmd::from_repr(request).unwrap();
+        info!(
+            "[sys_ioctl]: fd: {}, request: {:#x}, argp: {:#x}, cmd: {:?}",
+            fd, request, arg, cmd
+        );
+        match cmd {
+            TCGETS => {}
+            TCSETS => {}
+            TIOCGPGRP => arg_ptr.write(INIT_PROCESS_ID as u8),
+            TIOCSPGRP => {}
+            TIOCGWINSZ => arg_ptr.write(0),
+            _ => return Err(Errno::EINVAL),
+        }
         Ok(0)
     }
 
@@ -567,7 +553,7 @@ async fn get_path_or_create(
     debug_syscall_name: &str,
 ) -> SysResult<Path> {
     let path_str = get_string_from_ptr(&UserPtr::<u8>::new(rawpath));
-
+    debug!("path: {}", path_str);
     if !path_str.starts_with('/') {
         if fd == AT_FDCWD {
             let cwd = task.cwd().clone();

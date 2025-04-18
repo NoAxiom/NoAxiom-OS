@@ -1,4 +1,4 @@
-use alloc::sync::Arc;
+use alloc::{string::String, sync::Arc};
 
 use basic::dentry::Dentry;
 use driver::devices::impls::block::BlockDevice;
@@ -8,9 +8,15 @@ use impls::{
 };
 use ksync::Once;
 
-use crate::{config::fs::BLOCK_SIZE, fs::manager::FS_MANAGER, include::fs::MountFlags};
+use crate::{
+    config::fs::BLOCK_SIZE,
+    fs::{manager::FS_MANAGER, path::Path},
+    include::fs::{InodeMode, MountFlags},
+};
 pub mod basic;
 mod impls;
+
+pub use impls::devfs::TTYFILE;
 
 lazy_static::lazy_static! {
     static ref ROOT_DENTRY: Once<Arc<dyn Dentry>> = Once::new();
@@ -64,6 +70,9 @@ pub async fn fs_init() {
         .load_dir()
         .await
         .expect("load root dir failed");
+
+    let passwd = Path::from_or_create(String::from("/etc/passwd"), InodeMode::FILE).await;
+    let _passwd_file = passwd.dentry().open().expect("open passwd failed");
 }
 
 pub fn root_dentry() -> Arc<dyn basic::dentry::Dentry> {

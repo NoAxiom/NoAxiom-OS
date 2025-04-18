@@ -24,6 +24,7 @@ UITEST :=
 DEV := 
 SH := 
 RAMDISK :=
+log_print := 
 
 ifneq ($(MULTICORE), 1)
 	FEATURES += multicore
@@ -79,6 +80,10 @@ endif
 
 ifneq ($(INTERRUPTABLE_ASYNC), )
 	FEATURES += interruptable_async
+endif
+
+ifneq ($(log_print), )
+	FEATURES += log_print
 endif
 
 ifneq ($(ASYNC), )

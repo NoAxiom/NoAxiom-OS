@@ -20,6 +20,7 @@ qemu = ["platform/qemu"]
 interruptable_async = ["driver/interruptable_async"]
 async = ["driver/async"]
 glibc = []
+log_print = []
 
 [dependencies]
 # extern libs

@@ -7,7 +7,6 @@ pub mod fdtable;
 pub mod manager;
 pub mod path;
 pub mod pipe;
-pub mod stdio;
 pub mod vfs;
 
 use arch::{Arch, ArchInt};

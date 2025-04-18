@@ -1,4 +1,4 @@
-use alloc::boxed::Box;
+use alloc::{boxed::Box, vec::Vec};
 
 use async_trait::async_trait;
 use include::errno::Errno;
@@ -25,6 +25,7 @@ struct TtyInner {
 pub struct TtyFile {
     meta: FileMeta,
     inner: SpinLock<TtyInner>,
+    buf: SpinLock<Vec<u8>>,
 }
 
 impl TtyFile {
@@ -36,6 +37,7 @@ impl TtyFile {
                 win_size: WinSize::new(),
                 termios: Termios::new(),
             }),
+            buf: SpinLock::new(Vec::new()),
         }
     }
 }
@@ -51,15 +53,45 @@ impl File for TtyFile {
     }
 
     async fn base_read(&self, _offset: usize, buf: &mut [u8]) -> SyscallResult {
-        for i in 0..buf.len() {
-            buf[i] = platform::getchar() as u8;
+        // todo: use yield_now.await
+        let mut c = platform::getchar() as i8;
+        loop {
+            if c != -1 {
+                break;
+            }
+            c = platform::getchar() as i8;
         }
-        Ok(buf.len() as isize)
+        buf[0] = c as u8;
+        Ok(1 as isize)
     }
 
     async fn base_write(&self, _offset: usize, buf: &[u8]) -> SyscallResult {
-        for i in 0..buf.len() {
-            platform::putchar(buf[i] as usize);
+        #[cfg(feature = "log_print")]
+        {
+            let mut stdout_buf = self.buf.lock();
+            for c in buf.iter() {
+                stdout_buf.push(*c);
+                if *c == '\n' as u8 {
+                    // only for debug
+                    print!(
+                        "[PRINT, HART{}, TID{} at {}ms] ",
+                        crate::cpu::get_hartid(),
+                        crate::cpu::current_cpu()
+                            .task
+                            .as_ref()
+                            .map_or_else(|| 0, |task| task.tid()),
+                        crate::time::gettime::get_time_ms(),
+                    );
+                    for it in stdout_buf.iter() {
+                        print!("{}", *it as char);
+                    }
+                    stdout_buf.clear();
+                }
+            }
+        }
+        #[cfg(not(feature = "log_print"))]
+        {
+            print!("{}", core::str::from_utf8(buf).unwrap());
         }
         Ok(buf.len() as isize)
     }
@@ -122,6 +154,15 @@ impl File for TtyFile {
             }
             TCSBRK => Ok(0),
             _ => todo!(),
+        }
+    }
+}
+
+impl Drop for TtyFile {
+    fn drop(&mut self) {
+        let stdout_buf = self.buf.lock();
+        if !stdout_buf.is_empty() {
+            print!("{}", core::str::from_utf8(stdout_buf.as_slice()).unwrap());
         }
     }
 }

@@ -16,6 +16,7 @@ use crate::{
     constant::fs::LEN_BEFORE_NAME,
     include::{
         fs::{FileFlags, LinuxDirent64},
+        io::PollEvent,
         result::Errno,
     },
     syscall::SyscallResult,
@@ -40,6 +41,12 @@ impl FileMeta {
             dentry,
             inode,
         }
+    }
+    #[allow(unused)]
+    pub fn empty() -> Self {
+        let dentry = Arc::new(dentry::EmptyDentry::new());
+        let inode = Arc::new(inode::EmptyInode::new());
+        Self::new(dentry, inode)
     }
     pub fn dentry(&self) -> Arc<dyn Dentry> {
         self.dentry.clone()
@@ -67,10 +74,6 @@ pub trait File: Send + Sync + DowncastSync {
     fn dentry(&self) -> Arc<dyn Dentry> {
         self.meta().dentry.clone()
     }
-    /// Is STD_IN or STD_OUT or STD_ERR
-    fn is_stdio(&self) -> bool {
-        false
-    }
     /// Get the meta of the file
     fn meta(&self) -> &FileMeta;
     /// Read data from file at `offset` to `buf`
@@ -85,7 +88,18 @@ pub trait File: Send + Sync + DowncastSync {
     /// Delete dentry, only for directories
     async fn delete_child(&self, name: &str) -> Result<(), Errno>;
     /// IOCTL command
+    #[allow(unused)]
     fn ioctl(&self, cmd: usize, arg: usize) -> SyscallResult;
+    fn poll(&self, req: &PollEvent) -> PollEvent {
+        let mut res = PollEvent::empty();
+        if req.contains(PollEvent::POLLIN) {
+            res |= PollEvent::POLLIN;
+        }
+        if req.contains(PollEvent::POLLOUT) {
+            res |= PollEvent::POLLOUT;
+        }
+        res
+    }
 }
 
 impl_downcast!(sync File);
@@ -138,18 +152,12 @@ impl dyn File {
         Ok(buf)
     }
     pub async fn read(&self, buf: &mut [u8]) -> SyscallResult {
-        if self.is_stdio() {
-            return self.base_read(0, buf).await;
-        }
         let offset = self.pos();
         let len = self.base_read(offset, buf).await?;
         self.meta().pos.fetch_add(len as usize, Ordering::Relaxed);
         Ok(len)
     }
     pub async fn write(&self, buf: &[u8]) -> SyscallResult {
-        if self.is_stdio() {
-            return self.base_write(0, buf).await;
-        }
         let offset = self.pos();
         let len = self.base_write(offset, buf).await?;
         self.meta().pos.fetch_add(len as usize, Ordering::Relaxed);
