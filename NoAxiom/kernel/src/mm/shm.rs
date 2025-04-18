@@ -4,6 +4,7 @@ use ksync::mutex::SpinLock;
 use lazy_static::lazy_static;
 use memory::address::{PhysAddr, VirtAddr};
 
+use super::map_area::MapArea;
 use crate::{
     cpu::current_task,
     include::{fs::CreateMode, mm::ShmIdDs},
@@ -121,4 +122,20 @@ pub fn shm_get_address_and_size(key: usize) -> (PhysAddr, usize) {
 }
 pub fn shm_get_nattch(key: usize) -> usize {
     SHM_MANAGER.lock().get_nattch(key)
+}
+
+pub struct ShmInfo {
+    pub shm_areas: Vec<MapArea>,
+    pub shm_trackers: BTreeMap<VirtAddr, ShmTracker>,
+    pub shm_top: usize,
+}
+
+impl ShmInfo {
+    pub fn new() -> Self {
+        Self {
+            shm_areas: Vec::new(),
+            shm_trackers: BTreeMap::new(),
+            shm_top: 0,
+        }
+    }
 }

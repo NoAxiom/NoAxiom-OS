@@ -5,9 +5,16 @@ use super::SyscallResult;
 use crate::{
     config::mm::PAGE_SIZE,
     include::{
-        ipc::{IPC_PRIVATE, IPC_RMID}, mm::{MmapFlags, MmapProts}, result::Errno
+        ipc::{IPC_PRIVATE, IPC_RMID},
+        mm::{MmapFlags, MmapProts},
+        result::Errno,
     },
-    mm::{address::VirtAddr, page_table::PageTable, permission::MapPermission, shm::{create_shm, remove_shm}},
+    mm::{
+        address::VirtAddr,
+        page_table::PageTable,
+        permission::MapPermission,
+        shm::{create_shm, remove_shm},
+    },
     return_errno,
     syscall::Syscall,
     utils::align_up,
@@ -112,7 +119,6 @@ impl Syscall<'_> {
         let size = (size + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE;
         assert!(size % PAGE_SIZE == 0);
         let new_key;
-        let pid = self.task.tid();
         if key == IPC_PRIVATE {
             new_key = create_shm(key, size, shmflg);
         } else {
@@ -136,7 +142,7 @@ impl Syscall<'_> {
         let task = self.task;
         let mut memory_set = task.memory_set().lock();
         let address = if address == 0 {
-            memory_set.shm_top
+            memory_set.shm.shm_top
         } else {
             address
         };

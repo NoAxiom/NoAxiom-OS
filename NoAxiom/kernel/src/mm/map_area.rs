@@ -1,6 +1,6 @@
 //! map area
 
-use alloc::{collections::btree_map::BTreeMap, sync::Arc};
+use alloc::collections::btree_map::BTreeMap;
 
 use arch::{Arch, ArchMemory, ArchPageTableEntry};
 
@@ -12,7 +12,6 @@ use super::{
 };
 use crate::{
     config::mm::PAGE_SIZE,
-    fs::vfs::basic::file::File,
     mm::address::{PhysPageNum, StepOne},
 };
 
@@ -25,6 +24,7 @@ pub enum MapAreaType {
     ElfBinary,
     File,
     KernelSpace,
+    Shared,
 }
 
 /// map area, saves program data mapping information
@@ -122,14 +122,14 @@ impl MapArea {
                 }
                 self.frame_map.insert(vpn, frame);
                 let flags = self.map_permission.into();
-                page_table.map(vpn, ppn, flags, false);
+                page_table.map(vpn, ppn, flags);
                 assert!(page_table.find_pte(vpn).is_some());
             }
             // direct: kernel space
             MapType::Direct => {
                 let ppn = vpn.kernel_translate_into_ppn();
                 let flags = self.map_permission.into();
-                page_table.map(vpn, ppn, flags, false);
+                page_table.map(vpn, ppn, flags);
             }
         }
     }
