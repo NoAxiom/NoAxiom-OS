@@ -120,6 +120,7 @@ impl Syscall<'_> {
             }
         };
 
+        let res_len = res.len();
         for (id, result) in res {
             let mut poll_fd = fds[id].1;
             poll_fd.revents |= result;
@@ -131,6 +132,6 @@ impl Syscall<'_> {
             *pcb.sig_mask_mut() = old_mask;
         }
         debug!("[sys_ppoll]: OK!");
-        Ok(0)
+        Ok(res_len as isize)
     }
 }
