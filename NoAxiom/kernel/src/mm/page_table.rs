@@ -138,11 +138,13 @@ impl PageTable {
 
     /// unmap a vpn
     pub fn unmap(&mut self, vpn: VirtPageNum) {
-        let pte = self.find_pte(vpn).unwrap();
-        if !pte.flags().contains(MappingFlags::V) {
-            error!("{:?} is invalid before unmapping", vpn);
+        // warn!("unmap vpn: {:#x}", vpn.0);
+        if let Some(pte) = self.find_pte(vpn) {
+            if !pte.flags().contains(MappingFlags::V) {
+                error!("{:?} is invalid before unmapping", vpn);
+            }
+            pte.reset();
         }
-        pte.reset();
     }
 
     /// translate vpn into pte

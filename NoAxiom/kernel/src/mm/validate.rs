@@ -45,7 +45,7 @@ pub async fn validate(
                 pte.flags(),
                 current_task().tid()
             );
-            memory_set.lock().realloc_cow(vpn, pte);
+            memory_set.lock().realloc_cow(vpn, pte)?;
             Arch::tlb_flush();
             Ok(())
         } else if trap_type.is_some() && matches!(trap_type.unwrap(), TrapType::StorePageFault(_)) {
@@ -64,7 +64,7 @@ pub async fn validate(
         }
     } else {
         let mut ms = memory_set.lock();
-        if ms.user_stack_area.vpn_range.is_in_range(vpn) {
+        if ms.stack.vpn_range.is_in_range(vpn) {
             let task = current_task();
             info!(
                 "[memory_validate] realloc stack, tid: {}, addr: {:#x?}, epc: {:#x}",
@@ -75,9 +75,9 @@ pub async fn validate(
             ms.lazy_alloc_stack(vpn);
             Arch::tlb_flush();
             Ok(())
-        } else if ms.user_brk_area.vpn_range.is_in_range(vpn) {
+        } else if ms.brk.area.vpn_range.is_in_range(vpn) {
             info!(
-                "[memory_validate] realloc heap, tid: {}, addr: {:x?}",
+                "[memory_validate] realloc brk, tid: {}, addr: {:x?}",
                 current_task().tid(),
                 vpn.0
             );
@@ -103,7 +103,7 @@ impl Task {
         addr: usize,
         trap_type: Option<TrapType>,
     ) -> SysResult<()> {
-        trace!("[memory_validate] check at addr: {:#x}", addr);
+        debug!("[memory_validate] check at addr: {:#x}", addr);
         let ms = self.memory_set();
         let vpn = VirtAddr::from(addr).floor();
         let pte = PageTable::from_ppn(Arch::current_root_ppn()).translate_vpn(vpn);

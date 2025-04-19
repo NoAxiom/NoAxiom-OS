@@ -15,14 +15,12 @@ use crate::{
     mm::address::{PhysPageNum, StepOne},
 };
 
-#[allow(unused)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MapAreaType {
     None,
     UserStack,
     UserHeap,
     ElfBinary,
-    File,
     KernelSpace,
     Shared,
 }
