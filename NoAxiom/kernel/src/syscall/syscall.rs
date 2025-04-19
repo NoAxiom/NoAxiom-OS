@@ -76,6 +76,7 @@ impl<'a> Syscall<'a> {
             // SYS_STATFS =>           todo!(),
             // SYS_PWRITE64 =>         todo!(),
             // SYS_SPLICE =>           todo!(),
+            // SYS_STATX =>            todo!(),
 
             // io
             SYS_PPOLL => self.sys_ppoll(args[0], args[1], args[2], args[3]).await,
