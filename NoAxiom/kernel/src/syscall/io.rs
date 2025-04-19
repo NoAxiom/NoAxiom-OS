@@ -83,9 +83,12 @@ impl Syscall<'_> {
             Some(sigmask_ptr.read())
         };
 
-        info!(
+        trace!(
             "[sys_ppoll]: fds_ptr {:#x}, nfds {}, timeout:{:?}, sigmask:{:?}",
-            fds_ptr, nfds, timeout, sigmask
+            fds_ptr,
+            nfds,
+            timeout,
+            sigmask
         );
 
         let fd_table = self.task.fd_table();

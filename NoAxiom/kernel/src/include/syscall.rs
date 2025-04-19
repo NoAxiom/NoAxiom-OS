@@ -291,3 +291,13 @@ pub enum SyscallID {
     // loongarch specific syscall
     SYS_STATX = 291,
 }
+
+impl SyscallID {
+    pub fn is_debug_on(&self) -> bool {
+        match self {
+            SyscallID::SYS_READ | SyscallID::SYS_WRITE | SyscallID::SYS_IOCTL => false,
+            SyscallID::SYS_PPOLL => false,
+            _ => true,
+        }
+    }
+}

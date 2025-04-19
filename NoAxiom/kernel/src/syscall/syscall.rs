@@ -31,7 +31,9 @@ impl<'a> Syscall<'a> {
             error!("invalid syscall id: {}", id);
             Errno::ENOSYS
         })?;
-        debug!("[syscall] id: {:?}, args: {:X?}", id, args);
+        if id.is_debug_on() {
+            info!("[syscall] id: {:?}, args: {:X?}", id, args);
+        }
         use SyscallID::*;
         #[rustfmt::skip]
         let res = match id {
@@ -124,8 +126,9 @@ impl<'a> Syscall<'a> {
             // SYS_SYSTEMSHUTDOWN =>       todo!(),
             
             // futex
-            SYS_GET_ROBUST_LIST => self.sys_get_robust_list(args[0], args[1], args[2]),
-            SYS_SET_ROBUST_LIST => self.sys_set_robust_list(args[0], args[1]),
+            SYS_GET_ROBUST_LIST =>  self.sys_get_robust_list(args[0], args[1], args[2]),
+            SYS_SET_ROBUST_LIST =>  self.sys_set_robust_list(args[0], args[1]),
+            SYS_FUTEX =>            todo!(),
 
             // signal
             SYS_SIGTIMEDWAIT => Self::empty_syscall("sigtimedwait", 0),
@@ -162,9 +165,6 @@ impl<'a> Syscall<'a> {
             SYS_SYSINFO =>  Self::empty_syscall("info", 0),
             SYS_UNAME =>    Self::sys_uname(args[0]),
             SYS_SYSLOG =>   Self::sys_syslog(args[0], args[1], args[2]).await,
-
-            // futex
-            SYS_FUTEX => todo!(),
 
             // unsupported
             _ => {
