@@ -42,7 +42,7 @@ impl Devices {
                     Ok(_) => {
                         #[cfg(feature = "interruptable_async")]
                         {
-                            warn!("pci_dev for interruptable_async is not supported");
+                            log::warn!("pci_dev for interruptable_async is not supported");
                         }
                         #[cfg(feature = "async")]
                         if let Some(transport) =
