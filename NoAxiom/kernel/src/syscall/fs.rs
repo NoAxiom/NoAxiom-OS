@@ -5,7 +5,7 @@ use ksync::mutex::check_no_lock;
 
 use super::{SysResult, Syscall, SyscallResult};
 use crate::{
-    constant::fs::AT_FDCWD,
+    constant::fs::{AT_FDCWD, UTIME_NOW, UTIME_OMIT},
     fs::{fdtable::RLimit, manager::FS_MANAGER, path::Path, pipe::PipeFile, vfs::root_dentry},
     include::{
         fs::{FcntlArgFlags, FcntlFlags, FileFlags, InodeMode, Iovec, Kstat, MountFlags},
@@ -14,6 +14,7 @@ use crate::{
     },
     mm::user_ptr::UserPtr,
     task::Task,
+    time::{gettime::get_time_duration, time_spec::TimeSpec},
     utils::get_string_from_ptr,
 };
 
@@ -301,14 +302,7 @@ impl Syscall<'_> {
             "[sys_newfstatat] dirfd: {}, path: {:?}, stat_buf: {:#x}",
             dirfd, path, stat_buf
         );
-        let path = get_path_or_create(
-            self.task.clone(),
-            path,
-            dirfd,
-            InodeMode::empty(),
-            "sys_newfstat",
-        )
-        .await?;
+        let path = get_path(self.task.clone(), path, dirfd, "sys_newfstat")?;
         info!(
             "[sys_newfstat] dirfd: {}, path: {:?}, stat_buf: {:#x}",
             dirfd, path, stat_buf
@@ -406,22 +400,23 @@ impl Syscall<'_> {
     /// Create a hard link
     pub fn sys_linkat(
         &self,
-        olddirfd: usize,
+        olddirfd: isize,
         oldpath: usize,
-        newdirfd: usize,
+        newdirfd: isize,
         newpath: usize,
         _flags: usize,
     ) -> SyscallResult {
         info!("[sys_linkat]");
         let task = self.task;
-        let old_path = get_path(task.clone(), oldpath, olddirfd as isize, "sys_linkat")?;
-        let new_path = get_path(task.clone(), newpath, newdirfd as isize, "sys_linkat")?;
+        let old_path = get_path(task.clone(), oldpath, olddirfd, "sys_linkat")?;
+        let new_path = get_path(task.clone(), newpath, newdirfd, "sys_linkat")?;
         let old_dentry = old_path.dentry();
         let new_dentry = new_path.dentry();
         new_dentry.link_to(old_dentry)?;
         Ok(0)
     }
 
+    /// Read link file, error if the file is not a link
     pub async fn sys_readlinkat(
         &self,
         dirfd: isize,
@@ -438,7 +433,6 @@ impl Syscall<'_> {
         if dentry.inode()?.file_type() != InodeMode::LINK {
             return Err(Errno::EINVAL);
         }
-        // todo: read, now just do nothing
         let user_ptr = UserPtr::<u8>::new(buf);
         let buf_slice = user_ptr.as_slice_mut_checked(buflen).await?;
         let file = dentry.open()?;
@@ -447,14 +441,14 @@ impl Syscall<'_> {
     }
 
     /// Unlink a file, also delete the file if nlink is 0
-    pub async fn sys_unlinkat(&self, dirfd: usize, path: usize, _flags: usize) -> SyscallResult {
+    pub async fn sys_unlinkat(&self, dirfd: isize, path: usize, _flags: usize) -> SyscallResult {
         info!(
             "[sys_unlinkat] dirfd: {}, path: {}",
-            dirfd as isize,
+            dirfd,
             get_string_from_ptr(&UserPtr::<u8>::new(path))
         );
         let task = self.task;
-        let path = get_path(task.clone(), path, dirfd as isize, "sys_unlinkat")?;
+        let path = get_path(task.clone(), path, dirfd, "sys_unlinkat")?;
         let dentry = path.dentry();
         dentry.unlink().await?;
         Ok(0)
@@ -547,6 +541,103 @@ impl Syscall<'_> {
                 unimplemented!("fcntl cmd: {op:?} not implemented");
             }
         }
+    }
+
+    /// Copy from input file descriptor to output file descriptor
+    pub async fn sys_sendfile(
+        &self,
+        out_fd: usize,
+        in_fd: usize,
+        offset: usize,
+        count: usize,
+    ) -> SyscallResult {
+        info!("[sys_sendfile] out_fd: {out_fd}, in_fd: {in_fd}, offset: {offset}, count: {count}");
+        let fd_table = self.task.fd_table();
+        let out_file = fd_table.get(out_fd).ok_or(Errno::EBADF)?;
+        let in_file = fd_table.get(in_fd).ok_or(Errno::EBADF)?;
+        if !out_file.meta().writable() || !in_file.meta().readable() {
+            return Err(Errno::EBADF);
+        }
+
+        let offset_ptr = UserPtr::<usize>::new(offset);
+        let mut buf = vec![0u8; count];
+        let read_len = if !offset_ptr.is_null() {
+            let offset = offset_ptr.read();
+            let read_len = in_file.base_read(offset, &mut buf).await? as usize;
+            offset_ptr.write(offset + read_len);
+            read_len
+        } else {
+            in_file.read(&mut buf).await? as usize
+        };
+
+        out_file.write(&buf[..read_len]).await
+    }
+
+    pub fn sys_faccessat(
+        &self,
+        dirfd: isize,
+        path: usize,
+        mode: usize,
+        flag: usize,
+    ) -> SyscallResult {
+        info!(
+            "[sys_faccessat] faccessat file: {:?}, flag:{:?}, mode:{:?}, just check path",
+            path, flag, mode
+        );
+        get_path(self.task.clone(), path, dirfd, "sys_faccessat")?;
+        Ok(0)
+    }
+
+    /// Modify timestamp of a file
+    pub fn sys_utimensat(
+        &self,
+        dirfd: isize,
+        path: usize,
+        times: usize,
+        _flags: usize,
+    ) -> SyscallResult {
+        info!("[sys_utimensat] dirfd: {}, times: {:#x}", dirfd, times);
+        let fd_table = self.task.fd_table();
+        let path_ptr = UserPtr::<u8>::new(path);
+        let times_ptr = UserPtr::<TimeSpec>::new(times);
+        let inode = if path_ptr.is_null() {
+            match dirfd {
+                AT_FDCWD => return Err(Errno::EINVAL),
+                fd => fd_table.get(fd as usize).ok_or(Errno::EBADF)?.inode(),
+            }
+        } else {
+            let path = get_path(self.task.clone(), path, dirfd, "sys_utimensat")?;
+            path.dentry().inode()?
+        };
+
+        let current = TimeSpec::from(get_time_duration());
+        let (mut atime, mut mtime, ctime) = (Some(current), Some(current), Some(current));
+        if !times_ptr.is_null() {
+            for i in 0..2 {
+                let times_ptr = UserPtr::<TimeSpec>::new(times + i * TimeSpec::size());
+                let time_spec = times_ptr.read();
+                match time_spec.tv_nsec {
+                    UTIME_NOW => {}
+                    UTIME_OMIT => {
+                        if i == 0 {
+                            atime = None;
+                        } else {
+                            mtime = None;
+                        }
+                    }
+                    _ => {
+                        if i == 0 {
+                            atime = Some(time_spec);
+                        } else {
+                            mtime = Some(time_spec);
+                        }
+                    }
+                }
+            }
+        }
+
+        inode.set_time(&atime, &mtime, &ctime);
+        Ok(0)
     }
 }
 

@@ -4,9 +4,12 @@ use downcast_rs::{impl_downcast, DowncastSync};
 use spin::Mutex;
 
 use super::superblock::{EmptySuperBlock, SuperBlock};
-use crate::include::{
-    fs::{InodeMode, Stat},
-    result::Errno,
+use crate::{
+    include::{
+        fs::{InodeMode, Stat},
+        result::Errno,
+    },
+    time::time_spec::TimeSpec,
 };
 
 lazy_static::lazy_static! {
@@ -91,6 +94,27 @@ impl dyn Inode {
     }
     pub fn set_size(&self, size: usize) {
         self.meta().inner.lock().size = size;
+    }
+    // set timestamp, `None` means not to change
+    pub fn set_time(
+        &self,
+        atime: &Option<TimeSpec>,
+        mtime: &Option<TimeSpec>,
+        ctime: &Option<TimeSpec>,
+    ) {
+        let mut inner = self.meta().inner.lock();
+        if let Some(atime) = atime {
+            inner.atime_sec = atime.tv_sec;
+            inner.atime_nsec = atime.tv_nsec;
+        }
+        if let Some(mtime) = mtime {
+            inner.mtime_sec = mtime.tv_sec;
+            inner.mtime_nsec = mtime.tv_nsec;
+        }
+        if let Some(ctime) = ctime {
+            inner.ctime_sec = ctime.tv_sec;
+            inner.ctime_nsec = ctime.tv_nsec;
+        }
     }
 }
 

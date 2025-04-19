@@ -155,6 +155,18 @@ bitflags! {
     }
 }
 
+impl From<CreateMode> for InodeMode {
+    fn from(mode: CreateMode) -> Self {
+        InodeMode::from_bits_truncate(mode.bits())
+    }
+}
+
+impl From<InodeMode> for CreateMode {
+    fn from(mode: InodeMode) -> Self {
+        CreateMode::from_bits_truncate(mode.bits())
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 #[repr(C)]
 pub struct Stat {

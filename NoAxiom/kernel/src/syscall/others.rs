@@ -1,21 +1,11 @@
 use super::{Syscall, SyscallResult};
-use crate::{
-    include::info::Utsname, mm::user_ptr::UserPtr, sched::utils::yield_now,
-    time::gettime::get_time_ns,
-};
+use crate::{mm::user_ptr::UserPtr, sched::utils::yield_now, time::gettime::get_time_ns};
 
 impl Syscall<'_> {
     /// yield current task
     pub async fn sys_yield(&self) -> SyscallResult {
         trace!("sys_yield");
         yield_now().await;
-        Ok(0)
-    }
-
-    pub fn sys_uname(buf: usize) -> SyscallResult {
-        let buf = UserPtr::<Utsname>::new(buf);
-        let res = Utsname::get();
-        buf.write(res);
         Ok(0)
     }
 

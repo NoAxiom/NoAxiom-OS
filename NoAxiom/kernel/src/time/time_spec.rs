@@ -25,6 +25,10 @@ impl TimeSpec {
             && (self.tv_nsec as isize >= 0)
             && (self.tv_nsec < 1_000_000_000)
     }
+
+    pub const fn size() -> usize {
+        core::mem::size_of::<Self>()
+    }
 }
 
 impl From<Duration> for TimeSpec {
