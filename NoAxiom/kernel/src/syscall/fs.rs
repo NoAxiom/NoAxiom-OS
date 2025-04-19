@@ -92,12 +92,12 @@ impl Syscall<'_> {
         let path = get_string_from_ptr(&ptr);
         info!("[sys_chdir] path: {}", path);
 
-        // check if the path is valid
-        let split_path = path.split('/').collect::<Vec<&str>>();
-        root_dentry().find_path(&split_path)?;
-
         let mut cwd_guard = self.task.cwd();
-        *cwd_guard = cwd_guard.clone().from_cd(&"..")?.from_cd(&path)?;
+        if path.starts_with('/') {
+            *cwd_guard = Path::try_from(path)?;
+        } else {
+            *cwd_guard = cwd_guard.clone().from_cd(&path)?;
+        }
         Ok(0)
     }
 
@@ -297,6 +297,10 @@ impl Syscall<'_> {
         stat_buf: usize,
         _flags: usize,
     ) -> SyscallResult {
+        info!(
+            "[sys_newfstatat] dirfd: {}, path: {:?}, stat_buf: {:#x}",
+            dirfd, path, stat_buf
+        );
         let path = get_path_or_create(
             self.task.clone(),
             path,
@@ -511,43 +515,35 @@ impl Syscall<'_> {
         info!("[sys_fcntl] fd: {fd}, cmd: {op:?}, arg: {flags:?}");
         match op {
             FcntlFlags::F_SETFL => {
-                debug!("F_SETFL");
                 file.set_flags(flags);
                 Ok(0)
             }
             FcntlFlags::F_SETFD => {
-                debug!("F_SETFD");
                 let arg = FileFlags::from_bits_retain(arg as u32);
                 let fd_flags = FcntlArgFlags::from_arg(arg);
                 fd_table.set_fdflag(fd, fd_flags);
                 Ok(0)
             }
             FcntlFlags::F_GETFD => {
-                debug!("F_GETFD");
                 let fd_flags = fd_table.get_fdflag(fd).ok_or(Errno::EBADF)?;
                 Ok(fd_flags.bits() as isize)
             }
             FcntlFlags::F_GETFL => {
-                debug!("F_GETFL");
                 let file_flag = file.flags();
                 Ok(file_flag.bits() as isize)
             }
             FcntlFlags::F_DUPFD => {
-                debug!("F_DUPFD");
                 let new_fd = fd_table.alloc_fd_after(fd)?;
                 assert!(new_fd > fd);
                 fd_table.copyfrom(fd, new_fd)
             }
             FcntlFlags::F_DUPFD_CLOEXEC => {
-                debug!("F_DUPFD_CLOEXEC");
                 let new_fd = fd_table.alloc_fd_after(fd)?;
                 assert!(new_fd > fd);
-                debug!("new_fd: {}", new_fd);
                 fd_table.set_fdflag(new_fd, FcntlArgFlags::FD_CLOEXEC);
                 fd_table.copyfrom(fd, new_fd)
             }
             _ => {
-                debug!("FcntlFlags::FcntlCmd not implemented");
                 unimplemented!("fcntl cmd: {op:?} not implemented");
             }
         }
@@ -562,7 +558,7 @@ async fn get_path_or_create(
     debug_syscall_name: &str,
 ) -> SysResult<Path> {
     let path_str = get_string_from_ptr(&UserPtr::<u8>::new(rawpath));
-    trace!("path: {}", path_str);
+    debug!("path: {}", path_str);
     if !path_str.starts_with('/') {
         if fd == AT_FDCWD {
             let cwd = task.cwd().clone();

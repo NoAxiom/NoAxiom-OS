@@ -238,6 +238,7 @@ impl dyn Dentry {
                 current = child.clone();
                 idx += 1;
             } else {
+                println!("[kernel] [find_path] file not exist");
                 return Err(Errno::ENOENT);
             }
         }

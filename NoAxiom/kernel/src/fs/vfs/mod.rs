@@ -72,7 +72,11 @@ pub async fn fs_init() {
         .expect("load root dir failed");
 
     let passwd = Path::from_or_create(String::from("/etc/passwd"), InodeMode::FILE).await;
-    let _passwd_file = passwd.dentry().open().expect("open passwd failed");
+    passwd.dentry().open().expect("open /etc/passwd failed");
+
+    #[cfg(feature = "glibc")]
+    let ls = Path::from_or_create(String::from("/glibc/ls"), InodeMode::FILE).await;
+    ls.dentry().open().expect("open ls failed");
 }
 
 pub fn root_dentry() -> Arc<dyn basic::dentry::Dentry> {
