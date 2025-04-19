@@ -55,10 +55,10 @@ use crate::{
 };
 
 /// shared between threads
-type Shared<T> = Arc<SpinLock<T>>;
-struct SharedMutable<T>(PhantomData<T>);
-impl<T> SharedMutable<T> {
-    pub fn new(data: T) -> Shared<T> {
+type SharedMut<T> = Arc<SpinLock<T>>;
+struct Shared<T>(PhantomData<T>);
+impl<T> Shared<T> {
+    pub fn new(data: T) -> SharedMut<T> {
         Arc::new(SpinLock::new(data))
     }
 }
@@ -148,12 +148,12 @@ pub struct Task {
     tgid: Immutable<TGID>,     // task group id, aka pid
 
     // shared
-    fd_table: Shared<FdTable>,         // file descriptor table
-    cwd: Shared<Path>,                 // current work directory
-    sa_list: Shared<SigActionList>,    // signal action list, saves signal handler
-    memory_set: Shared<MemorySet>,     // memory set for the task
-    thread_group: Shared<ThreadGroup>, // thread group
-    pgid: Shared<PGID>,                // process group id
+    fd_table: SharedMut<FdTable>,         // file descriptor table
+    cwd: SharedMut<Path>,                 // current work directory
+    sa_list: SharedMut<SigActionList>,    // signal action list, saves signal handler
+    memory_set: SharedMut<MemorySet>,     // memory set for the task
+    thread_group: SharedMut<ThreadGroup>, // thread group
+    pgid: SharedMut<PGID>,                // process group id
 }
 
 impl PCB {
@@ -364,15 +364,15 @@ impl Task {
         let task = Arc::new(Self {
             tid,
             tgid,
-            pgid: SharedMutable::new(tgid),
-            pcb: SpinLock::new(PCB::default()),
-            thread_group: SharedMutable::new(ThreadGroup::new()),
-            memory_set: SharedMutable::new(memory_set),
+            pgid: Shared::new(tgid),
+            pcb: Mutable::new(PCB::default()),
+            thread_group: Shared::new(ThreadGroup::new()),
+            memory_set: Shared::new(memory_set),
             trap_cx: ThreadOnly::new(TrapContext::app_init_cx(elf_entry, user_sp)),
             sched_entity: SchedEntity::new_bare(INIT_PROCESS_ID),
-            fd_table: SharedMutable::new(FdTable::new()),
-            cwd: SharedMutable::new(Path::try_from(String::from("/")).unwrap()),
-            sa_list: SharedMutable::new(SigActionList::new()),
+            fd_table: Shared::new(FdTable::new()),
+            cwd: Shared::new(Path::try_from(String::from("/")).unwrap()),
+            sa_list: Shared::new(SigActionList::new()),
             waker: Once::new(),
             tcb: ThreadOnly::new(TCB {
                 ..Default::default()
@@ -509,20 +509,20 @@ impl Task {
             self.memory_set().clone()
         } else {
             let (ms, _) = self.memory_set().lock().clone_cow();
-            SharedMutable::new(ms)
+            Shared::new(ms)
         };
 
         let sa_list = if flags.contains(CloneFlags::SIGHAND) {
             self.sa_list.clone()
         } else {
-            SharedMutable::new(self.sa_list.lock().clone())
+            Shared::new(self.sa_list.lock().clone())
         };
 
         let fd_table = if flags.contains(CloneFlags::FILES) {
             self.fd_table.clone()
         } else {
             trace!("fd table info cloned");
-            let tmp = SharedMutable::new(self.fd_table.lock().clone());
+            let tmp = Shared::new(self.fd_table.lock().clone());
             let mut guard = tmp.lock();
             guard.table[STD_IN] = Some(FdTableEntry::std_in());
             guard.table[STD_OUT] = Some(FdTableEntry::std_out());
@@ -541,7 +541,7 @@ impl Task {
                 tgid: self.tgid.clone(),
                 pgid: self.pgid.clone(),
                 thread_group: self.thread_group.clone(),
-                pcb: SpinLock::new(PCB {
+                pcb: Mutable::new(PCB {
                     parent: self.pcb.lock().parent.clone(),
                     ..Default::default()
                 }),
@@ -567,9 +567,9 @@ impl Task {
             let new_process = Arc::new(Self {
                 tid: new_tid,
                 tgid: new_tgid,
-                pgid: SharedMutable::new(new_pgid),
-                thread_group: SharedMutable::new(ThreadGroup::new()),
-                pcb: SpinLock::new(PCB {
+                pgid: Shared::new(new_pgid),
+                thread_group: Shared::new(ThreadGroup::new()),
+                pcb: Mutable::new(PCB {
                     parent: Some(self.get_tg_leader()),
                     ..Default::default()
                 }),
@@ -577,7 +577,7 @@ impl Task {
                 trap_cx: ThreadOnly::new(self.trap_context().clone()),
                 sched_entity: self.sched_entity.data_clone(new_tgid),
                 fd_table,
-                cwd: SharedMutable::new(self.cwd().clone()),
+                cwd: Shared::new(self.cwd().clone()),
                 sa_list,
                 waker: Once::new(),
                 tcb: ThreadOnly::new(TCB {
