@@ -614,8 +614,8 @@ impl Task {
             self.init_user_stack(user_sp, args, envs, &mut auxs);
         self.trap_context_mut()
             .update_cx(elf_entry, user_sp, argc, argv_base, envp_base);
-        // debug!("trap_context: {:#x?}", self.trap_context());
-        // FIXME: close fd table, reset sigactions
+        self.sa_list.lock().reset();
+        // FIXME: close fd table
         Ok(())
     }
 }

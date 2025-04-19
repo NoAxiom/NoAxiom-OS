@@ -139,4 +139,14 @@ impl SigActionList {
         }
         res
     }
+    pub fn reset(&mut self) {
+        for (num, action) in self.actions.iter_mut().enumerate() {
+            match action.handler {
+                SAHandlerType::User { .. } => {
+                    action.handler = SAHandlerType::new_default(SigNum::from((num + 1) as usize))
+                }
+                _ => {}
+            }
+        }
+    }
 }
