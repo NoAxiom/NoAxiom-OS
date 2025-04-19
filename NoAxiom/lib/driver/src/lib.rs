@@ -8,6 +8,7 @@ use devices::{impls::block::BlockDevice, ALL_DEVICES};
 mod bus;
 pub mod devices;
 mod dtb;
+#[cfg(target_arch = "riscv64")]
 mod plic;
 
 extern crate alloc;

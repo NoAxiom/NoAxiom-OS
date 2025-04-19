@@ -1,14 +1,14 @@
 //! utility functions
 
 mod crossover;
-pub mod event;
+// pub mod event;
 pub mod futures;
 
 use alloc::{string::String, vec::Vec};
 
 use crossover::{Crossover, CrossoverManager};
 
-use crate::{mm::user_ptr::UserPtr, task::Task};
+use crate::mm::user_ptr::UserPtr;
 
 pub fn reverse<T: Clone>(vec: &Vec<T>) -> Vec<T> {
     let mut res = vec.clone();

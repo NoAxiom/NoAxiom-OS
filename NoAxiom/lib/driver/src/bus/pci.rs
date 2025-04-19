@@ -1,8 +1,6 @@
 use arch::ArchMemory;
 use include::errno::Errno;
-use log::warn;
 use platform::{PCI_BUS_END, PCI_RANGE};
-use spin::Mutex;
 use virtio_drivers_async::transport::{
     pci::{
         bus::{

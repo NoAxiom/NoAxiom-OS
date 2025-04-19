@@ -71,6 +71,7 @@ impl Future for GetWakerFuture {
 }
 
 /// Get the waker of the current future.
+#[allow(unused)]
 pub async fn get_current_waker() -> Waker {
     GetWakerFuture.await
 }

@@ -4,6 +4,7 @@ use fdt::Fdt;
 use ksync::Once;
 
 pub struct DtbInfo {
+    #[cfg(target_arch = "riscv64")]
     pub plic: usize,
     pub virtio_mmio_regions: Vec<(usize, usize)>,
     pub pci_ecam_base: usize,
@@ -42,6 +43,7 @@ pub fn init(dtb: usize) {
     }
     virtio_mmio_regions.sort_by(|a, b| a.0.cmp(&b.0));
     DTB_INFO.call_once(|| DtbInfo {
+        #[cfg(target_arch = "riscv64")]
         plic,
         virtio_mmio_regions,
         pci_ecam_base,

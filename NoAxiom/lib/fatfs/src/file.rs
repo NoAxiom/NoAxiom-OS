@@ -9,7 +9,6 @@ use crate::time::{Date, DateTime, TimeProvider};
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 use async_trait::async_trait;
-use console::{print, println};
 
 const MAX_FILE_SIZE: u32 = u32::MAX;
 

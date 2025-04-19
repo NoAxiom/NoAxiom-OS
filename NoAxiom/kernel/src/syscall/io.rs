@@ -131,7 +131,6 @@ impl Syscall<'_> {
         if let Some(old_mask) = old_mask {
             *pcb.sig_mask_mut() = old_mask;
         }
-        debug!("[sys_ppoll]: OK!");
         Ok(res_len as isize)
     }
 }
