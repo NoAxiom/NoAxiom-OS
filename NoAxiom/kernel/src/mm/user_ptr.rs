@@ -5,24 +5,6 @@ use arch::{consts::KERNEL_ADDR_OFFSET, Arch, ArchMemory};
 use super::{address::VirtAddr, page_table::PageTable, validate::validate};
 use crate::{cpu::current_task, mm::address::VpnRange, syscall::SysResult};
 
-// /// check if the slice is well-allocated
-// /// any unallocated memory access will cause a page fault
-// /// and will be handled by the kernel_trap_handler => memory_validate
-// /// so we should validate the memory before we lock current memory_set
-// #[allow(unused)]
-// pub fn validate_slice(va: usize, len: usize) -> SysResult<()> {
-//     warn!(
-//         "DON'T ABUSE THIS FUNCTION!!!\n
-//         [validate_slice] buf_addr = {:#x}, len = {:#x}",
-//         va, len
-//     );
-//     let start: VirtPageNum = VirtAddr::from(va).floor();
-//     let end: VirtPageNum = VirtAddr::from(va + len).ceil();
-//     let mut memory_set =
-// current_cpu().task.as_ref().unwrap().memory_set().lock();     for vpn in
-// VpnRange::new(start, end) {}     Ok(())
-// }
-
 /// the UserPtr is a wrapper for user-space pointer
 /// NOTE THAT: it will NOT validate the pointer
 /// and will probably trigger pagefault when accessing userspace
@@ -187,7 +169,7 @@ impl UserPtr<u8> {
             VirtAddr::from(self.addr_usize() + len),
         ) {
             if page_table.translate_vpn(vpn).is_none() {
-                validate(memory_set, vpn, None, None, false).await?;
+                validate(memory_set, vpn, None, None).await?;
             }
         }
         Ok(unsafe { core::slice::from_raw_parts_mut(self.ptr, len) })

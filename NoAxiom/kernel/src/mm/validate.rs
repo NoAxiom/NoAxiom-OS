@@ -34,7 +34,6 @@ pub async fn validate(
     vpn: VirtPageNum,
     trap_type: Option<TrapType>,
     pte: Option<PageTableEntry>,
-    is_blocked: bool,
 ) -> SysResult<()> {
     if let Some(pte) = pte {
         let flags = pte.flags();
@@ -57,7 +56,10 @@ pub async fn validate(
             );
             Err(Errno::EFAULT)
         } else {
-            error!("unknown error in memory validate, flag: {:?}", flags);
+            error!(
+                "unknown error in memory validate, vpn: {:#x}, flag: {:?}",
+                vpn.0, flags
+            );
             Err(Errno::EFAULT)
         }
     } else {
@@ -100,18 +102,11 @@ impl Task {
         self: &Arc<Self>,
         addr: usize,
         trap_type: Option<TrapType>,
-        is_blocked: bool,
     ) -> SysResult<()> {
         trace!("[memory_validate] check at addr: {:#x}", addr);
+        let ms = self.memory_set();
         let vpn = VirtAddr::from(addr).floor();
-        let pt = PageTable::from_ppn(Arch::current_root_ppn());
-        validate(
-            self.memory_set(),
-            vpn,
-            trap_type,
-            pt.translate_vpn(vpn),
-            is_blocked,
-        )
-        .await
+        let pte = PageTable::from_ppn(Arch::current_root_ppn()).translate_vpn(vpn);
+        validate(ms, vpn, trap_type, pte).await
     }
 }

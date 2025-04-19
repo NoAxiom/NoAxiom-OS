@@ -2,7 +2,7 @@ use alloc::sync::Arc;
 
 use super::Task;
 use crate::{
-    config::mm::USER_HEAP_SIZE,
+    config::mm::USER_HEAP_LIMIT,
     include::{
         mm::{MmapFlags, MmapProts},
         result::Errno,
@@ -23,7 +23,7 @@ impl Task {
         if grow_size > 0 {
             trace!("[grow_brk] expanded");
             let growed_addr: usize = memory_set.user_brk + grow_size as usize;
-            let limit = memory_set.user_brk_start + USER_HEAP_SIZE;
+            let limit = memory_set.user_brk_start + USER_HEAP_LIMIT;
             if growed_addr > limit {
                 return_errno!(Errno::ENOMEM);
             }

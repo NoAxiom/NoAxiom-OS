@@ -27,8 +27,10 @@ use crate::{
 impl Syscall<'_> {
     pub fn sys_sigaction(&self, signo: Signo, act: usize, old_act: usize) -> SyscallResult {
         debug!(
-            "[sys_sigaction]: signum {}, new act ptr {:#x}, old act ptr {:#x}",
-            signo, act, old_act,
+            "[sys_sigaction]: signum {:?}, new act ptr {:#x}, old act ptr {:#x}",
+            SigNum::from(signo),
+            act,
+            old_act,
         );
 
         let act = UserPtr::<USigAction>::new(act);
@@ -126,7 +128,10 @@ impl Syscall<'_> {
         if sig == SigNum::INVALID {
             return Err(Errno::EINVAL);
         }
-        debug!("[sys_kill] signo: {}, pid: {}, sig_name: {:?}", signo, pid, sig);
+        debug!(
+            "[sys_kill] signo: {}, pid: {}, sig_name: {:?}",
+            signo, pid, sig
+        );
         match pid {
             0 => {
                 // process group

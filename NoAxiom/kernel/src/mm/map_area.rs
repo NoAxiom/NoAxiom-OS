@@ -45,12 +45,6 @@ pub struct MapArea {
 
     /// area type
     pub area_type: MapAreaType,
-    // /// mapped file
-    // /// we use MapArea to trace area in a file
-    // pub file: Option<Arc<dyn File>>,
-
-    // /// offset in file
-    // pub file_offset: usize,
 }
 
 impl MapArea {
@@ -61,8 +55,6 @@ impl MapArea {
             map_permission: MapPermission::empty(),
             map_type: MapType::Identical,
             area_type: MapAreaType::None,
-            // file: None,
-            // file_offset: 0,
         }
     }
 

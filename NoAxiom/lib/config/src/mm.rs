@@ -22,7 +22,7 @@ pub const KERNEL_HEAP_SIZE: usize = 0x200_0000;
 /// user app's stack size: 8KB
 pub const USER_STACK_SIZE: usize = PAGE_SIZE * 2;
 /// user app's heap size: 120MB
-pub const USER_HEAP_SIZE: usize = PAGE_SIZE * 30000;
+pub const USER_HEAP_LIMIT: usize = PAGE_SIZE * 30000;
 
 /// mmap start address
 pub const MMAP_BASE_ADDR: usize = 0x6000_0000;

@@ -37,7 +37,10 @@ impl Task {
             let sa_list = self.sa_list();
             let signum = SigNum::from(si.signo);
             let action = sa_list.get(signum).unwrap().clone();
-            info!("[check_signal] sig {}: start to handle, handler: {:?}", si.signo, action.handler);
+            info!(
+                "[check_signal] sig {:?}: start to handle, handler: {:?}",
+                signum, action.handler
+            );
             match action.handler {
                 SAHandlerType::Ignore => self.sig_default_ignore(),
                 SAHandlerType::Kill => self.sig_default_terminate(),
@@ -182,6 +185,7 @@ impl Task {
 
     /// terminate the process
     fn sig_default_terminate(&self) {
+        debug!("[sig_default_terminate] terminate the process");
         let tg = self.thread_group();
         for (_, t) in tg.0.iter() {
             let task = t.upgrade().unwrap();
