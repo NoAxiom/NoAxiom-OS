@@ -55,6 +55,7 @@ impl Syscall<'_> {
     }
 
     pub fn sys_munmap(&self, start: usize, length: usize) -> SyscallResult {
+        warn!("sys_munmap: start: {:#x}, length: {:#x}", start, length);
         self.task
             .memory_set()
             .lock()

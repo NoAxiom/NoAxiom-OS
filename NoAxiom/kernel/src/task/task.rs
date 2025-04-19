@@ -512,7 +512,11 @@ impl Task {
             SharedMutable::new(ms)
         };
 
-        // TODO: CloneFlags::SIGHAND
+        let sa_list = if flags.contains(CloneFlags::SIGHAND) {
+            self.sa_list.clone()
+        } else {
+            SharedMutable::new(self.sa_list.lock().clone())
+        };
 
         let fd_table = if flags.contains(CloneFlags::FILES) {
             self.fd_table.clone()
@@ -520,7 +524,6 @@ impl Task {
             trace!("fd table info cloned");
             let tmp = SharedMutable::new(self.fd_table.lock().clone());
             let mut guard = tmp.lock();
-            // todo: maybe needn't to realloc STD_IN
             guard.table[STD_IN] = Some(FdTableEntry::std_in());
             guard.table[STD_OUT] = Some(FdTableEntry::std_out());
             guard.table[STD_ERR] = Some(FdTableEntry::std_err());
@@ -547,7 +550,7 @@ impl Task {
                 sched_entity: self.sched_entity.data_clone(tid_val),
                 fd_table,
                 cwd: self.cwd.clone(),
-                sa_list: self.sa_list.clone(),
+                sa_list,
                 waker: Once::new(),
                 tcb: ThreadOnly::new(TCB {
                     ..Default::default()
@@ -575,7 +578,7 @@ impl Task {
                 sched_entity: self.sched_entity.data_clone(new_tgid),
                 fd_table,
                 cwd: SharedMutable::new(self.cwd().clone()),
-                sa_list: SharedMutable::new(SigActionList::new()),
+                sa_list,
                 waker: Once::new(),
                 tcb: ThreadOnly::new(TCB {
                     ..Default::default()

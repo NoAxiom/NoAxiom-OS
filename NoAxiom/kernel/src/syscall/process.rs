@@ -53,27 +53,37 @@ impl Syscall<'_> {
         tls: usize,   // TLS线程本地存储描述符
         ctid: usize,  // 子线程ID, addr
     ) -> SyscallResult {
+        let flags = CloneFlags::from_bits(flags & !0xff).unwrap();
+        let new_task = self.task.fork(flags);
+        let new_tid = new_task.tid();
+        let cx = new_task.trap_context_mut();
         debug!(
             "[sys_fork] flags: {:?} stack: {:?} ptid: {:?} tls: {:?} ctid: {:?}",
             flags, stack, ptid, tls, ctid
         );
-        let flags = CloneFlags::from_bits(flags & !0xff).unwrap();
-        let task = self.task.fork(flags);
-        let trap_cx = task.trap_context_mut();
-        let tid = task.tid();
         use TrapArgs::*;
         if stack != 0 {
-            trap_cx[SP] = stack;
+            cx[SP] = stack;
         }
-        // TODO: PARENT_SETTID CHILD_SETTID CHILD_CLEARTID
         if flags.contains(CloneFlags::SETTLS) {
-            trap_cx[TLS] = tls;
+            cx[TLS] = tls;
         }
-        trap_cx[RES] = 0;
-        trace!("[sys_fork] new task context: {:?}", trap_cx);
-        spawn_utask(task);
+        if flags.contains(CloneFlags::PARENT_SETTID) {
+            let ptid = UserPtr::<usize>::new(ptid);
+            ptid.write(new_tid);
+        }
+        if flags.contains(CloneFlags::CHILD_SETTID) {
+            let ctid = UserPtr::<usize>::new(ctid);
+            ctid.write(new_tid);
+        }
+        if flags.contains(CloneFlags::CHILD_CLEARTID) {
+            new_task.set_clear_tid_address(ctid);
+        }
+        cx[RES] = 0;
+        trace!("[sys_fork] new task context: {:?}", cx);
+        spawn_utask(new_task);
         debug!("[sys_fork] done");
-        Ok(tid as isize)
+        Ok(new_tid as isize)
     }
 
     pub async fn sys_execve(&mut self, path: usize, argv: usize, envp: usize) -> SyscallResult {

@@ -113,6 +113,7 @@ impl KSigAction {
 }
 
 /// signal action list of a task
+#[derive(Clone)]
 pub struct SigActionList {
     pub actions: [KSigAction; MAX_SIGNUM as usize],
 }
