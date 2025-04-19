@@ -15,7 +15,7 @@ fn panic(info: &PanicInfo) -> ! {
     println!("[PANIC] kernel triggered panic!!!");
     if let Some(task) = current_cpu().task.as_ref() {
         let cx = task.trap_context();
-        trace!("[PANIC] cx detected: {:#x?}", cx);
+        info!("[PANIC] cx detected: {:#x?}", cx);
     }
     Arch::arch_info_print();
     if let Some(location) = info.location() {
@@ -33,5 +33,6 @@ fn panic(info: &PanicInfo) -> ! {
             info.message().unwrap()
         );
     }
+    loop {}
     platform::shutdown()
 }

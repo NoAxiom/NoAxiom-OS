@@ -24,9 +24,6 @@ use crate::{
 /// single mmap page struct
 #[derive(Clone)]
 pub struct MmapPage {
-    /// base va of mmap space
-    pub vpn: VirtPageNum,
-
     /// mmap protection
     pub prot: MmapProts,
 
@@ -78,6 +75,19 @@ pub struct MmapManager {
     pub alloc_tracer: BTreeMap<VirtPageNum, Vec<Waker>>,
 }
 
+impl Clone for MmapManager {
+    fn clone(&self) -> Self {
+        assert!(self.alloc_tracer.is_empty());
+        Self {
+            mmap_start: self.mmap_start,
+            mmap_top: self.mmap_top,
+            mmap_map: self.mmap_map.clone(),
+            frame_trackers: BTreeMap::new(),
+            alloc_tracer: BTreeMap::new(),
+        }
+    }
+}
+
 impl MmapManager {
     pub fn new(mmap_start: VirtAddr, mmap_top: VirtAddr) -> Self {
         Self {
@@ -108,7 +118,6 @@ impl MmapManager {
         for vpn in VpnRange::new_from_va(start_va, end_va) {
             // created a mmap page with lazy-mapping
             let mmap_page = MmapPage {
-                vpn,
                 prot,
                 flags,
                 valid: false,
@@ -170,6 +179,7 @@ pub async fn lazy_alloc_mmap<'a>(
         }
         None => match guard.mmap_manager.alloc_tracer.get_mut(&vpn) {
             Some(tracer) => {
+                unimplemented!();
                 tracer.push(take_waker().await);
                 drop(guard);
                 debug!("[lazy_alloc_mmap] suspend_no_int_now");
@@ -182,7 +192,10 @@ pub async fn lazy_alloc_mmap<'a>(
                 Ok(())
             }
             None => {
-                error!("[lazy_alloc_mmap] vpn not found in mmap_map");
+                error!(
+                    "[lazy_alloc_mmap] vpn not found in mmap_map, vpn: {:#x}",
+                    vpn.0
+                );
                 Err(Errno::EFAULT)
             }
         },

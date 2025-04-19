@@ -20,7 +20,7 @@ ifeq ($(ARCH_NAME),riscv64)
 	export OBJCOPY := rust-objcopy --binary-architecture=riscv64
 	export SBI ?= $(ROOT)/$(PROJECT)/bootloader/rustsbi-qemu.bin
 	export QEMU := qemu-system-riscv64
-	export MULTICORE := 2
+	export MULTICORE := 1
 else ifeq ($(ARCH_NAME),loongarch64)
 	export TARGET := loongarch64-unknown-linux-gnu
 	export OBJDUMP := loongarch64-linux-gnu-objdump

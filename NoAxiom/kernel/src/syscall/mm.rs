@@ -24,7 +24,9 @@ impl Syscall<'_> {
     pub fn sys_brk(&self, brk: usize) -> SyscallResult {
         trace!("[sys_brk] brk: {:#x}", brk);
         if brk == 0 {
-            Ok(self.task.memory_set().lock().user_brk as isize)
+            let res = self.task.memory_set().lock().brk.end;
+            debug!("[sys_brk] get brk, brk.end = {:#x}", res);
+            Ok(res as isize)
         } else {
             self.task.grow_brk(brk)
         }

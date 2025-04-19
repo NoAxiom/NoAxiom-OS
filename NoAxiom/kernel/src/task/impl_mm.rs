@@ -2,7 +2,7 @@ use alloc::sync::Arc;
 
 use super::Task;
 use crate::{
-    config::mm::USER_HEAP_SIZE,
+    config::mm::USER_HEAP_LIMIT,
     include::{
         mm::{MmapFlags, MmapProts},
         result::Errno,
@@ -15,28 +15,28 @@ use crate::{
 impl Task {
     pub fn grow_brk(self: &Arc<Self>, new_brk: usize) -> SyscallResult {
         let mut memory_set = self.memory_set().lock();
-        let grow_size = new_brk - memory_set.user_brk;
+        let grow_size = new_brk - memory_set.brk.end;
         info!(
             "[grow_brk] start: {:#x}, old_brk: {:#x}, new_brk: {:#x}, grow_size: {:#x}",
-            memory_set.user_brk_start, memory_set.user_brk, new_brk, grow_size
+            memory_set.brk.start, memory_set.brk.end, new_brk, grow_size
         );
         if grow_size > 0 {
             trace!("[grow_brk] expanded");
-            let growed_addr: usize = memory_set.user_brk + grow_size as usize;
-            let limit = memory_set.user_brk_start + USER_HEAP_SIZE;
+            let growed_addr: usize = memory_set.brk.end + grow_size as usize;
+            let limit = memory_set.brk.start + USER_HEAP_LIMIT;
             if growed_addr > limit {
                 return_errno!(Errno::ENOMEM);
             }
-            memory_set.user_brk = growed_addr;
+            memory_set.brk.end = growed_addr;
         } else {
             trace!("[grow_brk] shrinked");
-            if new_brk < memory_set.user_brk_start {
+            if new_brk < memory_set.brk.start {
                 return_errno!(Errno::EINVAL);
             }
-            memory_set.user_brk = new_brk;
+            memory_set.brk.end = new_brk;
         }
         memory_set.brk_grow(VirtAddr(new_brk).ceil());
-        Ok(memory_set.user_brk as isize)
+        Ok(memory_set.brk.end as isize)
     }
 
     pub fn mmap(

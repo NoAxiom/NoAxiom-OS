@@ -6,7 +6,7 @@ use arch::{Arch, ArchInt, ArchTrap, TrapArgs, TrapType};
 
 use super::{ext_int::ext_int_handler, ipi::ipi_handler};
 use crate::{
-    cpu::{current_cpu, get_hartid},
+    cpu::{current_cpu, current_task, get_hartid},
     sched::utils::block_on,
     task::{exit::ExitCode, Task},
 };
@@ -17,10 +17,13 @@ fn kernel_trap_handler() {
     let trap_type = Arch::read_trap_type(None);
     let epc = Arch::read_epc();
     let kernel_panic = |msg: &str| {
-        panic!(
-            "kernel trap!!! msg: {}, trap_type: {:#x?}, epc: {:#x} ",
+        error!(
+            "[kernel trap] msg: {}, trap_type: {:#x?}, epc: {:#x} ",
             msg, trap_type, epc,
         );
+        let cx = current_task().trap_context();
+        error!("[kernel trap] cx: {:#x?}", cx);
+        panic!();
     };
     match trap_type {
         TrapType::StorePageFault(addr)
@@ -33,7 +36,7 @@ fn kernel_trap_handler() {
                     epc,
                     addr
                 );
-                match block_on(task.memory_validate(addr, Some(trap_type), true)) {
+                match block_on(task.memory_validate(addr, Some(trap_type))) {
                     Ok(_) => trace!("[memory_validate] success in kernel_trap_handler"),
                     Err(_) => kernel_panic("memory_validate failed"),
                 }
@@ -86,7 +89,7 @@ pub async fn user_trap_handler(task: &Arc<Task>) {
         TrapType::LoadPageFault(addr)
         | TrapType::StorePageFault(addr)
         | TrapType::InstructionPageFault(addr) => {
-            match task.memory_validate(addr, Some(trap_type), false).await {
+            match task.memory_validate(addr, Some(trap_type)).await {
                 Ok(_) => trace!("[memory_validate] success in user_trap_handler"),
                 Err(_) => {
                     panic!(

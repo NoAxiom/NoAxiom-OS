@@ -5,6 +5,8 @@ use arch::{
     consts::KERNEL_VIRT_MEMORY_END, Arch, ArchMemory, ArchPageTableEntry, ArchTime, MappingFlags,
     PageTableEntry,
 };
+use config::mm::USER_HEAP_LIMIT;
+use include::errno::Errno;
 use ksync::{cell::SyncUnsafeCell, mutex::SpinLock, Lazy};
 
 use super::{
@@ -16,7 +18,7 @@ use super::{
     shm::{shm_get_address_and_size, shm_get_nattch, ShmInfo, ShmTracker},
 };
 use crate::{
-    config::mm::{PAGE_SIZE, PAGE_WIDTH, USER_HEAP_SIZE, USER_STACK_SIZE},
+    config::mm::{PAGE_SIZE, PAGE_WIDTH, USER_STACK_SIZE},
     fs::{path::Path, vfs::basic::file::File},
     include::process::auxv::*,
     map_permission,
@@ -27,6 +29,7 @@ use crate::{
         permission::MapType,
     },
     pte_flags,
+    syscall::SysResult,
 };
 
 extern "C" {
@@ -70,47 +73,41 @@ pub struct ElfMemoryInfo {
     pub auxs: Vec<AuxEntry>,
 }
 
+pub struct BrkAreaInfo {
+    pub start: usize,
+    pub end: usize,
+    pub area: MapArea,
+}
+
+impl BrkAreaInfo {
+    pub fn new_bare() -> Self {
+        Self {
+            start: 0,
+            end: 0,
+            area: MapArea::new_bare(),
+        }
+    }
+}
+
 pub struct MemorySet {
     /// page table tracks mapping info
     pub page_table: SyncUnsafeCell<PageTable>,
 
     /// map_areas tracks user data
     pub areas: Vec<MapArea>,
-    /// user stack area, lazily allocated
-    pub user_stack_area: MapArea,
-    /// user heap area, lazily allocated
-    pub user_brk_area: MapArea,
 
-    /// user stack base address
-    pub user_stack_base: usize,
-    /// user heap base address
-    pub user_brk_start: usize,
-    /// user heap end address
-    pub user_brk: usize,
+    /// stack
+    pub stack: MapArea,
+
+    /// brk
+    pub brk: BrkAreaInfo,
 
     /// mmap manager
-    /// fixme: add cow copy with mmap areas
     pub mmap_manager: MmapManager,
 
     /// shm manager
     pub shm: ShmInfo,
 }
-
-// pub struct MemorySpace {
-//     pub root_ppn: SyncUnsafeCell<usize>,
-//     pub memory_set: Arc<SpinLock<MemorySet>>,
-// }
-// impl MemorySpace {
-//     pub fn root_ppn(&self) -> usize {
-//         *self.root_ppn.ref_mut()
-//     }
-//     pub fn change_root_ppn(&self, root_ppn: usize) {
-//         *self.root_ppn.ref_mut() = root_ppn;
-//     }
-//     pub fn memory_activate(&self) {
-//         memory_activate_by_ppn(self.root_ppn());
-//     }
-// }
 
 impl MemorySet {
     /// create an new empty memory set without any allocation
@@ -122,11 +119,8 @@ impl MemorySet {
         Self {
             page_table: SyncUnsafeCell::new(page_table),
             areas: Vec::new(),
-            user_stack_area: MapArea::new_bare(),
-            user_brk_area: MapArea::new_bare(),
-            user_stack_base: 0,
-            user_brk_start: 0,
-            user_brk: 0,
+            stack: MapArea::new_bare(),
+            brk: BrkAreaInfo::new_bare(),
             mmap_manager: MmapManager::new_bare(),
             shm: ShmInfo::new(),
         }
@@ -136,11 +130,6 @@ impl MemorySet {
     pub fn page_table(&self) -> &mut PageTable {
         unsafe { &mut (*self.page_table.get()) }
     }
-
-    // /// get token, which will be written into satp
-    // pub fn token(&self) -> usize {
-    //     self.page_table().token()
-    // }
 
     pub fn root_ppn(&self) -> PhysPageNum {
         self.page_table().root_ppn()
@@ -264,35 +253,6 @@ impl MemorySet {
         memory_set
     }
 
-    // TODO: is lazy allocation necessary? currently we don't use lazy alloc
-    /// map user_stack_area
-    pub fn map_user_stack(&mut self, start: usize, end: usize) {
-        self.user_stack_base = start;
-        let map_area = MapArea::new(
-            start.into(),
-            end.into(),
-            MapType::Framed,
-            map_permission!(U, R, W),
-            MapAreaType::UserStack,
-        );
-        // map_area.map_each(self.page_table());
-        self.user_stack_area = map_area;
-    }
-
-    /// map user_heap_area lazily
-    pub fn map_user_heap(&mut self, start: usize, end: usize) {
-        self.user_brk_start = start;
-        self.user_brk = end;
-        let map_area = MapArea::new(
-            start.into(),
-            end.into(),
-            MapType::Framed,
-            map_permission!(U, R, W),
-            MapAreaType::UserHeap,
-        );
-        self.user_brk_area = map_area;
-    }
-
     pub fn load_dl_interp(&mut self, elf: &Arc<dyn File>) -> Option<usize> {
         const DL_INTERP_PATH: &str = "/glibc/lib/libc.so";
         todo!("load_dl_interp")
@@ -372,7 +332,14 @@ impl MemorySet {
         // user stack
         let user_stack_base: usize = usize::from(end_va) + PAGE_SIZE; // stack bottom
         let user_stack_end = user_stack_base + USER_STACK_SIZE; // stack top
-        memory_set.map_user_stack(user_stack_base, user_stack_end);
+        let map_area = MapArea::new(
+            user_stack_base.into(),
+            user_stack_end.into(),
+            MapType::Framed,
+            map_permission!(U, R, W),
+            MapAreaType::UserStack,
+        );
+        memory_set.stack = map_area;
         info!(
             "[memory_set] user stack mapped! [{:#x}, {:#x})",
             user_stack_base, user_stack_end
@@ -380,11 +347,19 @@ impl MemorySet {
 
         // user heap
         let user_heap_base: usize = user_stack_end + PAGE_SIZE;
-        let user_heap_end: usize = user_heap_base;
-        memory_set.map_user_heap(user_heap_base, user_heap_end);
+        memory_set.brk.start = user_heap_base;
+        memory_set.brk.end = user_heap_base;
+        memory_set.brk.area = MapArea::new(
+            user_heap_base.into(),
+            user_heap_base.into(),
+            MapType::Framed,
+            map_permission!(U, R, W),
+            MapAreaType::UserHeap,
+        );
         info!(
-            "[memory_set] user heap mapped! [{:#x}, {:#x})",
-            user_heap_base, user_heap_end
+            "[memory_set] user heap inserted! [{:#x}, {:#x})",
+            user_heap_base,
+            user_heap_base + USER_HEAP_LIMIT
         );
 
         // aux vector
@@ -433,107 +408,124 @@ impl MemorySet {
     pub fn clone_cow(&mut self) -> (Self, usize) {
         trace!("[clone_cow] start");
         let mut new_set = Self::new_with_kernel();
-        let remap_cow = |vpn: VirtPageNum,
-                         new_set: &mut MemorySet,
-                         new_area: &mut MapArea,
-                         frame_tracker: &FrameTracker| {
-            let old_pte = self.page_table().find_pte(vpn).unwrap();
+        fn remap_cow(
+            old_set: &MemorySet,
+            vpn: VirtPageNum,
+            new_set: &mut MemorySet,
+            new_area: &mut MapArea,
+            frame_tracker: &FrameTracker,
+        ) {
+            let old_pte = old_set.page_table().find_pte(vpn).unwrap();
             let old_flags = old_pte.flags();
             if old_flags.contains(MappingFlags::W) {
                 let new_flags = flags_switch_to_cow(&old_flags);
-                // let old = old_pte.clone();
                 old_pte.set_flags(new_flags);
                 new_set
                     .page_table()
                     .map(vpn, old_pte.ppn().into(), new_flags);
-                // trace!(
-                //     "remap_cow: vpn = {:#x}, new_flags = {:?}, old_pte =
-                // {:#x}, new_pte = {:#x}",     vpn.0,
-                //     new_flags,
-                //     old.0,
-                //     old_pte.0,
-                // );
             } else {
                 new_set
                     .page_table()
                     .map(vpn, old_pte.ppn().into(), old_flags);
             }
             new_area.frame_map.insert(vpn, frame_tracker.clone());
-        };
+        }
 
         // normal areas
         for area in self.areas.iter() {
-            assert!(area.area_type == MapAreaType::ElfBinary);
             let mut new_area = MapArea::from_another(area);
             for vpn in area.vpn_range {
-                // no `let Some(...)` since we always alloc it
                 let frame_tracker = area.frame_map.get(&vpn).unwrap();
-                remap_cow(vpn, &mut new_set, &mut new_area, frame_tracker);
+                remap_cow(self, vpn, &mut new_set, &mut new_area, frame_tracker);
             }
             new_set.areas.push(new_area);
         }
 
         // stack
-        trace!(
-            "mapping stack as cow, range: [{:#x}, {:#x})",
-            self.user_stack_base,
-            self.user_stack_base + USER_STACK_SIZE,
-        );
-        let area = &self.user_stack_area;
-        let mut new_area = MapArea::from_another(&self.user_stack_area);
-        for vpn in self.user_stack_area.vpn_range {
+        let area = &self.stack;
+        let mut new_area = MapArea::from_another(area);
+        for vpn in self.stack.vpn_range {
             if let Some(frame_tracker) = area.frame_map.get(&vpn) {
-                remap_cow(vpn, &mut new_set, &mut new_area, frame_tracker);
+                remap_cow(self, vpn, &mut new_set, &mut new_area, frame_tracker);
             }
         }
-        new_set.user_stack_area = new_area;
+        new_set.stack = new_area;
 
         // heap
-        // FIXME: USE REAL HEAP SIZE!!!
-        trace!(
-            "mapping heap as cow, range: [{:#x}, {:#x})",
-            self.user_brk_start,
-            self.user_brk_start + USER_HEAP_SIZE,
-        );
-        let area = &self.user_brk_area;
+        let area = &self.brk.area;
         let mut new_area = MapArea::from_another(area);
         for vpn in area.vpn_range {
-            trace!(
-                "[clone_cow] vpn: {:#x}, range: [{:#x}, {:#x})",
-                vpn.0,
-                area.vpn_range.start().0,
-                area.vpn_range.end().0
-            );
-            for it in area.frame_map.iter() {
-                trace!("[clone_cow] frame_map: {:#x}", it.0 .0);
-            }
             if let Some(frame_tracker) = area.frame_map.get(&vpn) {
-                remap_cow(vpn, &mut new_set, &mut new_area, frame_tracker);
+                remap_cow(self, vpn, &mut new_set, &mut new_area, frame_tracker);
             }
         }
-        new_set.user_brk_area = new_area;
+        new_set.brk.area = new_area;
+
+        // mmap
+        new_set.mmap_manager = self.mmap_manager.clone();
+        for (vpn, mmap_page) in self.mmap_manager.mmap_map.iter() {
+            if mmap_page.valid {
+                let vpn = vpn.clone();
+                if let Some(frame_tracker) = self.mmap_manager.frame_trackers.get(&vpn) {
+                    let old_pte = self.page_table().find_pte(vpn).unwrap();
+                    let old_flags = old_pte.flags();
+                    if old_flags.contains(MappingFlags::W) {
+                        let new_flags = flags_switch_to_cow(&old_flags);
+                        old_pte.set_flags(new_flags);
+                        new_set
+                            .page_table()
+                            .map(vpn, old_pte.ppn().into(), new_flags);
+                    } else {
+                        new_set
+                            .page_table()
+                            .map(vpn, old_pte.ppn().into(), old_flags);
+                    }
+                    new_set
+                        .mmap_manager
+                        .frame_trackers
+                        .insert(vpn, frame_tracker.clone());
+                }
+            }
+        }
+
+        // shm
+        for shm_area in self.shm.shm_areas.iter() {
+            let mut new_area = MapArea::from_another(shm_area);
+            for vpn in shm_area.vpn_range {
+                if let Some(frame_tracker) = shm_area.frame_map.get(&vpn) {
+                    remap_cow(self, vpn, &mut new_set, &mut new_area, frame_tracker);
+                }
+            }
+            new_set.shm.shm_areas.push(new_area);
+        }
+        new_set.shm.shm_top = self.shm.shm_top;
+        for (va, shm_tracker) in self.shm.shm_trackers.iter() {
+            let new_shm_tracker = ShmTracker::new(shm_tracker.key);
+            new_set.shm.shm_trackers.insert(*va, new_shm_tracker);
+        }
 
         let root_ppn = new_set.root_ppn();
         (new_set, root_ppn.0)
     }
 
     pub fn lazy_alloc_stack(&mut self, vpn: VirtPageNum) {
-        self.user_stack_area
+        self.stack
             .map_one(vpn, unsafe { &mut (*self.page_table.get()) });
     }
 
     pub fn lazy_alloc_brk(&mut self, vpn: VirtPageNum) {
-        self.user_brk_area
+        self.brk
+            .area
             .map_one(vpn, unsafe { &mut (*self.page_table.get()) });
     }
 
     pub fn brk_grow(&mut self, new_brk_vpn: VirtPageNum) {
-        self.user_brk_area
+        self.brk
+            .area
             .change_end_vpn(new_brk_vpn, unsafe { &mut (*self.page_table.get()) });
-        // tlb is already flushed in `modify_end`
     }
 
-    pub fn realloc_cow(&mut self, vpn: VirtPageNum, pte: PageTableEntry) {
+    pub fn realloc_cow(&mut self, vpn: VirtPageNum, pte: PageTableEntry) -> SysResult<()> {
         let old_ppn = PhysPageNum::from(pte.ppn());
         let old_flags = pte.flags();
         let new_flags = flags_switch_to_rw(&old_flags);
@@ -543,23 +535,28 @@ impl MemorySet {
         } else {
             let frame = frame_alloc();
             let new_ppn = frame.ppn();
-            let mut flag = false;
+            let mut target = None;
             for area in self.areas.iter_mut() {
                 if area.vpn_range.is_in_range(vpn) {
-                    area.frame_map.insert(vpn, frame.clone());
-                    flag = true;
+                    target = Some(area);
                     break;
                 }
             }
-            if !flag {
-                if self.user_stack_area.vpn_range.is_in_range(vpn) {
-                    self.user_stack_area.frame_map.insert(vpn, frame.clone());
-                } else if self.user_brk_area.vpn_range.is_in_range(vpn) {
-                    self.user_brk_area.frame_map.insert(vpn, frame.clone());
-                } else if self.mmap_manager.is_in_space(vpn) {
-                    self.mmap_manager.frame_trackers.insert(vpn, frame.clone());
-                } else {
-                    panic!("[realloc_cow] vpn is not in any area!!!");
+            match target {
+                Some(area) => {
+                    area.frame_map.insert(vpn, frame);
+                }
+                None => {
+                    if self.stack.vpn_range.is_in_range(vpn) {
+                        self.stack.frame_map.insert(vpn, frame);
+                    } else if self.brk.area.vpn_range.is_in_range(vpn) {
+                        self.brk.area.frame_map.insert(vpn, frame);
+                    } else if self.mmap_manager.is_in_space(vpn) {
+                        self.mmap_manager.frame_trackers.insert(vpn, frame);
+                    } else {
+                        error!("[realloc_cow] vpn is not in any area!!!");
+                        return Err(Errno::ENOMEM);
+                    }
                 }
             }
             self.page_table()
@@ -572,6 +569,7 @@ impl MemorySet {
                 frame_refcount(new_ppn),
             );
         }
+        Ok(())
     }
 
     pub fn attach_shm(&mut self, key: usize, start_va: VirtAddr) {
