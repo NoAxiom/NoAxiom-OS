@@ -109,16 +109,16 @@ pub async fn task_main(task: Arc<Task>) {
         }
         assert!(check_no_lock());
 
-        // check if need schedule
-        if task.tcb().time_stat.need_schedule() {
-            debug!(
-                "task {} yield in user trap handler by time = {:?}, time_slice = {:?}",
-                task.tid(),
-                task.tcb().time_stat,
-                TIME_SLICE_DURATION,
-            );
-            yield_now().await;
-        }
+        // // check if need schedule
+        // if task.tcb().time_stat.need_schedule() {
+        //     debug!(
+        //         "task {} yield in user trap handler by time = {:?}, time_slice = {:?}",
+        //         task.tid(),
+        //         task.tcb().time_stat,
+        //         TIME_SLICE_DURATION,
+        //     );
+        //     yield_now().await;
+        // }
     }
     assert!(check_no_lock());
     task.exit_handler().await;

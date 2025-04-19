@@ -179,6 +179,7 @@ pub async fn lazy_alloc_mmap<'a>(
         }
         None => match guard.mmap_manager.alloc_tracer.get_mut(&vpn) {
             Some(tracer) => {
+                unimplemented!();
                 tracer.push(take_waker().await);
                 drop(guard);
                 debug!("[lazy_alloc_mmap] suspend_no_int_now");
