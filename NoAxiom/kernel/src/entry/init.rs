@@ -13,8 +13,8 @@ use crate::{
         heap::heap_init,
         memory_set::{kernel_space_activate, kernel_space_init},
     },
-    rust_main,
-    sched::utils::block_on, time::clock::ktime_init,
+    sched::{runtime, utils::block_on},
+    time::{clock::ktime_init, sleep::current_sleep_manager},
 };
 
 /// awake other core
@@ -41,7 +41,7 @@ pub extern "C" fn _other_hart_init(hart_id: usize, dtb: usize) -> ! {
         "[other_init] entry init hart_id: {}, dtb_addr: {:#x}",
         hart_id, dtb as usize,
     );
-    rust_main()
+    run_tasks()
 }
 
 // pub static BOOT_HART_ID: AtomicUsize = AtomicUsize::new(0);
@@ -86,6 +86,15 @@ pub extern "C" fn _boot_hart_init(_hartid: usize, dtb: usize) -> ! {
         get_hartid(),
         dtb as usize,
     );
+    run_tasks()
+}
 
-    rust_main()
+/// run_tasks: only act as a task runner
+#[no_mangle]
+pub fn run_tasks() -> ! {
+    info!("[kernel] hart id {} has been booted", get_hartid());
+    loop {
+        current_sleep_manager().sleep_handler();
+        runtime::run();
+    }
 }
