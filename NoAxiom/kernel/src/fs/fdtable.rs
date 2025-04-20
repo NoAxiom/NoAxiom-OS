@@ -198,4 +198,14 @@ impl FdTable {
         self.table[fd] = None;
         Ok(0)
     }
+
+    pub fn close_on_exec(&mut self) {
+        for table_entry in self.table.iter_mut() {
+            if let Some(entry) = table_entry {
+                if entry.flags.contains(FcntlArgFlags::FD_CLOEXEC) {
+                    *table_entry = None;
+                }
+            }
+        }
+    }
 }

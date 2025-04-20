@@ -615,7 +615,7 @@ impl Task {
         self.trap_context_mut()
             .update_cx(elf_entry, user_sp, argc, argv_base, envp_base);
         self.sa_list.lock().reset();
-        // FIXME: close fd table
+        self.fd_table().close_on_exec();
         Ok(())
     }
 }
