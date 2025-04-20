@@ -14,7 +14,7 @@ use crate::{
         memory_set::{kernel_space_activate, kernel_space_init},
     },
     rust_main,
-    sched::utils::block_on,
+    sched::utils::block_on, time::clock::ktime_init,
 };
 
 /// awake other core
@@ -76,6 +76,7 @@ pub extern "C" fn _boot_hart_init(_hartid: usize, dtb: usize) -> ! {
 
     // spawn init_proc and wake other harts
     // crate::entry::init_proc::schedule_spawn_all_apps();
+    ktime_init();
     schedule_spawn_with_kernel_app();
     wake_other_hart(get_hartid());
 
