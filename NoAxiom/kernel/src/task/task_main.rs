@@ -12,7 +12,7 @@ use crate::{
     cpu::current_cpu,
     sched::utils::{suspend_now, take_waker, yield_now},
     task::{status::TaskStatus, Task},
-    time::{gettime::get_time_us, time_slice::TIME_SLICE_DURATION},
+    time::gettime::get_time_us,
     trap::handler::user_trap_handler,
 };
 
@@ -67,11 +67,19 @@ pub async fn task_main(task: Arc<Task>) {
         // kernel -> user
         trace!("[task_main] trap_restore, cx: {:#x?}", task.trap_context());
         task.tcb_mut().time_stat.record_trap_in();
-        Arch::trap_restore(task.trap_context_mut());
+        let cx = task.trap_context_mut();
+        Arch::trap_restore(cx);
+        let trap_type = Arch::read_trap_type(Some(cx));
         task.tcb_mut().time_stat.record_trap_out();
+
+        // check sigmask and status
         assert!(check_no_lock());
         let mut pcb = task.pcb();
         if let Some(old_mask) = old_mask.take() {
+            debug!(
+                "reset mask from {:?} to {:?}",
+                pcb.pending_sigs.sig_mask, old_mask
+            );
             pcb.pending_sigs.sig_mask = old_mask;
         }
         match pcb.status() {
@@ -88,7 +96,9 @@ pub async fn task_main(task: Arc<Task>) {
         );
         assert!(!Arch::is_interrupt_enabled());
         assert!(check_no_lock());
-        user_trap_handler(&task).await;
+        user_trap_handler(&task, trap_type).await;
+
+        // check status
         let pcb = task.pcb();
         match pcb.status() {
             TaskStatus::Terminated => break,
@@ -96,6 +106,16 @@ pub async fn task_main(task: Arc<Task>) {
             _ => drop(pcb),
         }
         assert!(check_no_lock());
+
+        // check if need schedule
+        if task.tcb().time_stat.need_schedule() {
+            trace!(
+                "task {} yield by time = {:?}",
+                task.tid(),
+                task.tcb().time_stat,
+            );
+            yield_now().await;
+        }
 
         // check signal before return to user
         trace!("[task_main] check_signal");
@@ -108,17 +128,6 @@ pub async fn task_main(task: Arc<Task>) {
             _ => drop(pcb),
         }
         assert!(check_no_lock());
-
-        // // check if need schedule
-        // if task.tcb().time_stat.need_schedule() {
-        //     debug!(
-        //         "task {} yield in user trap handler by time = {:?}, time_slice = {:?}",
-        //         task.tid(),
-        //         task.tcb().time_stat,
-        //         TIME_SLICE_DURATION,
-        //     );
-        //     yield_now().await;
-        // }
     }
     assert!(check_no_lock());
     task.exit_handler().await;
