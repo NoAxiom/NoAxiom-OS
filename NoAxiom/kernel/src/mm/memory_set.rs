@@ -258,18 +258,20 @@ impl MemorySet {
         todo!("load_dl_interp")
     }
 
-    pub async fn load_from_vec(file_data: Vec<u8>) -> ElfMemoryInfo {
+    pub async fn load_from_vec(file_data: Vec<u8>) -> SysResult<ElfMemoryInfo> {
         let mut memory_set = Self::new_with_kernel();
         let mut auxs: Vec<AuxEntry> = Vec::new(); // auxiliary vector
         let mut dl_flag = false; // dynamic link flag
-        let elf = xmas_elf::ElfFile::new(file_data.as_slice()).unwrap();
+        let elf = xmas_elf::ElfFile::new(file_data.as_slice()).map_err(|x| {
+            error!("[load_elf] elf error: {:?}", x);
+            Errno::ENOEXEC
+        })?;
 
         // check: magic
         let magic = elf.header.pt1.magic;
         assert_eq!(magic, [0x7f, 0x45, 0x4c, 0x46], "invalid elf!");
         let ph_count = elf.header.pt2.ph_count();
         let mut head_va = 0;
-        let mut start_vpn = None;
         let mut end_vpn = None;
 
         // map pages by loaded program header
@@ -289,6 +291,7 @@ impl MemorySet {
                         map_permission!(U).merge_from_elf_flags(ph.flags()),
                         MapAreaType::ElfBinary,
                     );
+                    end_vpn = Some(map_area.vpn_range.end());
                     debug!(
                         "[load_elf]: range: {:?}, perm: {:?}, ph_flag: {:?}, offset: {:#x}, mem_size: {:#x}, file_size: {:#x}",
                         map_area.vpn_range,
@@ -298,10 +301,6 @@ impl MemorySet {
                         ph.mem_size(),
                         ph.file_size(),
                     );
-                    if start_vpn.is_none() {
-                        start_vpn = Some(map_area.vpn_range.start());
-                    }
-                    end_vpn = Some(map_area.vpn_range.end());
                     memory_set.push_area(
                         map_area,
                         Some(
@@ -325,7 +324,7 @@ impl MemorySet {
                 }
             }
         }
-        let end_va: VirtAddr = end_vpn.unwrap().into();
+        let end_va = VirtAddr::from(end_vpn.expect("no valid ph"));
         let elf_entry = elf.header.pt2.entry_point() as usize;
         debug!("[load_elf] raw_entry: {:#x}", elf_entry);
 
@@ -386,16 +385,16 @@ impl MemorySet {
         auxs.push(AuxEntry(AT_CLKTCK, Arch::get_freq() as usize));
         auxs.push(AuxEntry(AT_SECURE, 0 as usize));
 
-        ElfMemoryInfo {
+        Ok(ElfMemoryInfo {
             memory_set,
             elf_entry,
             user_sp: user_stack_end, // stack grows downward, so return stack_end
             auxs,
-        }
+        })
     }
 
     #[inline]
-    pub async fn load_from_path(path: Path) -> ElfMemoryInfo {
+    pub async fn load_from_path(path: Path) -> SysResult<ElfMemoryInfo> {
         trace!("[load_elf] from path: {:?}", path);
         let elf_file = path.dentry().open().unwrap();
         trace!("[load_elf] file name: {}", elf_file.name());
