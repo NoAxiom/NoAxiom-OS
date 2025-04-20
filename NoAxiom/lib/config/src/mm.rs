@@ -10,17 +10,16 @@ pub const PAGE_SIZE: usize = 1 << PAGE_WIDTH;
 pub const KERNEL_STACK_WIDTH: usize = 20;
 /// kernel stack size: 64KB (*CPU_NUM = 128KB)
 pub const KERNEL_STACK_SIZE: usize = 1 << KERNEL_STACK_WIDTH;
+/// kernel heap size: 32MB
+pub const KERNEL_HEAP_SIZE: usize = 0x200_0000;
 
 /// raw vpn & ppn width: 9
 pub const PAGE_NUM_WIDTH: usize = PAGE_WIDTH - 3;
 /// page table entry per page: 512
 pub const PTE_PER_PAGE: usize = 1 << PAGE_NUM_WIDTH;
 
-/// kernel heap size: 32MB
-pub const KERNEL_HEAP_SIZE: usize = 0x200_0000;
-
-/// user app's stack size: 8KB
-pub const USER_STACK_SIZE: usize = PAGE_SIZE * 2;
+/// user app's stack size: 8MB
+pub const USER_STACK_SIZE: usize = PAGE_SIZE * 2048;
 /// user app's heap size: 120MB
 pub const USER_HEAP_LIMIT: usize = PAGE_SIZE * 30000;
 

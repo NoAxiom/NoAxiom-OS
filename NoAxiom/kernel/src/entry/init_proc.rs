@@ -19,7 +19,7 @@ pub fn schedule_spawn_with_path() {
     spawn_ktask(async move {
         // new process must be EXECUTABLE file, not directory
         let path = Path::from_or_create(INIT_PROC_PATH.to_string(), InodeMode::FILE).await;
-        let elf = MemorySet::load_from_path(path.clone()).await;
+        let elf = MemorySet::load_from_path(path.clone()).await.unwrap();
         let task = Task::new_process(elf);
         spawn_utask(task);
     });
@@ -56,7 +56,7 @@ pub fn schedule_spawn_with_kernel_app() {
             start, end, size
         );
         let file_data = Vec::from(unsafe { core::slice::from_raw_parts(start as *const u8, size) });
-        let elf = MemorySet::load_from_vec(file_data).await;
+        let elf = MemorySet::load_from_vec(file_data).await.unwrap();
         let task = Task::new_process(elf);
         let path = Path::from_or_create(INIT_PROC_PATH.to_string(), InodeMode::FILE).await;
         let path = path.from_cd("..").expect("directory not found");

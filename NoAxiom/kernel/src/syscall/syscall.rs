@@ -151,13 +151,15 @@ impl<'a> Syscall<'a> {
             SYS_SHMDT =>        self.sys_shmdt(args[0]),
             
             // others
-            SYS_TIMES =>            self.sys_times(args[0]),
             SYS_SCHED_YIELD =>      self.sys_yield().await,
+            SYS_GETRANDOM =>        self.sys_getrandom(args[0], args[1], args[2]).await,
+
+            // time
+            SYS_TIMES =>            self.sys_times(args[0]),
             SYS_GETTIMEOFDAY =>     Self::sys_gettimeofday(args[0]),
             SYS_NANOSLEEP =>        self.sys_nanosleep(args[0]).await,
-            SYS_GETRANDOM =>        self.sys_getrandom(args[0], args[1], args[2]).await,
+            SYS_CLOCK_GETTIME =>    self.sys_clock_gettime(args[0], args[1]),
             // SYS_SETITIMER =>        todo!(),
-            // SYS_CLOCK_GETTIME =>    todo!(),
             // SYS_CLOCK_GETRES =>     todo!(),
             // SYS_CLOCK_NANOSLEEP =>  todo!(),
 

@@ -14,7 +14,7 @@ use crate::{
         sig_set::SigMask,
         sig_stack::{MContext, UContext},
     },
-    task::{status::TaskStatus, Task},
+    task::{exit::ExitCode, status::TaskStatus, Task},
 };
 
 extern "C" {
@@ -186,11 +186,7 @@ impl Task {
     /// terminate the process
     fn sig_default_terminate(&self) {
         debug!("[sig_default_terminate] terminate the process");
-        let tg = self.thread_group();
-        for (_, t) in tg.0.iter() {
-            let task = t.upgrade().unwrap();
-            task.pcb().set_status(TaskStatus::Terminated);
-        }
+        self.terminate_group(ExitCode::new(0));
     }
     /// stop the process
     fn sig_default_stop(&self) {

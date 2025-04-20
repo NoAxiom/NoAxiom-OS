@@ -267,9 +267,6 @@ impl Task {
     pub fn thread_group(&self) -> SpinLockGuard<ThreadGroup> {
         self.thread_group.lock()
     }
-    pub fn thread_group_map<T>(&self, f: impl FnOnce(&mut ThreadGroup) -> T) -> T {
-        f(&mut self.thread_group.lock())
-    }
 
     /// get fd_table
     #[inline(always)]
@@ -342,6 +339,15 @@ impl Task {
             pcb.set_exit_code(exit_code);
         }
         pcb.set_status(TaskStatus::Terminated);
+    }
+
+    /// terminate all tasks in current thread group
+    pub fn terminate_group(&self, exit_code: ExitCode) {
+        let tg = self.thread_group();
+        for (_id, t) in tg.0.iter() {
+            let task = t.upgrade().unwrap();
+            task.terminate(exit_code);
+        }
     }
 }
 
@@ -605,7 +611,7 @@ impl Task {
             elf_entry,
             user_sp,
             mut auxs,
-        } = MemorySet::load_from_path(path).await;
+        } = MemorySet::load_from_path(path).await?;
         self.delete_children();
         memory_set.memory_activate();
         self.change_memory_set(memory_set);
@@ -614,7 +620,7 @@ impl Task {
             self.init_user_stack(user_sp, args, envs, &mut auxs);
         self.trap_context_mut()
             .update_cx(elf_entry, user_sp, argc, argv_base, envp_base);
-        self.sa_list.lock().reset();
+        self.sa_list().reset();
         self.fd_table().close_on_exec();
         Ok(())
     }
