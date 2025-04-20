@@ -28,20 +28,10 @@ impl Syscall<'_> {
 
     /// exit group
     pub fn sys_exit_group(&mut self, exit_code: i32) -> SyscallResult {
-        // terminate_all_tasks();
         let task = self.task;
-        let tasks = task.thread_group_map(|tgroup| {
-            let mut tasks = Vec::new();
-            for (_, task) in tgroup.0.iter_mut() {
-                let task = task.upgrade().unwrap();
-                tasks.push(task);
-            }
-            tasks
-        });
-        for t in tasks {
-            t.terminate(ExitCode::new(exit_code));
-        }
-        task.terminate(ExitCode::new(exit_code));
+        let exit_code = ExitCode::new(exit_code);
+        task.terminate_group(exit_code);
+        task.terminate(exit_code);
         Ok(0)
     }
 
