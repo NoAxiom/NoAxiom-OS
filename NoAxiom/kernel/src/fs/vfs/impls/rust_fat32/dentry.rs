@@ -16,6 +16,7 @@ use crate::{
         impls::rust_fat32::fs_err,
     },
     include::{fs::InodeMode, result::Errno},
+    syscall::SysResult,
 };
 
 pub struct Fat32Dentry {

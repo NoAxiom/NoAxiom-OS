@@ -38,7 +38,7 @@ use crate::{
         fs::{FileFlags, InodeMode, Stat},
         result::Errno,
     },
-    syscall::SyscallResult,
+    syscall::{SysResult, SyscallResult},
 };
 
 #[derive(PartialEq)]
