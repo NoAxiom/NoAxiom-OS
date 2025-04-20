@@ -99,7 +99,7 @@ impl Syscall<'_> {
                 let mmap_start = memory_set.mmap_manager.mmap_start;
                 let mmap_top = memory_set.mmap_manager.mmap_top;
                 let mmap_perm = MmapProts::from_bits(prot).unwrap();
-                let va: VirtAddr = vpn.into();
+                let va = VirtAddr::from(vpn);
                 if va >= mmap_start && va < mmap_top {
                     memory_set
                         .mmap_manager
