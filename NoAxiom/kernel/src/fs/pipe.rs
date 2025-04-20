@@ -236,7 +236,7 @@ impl Inode for PipeInode {
     fn meta(&self) -> &InodeMeta {
         &self.meta
     }
-    fn stat(&self) -> Result<Stat, Errno> {
+    fn stat(&self) -> SysResult<Stat> {
         let inner = self.meta.inner.lock();
         Ok(Stat {
             st_dev: 0,

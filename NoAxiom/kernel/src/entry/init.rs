@@ -46,7 +46,6 @@ pub extern "C" fn _other_hart_init(hart_id: usize, dtb: usize) -> ! {
 
 // pub static BOOT_HART_ID: AtomicUsize = AtomicUsize::new(0);
 
-// TODO: dtb, init_proc
 /// init bss, mm, console, and other drivers, then jump to rust_main,
 /// called by [`super::boot`]
 #[no_mangle]

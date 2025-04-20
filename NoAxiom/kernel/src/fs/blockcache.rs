@@ -18,7 +18,7 @@ use crate::config::fs::{BLOCK_SIZE, MAX_LRU_CACHE_SIZE};
 
 /// async block cache for data struct `B` with LRU strategy  
 pub struct AsyncBlockCache<B: Cache + Clone> {
-    cache: Mutex<LruCache<usize, B>>, // todo: use async_mutex
+    cache: Mutex<LruCache<usize, B>>, // ser_trap] page fau: use async_mutex
     block_device: Arc<&'static dyn BlockDevice>,
 }
 

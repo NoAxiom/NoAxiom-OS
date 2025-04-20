@@ -16,6 +16,7 @@ use crate::{
         impls::ext4::{fs_err, superblock::Ext4SuperBlock},
     },
     include::{fs::InodeMode, result::Errno},
+    syscall::SysResult,
 };
 
 pub struct Ext4Dentry {
@@ -49,7 +50,7 @@ impl Dentry for Ext4Dentry {
         Arc::new(Self::new(Some(self), name, super_block))
     }
 
-    fn open(self: Arc<Self>) -> Result<Arc<dyn File>, Errno> {
+    fn open(self: Arc<Self>) -> SysResult<Arc<dyn File>> {
         let inode = self.inode()?;
         match inode.file_type() {
             InodeMode::DIR => Ok(Arc::new(Ext4Dir::new(
@@ -75,11 +76,7 @@ impl Dentry for Ext4Dentry {
     so when calling Dentry::create, we are sure that the dentry is not negative,
     and then we open ALL the dentry from root to here
      */
-    async fn create(
-        self: Arc<Self>,
-        name: &str,
-        mode: InodeMode,
-    ) -> Result<Arc<dyn Dentry>, Errno> {
+    async fn create(self: Arc<Self>, name: &str, mode: InodeMode) -> SysResult<Arc<dyn Dentry>> {
         let inode = self.inode()?;
         let downcast_inode = inode
             .clone()

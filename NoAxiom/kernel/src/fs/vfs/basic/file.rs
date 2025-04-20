@@ -5,7 +5,6 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 
 use async_trait::async_trait;
 use downcast_rs::{impl_downcast, DowncastSync};
-use fatfs::SeekFrom;
 use spin::Mutex;
 
 use super::{
@@ -15,11 +14,11 @@ use super::{
 use crate::{
     constant::fs::LEN_BEFORE_NAME,
     include::{
-        fs::{FileFlags, LinuxDirent64},
+        fs::{FileFlags, LinuxDirent64, SeekFrom},
         io::PollEvent,
         result::Errno,
     },
-    syscall::SyscallResult,
+    syscall::{SysResult, SyscallResult},
 };
 
 pub struct FileMeta {
@@ -116,7 +115,7 @@ impl dyn File {
     /// Called when the VFS needs to move the file position index.
     ///
     /// Return the result offset.
-    fn seek(&self, pos: SeekFrom) -> SyscallResult {
+    pub fn seek(&self, pos: SeekFrom) -> SyscallResult {
         let mut res_pos = self.pos();
         match pos {
             SeekFrom::Current(offset) => {
@@ -145,7 +144,7 @@ impl dyn File {
         Ok(res_pos as isize)
     }
 
-    pub async fn read_all(&self) -> Result<Vec<u8>, Errno> {
+    pub async fn read_all(&self) -> SysResult<Vec<u8>> {
         let len = self.meta().inode.size();
         let mut buf = vec![0; len];
         self.base_read(0, &mut buf).await?;
@@ -188,7 +187,7 @@ impl dyn File {
         let children = dentry.children();
         let offset = self.pos();
         for dentry in children.values().skip(offset) {
-            if dentry.is_negetive() {
+            if dentry.is_negative() {
                 self.seek(SeekFrom::Current(1))?;
                 continue;
             }

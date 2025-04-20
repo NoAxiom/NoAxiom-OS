@@ -1,4 +1,5 @@
 use bitflags::bitflags;
+use config::fs::BLOCK_SIZE;
 use strum::FromRepr;
 
 bitflags! {
@@ -190,6 +191,103 @@ pub struct Stat {
     pub st_ctime_nsec: u64,
     pub unused: u64,
 } // 128
+
+#[derive(Clone, Copy, Debug)]
+#[repr(C)]
+/// Store the file attributes from a supported file.
+pub struct Statx {
+    pub stx_mask: u32,
+    pub stx_blksize: u32,
+    pub stx_attributes: u64,
+    pub stx_nlink: u32,
+    pub stx_uid: u32,
+    pub stx_gid: u32,
+    pub stx_mode: u16,
+    __statx_pad1: [u16; 1],
+    pub stx_ino: u64,
+    pub stx_size: u64,
+    pub stx_blocks: u64,
+    pub stx_attributes_mask: u64,
+    pub stx_atime: StatxTimestamp,
+    pub stx_btime: StatxTimestamp,
+    pub stx_ctime: StatxTimestamp,
+    pub stx_mtime: StatxTimestamp,
+    pub stx_rdev_major: u32,
+    pub stx_rdev_minor: u32,
+    pub stx_dev_major: u32,
+    pub stx_dev_minor: u32,
+    pub stx_mnt_id: u64,
+    __statx_pad2: u64,
+    __statx_pad3: [u64; 12],
+}
+#[derive(Clone, Copy, Debug)]
+#[repr(C)]
+pub struct StatxTimestamp {
+    pub tv_sec: i64,
+    pub tv_nsec: u32,
+    pub __statx_timestamp_pad1: [i32; 1],
+}
+
+impl StatxTimestamp {
+    pub fn new(tv_sec: i64, tv_nsec: u32) -> Self {
+        Self {
+            tv_sec,
+            tv_nsec,
+            __statx_timestamp_pad1: [0; 1],
+        }
+    }
+}
+
+impl Statx {
+    #![allow(unused)]
+    /// Get the inode number described in the `Stat`
+    pub fn get_ino(&self) -> usize {
+        self.stx_ino as usize
+    }
+    pub fn get_size(&self) -> usize {
+        self.stx_size as usize
+    }
+    pub fn new(
+        stx_mask: u32,
+        stx_nlink: u32,
+        stx_mode: u16,
+        stx_ino: u64,
+        stx_size: u64,
+        stx_atime: StatxTimestamp,
+        stx_ctime: StatxTimestamp,
+        stx_mtime: StatxTimestamp,
+        stx_rdev_major: u32,
+        stx_rdev_minor: u32,
+        stx_dev_major: u32,
+        stx_dev_minor: u32,
+    ) -> Self {
+        Self {
+            stx_mask,
+            stx_blksize: BLOCK_SIZE as u32,
+            stx_attributes: 0,
+            stx_nlink,
+            stx_uid: 0,
+            stx_gid: 0,
+            stx_mode,
+            __statx_pad1: [0 as u16; 1],
+            stx_ino,
+            stx_size,
+            stx_blocks: (stx_size as u64 + BLOCK_SIZE as u64 - 1) / BLOCK_SIZE as u64,
+            stx_attributes_mask: 0,
+            stx_atime,
+            stx_btime: stx_ctime,
+            stx_ctime,
+            stx_mtime,
+            stx_rdev_major,
+            stx_rdev_minor,
+            stx_dev_major,
+            stx_dev_minor,
+            stx_mnt_id: 0,
+            __statx_pad2: 0,
+            __statx_pad3: [0 as u64; 12],
+        }
+    }
+}
 
 // Defined in <bits/struct_stat.h>
 #[derive(Debug, Clone, Copy)]
@@ -521,11 +619,13 @@ impl Termios {
         }
     }
 
+    #[allow(unused)]
     pub fn is_icrnl(&self) -> bool {
         const ICRNL: u32 = 0o0000400;
         self.iflag & ICRNL != 0
     }
 
+    #[allow(unused)]
     pub fn is_echo(&self) -> bool {
         const ECHO: u32 = 0o0000010;
         self.lflag & ECHO != 0
@@ -549,5 +649,84 @@ impl WinSize {
             ws_xpixel: 0,
             ws_ypixel: 0,
         }
+    }
+}
+
+/// Enumeration of possible methods to seek within an I/O object.
+///
+/// It is based on the `std::io::SeekFrom` enum.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SeekFrom {
+    /// Sets the offset to the provided number of bytes.
+    Start(u64),
+    /// Sets the offset to the size of this object plus the specified number of
+    /// bytes.
+    End(i64),
+    /// Sets the offset to the current position plus the specified number of
+    /// bytes.
+    Current(i64),
+}
+
+#[derive(FromRepr, Debug)]
+#[repr(usize)]
+pub enum Whence {
+    SeekSet = 0,
+    SeekCur = 1,
+    SeekEnd = 2,
+    SeekData = 3,
+    SeekHold = 4,
+}
+
+bitflags::bitflags! {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    // Defined in <stdio.h>.
+    pub struct RenameFlags: i32 {
+        /// Don't overwrite newpath of the rename. Return an error if newpath already exists.
+        const RENAME_NOREPLACE = 1 << 0;
+        /// Atomically exchange oldpath and newpath.
+        const RENAME_EXCHANGE = 1 << 1;
+        /// This operation makes sense only for overlay/union filesystem implementations.
+        const RENAME_WHITEOUT = 1 << 2;
+    }
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct Statfs {
+    pub f_type: u64,
+    pub f_bsize: u64,
+    pub f_blocks: u64,
+    pub f_bfree: u64,
+    pub f_bavail: u64,
+    pub f_files: u64,
+    pub f_ffree: u64,
+    pub f_fsid: u64,
+    pub f_namelen: u64,
+    pub f_frsize: u64,
+    pub f_flag: u64,
+    pub f_spare: [u64; 4],
+}
+impl Statfs {
+    // TODO
+    pub fn new() -> Self {
+        Self {
+            f_type: 1,
+            f_bsize: 512,
+            f_blocks: 12345,
+            f_bfree: 1234,
+            f_bavail: 123,
+            f_files: 1000,
+            f_ffree: 100,
+            f_fsid: 1,
+            f_namelen: 123,
+            f_frsize: 4096,
+            f_flag: 123,
+            f_spare: [0; 4],
+        }
+    }
+    #[allow(unused)]
+    pub fn as_bytes(&self) -> &[u8] {
+        let size = core::mem::size_of::<Self>();
+        unsafe { core::slice::from_raw_parts(self as *const _ as usize as *const u8, size) }
     }
 }

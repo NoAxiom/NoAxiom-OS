@@ -295,8 +295,9 @@ pub enum SyscallID {
 impl SyscallID {
     pub fn is_debug_on(&self) -> bool {
         match self {
-            SyscallID::SYS_READ | SyscallID::SYS_WRITE | SyscallID::SYS_IOCTL => false,
-            SyscallID::SYS_PPOLL => false,
+            SyscallID::SYS_READ | SyscallID::SYS_WRITE => false,
+            SyscallID::SYS_PPOLL | SyscallID::SYS_IOCTL => false,
+            SyscallID::SYS_FSTAT | SyscallID::SYS_NEWFSTATAT => false,
             _ => true,
         }
     }

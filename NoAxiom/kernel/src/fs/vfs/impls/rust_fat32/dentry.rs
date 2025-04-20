@@ -49,7 +49,7 @@ impl Dentry for Fat32Dentry {
         Arc::new(Self::new(Some(self), name, super_block))
     }
 
-    fn open(self: Arc<Self>) -> Result<Arc<dyn File>, Errno> {
+    fn open(self: Arc<Self>) -> SysResult<Arc<dyn File>> {
         let inode = self.inode()?;
         match inode.file_type() {
             InodeMode::DIR => Ok(Arc::new(Fat32Dir::new(
@@ -68,11 +68,7 @@ impl Dentry for Fat32Dentry {
         }
     }
 
-    async fn create(
-        self: Arc<Self>,
-        name: &str,
-        mode: InodeMode,
-    ) -> Result<Arc<dyn Dentry>, Errno> {
+    async fn create(self: Arc<Self>, name: &str, mode: InodeMode) -> SysResult<Arc<dyn Dentry>> {
         let inode = self.inode()?;
         let super_block = &self.meta().super_block;
         assert!(inode.file_type() == InodeMode::DIR);

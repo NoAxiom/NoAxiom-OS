@@ -5,6 +5,7 @@ use alloc::{
     sync::{Arc, Weak},
     vec::Vec,
 };
+use core::panic;
 
 use async_trait::async_trait;
 use downcast_rs::DowncastSync;
@@ -18,8 +19,11 @@ use super::{
 };
 use crate::{
     fs::path::Path,
-    include::{fs::InodeMode, result::Errno},
-    syscall::SyscallResult,
+    include::{
+        fs::{InodeMode, RenameFlags},
+        result::Errno,
+    },
+    syscall::{SysResult, SyscallResult},
 };
 
 pub struct DentryMeta {
@@ -61,15 +65,13 @@ pub trait Dentry: Send + Sync + DowncastSync {
     /// Get the meta of the dentry
     fn meta(&self) -> &DentryMeta;
     /// Open the file associated with the dentry
-    fn open(self: Arc<Self>) -> Result<Arc<dyn File>, Errno>;
+    fn open(self: Arc<Self>) -> SysResult<Arc<dyn File>>;
     /// Get new dentry from name
     fn from_name(self: Arc<Self>, name: &str) -> Arc<dyn Dentry>;
     /// Create a new dentry with `name` and `mode`
-    async fn create(self: Arc<Self>, name: &str, mode: InodeMode)
-        -> Result<Arc<dyn Dentry>, Errno>;
-
+    async fn create(self: Arc<Self>, name: &str, mode: InodeMode) -> SysResult<Arc<dyn Dentry>>;
     /// Get the inode of the dentry
-    fn inode(&self) -> Result<Arc<dyn Inode>, Errno> {
+    fn inode(&self) -> SysResult<Arc<dyn Inode>> {
         self.meta()
             .inode
             .lock()
@@ -97,11 +99,14 @@ pub trait Dentry: Send + Sync + DowncastSync {
         }
         *self.meta().inode.lock() = Some(inode);
     }
+    fn set_inode_none(&self) {
+        *self.meta().inode.lock() = None;
+    }
 }
 
 impl dyn Dentry {
     /// Check if the dentry is negative
-    pub fn is_negetive(&self) -> bool {
+    pub fn is_negative(&self) -> bool {
         self.inode().is_err()
     }
 
@@ -218,7 +223,10 @@ impl dyn Dentry {
     }
 
     /// Find the dentry with `path`, Error if not found.
-    pub fn find_path(self: Arc<Self>, path: &Vec<&str>) -> Result<Arc<dyn Dentry>, Errno> {
+    ///
+    /// - all the mid dentry should be NON-NEGATIVE and DIR
+    /// - the file dentry can be negative
+    pub fn find_path(self: Arc<Self>, path: &Vec<&str>) -> SysResult<Arc<dyn Dentry>> {
         let mut idx = 0;
         let max_idx = path.len() - 1;
         let mut current = self.clone();
@@ -294,8 +302,8 @@ impl dyn Dentry {
     }
 
     /// Hard link, link self to `target`.
-    pub fn link_to(self: Arc<Self>, target: Arc<dyn Dentry>) -> Result<Arc<dyn Dentry>, Errno> {
-        if !self.is_negetive() {
+    pub fn link_to(self: Arc<Self>, target: Arc<dyn Dentry>) -> SysResult<Arc<dyn Dentry>> {
+        if !self.is_negative() {
             return Err(Errno::EEXIST);
         }
         let inode = target.inode()?;
@@ -319,6 +327,69 @@ impl dyn Dentry {
         }
         Ok(0)
     }
+
+    pub async fn rename_to(
+        self: Arc<Self>,
+        target: Arc<dyn Dentry>,
+        flags: RenameFlags,
+    ) -> SysResult<()> {
+        if flags.contains(RenameFlags::RENAME_EXCHANGE)
+            && (flags.contains(RenameFlags::RENAME_NOREPLACE)
+                || flags.contains(RenameFlags::RENAME_WHITEOUT))
+        {
+            return Err(Errno::EINVAL);
+        }
+        // FIXME: i don't think should check if descendant
+        if target.is_negative() && flags.contains(RenameFlags::RENAME_EXCHANGE) {
+            return Err(Errno::ENOENT);
+        } else if flags.contains(RenameFlags::RENAME_NOREPLACE) {
+            return Err(Errno::EEXIST);
+        }
+
+        // ext4_rs doesn't support mv or rename methods
+        // so we delete the target and copy from self
+
+        let tar_parent = target.parent().unwrap_or_else(|| {
+            panic!("rename_to: target parent is None");
+        });
+        let self_file_type = self.inode()?.file_type();
+        let tar_name = target.name();
+
+        // delete
+        if !target.is_negative() {
+            let tar_file_type = target.inode()?.file_type();
+            if self_file_type != tar_file_type {
+                return Err(Errno::EINVAL);
+            }
+            match tar_file_type {
+                InodeMode::DIR => {
+                    warn!("[rename_to] delete dir {}", target.name());
+                }
+                InodeMode::FILE => {}
+                _ => unimplemented!("rename at not dir/file"),
+            }
+            tar_parent
+                .clone()
+                .open()?
+                .delete_child(tar_name.as_str())
+                .await?;
+        }
+
+        let target = tar_parent.remove_child(target.name().as_str()).unwrap();
+
+        // copy
+        tar_parent
+            .create(self.name().as_str(), self_file_type)
+            .await?;
+
+        if flags.contains(RenameFlags::RENAME_EXCHANGE) {
+            self.set_inode(target.inode()?);
+        } else {
+            self.set_inode_none();
+        }
+
+        Ok(())
+    }
 }
 
 pub struct EmptyDentry {
@@ -340,7 +411,7 @@ impl Dentry for EmptyDentry {
         &self.meta
     }
 
-    fn open(self: Arc<Self>) -> Result<Arc<dyn File>, Errno> {
+    fn open(self: Arc<Self>) -> SysResult<Arc<dyn File>> {
         unreachable!()
     }
 
@@ -348,11 +419,7 @@ impl Dentry for EmptyDentry {
         unreachable!()
     }
 
-    async fn create(
-        self: Arc<Self>,
-        _name: &str,
-        _mode: InodeMode,
-    ) -> Result<Arc<dyn Dentry>, Errno> {
+    async fn create(self: Arc<Self>, _name: &str, _mode: InodeMode) -> SysResult<Arc<dyn Dentry>> {
         unreachable!()
     }
 }

@@ -1,8 +1,9 @@
-use alloc::sync::Arc;
+use alloc::{boxed::Box, sync::Arc};
 
+use async_trait::async_trait;
 use spin::Mutex;
 
-use super::IExtInode;
+use super::{fs_err, superblock::Ext4SuperBlock, IExtInode};
 use crate::{
     config::fs::BLOCK_SIZE,
     fs::vfs::basic::{
@@ -10,6 +11,7 @@ use crate::{
         superblock::SuperBlock,
     },
     include::fs::{InodeMode, Stat},
+    syscall::SysResult,
 };
 
 pub struct Ext4FileInode {
@@ -78,6 +80,7 @@ impl Ext4DirInode {
     }
 }
 
+#[async_trait]
 impl Inode for Ext4DirInode {
     fn meta(&self) -> &InodeMeta {
         &self.meta
@@ -106,5 +109,17 @@ impl Inode for Ext4DirInode {
             st_ctime_nsec: inner.ctime_nsec as u64,
             unused: 0,
         })
+    }
+    async fn truncate(&self, new: usize) -> SysResult<()> {
+        let super_block = &self.meta.super_block;
+        let ext4 = super_block
+            .downcast_ref::<Ext4SuperBlock>()
+            .unwrap()
+            .get_fs();
+        let mut inode = self.ino.lock();
+        ext4.truncate_inode(&mut inode, new as u64)
+            .await
+            .map_err(fs_err)?;
+        Ok(())
     }
 }

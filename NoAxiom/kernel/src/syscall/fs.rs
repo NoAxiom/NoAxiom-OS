@@ -8,7 +8,10 @@ use crate::{
     constant::fs::{AT_FDCWD, UTIME_NOW, UTIME_OMIT},
     fs::{fdtable::RLimit, manager::FS_MANAGER, path::Path, pipe::PipeFile, vfs::root_dentry},
     include::{
-        fs::{FcntlArgFlags, FcntlFlags, FileFlags, InodeMode, Iovec, Kstat, MountFlags},
+        fs::{
+            FcntlArgFlags, FcntlFlags, FileFlags, InodeMode, Iovec, Kstat, MountFlags, RenameFlags,
+            SeekFrom, Statfs, Statx, Whence,
+        },
         resource::Resource,
         result::Errno,
     },
@@ -126,7 +129,7 @@ impl Syscall<'_> {
             info!("[sys_openat] O_CREATE");
             // check if the file already exists
             if let Ok(dentry) = target {
-                if flags.contains(FileFlags::O_EXCL) && !dentry.is_negetive() {
+                if flags.contains(FileFlags::O_EXCL) && !dentry.is_negative() {
                     return Err(Errno::EEXIST);
                 }
             }
@@ -212,6 +215,28 @@ impl Syscall<'_> {
         Ok(read_size)
     }
 
+    pub async fn sys_pread64(
+        &self,
+        fd: usize,
+        buf: usize,
+        len: usize,
+        offset: usize,
+    ) -> SyscallResult {
+        info!(
+            "[sys_pread64] fd: {}, buf: {:#x}, len: {}, offset: {}",
+            fd, buf, len, offset
+        );
+        let fd_table = self.task.fd_table();
+        let file = fd_table.get(fd).ok_or(Errno::EBADF)?;
+        drop(fd_table);
+        if !file.meta().readable() {
+            return Err(Errno::EINVAL);
+        }
+        let user_ptr = UserPtr::<u8>::new(buf);
+        let buf_slice = user_ptr.as_slice_mut_checked(len).await?;
+        file.base_read(offset, buf_slice).await
+    }
+
     /// Write data to a file descriptor
     pub async fn sys_write(&self, fd: usize, buf: usize, len: usize) -> SyscallResult {
         trace!("[sys_write] fd: {}, buf: {:?}, len: {}", fd, buf, len);
@@ -254,6 +279,28 @@ impl Syscall<'_> {
         Ok(write_size)
     }
 
+    pub async fn sys_pwrite64(
+        &self,
+        fd: usize,
+        buf: usize,
+        len: usize,
+        offset: usize,
+    ) -> SyscallResult {
+        info!(
+            "[sys_pwrite64] fd: {}, buf: {:#x}, len: {}, offset: {}",
+            fd, buf, len, offset
+        );
+        let fd_table = self.task.fd_table();
+        let file = fd_table.get(fd).ok_or(Errno::EBADF)?;
+        drop(fd_table);
+        if !file.meta().writable() {
+            return Err(Errno::EINVAL);
+        }
+        let user_ptr = UserPtr::<u8>::new(buf);
+        let buf_slice = user_ptr.as_slice_mut_checked(len).await?;
+        file.base_write(offset, buf_slice).await
+    }
+
     /// Create a directory
     pub async fn sys_mkdirat(&self, dirfd: isize, path: usize, mode: u32) -> SyscallResult {
         let mode = InodeMode::from_bits_truncate(mode);
@@ -281,12 +328,32 @@ impl Syscall<'_> {
 
     /// Get file status
     pub fn sys_fstat(&self, fd: usize, stat_buf: usize) -> SyscallResult {
-        info!("[sys_fstat]: fd: {}, stat_buf: {:#x}", fd, stat_buf);
+        trace!("[sys_fstat]: fd: {}, stat_buf: {:#x}", fd, stat_buf);
         let fd_table = self.task.fd_table();
         let file = fd_table.get(fd).ok_or(Errno::EBADF)?;
         let kstat = Kstat::from_stat(file.inode().stat()?);
-        let ptr = UserPtr::<Kstat>::new(stat_buf as usize);
+        let ptr = UserPtr::<Kstat>::new(stat_buf);
         ptr.write(kstat);
+        Ok(0)
+    }
+
+    pub fn sys_statx(
+        &self,
+        dirfd: isize,
+        path: usize,
+        flags: u32,
+        mask: u32,
+        buf: usize,
+    ) -> SyscallResult {
+        let path = get_path(self.task.clone(), path, dirfd, "sys_statx")?;
+        let flags = FcntlArgFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
+        info!(
+            "[sys_statx] dirfd: {}, path: {:?}, flags: {:?}",
+            dirfd, path, flags,
+        );
+        let statx = path.dentry().inode()?.statx(mask)?;
+        let ptr = UserPtr::<Statx>::new(buf);
+        ptr.write(statx);
         Ok(0)
     }
 
@@ -298,17 +365,15 @@ impl Syscall<'_> {
         stat_buf: usize,
         _flags: usize,
     ) -> SyscallResult {
-        info!(
-            "[sys_newfstatat] dirfd: {}, path: {:?}, stat_buf: {:#x}",
-            dirfd, path, stat_buf
-        );
         let path = get_path(self.task.clone(), path, dirfd, "sys_newfstat")?;
-        info!(
+        trace!(
             "[sys_newfstat] dirfd: {}, path: {:?}, stat_buf: {:#x}",
-            dirfd, path, stat_buf
+            dirfd,
+            path,
+            stat_buf
         );
         let kstat = Kstat::from_stat(path.dentry().inode()?.stat()?);
-        let ptr = UserPtr::<Kstat>::new(stat_buf as usize);
+        let ptr = UserPtr::<Kstat>::new(stat_buf);
         ptr.write(kstat);
         Ok(0)
     }
@@ -576,6 +641,7 @@ impl Syscall<'_> {
         out_file.write(&buf[..read_len]).await
     }
 
+    /// Check if a file exists
     pub fn sys_faccessat(
         &self,
         dirfd: isize,
@@ -642,8 +708,150 @@ impl Syscall<'_> {
         inode.set_time(&atime, &mtime, &ctime);
         Ok(0)
     }
+
+    /// Seek a file, move the file offset to a new position
+    pub fn sys_lseek(&self, fd: usize, offset: isize, whence: usize) -> SyscallResult {
+        info!(
+            "[sys_lseek] fd: {}, offset: {}, whence: {}",
+            fd, offset, whence
+        );
+        let fd_table = self.task.fd_table();
+        let file = fd_table.get(fd).ok_or(Errno::EBADF)?;
+        drop(fd_table);
+        let whence = Whence::from_repr(whence).ok_or(Errno::EINVAL)?;
+
+        match whence {
+            Whence::SeekSet => file.seek(SeekFrom::Start(offset as u64)),
+            Whence::SeekCur => file.seek(SeekFrom::Current(offset as i64)),
+            Whence::SeekEnd => file.seek(SeekFrom::End(offset as i64)),
+            e => unimplemented!("lseek whence unimplemented: {e:?}"),
+        }
+    }
+
+    /// Rename a file
+    pub async fn sys_renameat2(
+        &self,
+        old_dirfd: isize,
+        old_path: usize,
+        new_dirfd: isize,
+        new_path: usize,
+        flags: i32,
+    ) -> SyscallResult {
+        let old_path = get_path(self.task.clone(), old_path, old_dirfd, "sys_renameat2")?;
+        let new_path = get_path(self.task.clone(), new_path, new_dirfd, "sys_renameat2")?;
+        let flags = RenameFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
+        info!(
+            "[sys_renameat2] old_path: {:?}, new_path: {:?}",
+            old_path, new_path
+        );
+
+        let old_dentry = old_path.dentry();
+        let new_dentry = new_path.dentry();
+        old_dentry.rename_to(new_dentry, flags).await?;
+        Ok(0)
+    }
+
+    /// Truncate a file to a specified length
+    pub async fn sys_ftruncate(&self, fd: usize, length: usize) -> SyscallResult {
+        info!("[sys_ftruncate] fd: {}, length: {}", fd, length);
+        let fd_table = self.task.fd_table();
+        let file = fd_table.get(fd).ok_or(Errno::EBADF)?;
+        drop(fd_table);
+        file.inode().truncate(length).await?;
+        Ok(0)
+    }
+
+    /// get fs status
+    pub fn sys_statfs(&self, path: usize, buf: usize) -> SyscallResult {
+        let path = get_string_from_ptr(&UserPtr::<u8>::new(path as usize));
+        info!("[sys_statfs] path: {}, buf: {:#x}", path, buf);
+        let statfs = Statfs::new();
+        let ptr = UserPtr::<Statfs>::new(buf);
+        ptr.write(statfs);
+        Ok(0)
+    }
+
+    /// splice data from one file descriptor to another
+    pub async fn sys_splice(
+        &self,
+        fd_in: usize,
+        off_in: usize,
+        fd_out: usize,
+        off_out: usize,
+        len: usize,
+        _flags: usize,
+    ) -> SyscallResult {
+        info!(
+            "[sys_splice] fd_in: {}, off_in: {:#x}, fd_out: {}, off_out: {:#x}, len: {}",
+            fd_in, off_in, fd_out, off_out, len
+        );
+        let fd_table = self.task.fd_table();
+        let file_in = fd_table.get(fd_in).ok_or(Errno::EBADF)?;
+        let file_out = fd_table.get(fd_out).ok_or(Errno::EBADF)?;
+        drop(fd_table);
+        let file_in_type = file_in.inode().file_type();
+        let file_out_type = file_out.inode().file_type();
+        let off_in = UserPtr::<i64>::new(off_in);
+        let off_out = UserPtr::<i64>::new(off_out);
+
+        if file_in_type == InodeMode::FIFO && !off_in.is_null() {
+            return Err(Errno::ESPIPE);
+        }
+        if file_out_type == InodeMode::FIFO && !off_out.is_null() {
+            return Err(Errno::ESPIPE);
+        }
+        if !file_in_type == InodeMode::FIFO && !file_out_type == InodeMode::FIFO {
+            return Err(Errno::EINVAL);
+        }
+        if !file_in.meta().readable() || !file_out.meta().writable() {
+            return Err(Errno::EBADF);
+        }
+        if Arc::ptr_eq(&file_in.inode(), &file_out.inode()) {
+            return Err(Errno::EINVAL);
+        }
+
+        let mut buf = vec![0; len];
+        let in_offset = if !off_in.is_null() {
+            let off_in = off_in.read();
+            if off_in < 0 {
+                return Err(Errno::EINVAL);
+            }
+            off_in as usize
+        } else {
+            0
+        };
+        let in_len = file_in.base_read(in_offset, &mut buf).await?;
+        if in_len == 0 {
+            return Ok(0);
+        }
+
+        buf.truncate(in_len as usize);
+        let out_offset = if !off_out.is_null() {
+            let off_out = off_out.read();
+            if off_out < 0 {
+                return Err(Errno::EINVAL);
+            }
+            off_out as usize
+        } else {
+            0
+        };
+        let out_len = file_out.base_write(out_offset, &buf).await? as usize;
+
+        if !off_in.is_null() {
+            off_in.write(off_in.read() + in_len as i64);
+        }
+        if !off_out.is_null() {
+            off_out.write(off_out.read() + out_len as i64);
+        }
+
+        Ok(out_len as isize)
+    }
 }
 
+/// create if not exist
+/// and the created file/dir is NON-NEGATIVE
+///
+/// todo: add function: create with the last file negative
 async fn get_path_or_create(
     task: Arc<Task>,
     rawpath: usize,

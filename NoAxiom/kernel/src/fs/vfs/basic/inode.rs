@@ -1,14 +1,13 @@
-use alloc::sync::Arc;
+use alloc::{boxed::Box, sync::Arc};
 
+use async_trait::async_trait;
 use downcast_rs::{impl_downcast, DowncastSync};
 use spin::Mutex;
 
 use super::superblock::{EmptySuperBlock, SuperBlock};
 use crate::{
-    include::{
-        fs::{InodeMode, Stat},
-        result::Errno,
-    },
+    include::fs::{InodeMode, Stat, Statx, StatxTimestamp},
+    syscall::SysResult,
     time::time_spec::TimeSpec,
 };
 
@@ -35,7 +34,7 @@ pub struct InodeMeta {
     /// The mode of file
     pub inode_mode: InodeMode,
     /// The super block of the inode
-    super_block: Arc<dyn SuperBlock>,
+    pub super_block: Arc<dyn SuperBlock>,
 }
 
 impl InodeMeta {
@@ -77,9 +76,13 @@ pub struct InodeMetaInner {
     pub ctime_nsec: usize,
 }
 
+#[async_trait]
 pub trait Inode: Send + Sync + DowncastSync {
     fn meta(&self) -> &InodeMeta;
-    fn stat(&self) -> Result<Stat, Errno>;
+    fn stat(&self) -> SysResult<Stat>;
+    async fn truncate(&self, _new: usize) -> SysResult<()> {
+        panic!("this inode not implemented truncate");
+    }
 }
 
 impl dyn Inode {
@@ -94,6 +97,23 @@ impl dyn Inode {
     }
     pub fn set_size(&self, size: usize) {
         self.meta().inner.lock().size = size;
+    }
+    pub fn statx(&self, mask: u32) -> SysResult<Statx> {
+        let stat = self.stat()?;
+        Ok(Statx::new(
+            mask,
+            stat.st_nlink,
+            stat.st_mode as u16,
+            stat.st_ino,
+            stat.st_size,
+            StatxTimestamp::new(stat.st_atime_sec as i64, stat.st_atime_nsec as u32),
+            StatxTimestamp::new(stat.st_ctime_sec as i64, stat.st_ctime_nsec as u32),
+            StatxTimestamp::new(stat.st_mtime_sec as i64, stat.st_mtime_nsec as u32),
+            (stat.st_rdev as u32 & 0xffff_00) >> 8 as u32,
+            (stat.st_rdev & 0xff) as u32,
+            (stat.st_dev as u32 & 0xffff_00) >> 8 as u32,
+            (stat.st_dev & 0xff) as u32,
+        ))
     }
     // set timestamp, `None` means not to change
     pub fn set_time(
@@ -139,7 +159,7 @@ impl Inode for EmptyInode {
         &self.meta
     }
 
-    fn stat(&self) -> Result<Stat, Errno> {
+    fn stat(&self) -> SysResult<Stat> {
         Ok(Stat::default())
     }
 }

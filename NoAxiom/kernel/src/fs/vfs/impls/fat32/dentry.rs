@@ -13,6 +13,7 @@ use crate::{
         superblock::SuperBlock,
     },
     include::{fs::InodeMode, result::Errno},
+    syscall::SysResult,
 };
 
 pub struct FAT32Dentry {
@@ -46,7 +47,7 @@ impl Dentry for FAT32Dentry {
         Arc::new(Self::new(Some(self), name, super_block))
     }
 
-    fn open(self: Arc<Self>) -> Result<Arc<dyn File>, Errno> {
+    fn open(self: Arc<Self>) -> SysResult<Arc<dyn File>> {
         let inode = self.inode()?;
         match inode.file_type() {
             InodeMode::DIR => Ok(Arc::new(FAT32Directory::new(
@@ -65,11 +66,7 @@ impl Dentry for FAT32Dentry {
         }
     }
 
-    async fn create(
-        self: Arc<Self>,
-        name: &str,
-        mode: InodeMode,
-    ) -> Result<Arc<dyn Dentry>, Errno> {
+    async fn create(self: Arc<Self>, name: &str, mode: InodeMode) -> SysResult<Arc<dyn Dentry>> {
         let inode = self.inode()?;
         let super_block = &self.meta().super_block;
         assert!(inode.file_type() == InodeMode::DIR);
