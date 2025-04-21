@@ -10,7 +10,7 @@ impl Devices {
             if !registered[0] {
                 #[cfg(feature = "async")]
                 {
-                    log::debug!("[driver] probe driver");
+                    log::debug!("[driver] probe driver at {:#x}", addr);
                     use core::ptr::NonNull;
 
                     use include::errno::Errno;
@@ -22,8 +22,10 @@ impl Devices {
 
                     use crate::devices::impls::{virtio::dev_err, BlkDevice};
 
+                    let addr = *addr | arch::consts::KERNEL_ADDR_OFFSET;
+
                     let transport = unsafe {
-                        MmioTransport::new(NonNull::new(*addr as *mut VirtIOHeader).unwrap())
+                        MmioTransport::new(NonNull::new(addr as *mut VirtIOHeader).unwrap())
                             .map_err(|_| Errno::EINVAL)?
                     };
 
