@@ -349,6 +349,18 @@ impl Task {
             task.terminate(exit_code);
         }
     }
+
+    /// terminate all tasks except group leader in current thread group
+    pub fn terminate_threads(&self) {
+        assert!(self.is_group_leader());
+        let tg = self.thread_group();
+        for (_id, t) in tg.0.iter() {
+            let task = t.upgrade().unwrap();
+            if !task.is_group_leader() {
+                task.terminate(ExitCode::default());
+            }
+        }
+    }
 }
 
 // process implementation
@@ -539,9 +551,9 @@ impl Task {
 
         let res = if flags.contains(CloneFlags::THREAD) {
             // fork as a new thread
-            debug!("fork new thread");
             let new_tid = tid_alloc();
             let tid_val = new_tid.0;
+            info!("fork new thread, tid: {}", tid_val);
             let new_thread = Arc::new(Self {
                 tid: new_tid,
                 tgid: self.tgid.clone(),
@@ -569,7 +581,7 @@ impl Task {
             let new_tid = tid_alloc();
             let new_tgid = new_tid.0;
             let new_pgid = *self.pgid(); // use parent's pgid
-            trace!("fork new process, tgid: {}", new_tgid);
+            info!("fork new process, tgid: {}", new_tgid);
             let new_process = Arc::new(Self {
                 tid: new_tid,
                 tgid: new_tgid,
@@ -612,8 +624,8 @@ impl Task {
             user_sp,
             mut auxs,
         } = MemorySet::load_from_path(path).await?;
-        self.delete_children();
         memory_set.memory_activate();
+        self.terminate_threads();
         self.change_memory_set(memory_set);
         trace!("init usatck");
         let (user_sp, argc, argv_base, envp_base) =

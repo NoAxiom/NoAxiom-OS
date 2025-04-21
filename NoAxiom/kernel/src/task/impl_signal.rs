@@ -186,7 +186,7 @@ impl Task {
     /// terminate the process
     fn sig_default_terminate(&self) {
         debug!("[sig_default_terminate] terminate the process");
-        self.terminate_group(ExitCode::new(0));
+        self.terminate_group(ExitCode::default());
     }
     /// stop the process
     fn sig_default_stop(&self) {

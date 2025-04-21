@@ -1,4 +1,30 @@
-//! NoAxiom main
+//! # NoAxiom Kernel
+//!
+//! ## Brief
+//! This is the main kernel of NoAxiom OS.
+//! NoAxiom OS is an open-source operating system with Linux-like syscall
+//! interfaces, which can run both on RISC-V and LoongArch architectures.
+//! NoAxiom provides an async runtime with multicore asynchronous scheduling.
+//! And provides asynchronous drivers when under specific platforms.
+//!
+//! ## Kernel Module Description
+//! [`config`]: the global configs for the kernel (imports from external library)
+//! [`constant`]: the constant values without any implementation
+//! [`cpu`]: per-cpu structures
+//! [`driver`]: the driver implementations
+//! [`entry`] defines the initialize entry of NoAxiom
+//! [`fs`]: the file system implementations
+//! [`include`]: struct definitions with basic impls
+//! [`mm`]: memory management
+//! [`net`]: network stack
+//! [`panic`]: panic handler
+//! [`sched`]: scheduler and runtime
+//! [`signal`]: signal implementations
+//! [`syscall`]: syscall implementations
+//! [`task`]: task management and syscall inner impls for task control block
+//! [`time`]: time struct definations, utils and management
+//! [`trap`]: trap handler and specific interrupt handler
+//! [`utils`]: utils functions
 
 #![no_std]
 #![no_main]
@@ -24,7 +50,7 @@ extern crate log;
 #[macro_use]
 extern crate console;
 
-mod config;
+use config;
 mod constant;
 mod cpu;
 mod driver;
@@ -43,13 +69,3 @@ mod trap;
 mod utils;
 
 core::arch::global_asm!(include_str!("link_apps.S"));
-
-/// rust_main: only act as a task runner
-/// called by [`entry::init::_boot_hart_init`]
-#[no_mangle]
-pub fn rust_main() -> ! {
-    info!("[kernel] hart id {} has been booted", cpu::get_hartid());
-    loop {
-        sched::runtime::run();
-    }
-}

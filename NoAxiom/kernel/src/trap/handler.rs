@@ -31,10 +31,9 @@ fn kernel_trap_handler() {
         | TrapType::InstructionPageFault(addr) => {
             if let Some(task) = current_cpu().task.as_mut() {
                 // fixme: currently this block_on cannot be canceled
-                trace!(
+                info!(
                     "[kernel] block on memory_validate, epc: {:#x}, addr: {:#x}",
-                    epc,
-                    addr
+                    epc, addr
                 );
                 match block_on(task.memory_validate(addr, Some(trap_type))) {
                     Ok(_) => trace!("[memory_validate] success in kernel_trap_handler"),
@@ -58,20 +57,20 @@ fn kernel_trap_handler() {
 
 /// user trap handler
 #[no_mangle]
-pub async fn user_trap_handler(task: &Arc<Task>) {
+pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
     assert!(!Arch::is_interrupt_enabled());
     trace!("[trap_handler] call trap handler");
 
     // def: context, user trap pc, trap type
     let cx = task.trap_context_mut();
-    let epc = Arch::read_epc();
-    let trap_type = Arch::read_trap_type(Some(cx));
 
     // user exit when detect unexpected trap
     let user_exit = |msg: &str| {
         panic!(
             "[user_trap_handler] unexpected exit!!! msg: {}, trap_type: {:#x?}, sepc = {:#x}",
-            msg, trap_type, epc
+            msg,
+            trap_type,
+            cx[TrapArgs::EPC],
         );
         task.terminate(ExitCode::new_raw(-1));
     };

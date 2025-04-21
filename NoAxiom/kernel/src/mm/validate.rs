@@ -13,7 +13,6 @@ use crate::{
     task::Task,
 };
 
-// TODO: add mmap check
 /// # memory validate
 /// Check if is the copy-on-write/lazy-alloc pages triggered the page fault.
 ///
@@ -103,7 +102,10 @@ impl Task {
         addr: usize,
         trap_type: Option<TrapType>,
     ) -> SysResult<()> {
-        debug!("[memory_validate] check at addr: {:#x}", addr);
+        debug!(
+            "[memory_validate] check at addr: {:#x}, type: {:x?}",
+            addr, trap_type
+        );
         let ms = self.memory_set();
         let vpn = VirtAddr::from(addr).floor();
         let pte = PageTable::from_ppn(Arch::current_root_ppn()).translate_vpn(vpn);

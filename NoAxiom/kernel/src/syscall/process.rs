@@ -46,17 +46,17 @@ impl Syscall<'_> {
         let flags = CloneFlags::from_bits(flags & !0xff).unwrap();
         let new_task = self.task.fork(flags);
         let new_tid = new_task.tid();
-        let cx = new_task.trap_context_mut();
+        let new_cx = new_task.trap_context_mut();
         debug!(
             "[sys_fork] flags: {:?} stack: {:?} ptid: {:?} tls: {:?} ctid: {:?}",
             flags, stack, ptid, tls, ctid
         );
         use TrapArgs::*;
         if stack != 0 {
-            cx[SP] = stack;
+            new_cx[SP] = stack;
         }
         if flags.contains(CloneFlags::SETTLS) {
-            cx[TLS] = tls;
+            new_cx[TLS] = tls;
         }
         if flags.contains(CloneFlags::PARENT_SETTID) {
             let ptid = UserPtr::<usize>::new(ptid);
@@ -69,10 +69,9 @@ impl Syscall<'_> {
         if flags.contains(CloneFlags::CHILD_CLEARTID) {
             new_task.set_clear_tid_address(ctid);
         }
-        cx[RES] = 0;
-        trace!("[sys_fork] new task context: {:?}", cx);
+        new_cx[RES] = 0;
+        trace!("[sys_fork] new task context: {:?}", new_cx);
         spawn_utask(new_task);
-        debug!("[sys_fork] done");
         Ok(new_tid as isize)
     }
 
@@ -87,6 +86,7 @@ impl Syscall<'_> {
             args.push(String::from("busybox"));
             args.push(String::from("sh"));
         } else if path.ends_with("ls") || path.ends_with("sleep") {
+            debug!("executing ls or sleep");
             path = String::from("/glibc/busybox");
             args.push(String::from("busybox"));
         }

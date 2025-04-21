@@ -14,7 +14,7 @@ use crate::{
     config::cpu::CPU_NUM,
     constant::sched::NICE_0_LOAD,
     cpu::get_hartid,
-    time::{gettime::get_time, sleep::current_sleep_manager, time_slice::get_load_balance_ticks},
+    time::{gettime::get_time, time_slice::get_load_balance_ticks},
 };
 
 struct CfsTreeNode<R> {
@@ -310,7 +310,6 @@ impl Runtime<CFS<SchedInfo>, SchedInfo> for CfsRuntime {
     }
 
     fn run(&self) {
-        current_sleep_manager().sleep_handler();
         let mut local = self.current_scheduler().lock();
         local.set_running(false);
         // run task

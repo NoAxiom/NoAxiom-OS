@@ -119,7 +119,7 @@ impl TimeInfo {
         let current_time = get_time_duration();
         let stime_slice = current_time - self.user_time_start;
         if self.user_time_start != Duration::ZERO {
-            self.add_utime(stime_slice);
+            self.add_stime(stime_slice);
         }
         self.user_time_start = current_time;
     }
