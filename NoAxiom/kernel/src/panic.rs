@@ -4,7 +4,10 @@ use core::panic::PanicInfo;
 
 use arch::{Arch, ArchBoot};
 
-use crate::cpu::{current_cpu, get_hartid};
+use crate::{
+    cpu::{current_cpu, get_hartid},
+    time::gettime::get_time_ms,
+};
 
 lazy_static::lazy_static! {
     static ref PANIC_FLAG: spin::Mutex<bool> = spin::Mutex::new(false);
@@ -12,7 +15,15 @@ lazy_static::lazy_static! {
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
-    println!("[PANIC] kernel triggered panic!!!");
+    println!(
+        "[PANIC] HART{}, TID{}, PANIC at {}ms",
+        get_hartid(),
+        current_cpu()
+            .task
+            .as_ref()
+            .map_or_else(|| 0, |task| task.tid()),
+        get_time_ms(),
+    );
     #[cfg(feature = "debug_sig")]
     println!(
         "[PANIC] during syscall {:?}",
@@ -20,7 +31,7 @@ fn panic(info: &PanicInfo) -> ! {
     );
     if let Some(task) = current_cpu().task.as_ref() {
         let cx = task.trap_context();
-        info!("[PANIC] cx detected: {:#x?}", cx);
+        println!("[PANIC] cx detected: {:#x?}", cx);
     }
     Arch::arch_info_print();
     if let Some(location) = info.location() {

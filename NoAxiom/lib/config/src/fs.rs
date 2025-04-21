@@ -31,3 +31,23 @@ pub const ROOT_FAKE_ENTRY: [u8; 32] = {
 };
 
 pub const PIPE_BUF_SIZE: usize = 4096;
+
+#[cfg(feature = "glibc")]
+mod lib_def {
+    pub const LIB_NAME: &str = "glibc";
+    pub const ROOT_NAME: &str = "/glibc";
+}
+
+#[cfg(feature = "musl")]
+mod lib_def {
+    pub const LIB_NAME: &str = "musl";
+    pub const ROOT_NAME: &str = "/musl";
+}
+
+#[cfg(not(any(feature = "glibc", feature = "musl")))]
+mod lib_def {
+    pub const LIB_NAME: &str = "";
+    pub const ROOT_NAME: &str = "";
+}
+
+pub use lib_def::*;

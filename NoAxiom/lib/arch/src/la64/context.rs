@@ -181,5 +181,6 @@ impl ArchTrapContext for TrapContext {
         self[A0] = argc;
         self[A1] = argv;
         self[A2] = envp;
+        self.freg = UserFloatContext::new();
     }
 }

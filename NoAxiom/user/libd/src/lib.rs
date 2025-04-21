@@ -11,6 +11,7 @@ pub mod arch;
 pub mod entry;
 pub mod errno;
 mod heap;
+pub mod lib_basepath;
 pub mod lib_client;
 pub mod lib_event;
 pub mod lib_request;

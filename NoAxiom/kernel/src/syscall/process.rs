@@ -1,6 +1,7 @@
 use alloc::{string::String, vec::Vec};
 
 use arch::TrapArgs;
+use config::fs::ROOT_NAME;
 
 use super::{Syscall, SyscallResult};
 use crate::{
@@ -82,16 +83,16 @@ impl Syscall<'_> {
 
         // args and envs init
         if path.contains(".sh") {
-            path = String::from("busybox");
+            path = format!("{}/busybox", ROOT_NAME);
             args.push(String::from("busybox"));
             args.push(String::from("sh"));
         } else if path.ends_with("ls") || path.ends_with("sleep") {
             debug!("executing ls or sleep");
-            path = String::from("/glibc/busybox");
+            path = format!("{}/busybox", ROOT_NAME);
             args.push(String::from("busybox"));
         }
-        envs.push(String::from("PATH=/glibc"));
-        envs.push(String::from("LD_LIBRARY_PATH=/glibc"));
+        envs.push(format!("PATH={}", ROOT_NAME));
+        envs.push(format!("LD_LIBRARY_PATH={}", ROOT_NAME));
 
         let file_path = if !path.starts_with('/') {
             let cwd = self.task.cwd();

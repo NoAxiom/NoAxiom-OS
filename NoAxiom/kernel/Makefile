@@ -7,83 +7,38 @@ endif
 
 FEATURES :=
 
-VF2 :=
 QEMU := 1
 ifeq ($(ARCH_NAME),riscv64)
 	INTERRUPTABLE_ASYNC := 1
 else ifeq ($(ARCH_NAME),loongarch64)
 	ASYNC := 1
 endif
-GLIBC := 1
-UART := 
-PRELIMINARY :=
-BUSYBOX :=
-RUNTESTS :=
-TIME_TRACER := 
-UITEST :=
-DEV := 
-SH := 
-RAMDISK :=
-log_print := 
+LOG_PRINT := 
 DEBUG_SIG := 1
 
 ifneq ($(MULTICORE), 1)
 	FEATURES += multicore
 endif
 
-ifneq ($(UART), )
-	FEATURES += uart
-endif
-
-ifneq ($(RAMDISK), )
-	FEATURES += ramdisk
-endif
-
-ifneq ($(UITEST), )
-	FEATURES += uitest
-endif
-
-ifneq ($(TIME_TRACER), )
-	FEATURES += time_tracer
-endif
-
-ifneq ($(SH), )
-	FEATURES += customized-sh
-endif
-
-ifneq ($(DEV), )
-	FEATURES += dev
-endif
-
-ifneq ($(VF2), )
-	FEATURES += vf2
-endif
-
 ifneq ($(QEMU), )
 	FEATURES += qemu
 endif
 
-ifneq ($(BUSYBOX), )
+ifeq ($(INIT_PROC),busybox)
 	FEATURES += busybox
 endif
 
-ifneq ($(PRELIMINARY), )
-	FEATURES += preliminary
-endif
-
-ifneq ($(RUNTESTS), )
-	FEATURES += runtests
-endif
-
-ifneq ($(GLIBC), )
+ifeq ($(LIB_NAME),glibc)
 	FEATURES += glibc
+else ifeq ($(LIB_NAME),musl)
+	FEATURES += musl
 endif
 
 ifneq ($(INTERRUPTABLE_ASYNC), )
 	FEATURES += interruptable_async
 endif
 
-ifneq ($(log_print), )
+ifneq ($(LOG_PRINT), )
 	FEATURES += log_print
 endif
 

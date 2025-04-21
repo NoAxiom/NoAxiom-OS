@@ -3,6 +3,10 @@ name = "libd"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+glibc = []
+musl = []
+
 [dependencies]
 buddy_system_allocator = "0.9"
 bitflags = "1.2.1"

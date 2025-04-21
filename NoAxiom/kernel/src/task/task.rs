@@ -1,13 +1,14 @@
 //! # Task
 
 use alloc::{
-    string::String,
+    string::{String, ToString},
     sync::{Arc, Weak},
     vec::Vec,
 };
 use core::{marker::PhantomData, ptr::null, task::Waker};
 
 use arch::{Arch, ArchFull, ArchTrapContext, TrapArgs, TrapContext};
+use config::fs::ROOT_NAME;
 use ksync::{
     cell::SyncUnsafeCell,
     mutex::{SpinLock, SpinLockGuard},
@@ -28,6 +29,7 @@ use crate::{
         path::Path,
     },
     include::{
+        fs::InodeMode,
         process::{
             auxv::{AuxEntry, AT_NULL, AT_RANDOM},
             robust_list::RobustList,
@@ -367,7 +369,7 @@ impl Task {
 // process implementation
 impl Task {
     /// create new process from elf
-    pub fn new_process(elf: ElfMemoryInfo) -> Arc<Self> {
+    pub async fn new_process(elf: ElfMemoryInfo) -> Arc<Self> {
         trace!("[kernel] spawn new process from elf");
         let ElfMemoryInfo {
             memory_set,
@@ -379,6 +381,8 @@ impl Task {
         // identifier
         let tid = tid_alloc();
         let tgid = tid.0;
+        // def root path
+        let path = Path::from_or_create(ROOT_NAME.to_string(), InodeMode::DIR).await;
         // create task
         let task = Arc::new(Self {
             tid,
@@ -390,7 +394,7 @@ impl Task {
             trap_cx: ThreadOnly::new(TrapContext::app_init_cx(elf_entry, user_sp)),
             sched_entity: SchedEntity::new_bare(INIT_PROCESS_ID),
             fd_table: Shared::new(FdTable::new()),
-            cwd: Shared::new(Path::try_from(String::from("/")).unwrap()),
+            cwd: Shared::new(path),
             sa_list: Shared::new(SigActionList::new()),
             waker: Once::new(),
             tg_leader: Once::new(),

@@ -146,46 +146,48 @@ pub struct TrapContext {
 impl core::fmt::Debug for TrapContext {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("TrapContext")
-            .field("r0  / zero", &self.x[0])
-            .field("r1  / ra  ", &self.x[1])
-            .field("r2  / sp  ", &self.x[2])
-            .field("r3  / gp  ", &self.x[3])
-            .field("r4  / tp  ", &self.x[4])
-            .field("r5  / t0  ", &self.x[5])
-            .field("r6  / t1  ", &self.x[6])
-            .field("r7  / t2  ", &self.x[7])
-            .field("r8  / s0  ", &self.x[8])
-            .field("r9  / s1  ", &self.x[9])
-            .field("r10 / a0  ", &self.x[10])
-            .field("r11 / a1  ", &self.x[11])
-            .field("r12 / a2  ", &self.x[12])
-            .field("r13 / a3  ", &self.x[13])
-            .field("r14 / a4  ", &self.x[14])
-            .field("r15 / a5  ", &self.x[15])
-            .field("r16 / a6  ", &self.x[16])
-            .field("r17 / a7  ", &self.x[17])
-            .field("r18 / s2  ", &self.x[18])
-            .field("r19 / s3  ", &self.x[19])
-            .field("r20 / s4  ", &self.x[20])
-            .field("r21 / s5  ", &self.x[21])
-            .field("r22 / s6  ", &self.x[22])
-            .field("r23 / s7  ", &self.x[23])
-            .field("r24 / s8  ", &self.x[24])
-            .field("r25 / s9  ", &self.x[25])
-            .field("r26 / s10 ", &self.x[26])
-            .field("r27 / s11 ", &self.x[27])
-            .field("r28 / t3  ", &self.x[28])
-            .field("r29 / t4  ", &self.x[29])
-            .field("r30 / t5  ", &self.x[30])
-            .field("r31 / t6  ", &self.x[31])
+            .field("r0 /zero", &self.x[0])
+            .field("r1  / ra", &self.x[1])
+            .field("r2  / sp", &self.x[2])
+            .field("r3  / gp", &self.x[3])
+            .field("r4  / tp", &self.x[4])
+            .field("r5  / t0", &self.x[5])
+            .field("r6  / t1", &self.x[6])
+            .field("r7  / t2", &self.x[7])
+            .field("r8  / s0", &self.x[8])
+            .field("r9  / s1", &self.x[9])
+            .field("r10 / a0", &self.x[10])
+            .field("r11 / a1", &self.x[11])
+            .field("r12 / a2", &self.x[12])
+            .field("r13 / a3", &self.x[13])
+            .field("r14 / a4", &self.x[14])
+            .field("r15 / a5", &self.x[15])
+            .field("r16 / a6", &self.x[16])
+            .field("r17 / a7", &self.x[17])
+            .field("r18 / s2", &self.x[18])
+            .field("r19 / s3", &self.x[19])
+            .field("r20 / s4", &self.x[20])
+            .field("r21 / s5", &self.x[21])
+            .field("r22 / s6", &self.x[22])
+            .field("r23 / s7", &self.x[23])
+            .field("r24 / s8", &self.x[24])
+            .field("r25 / s9", &self.x[25])
+            .field("r26 /s10", &self.x[26])
+            .field("r27 /s11", &self.x[27])
+            .field("r28 / t3", &self.x[28])
+            .field("r29 / t4", &self.x[29])
+            .field("r30 / t5", &self.x[30])
+            .field("r31 / t6", &self.x[31])
             .field("sstatus", &self.sstatus)
             .field("sepc", &self.sepc)
             .field("kernel_sp", &self.kernel_sp)
-            .field("kernel_ra", &self.kernel_ra)
-            .field("kernel_reg", &self.kernel_reg)
-            .field("kernel_fp", &self.kernel_fp)
-            .field("kernel_tp", &self.kernel_tp)
-            .finish()
+            .finish()?;
+        if self.freg.user_fx.iter().any(|x| *x != 0f64) {
+            write!(f, "\nFloat Register: {:?}", self.freg)?;
+        } else {
+            write!(f, "\nFloat Register: Empty")?;
+        }
+        core::fmt::Result::Ok(())
     }
 }
 
@@ -266,6 +268,7 @@ impl ArchTrapContext for TrapContext {
         self[A1] = argv;
         self[A2] = envp;
         let mut sstatus = MySstatus::read();
+        self.freg = UserFloatContext::new();
         sstatus.set_spp(SPP::User);
         self.sstatus = sstatus;
     }

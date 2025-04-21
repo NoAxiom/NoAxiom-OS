@@ -10,6 +10,7 @@
     "async",
     "qemu",
     "glibc",
+    "busybox",
     "log_print",
     "debug_sig"
   ],
