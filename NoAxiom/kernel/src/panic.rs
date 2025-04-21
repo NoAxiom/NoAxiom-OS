@@ -13,6 +13,11 @@ lazy_static::lazy_static! {
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
     println!("[PANIC] kernel triggered panic!!!");
+    #[cfg(feature = "debug_sig")]
+    println!(
+        "[PANIC] during syscall {:?}",
+        crate::syscall::syscall::CURRENT_SYSCALL.lock()
+    );
     if let Some(task) = current_cpu().task.as_ref() {
         let cx = task.trap_context();
         info!("[PANIC] cx detected: {:#x?}", cx);

@@ -10,7 +10,8 @@
     "async",
     "qemu",
     "glibc",
-    "log_print"
+    "log_print",
+    "debug_sig"
   ],
   "C_Cpp_Runner.cCompilerPath": "gcc",
   "C_Cpp_Runner.cppCompilerPath": "g++",

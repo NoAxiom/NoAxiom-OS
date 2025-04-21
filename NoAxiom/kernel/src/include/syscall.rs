@@ -290,6 +290,10 @@ pub enum SyscallID {
 
     // loongarch specific syscall
     SYS_STATX = 291,
+
+    // for debug
+    #[cfg(feature = "debug_sig")]
+    NO_SYSCALL = 0xFFFF,
 }
 
 impl SyscallID {

@@ -13,6 +13,9 @@ pub struct Syscall<'a> {
     pub task: &'a Arc<Task>,
 }
 
+#[cfg(feature = "debug_sig")]
+pub static CURRENT_SYSCALL: ksync::mutex::SpinLock<SyscallID> = ksync::mutex::SpinLock::new(SyscallID::NO_SYSCALL);
+
 impl<'a> Syscall<'a> {
     pub fn new(task: &'a Arc<Task>) -> Self {
         Self { task }
@@ -31,6 +34,10 @@ impl<'a> Syscall<'a> {
             error!("invalid syscall id: {}", id);
             Errno::ENOSYS
         })?;
+
+        #[cfg(feature = "debug_sig")]
+        { *CURRENT_SYSCALL.lock() = id; }
+
         if id.is_debug_on() {
             info!("[syscall] id: {:?}, args: {:X?}", id, args);
         }
@@ -190,9 +197,11 @@ impl Task {
         let res = Syscall::new(self)
             .syscall(cx.get_syscall_id(), cx.get_syscall_args())
             .await;
-        match res {
+        let ret = match res {
             Ok(res) => res,
             Err(errno) => {
+                #[cfg(feature = "debug_sig")]
+                error!("during {:?}",CURRENT_SYSCALL.lock());
                 error!("syscall error: {:?}", errno);
                 let errno = errno as isize;
                 match errno > 0 {
@@ -200,6 +209,9 @@ impl Task {
                     false => errno,
                 }
             }
-        }
+        };
+        #[cfg(feature = "debug_sig")]
+        { *CURRENT_SYSCALL.lock() = SyscallID::NO_SYSCALL; }
+        ret
     }
 }
