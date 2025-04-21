@@ -6,7 +6,7 @@ use super::{Syscall, SyscallResult};
 use crate::{
     mm::user_ptr::UserPtr,
     time::{
-        clock::{CLOCK_MANAGER, CLOCK_PROCESS_CPUTIME_ID},
+        clock::{ClockId, CLOCK_MANAGER},
         gettime::{get_time_duration, get_time_ms, get_timeval},
         time_info::TMS,
         time_spec::TimeSpec,
@@ -38,39 +38,46 @@ impl Syscall<'_> {
     }
     pub fn sys_clock_gettime(&self, clockid: usize, tp: usize) -> SyscallResult {
         let ts = UserPtr::<TimeSpec>::from(tp);
+        let clockid = ClockId::from_repr(clockid).ok_or(Errno::EINVAL)?;
         info!(
-            "[sys_clock_gettime] clock_id: {}, ts_addr: {:#x}",
+            "[sys_clock_gettime] clock_id: {:?}, ts_addr: {:#x}",
             clockid,
             ts.addr_usize(),
         );
-        if clockid == CLOCK_PROCESS_CPUTIME_ID {
-            let task = self.task;
-            let mut user_time = Duration::ZERO;
-            let mut sys_time = Duration::ZERO;
-            for (_tid, task) in task.thread_group().0.iter() {
-                if let Some(task) = task.upgrade() {
-                    let tcb = task.tcb();
-                    user_time += tcb.time_stat.utime();
-                    sys_time += tcb.time_stat.stime();
+        use ClockId::*;
+        match clockid {
+            CLOCK_PROCESS_CPUTIME_ID => {
+                let task = self.task;
+                let mut cpu_time = Duration::ZERO;
+                for (_tid, task) in task.thread_group().0.iter() {
+                    if let Some(task) = task.upgrade() {
+                        let tcb = task.tcb();
+                        cpu_time += tcb.time_stat.cpu_time();
+                    }
                 }
-            }
-            let cpu_time = user_time + sys_time;
-            trace!("[sys_clock_gettime] get process cpu time: {:?}", cpu_time);
-            ts.write(TimeSpec::from(cpu_time));
-            return Ok(0);
-        }
-        match CLOCK_MANAGER.lock().0.get(&clockid) {
-            Some(clock) => {
-                let dev_time = get_time_duration();
-                let clock_time = dev_time + *clock;
-                trace!("[sys_clock_gettime] get time {:?}", clock_time);
-                ts.write(TimeSpec::from(clock_time));
+                trace!("[sys_clock_gettime] get process cpu time: {:?}", cpu_time);
+                ts.write(TimeSpec::from(cpu_time));
                 return Ok(0);
             }
-            None => {
-                error!("[sys_clock_gettime] Cannot find the clock: {}", clockid);
-                return Err(Errno::EINVAL);
+            CLOCK_THREAD_CPUTIME_ID => {
+                let cpu_time = self.task.tcb().time_stat.cpu_time();
+                trace!("[sys_clock_gettime] get process cpu time: {:?}", cpu_time);
+                ts.write(TimeSpec::from(cpu_time));
+                return Ok(0);
             }
+            _ => match CLOCK_MANAGER.lock().0.get(&clockid) {
+                Some(clock) => {
+                    let dev_time = get_time_duration();
+                    let clock_time = dev_time + *clock;
+                    trace!("[sys_clock_gettime] get time {:?}", clock_time);
+                    ts.write(TimeSpec::from(clock_time));
+                    return Ok(0);
+                }
+                None => {
+                    error!("[sys_clock_gettime] Cannot find the clock: {:?}", clockid);
+                    return Err(Errno::EINVAL);
+                }
+            },
         }
     }
 }
