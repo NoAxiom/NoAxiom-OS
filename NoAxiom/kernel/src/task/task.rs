@@ -1,7 +1,6 @@
 //! # Task
 
 use alloc::{
-    borrow::ToOwned,
     string::String,
     sync::{Arc, Weak},
     vec::Vec,
@@ -81,15 +80,15 @@ type ThreadOnly<T> = SyncUnsafeCell<T>;
 /// so there's no need to use any lock in this struct
 #[repr(align(64))]
 pub struct PCB {
+    // task status
+    pub status: TaskStatus,  // task status
+    pub exit_code: ExitCode, // exit code
+
     // paternity
     // assertion: only when the task is group leader, it can have children
     pub children: Vec<Arc<Task>>,        // children tasks
     pub zombie_children: Vec<Arc<Task>>, // zombie children
     pub parent: Option<Weak<Task>>,      // parent task, weak ptr
-
-    // task status
-    pub status: TaskStatus,  // task status
-    pub exit_code: ExitCode, // exit code
 
     // signal structs
     pub pending_sigs: SigPending,        // pending signals
@@ -144,8 +143,9 @@ pub struct Task {
     waker: Once<Waker>,               // waker for the task
 
     // immutable
-    tid: Immutable<TidTracer>, // task id, with lifetime holded
-    tgid: Immutable<TGID>,     // task group id, aka pid
+    tid: Immutable<TidTracer>,              // task id, with lifetime holded
+    tgid: Immutable<TGID>,                  // task group id, aka pid
+    tg_leader: Immutable<Once<Weak<Task>>>, // thread group leader
 
     // shared
     fd_table: SharedMut<FdTable>,         // file descriptor table
@@ -232,13 +232,14 @@ impl Task {
         *self.pgid.lock() = pgid;
         // self.pgid = SharedMutable::new(pgid);
     }
-    pub fn get_tg_leader(&self) -> Weak<Task> {
-        self.thread_group
-            .lock()
-            .0
-            .get(&self.tgid)
-            .unwrap()
-            .to_owned()
+    pub fn set_self_as_tg_leader(self: &Arc<Self>) {
+        self.tg_leader.call_once(|| Arc::downgrade(self));
+    }
+    pub fn set_tg_leader(&self, task: &Arc<Self>) {
+        self.tg_leader.call_once(|| Arc::downgrade(task));
+    }
+    pub fn get_tg_leader(&self) -> Arc<Task> {
+        self.tg_leader.get().unwrap().upgrade().unwrap()
     }
 
     /// check if the task is group leader
@@ -392,12 +393,14 @@ impl Task {
             cwd: Shared::new(Path::try_from(String::from("/")).unwrap()),
             sa_list: Shared::new(SigActionList::new()),
             waker: Once::new(),
+            tg_leader: Once::new(),
             tcb: ThreadOnly::new(TCB {
                 ..Default::default()
             }),
         });
         task.trap_context_mut()[TrapArgs::SP] -= 16;
         task.thread_group().insert(&task);
+        task.tg_leader.call_once(|| Arc::downgrade(&task));
         TASK_MANAGER.insert(&task);
         PROCESS_GROUP_MANAGER.insert_new_group(&task);
         info!("[spawn] new task spawn complete, tid {}", task.tid.0);
@@ -570,11 +573,13 @@ impl Task {
                 cwd: self.cwd.clone(),
                 sa_list,
                 waker: Once::new(),
+                tg_leader: Once::new(),
                 tcb: ThreadOnly::new(TCB {
                     ..Default::default()
                 }),
             });
-            self.thread_group.lock().insert(&new_thread);
+            new_thread.set_tg_leader(self);
+            new_thread.thread_group.lock().insert(&new_thread);
             new_thread
         } else {
             // fork as a new process
@@ -588,7 +593,7 @@ impl Task {
                 pgid: Shared::new(new_pgid),
                 thread_group: Shared::new(ThreadGroup::new()),
                 pcb: Mutable::new(PCB {
-                    parent: Some(self.get_tg_leader()),
+                    parent: Some(Arc::downgrade(self)),
                     ..Default::default()
                 }),
                 memory_set,
@@ -598,14 +603,19 @@ impl Task {
                 cwd: Shared::new(self.cwd().clone()),
                 sa_list,
                 waker: Once::new(),
+                tg_leader: Once::new(),
                 tcb: ThreadOnly::new(TCB {
                     ..Default::default()
                 }),
             });
             new_process.thread_group().insert(&new_process);
+            new_process.set_self_as_tg_leader();
+            self.get_tg_leader()
+                .pcb()
+                .children
+                .push(new_process.clone());
             TASK_MANAGER.insert(&new_process);
             PROCESS_GROUP_MANAGER.insert_process(new_pgid, &new_process);
-            self.pcb().children.push(new_process.clone());
             new_process
         };
         res
