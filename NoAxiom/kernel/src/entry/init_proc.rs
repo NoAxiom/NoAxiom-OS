@@ -37,9 +37,9 @@ pub fn schedule_spawn_with_kernel_app() {
             }
             const INIT_PROC_NAME: &str = $name;
             #[cfg(feature = "glibc")]
-            const INIT_PROC_PATH: &str = concat!("/glibc/", $name);
+            const INIT_PROC_PATH: &str = "/glibc";
             #[cfg(not(feature = "glibc"))]
-            const INIT_PROC_PATH: &str = concat!("/musl/", $name);
+            const INIT_PROC_PATH: &str = "/musl";
         };
     }
     use_app!("run_busybox");
@@ -58,8 +58,7 @@ pub fn schedule_spawn_with_kernel_app() {
         let file_data = Vec::from(unsafe { core::slice::from_raw_parts(start as *const u8, size) });
         let elf = MemorySet::load_from_vec(file_data).await.unwrap();
         let task = Task::new_process(elf);
-        let path = Path::from_or_create(INIT_PROC_PATH.to_string(), InodeMode::FILE).await;
-        let path = path.from_cd("..").expect("directory not found");
+        let path = Path::from_or_create(INIT_PROC_PATH.to_string(), InodeMode::DIR).await;
         let mut guard = task.cwd();
         *guard = path;
         drop(guard);

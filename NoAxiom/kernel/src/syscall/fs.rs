@@ -32,7 +32,7 @@ impl Syscall<'_> {
         }
 
         let cwd = self.task.cwd().clone();
-        let cwd_str = cwd.as_string();
+        let cwd_str = format!("{}\0", cwd.as_str());
         let cwd_bytes = cwd_str.as_bytes();
 
         info!("[sys_getcwd] buf: {:?}, size: {}, cwd:{:?}", buf, size, cwd);
@@ -272,8 +272,10 @@ impl Syscall<'_> {
             iov_ptr.as_slice_mut_checked(Iovec::size()).await?;
 
             let iov = iov_ptr.read();
-            let buf_ptr = UserPtr::<u8>::new(iov.iov_base);
-            let buf_slice = buf_ptr.as_slice_mut_checked(iov.iov_len).await?;
+            // let buf_ptr = UserPtr::<u8>::new(iov.iov_base);
+            // let buf_slice = buf_ptr.as_slice_mut_checked(iov.iov_len).await?;
+            let buf_slice =
+                unsafe { core::slice::from_raw_parts(iov.iov_base as *const u8, iov.iov_len) };
             write_size += file.write(buf_slice).await?;
         }
         Ok(write_size)

@@ -94,6 +94,10 @@ impl Path {
     pub fn as_string(&self) -> String {
         self.inner.clone()
     }
+
+    pub fn as_str(&self) -> &str {
+        self.inner.as_str()
+    }
 }
 
 impl Debug for Path {
