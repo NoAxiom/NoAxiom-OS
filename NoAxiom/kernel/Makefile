@@ -25,6 +25,7 @@ DEV :=
 SH := 
 RAMDISK :=
 log_print := 
+DEBUG_SIG := 1
 
 ifneq ($(MULTICORE), 1)
 	FEATURES += multicore
@@ -84,6 +85,10 @@ endif
 
 ifneq ($(log_print), )
 	FEATURES += log_print
+endif
+
+ifneq ($(DEBUG_SIG), )
+	FEATURES += debug_sig
 endif
 
 ifneq ($(ASYNC), )
