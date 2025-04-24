@@ -7,7 +7,7 @@ use alloc::{
 };
 use core::{marker::PhantomData, ptr::null, task::Waker};
 
-use arch::{Arch, ArchFull, ArchTrapContext, TrapArgs, TrapContext};
+use arch::{Arch, ArchFull, ArchMemory, ArchTrapContext, TrapArgs, TrapContext};
 use config::fs::ROOT_NAME;
 use ksync::{
     cell::SyncUnsafeCell,
@@ -534,6 +534,7 @@ impl Task {
             self.memory_set().clone()
         } else {
             let (ms, _) = self.memory_set().lock().clone_cow();
+            Arch::tlb_flush();
             Shared::new(ms)
         };
 
