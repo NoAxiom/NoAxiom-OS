@@ -5,7 +5,7 @@ use crate::{
     constant::banner::NOAXIOM_BANNER,
     cpu::get_hartid,
     driver,
-    entry::init_proc::schedule_spawn_with_kernel_app,
+    entry::init_proc::schedule_spawn_with_path,
     fs::{self},
     mm::{
         bss::bss_init,
@@ -76,7 +76,7 @@ pub extern "C" fn _boot_hart_init(_hartid: usize, dtb: usize) -> ! {
     // spawn init_proc and wake other harts
     // crate::entry::init_proc::schedule_spawn_all_apps();
     ktime_init();
-    schedule_spawn_with_kernel_app();
+    schedule_spawn_with_path();
     wake_other_hart(get_hartid());
 
     // main

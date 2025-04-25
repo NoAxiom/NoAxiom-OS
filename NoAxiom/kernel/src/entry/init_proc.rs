@@ -13,11 +13,15 @@ use crate::{
 /// spawn init process
 #[allow(unused)]
 pub fn schedule_spawn_with_path() {
-    const INIT_PROC_PATH: &str = "init_proc";
-    info!("[init] spawn initproc with path = {}", INIT_PROC_PATH);
+    println!(
+        "[kernel] spawn initproc with app name = {}, path = {}",
+        INIT_PROC_NAME, ROOT_NAME
+    );
     spawn_ktask(async move {
-        // new process must be EXECUTABLE file, not directory
-        let path = Path::from_or_create(INIT_PROC_PATH.to_string(), InodeMode::FILE).await;
+        let path_str = format!("{}/{}", ROOT_NAME, INIT_PROC_NAME);
+        let path = Path::from_or_create(path_str, InodeMode::FILE).await;
+        let file = path.dentry().open().unwrap();
+        file.write(&get_file()).await.unwrap();
         let elf = MemorySet::load_from_path(path.clone()).await.unwrap();
         let task = Task::new_process(elf).await;
         spawn_utask(task);
@@ -45,16 +49,20 @@ pub fn schedule_spawn_with_kernel_app() {
         INIT_PROC_NAME, ROOT_NAME
     );
     spawn_ktask(async move {
-        let start = app_start as usize;
-        let end = app_end as usize;
-        let size = end - start;
-        debug!(
-            "[kernel_app] start: {:#x}, end: {:#x}, size: {}",
-            start, end, size
-        );
-        let file_data = Vec::from(unsafe { core::slice::from_raw_parts(start as *const u8, size) });
+        let file_data = get_file();
         let elf = MemorySet::load_from_vec(file_data).await.unwrap();
         let task = Task::new_process(elf).await;
         spawn_utask(task);
     });
+}
+
+fn get_file() -> Vec<u8> {
+    let start = app_start as usize;
+    let end = app_end as usize;
+    let size = end - start;
+    debug!(
+        "[kernel_app] start: {:#x}, end: {:#x}, size: {}",
+        start, end, size
+    );
+    Vec::from(unsafe { core::slice::from_raw_parts(start as *const u8, size) })
 }
