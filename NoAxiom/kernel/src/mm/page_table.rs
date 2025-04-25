@@ -26,17 +26,6 @@ pub struct PageTable {
 }
 
 impl PageTable {
-    /// create a new page table without any allocation
-    /// SAFETY: this function is only act as a placeholder,
-    /// don't really use this to construct a page table
-    pub fn new_bare() -> Self {
-        PageTable {
-            root_ppn: PhysPageNum(0),
-            frames: Vec::new(),
-            is_kernel: false,
-        }
-    }
-
     /// create a new page table,
     /// with allocating a frame for root node
     /// used in raw memory_set initialization
@@ -149,8 +138,8 @@ impl PageTable {
 
     /// translate vpn into pte
     /// returns None if nothing is mapped
-    pub fn translate_vpn(&self, vpn: VirtPageNum) -> Option<PageTableEntry> {
-        self.find_pte(vpn).map(|pte| *pte)
+    pub fn translate_vpn(&self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
+        self.find_pte(vpn)
     }
 
     /// translate va into pa

@@ -14,7 +14,7 @@ use crate::{
         memory_set::{kernel_space_activate, kernel_space_init},
     },
     sched::{runtime, utils::block_on},
-    time::{clock::ktime_init, sleep::current_sleep_manager},
+    time::{clock::ktime_init, sleep::sleep_handler},
 };
 
 /// awake other core
@@ -58,9 +58,9 @@ pub extern "C" fn _boot_hart_init(_hartid: usize, dtb: usize) -> ! {
     Arch::arch_init();
     driver::log_init();
     #[cfg(feature = "multicore")]
-    info!("[first_init] multicore(on): CPU_NUM = {}", CPU_NUM);
+    println!("multicore(on): CPU_NUM = {}", CPU_NUM);
     #[cfg(not(feature = "multicore"))]
-    info!("[first_init] multicore(off): CPUNUM = {}", CPU_NUM);
+    println!("multicore(off): CPU_NUM = {}", CPU_NUM);
 
     // kernel space init
     frame_init();
@@ -92,9 +92,9 @@ pub extern "C" fn _boot_hart_init(_hartid: usize, dtb: usize) -> ! {
 /// run_tasks: only act as a task runner
 #[no_mangle]
 pub fn run_tasks() -> ! {
-    info!("[kernel] hart id {} has been booted", get_hartid());
+    println!("[kernel] hart id {} has been booted", get_hartid());
     loop {
-        current_sleep_manager().sleep_handler();
+        sleep_handler();
         runtime::run();
     }
 }

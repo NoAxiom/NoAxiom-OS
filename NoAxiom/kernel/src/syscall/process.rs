@@ -1,4 +1,4 @@
-use alloc::{string::String, vec::Vec};
+use alloc::vec::Vec;
 
 use arch::TrapArgs;
 use config::fs::ROOT_NAME;
@@ -54,6 +54,7 @@ impl Syscall<'_> {
         );
         use TrapArgs::*;
         if stack != 0 {
+            // fixme: maybe we should update stack area in memoryspace?
             new_cx[SP] = stack;
         }
         if flags.contains(CloneFlags::SETTLS) {
@@ -83,16 +84,16 @@ impl Syscall<'_> {
 
         // args and envs init
         if path.contains(".sh") {
-            path = format!("{}/busybox", ROOT_NAME);
-            args.push(String::from("busybox"));
-            args.push(String::from("sh"));
+            path = format!("busybox");
+            args.push(format!("busybox"));
+            args.push(format!("sh"));
         } else if path.ends_with("ls") || path.ends_with("sleep") {
             debug!("executing ls or sleep");
-            path = format!("{}/busybox", ROOT_NAME);
-            args.push(String::from("busybox"));
+            path = format!("busybox");
+            args.push(format!("busybox"));
         }
-        envs.push(format!("PATH={}", ROOT_NAME));
-        envs.push(format!("LD_LIBRARY_PATH={}", ROOT_NAME));
+        // envs.push(format!("PATH={ROOT_NAME}"));
+        // envs.push(format!("LD_LIBRARY_PATH={ROOT_NAME}"));
 
         let file_path = if !path.starts_with('/') {
             let cwd = self.task.cwd();

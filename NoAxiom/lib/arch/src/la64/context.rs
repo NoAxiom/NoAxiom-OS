@@ -1,4 +1,4 @@
-use core::{arch::global_asm, ops::{Index, IndexMut}};
+use core::ops::{Index, IndexMut};
 
 use loongArch64::register::{euen, prmd};
 
@@ -6,6 +6,7 @@ use crate::{ArchTrapContext, ArchUserFloatContext, TrapArgs};
 
 /// Saved registers when a trap (interrupt or exception) occurs.
 #[repr(C)]
+#[repr(align(64))]
 #[derive(Debug, Default, Clone, Copy)]
 pub struct TrapContext {
     /// [0~31]/[0~255]: General Registers

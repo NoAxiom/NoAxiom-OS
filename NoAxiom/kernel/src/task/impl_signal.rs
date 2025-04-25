@@ -1,4 +1,4 @@
-use alloc::sync::Arc;
+use alloc::{sync::Arc, vec::Vec};
 use core::mem::size_of;
 
 use arch::{consts::HIGH_ADDR_OFFSET, ArchTrapContext, ArchUserFloatContext, TrapArgs};
@@ -31,10 +31,14 @@ impl Task {
             return None;
         }
         let old_mask = pcb.pending_sigs.sig_mask.clone();
+        let mut pending = Vec::new();
         while let Some(si) = pcb.pending_sigs.pop_with_mask(old_mask) {
             trace!("[check_signal] find a signal {}", si.signo);
-            // successfully recived signal, handle it
-            let sa_list = self.sa_list();
+            pending.push(si);
+        }
+        drop(pcb);
+        let sa_list = self.sa_list();
+        for si in pending {
             let signum = SigNum::from(si.signo);
             let action = sa_list.get(signum).unwrap().clone();
             info!(
@@ -47,7 +51,8 @@ impl Task {
                 SAHandlerType::Stop => self.sig_default_stop(),
                 SAHandlerType::Continue => self.sig_default_continue(),
                 SAHandlerType::User { handler } => {
-                    info!("[handle_signal] start to handle user sigaction");
+                    let mut pcb = self.pcb();
+                    info!("[handle_signal] start to handle user sigaction, signum: {}, handler: {:#x}", si.signo, handler);
                     if !action.flags.contains(SAFlags::SA_NODEFER) {
                         pcb.pending_sigs.sig_mask.enable(si.signo as u32);
                     };
@@ -187,6 +192,7 @@ impl Task {
     fn sig_default_terminate(&self) {
         debug!("[sig_default_terminate] terminate the process");
         self.terminate_group(ExitCode::default());
+        debug!("[sig_default_terminate] terminate the process done");
     }
     /// stop the process
     fn sig_default_stop(&self) {

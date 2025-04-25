@@ -40,8 +40,8 @@ use_app!("run_busybox");
 
 #[allow(unused)]
 pub fn schedule_spawn_with_kernel_app() {
-    info!(
-        "[init] spawn initproc with app name = {}, path = {}",
+    println!(
+        "[kernel] spawn initproc with app name = {}, path = {}",
         INIT_PROC_NAME, ROOT_NAME
     );
     spawn_ktask(async move {

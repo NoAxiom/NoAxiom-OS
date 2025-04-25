@@ -10,7 +10,7 @@ use ksync::mutex::check_no_lock;
 
 use crate::{
     cpu::current_cpu,
-    sched::utils::{suspend_now, take_waker, yield_now},
+    sched::utils::{suspend_now, take_waker},
     task::{status::TaskStatus, Task},
     time::gettime::get_time_us,
     trap::handler::user_trap_handler,
@@ -68,7 +68,7 @@ pub async fn task_main(task: Arc<Task>) {
         trace!("[task_main] trap_restore, cx: {:#x?}", task.trap_context());
         task.tcb_mut().time_stat.record_trap_in();
         let cx = task.trap_context_mut();
-        Arch::trap_restore(cx);
+        Arch::trap_restore(cx); // restore context and return to user mode
         let trap_type = Arch::read_trap_type(Some(cx));
         task.tcb_mut().time_stat.record_trap_out();
 
@@ -76,15 +76,15 @@ pub async fn task_main(task: Arc<Task>) {
         assert!(check_no_lock());
         let mut pcb = task.pcb();
         if let Some(old_mask) = old_mask.take() {
-            debug!(
-                "reset mask from {:?} to {:?}",
-                pcb.pending_sigs.sig_mask, old_mask
-            );
+            trace!("clear sigmask {:?}", pcb.pending_sigs.sig_mask);
             pcb.pending_sigs.sig_mask = old_mask;
         }
         match pcb.status() {
             TaskStatus::Terminated => break,
-            TaskStatus::Stopped => suspend_now(pcb).await,
+            TaskStatus::Stopped => {
+                warn!("[task_main] task is stopped(1), tid: {}", task.tid());
+                suspend_now(pcb).await;
+            }
             _ => drop(pcb),
         }
         assert!(check_no_lock());
@@ -102,20 +102,13 @@ pub async fn task_main(task: Arc<Task>) {
         let pcb = task.pcb();
         match pcb.status() {
             TaskStatus::Terminated => break,
-            TaskStatus::Stopped => suspend_now(pcb).await,
+            TaskStatus::Stopped => {
+                warn!("[task_main] task is stopped(2), tid: {}", task.tid());
+                suspend_now(pcb).await;
+            }
             _ => drop(pcb),
         }
         assert!(check_no_lock());
-
-        // check if need schedule
-        if task.tcb().time_stat.need_schedule() {
-            trace!(
-                "task {} yield by time = {:?}",
-                task.tid(),
-                task.tcb().time_stat,
-            );
-            yield_now().await;
-        }
 
         // check signal before return to user
         trace!("[task_main] check_signal");
@@ -124,7 +117,10 @@ pub async fn task_main(task: Arc<Task>) {
         let pcb = task.pcb();
         match pcb.status() {
             TaskStatus::Terminated => break,
-            TaskStatus::Stopped => suspend_now(pcb).await,
+            TaskStatus::Stopped => {
+                warn!("[task_main] task is stopped(3), tid: {}", task.tid());
+                suspend_now(pcb).await;
+            }
             _ => drop(pcb),
         }
         assert!(check_no_lock());

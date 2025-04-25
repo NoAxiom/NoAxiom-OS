@@ -98,30 +98,4 @@ impl SigSet {
         let signum = signum - 1;
         self.contains(SigSet::from_bits_truncate(1 << signum))
     }
-    pub fn try_fetch(&self) -> Option<u32> {
-        // todo: use lowbit?
-        let mut signum = 1;
-        while signum < MAX_SIGNUM {
-            if self.contain_signum(signum) {
-                return Some(signum);
-            }
-            signum += 1;
-        }
-        None
-        // match self.is_empty() {
-        //     true => None,
-        //     false =>
-        // Some(crate::utils::lowbit::lowbit(self.bits()).trailing_zeros() + 1),
-        // }
-    }
-}
-
-#[repr(usize)]
-#[allow(non_camel_case_types)]
-#[derive(PartialEq, Eq, Copy, Clone, Debug)]
-pub enum SigMaskFlags {
-    SIG_BLOCK = 0,
-    SIG_UNBLOCK = 1,
-    SIG_SETMASK = 2,
-    UNKNOWN,
 }

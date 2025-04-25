@@ -39,7 +39,7 @@ impl<'a> Syscall<'a> {
         { *CURRENT_SYSCALL.lock() = id; }
 
         if id.is_debug_on() {
-            info!("[syscall] id: {:?}, args: {:X?}", id, args);
+            println!("[syscall] tid: {}, id: {:?}, args: {:X?}", self.task.tid(), id, args);
         }
         use SyscallID::*;
         #[rustfmt::skip]
@@ -146,7 +146,7 @@ impl<'a> Syscall<'a> {
             SYS_SIGSUSPEND =>   self.sys_sigsuspend(args[0]).await,
 
             // mm
-            SYS_MEMBARRIER =>   Self::empty_syscall("membarrier", 0),
+            SYS_MEMBARRIER =>   Self::empty_syscall("membarrier", 0), // fixme: should impl this in multicore
             SYS_MADVISE =>      Self::empty_syscall("madvise", 0),
             SYS_BRK =>          self.sys_brk(args[0]),
             SYS_MMAP =>         self.sys_mmap(args[0],args[1],args[2],args[3],args[4] as isize, args[5]),

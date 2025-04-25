@@ -123,7 +123,7 @@ impl From<PTEFlags> for MappingFlags {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct PageTableEntry(pub usize);
 
 impl Into<usize> for PageTableEntry {

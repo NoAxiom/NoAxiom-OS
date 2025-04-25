@@ -2,7 +2,7 @@ use alloc::sync::Arc;
 
 use super::Task;
 use crate::{
-    config::mm::USER_HEAP_LIMIT,
+    config::mm::USER_HEAP_SIZE,
     include::{
         mm::{MmapFlags, MmapProts},
         result::Errno,
@@ -13,32 +13,48 @@ use crate::{
 };
 
 impl Task {
+    /// [`crate::mm::memory_set::MemorySet::lazy_alloc_brk`]
     pub fn grow_brk(self: &Arc<Self>, new_brk: usize) -> SyscallResult {
-        let mut memory_set = self.memory_set().lock();
-        let grow_size = new_brk - memory_set.brk.end;
+        let mut ms = self.memory_set().lock();
         info!(
-            "[grow_brk] start: {:#x}, old_brk: {:#x}, new_brk: {:#x}, grow_size: {:#x}",
-            memory_set.brk.start, memory_set.brk.end, new_brk, grow_size
+            "[grow_brk] {} start: {:#x}, old_brk: {:#x}, new_brk: {:#x}",
+            if new_brk > ms.brk.end {
+                "grow"
+            } else {
+                "shrink"
+            },
+            ms.brk.start,
+            ms.brk.end,
+            new_brk,
         );
-        if grow_size > 0 {
-            trace!("[grow_brk] expanded");
-            let growed_addr: usize = memory_set.brk.end + grow_size as usize;
-            let limit = memory_set.brk.start + USER_HEAP_LIMIT;
-            if growed_addr > limit {
+
+        if new_brk > ms.brk.end {
+            if new_brk > ms.brk.start + USER_HEAP_SIZE {
                 return_errno!(Errno::ENOMEM);
             }
-            memory_set.brk.end = growed_addr;
+            ms.brk.end = new_brk;
         } else {
-            trace!("[grow_brk] shrinked");
-            if new_brk < memory_set.brk.start {
+            if new_brk < ms.brk.start {
                 return_errno!(Errno::EINVAL);
             }
-            memory_set.brk.end = new_brk;
+            ms.brk.end = new_brk;
         }
-        memory_set.brk_grow(VirtAddr(new_brk).ceil());
-        Ok(memory_set.brk.end as isize)
+        ms.brk_grow(VirtAddr(new_brk).ceil());
+        let brk_end = ms.brk.end;
+
+        // for debug
+        let range = ms.brk.area.vpn_range.clone();
+        drop(ms);
+        for vpn in range {
+            let ptr = vpn.as_va_usize() as *const u8;
+            let value = unsafe { ptr.read_volatile() };
+            debug!("[brk] ptr: {:#x}, value: {:#x}", ptr as usize, value);
+        }
+
+        Ok(brk_end as isize)
     }
 
+    /// [`crate::mm::memory_set::lazy_alloc_mmap`]
     pub fn mmap(
         &self,
         addr: usize,
@@ -78,8 +94,8 @@ impl Task {
 
         // push mmap range (without immediate mapping)
         debug!(
-            "[mmap] start_va: {:#x}, length: {:#x}, prot: {:?}, flags: {:?}, fd: {}, offset: {:#x}",
-            start_va.0, length, prot, flags, fd, offset
+            "[mmap] addr: {:#x}, start_va: {:#x}, length: {:#x}, prot: {:?}, flags: {:?}, fd: {}, offset: {:#x}",
+            addr, start_va.0, length, prot, flags, fd, offset
         );
         memory_set
             .mmap_manager

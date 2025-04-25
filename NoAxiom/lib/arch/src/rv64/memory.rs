@@ -27,7 +27,7 @@ pub struct PageTable {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct PageTableEntry(pub usize);
 
 impl Into<usize> for PageTableEntry {
@@ -171,5 +171,6 @@ impl ArchMemory for RV64 {
     #[inline(always)]
     fn activate(ppn: usize, _is_kernel: bool) {
         satp::write(8usize << 60 | ppn);
+        sfence_vma_all();
     }
 }

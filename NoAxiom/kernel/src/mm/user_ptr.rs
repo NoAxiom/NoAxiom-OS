@@ -77,7 +77,8 @@ impl<T> UserPtr<T> {
     where
         T: Copy,
     {
-        unsafe { *self.ptr }
+        unsafe { self.ptr.read_volatile() }
+        // unsafe { *self.ptr }
     }
 
     #[inline(always)]
@@ -90,7 +91,8 @@ impl<T> UserPtr<T> {
 
     #[inline(always)]
     pub fn write(&self, value: T) {
-        unsafe { *self.ptr = value };
+        unsafe { self.ptr.write_volatile(value) };
+        // unsafe { *self.ptr = value };
     }
 
     #[inline(always)]

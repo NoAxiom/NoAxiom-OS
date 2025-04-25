@@ -21,10 +21,10 @@ pub const PTE_PER_PAGE: usize = 1 << PAGE_NUM_WIDTH;
 /// user app's stack size: 8MB
 pub const USER_STACK_SIZE: usize = PAGE_SIZE * 2048;
 /// user app's heap size: 120MB
-pub const USER_HEAP_LIMIT: usize = PAGE_SIZE * 30000;
+pub const USER_HEAP_SIZE: usize = PAGE_SIZE * 30000;
 
 /// mmap start address
-pub const MMAP_BASE_ADDR: usize = 0x6000_0000;
+pub const MMAP_BASE_ADDR: usize = 0x6_0000_0000;
 /// mmap area max size
 pub const MMAP_MAX_SIZE: usize = 0x1000_0000;
 /// mmap max_end address

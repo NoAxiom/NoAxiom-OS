@@ -47,11 +47,9 @@ impl Syscall<'_> {
         if addr % PAGE_SIZE != 0 || length == 0 {
             return Err(Errno::EINVAL);
         }
-        let res = self
-            .task
+        self.task
             .mmap(addr, length, prot, flags, fd, offset)
-            .map(|addr| addr as isize);
-        res
+            .map(|addr| addr as isize)
     }
 
     pub fn sys_munmap(&self, start: usize, length: usize) -> SyscallResult {
@@ -87,11 +85,12 @@ impl Syscall<'_> {
 
         for vpn in vpn_range {
             if let Some(pte) = page_table.find_pte(vpn) {
+                let old_flags = pte.flags();
                 let flags = pte.flags().union(mapping_flags);
                 pte.set_flags(flags);
-                trace!(
-                    "[sys_mprotect] set flags in page table, vpn: {:#x}, flags: {:?}, pte_raw: {:#x}",
-                    vpn.0, flags, pte.0
+                debug!(
+                    "[sys_mprotect] set flags in page table, vpn: {:#x}, flags: {:?} => {:?}, pte_raw: {:?}",
+                    vpn.0, old_flags, flags, pte.raw_flag()
                 );
             } else {
                 let task = self.task;

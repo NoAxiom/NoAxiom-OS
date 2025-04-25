@@ -257,7 +257,7 @@ impl Syscall<'_> {
     /// Write iovcnt buffers of data described by iov to the file associated
     /// with the file descriptor fd
     pub async fn sys_writev(&self, fd: usize, iovp: usize, iovcnt: usize) -> SyscallResult {
-        info!(
+        trace!(
             "[sys_writev] fd: {}, iovp: {:#x}, iovcnt: {}",
             fd, iovp, iovcnt
         );

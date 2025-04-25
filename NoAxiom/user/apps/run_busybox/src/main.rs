@@ -7,7 +7,8 @@ use alloc::format;
 
 use libd::{
     lib_basepath::ROOT_NAME,
-    syscall::{execve, fork, wait, yield_},
+    println,
+    syscall::{execve, fork, wait},
 };
 
 #[no_mangle]
@@ -34,12 +35,10 @@ fn main() -> i32 {
         loop {
             let mut exit_code: usize = 0;
             let tid = wait(-1, &mut exit_code);
-            if tid == -1 {
-                yield_();
-                continue;
-            } else {
+            if tid < 0 {
                 break;
             }
+            println!("wait tid: {}, exit_code: {}", tid, exit_code);
         }
     }
     0

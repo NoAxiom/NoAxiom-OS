@@ -61,6 +61,7 @@ impl Syscall<'_> {
 
     pub fn sys_sigreturn(&self) -> SyscallResult {
         use TrapArgs::*;
+        info!("[sigreturn] do signal return");
 
         let task = self.task;
         let cx = task.trap_context_mut();

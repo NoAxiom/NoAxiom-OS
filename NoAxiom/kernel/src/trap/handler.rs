@@ -7,8 +7,13 @@ use arch::{Arch, ArchInt, ArchTrap, TrapArgs, TrapType};
 use super::{ext_int::ext_int_handler, ipi::ipi_handler};
 use crate::{
     cpu::{current_cpu, current_task, get_hartid},
-    sched::utils::block_on,
-    task::{exit::ExitCode, Task},
+    sched::utils::{block_on, yield_now},
+    signal::{
+        sig_detail::SigDetail,
+        sig_info::{SigCode, SigInfo},
+        sig_num::SigNum,
+    },
+    task::Task,
 };
 
 /// kernel trap handler
@@ -61,18 +66,37 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
     assert!(!Arch::is_interrupt_enabled());
     trace!("[trap_handler] call trap handler");
 
+    // check if need schedule
+    if task.tcb().time_stat.need_schedule() {
+        trace!(
+            "task {} yield by time = {:?}",
+            task.tid(),
+            task.tcb().time_stat,
+        );
+        yield_now().await;
+    }
+
     // def: context, user trap pc, trap type
     let cx = task.trap_context_mut();
 
     // user exit when detect unexpected trap
     let user_exit = |msg: &str| {
-        panic!(
+        error!(
             "[user_trap_handler] unexpected exit!!! msg: {}, trap_type: {:#x?}, sepc = {:#x}",
             msg,
             trap_type,
             cx[TrapArgs::EPC],
         );
-        task.terminate(ExitCode::new_raw(-1));
+        task.recv_siginfo(
+            &mut task.pcb(),
+            SigInfo {
+                signo: SigNum::SIGSEGV.into(),
+                code: SigCode::Kernel,
+                errno: 0,
+                detail: SigDetail::None,
+            },
+            false,
+        );
     };
 
     // user trap handler vector

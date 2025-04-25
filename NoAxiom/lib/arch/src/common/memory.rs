@@ -34,7 +34,7 @@ bitflags! {
     }
 }
 
-pub trait ArchPageTableEntry: Into<usize> + From<usize> + Clone + Copy {
+pub trait ArchPageTableEntry: Into<usize> + From<usize> + Clone {
     /// create a new page table entry from ppn and flags
     fn new(ppn: usize, flags: MappingFlags) -> Self;
     /// get the physical page number

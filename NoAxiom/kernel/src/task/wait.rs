@@ -25,6 +25,9 @@ pub struct WaitChildFuture {
 impl WaitChildFuture {
     pub fn new(task: Arc<Task>, pid_type: PidSel, wait_option: WaitOption) -> SysResult<Self> {
         let pcb = task.pcb();
+        if pcb.children.is_empty() && pcb.zombie_children.is_empty() {
+            return Err(Errno::ECHILD);
+        }
         let target = match pid_type {
             PidSel::Task(None) => None,
             PidSel::Task(Some(tgid)) => match pcb.children.iter().find(|task| task.tid() == tgid) {
@@ -33,6 +36,7 @@ impl WaitChildFuture {
             },
             PidSel::Group(_) => return Err(Errno::EINVAL),
         };
+        debug!("wait for child: {:?}", target.as_ref().map(|x| x.tid()));
         drop(pcb);
         Ok(Self {
             task,

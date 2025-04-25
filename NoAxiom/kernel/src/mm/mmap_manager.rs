@@ -1,23 +1,13 @@
-use alloc::{collections::btree_map::BTreeMap, sync::Arc, vec::Vec};
-use core::task::Waker;
-
-use arch::MappingFlags;
-use ksync::mutex::{SpinLock, SpinLockGuard};
+use alloc::{collections::btree_map::BTreeMap, sync::Arc};
 
 use super::{
     address::{VirtAddr, VirtPageNum, VpnRange},
-    frame::{frame_alloc, FrameTracker},
-    memory_set::MemorySet,
+    frame::FrameTracker,
 };
 use crate::{
     config::mm::{MMAP_BASE_ADDR, PAGE_SIZE},
-    cpu::current_task,
     fs::vfs::basic::file::File,
-    include::{
-        mm::{MmapFlags, MmapProts},
-        result::Errno,
-    },
-    sched::utils::{suspend_no_int_now, take_waker},
+    include::mm::{MmapFlags, MmapProts},
     syscall::SysResult,
 };
 
@@ -26,9 +16,6 @@ use crate::{
 pub struct MmapPage {
     /// mmap protection
     pub prot: MmapProts,
-
-    /// mmap flags
-    pub flags: MmapFlags,
 
     /// validity, indicating whether the page is acutally mapped
     pub valid: bool,
@@ -70,20 +57,15 @@ pub struct MmapManager {
 
     /// frame trackers for already allocated mmap pages
     pub frame_trackers: BTreeMap<VirtPageNum, FrameTracker>,
-
-    /// mmap alloc tracer
-    pub alloc_tracer: BTreeMap<VirtPageNum, Vec<Waker>>,
 }
 
 impl Clone for MmapManager {
     fn clone(&self) -> Self {
-        assert!(self.alloc_tracer.is_empty());
         Self {
             mmap_start: self.mmap_start,
             mmap_top: self.mmap_top,
             mmap_map: self.mmap_map.clone(),
             frame_trackers: BTreeMap::new(),
-            alloc_tracer: BTreeMap::new(),
         }
     }
 }
@@ -95,7 +77,6 @@ impl MmapManager {
             mmap_top,
             mmap_map: BTreeMap::new(),
             frame_trackers: BTreeMap::new(),
-            alloc_tracer: BTreeMap::new(),
         }
     }
 
@@ -109,7 +90,7 @@ impl MmapManager {
         start_va: VirtAddr,
         length: usize,
         prot: MmapProts,
-        flags: MmapFlags,
+        _flags: MmapFlags,
         st_offset: usize,
         file: Option<Arc<dyn File>>,
     ) -> usize {
@@ -119,7 +100,6 @@ impl MmapManager {
             // created a mmap page with lazy-mapping
             let mmap_page = MmapPage {
                 prot,
-                flags,
                 valid: false,
                 file: file.clone(),
                 offset,
@@ -144,10 +124,11 @@ impl MmapManager {
 
     /// is a va in mmap space
     pub fn is_in_space(&self, vpn: VirtPageNum) -> bool {
-        self.mmap_map.contains_key(&vpn) || self.alloc_tracer.contains_key(&vpn)
+        self.mmap_map.contains_key(&vpn)
     }
 }
 
+/*
 pub async fn lazy_alloc_mmap<'a>(
     memory_set: &Arc<SpinLock<MemorySet>>,
     vpn: VirtPageNum,
@@ -201,59 +182,5 @@ pub async fn lazy_alloc_mmap<'a>(
         },
     }
 }
-
-/*
-
-几个很麻烦的东西
-
-mmap这玩意可能会读取文件信息
-我不想把这个lazymmap做成blockon的行为
-它会先让权，过一会儿再回来把数据放进去
-那么这个读取文件期间，我们是没有对于memoryset进行lock的
-这个时候会出现munmap发生
-那么就需要进入memoryset.lock再次检查当前mmap区间的合法性
-
-目前打算搞一个妥协的方案, 只在kernel_trap的时候进行block_on的行为
-
-此外munmap的时候需要进行tlb shootdown，防止往已经dealloc的区间进行数据的写入
-这里需要对于IPI进行维护
-鉴于我们已经使用IPI进行了多核负载均衡的请求，还需要额外添加IPI_info的维护
-
-不过我觉得mmap的tlb shootdown没有很大的必要诶？？
-因为这玩意其实并不影响正确性，只是会影响信息到达的时间
-到底要不要发ipi啊 =^=
-
-pub struct LazyAllocMmapFuture<'a> {
-    memory_set: &'a Arc<SpinLock<MemorySet>>,
-    vpn: VirtPageNum,
-    mmap_page: MmapPage,
-}
-impl<'a> LazyAllocMmapFuture<'a> {
-    pub fn new(
-        memory_set: &'a Arc<SpinLock<MemorySet>>,
-        vpn: VirtPageNum,
-        mmap_page: MmapPage,
-    ) -> Self {
-        Self {
-            memory_set,
-            vpn,
-            mmap_page,
-        }
-    }
-}
-impl<'a> Future for LazyAllocMmapFuture<'a> {
-    type Output = SysResult<()>;
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output>
-{         let this = self.get_mut();
-        let mut fut = this.mmap_page.lazy_map_page();
-        let pin = pin!(fut);
-        let res = pin.poll(cx);
-        if res.is_ready() {
-
-        }
-        res
-    }
-}
-LazyAllocMmapFuture::new(memory_set, vpn, mmap_page).await?;
 
 */

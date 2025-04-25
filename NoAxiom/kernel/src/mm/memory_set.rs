@@ -1,13 +1,13 @@
 use alloc::{sync::Arc, vec::Vec};
-use core::sync::atomic::{fence, Ordering};
 
 use arch::{
     consts::KERNEL_VIRT_MEMORY_END, Arch, ArchMemory, ArchPageTableEntry, ArchTime, MappingFlags,
     PageTableEntry,
 };
-use config::mm::USER_HEAP_LIMIT;
+use config::{fs::ROOT_NAME, mm::USER_HEAP_SIZE};
 use include::errno::Errno;
-use ksync::{cell::SyncUnsafeCell, mutex::SpinLock, Lazy};
+use ksync::{cell::SyncUnsafeCell, mutex::SpinLock};
+use spin::Once;
 
 use super::{
     address::{PhysAddr, PhysPageNum},
@@ -29,6 +29,7 @@ use crate::{
         permission::MapType,
     },
     pte_flags,
+    sched::utils::yield_now,
     syscall::SysResult,
 };
 
@@ -46,23 +47,18 @@ extern "C" {
     fn ekernel();
 }
 
-pub static KERNEL_SPACE: Lazy<SpinLock<MemorySet>> = Lazy::new(|| {
-    let ms = MemorySet::init_kernel_space();
-    ms.page_table().mark_as_kernel();
-    SpinLock::new(ms)
-});
-
-/// lazily initialized kernel space token
-/// please assure it's initialized before any user space token
-pub static mut KERNEL_SPACE_ROOT_PPN: usize = 0;
+pub static KERNEL_SPACE: Once<MemorySet> = Once::new();
 
 pub fn kernel_space_activate() {
-    Arch::activate(unsafe { KERNEL_SPACE_ROOT_PPN }, true);
+    KERNEL_SPACE.get().unwrap().memory_activate();
 }
 
 #[inline(always)]
 pub fn kernel_space_init() {
-    KERNEL_SPACE.lock().memory_activate();
+    let ms = MemorySet::init_kernel_space();
+    ms.page_table().mark_as_kernel();
+    KERNEL_SPACE.call_once(|| ms);
+    kernel_space_activate();
 }
 
 /// elf load result
@@ -111,11 +107,8 @@ pub struct MemorySet {
 
 impl MemorySet {
     /// create an new empty memory set without any allocation
-    /// do not use this function directly, use [`new_with_kernel`] instead
-    ///
-    /// use [`PageTable::new_bare`] to create a completly empty page table,
-    /// or use [`PageTable::new_allocated`] to create one with root allocated
-    pub fn new_bare(page_table: PageTable) -> Self {
+    /// do not use this function directly, use [`Self::new_with_kernel`] instead
+    fn new(page_table: PageTable) -> Self {
         Self {
             page_table: SyncUnsafeCell::new(page_table),
             areas: Vec::new(),
@@ -126,9 +119,21 @@ impl MemorySet {
         }
     }
 
+    /// create a new memory set with root frame allocated
+    pub fn new_allocated() -> Self {
+        Self::new(PageTable::new_allocated())
+    }
+
+    /// create a new memory set with kernel space mapped,
+    pub fn new_with_kernel() -> Self {
+        Self::new(PageTable::clone_from_other(
+            KERNEL_SPACE.get().unwrap().page_table(),
+        ))
+    }
+
     #[inline(always)]
     pub fn page_table(&self) -> &mut PageTable {
-        unsafe { &mut (*self.page_table.get()) }
+        self.page_table.as_ref_mut()
     }
 
     pub fn root_ppn(&self) -> PhysPageNum {
@@ -139,11 +144,6 @@ impl MemorySet {
     #[inline(always)]
     pub fn memory_activate(&self) {
         self.page_table().memory_activate();
-    }
-
-    /// translate va into pa
-    pub fn translate_va(&self, va: VirtAddr) -> Option<PhysAddr> {
-        self.page_table().translate_va(va)
     }
 
     /// push a map area into current memory set
@@ -157,12 +157,13 @@ impl MemorySet {
         map_area.map_each(self.page_table());
         let pte = self
             .page_table()
-            .translate_vpn(map_area.vpn_range().start());
+            .translate_vpn(map_area.vpn_range().start())
+            .unwrap();
         trace!(
             "create pte: ppn: {:#x}, flags: {:?}, raw_flag: {:?}",
-            pte.unwrap().ppn(),
-            pte.unwrap().flags(),
-            pte.unwrap().raw_flag(),
+            pte.ppn(),
+            pte.flags(),
+            pte.raw_flag(),
         );
         if let Some(data) = data {
             map_area.load_data(self.page_table(), data, offset);
@@ -172,7 +173,7 @@ impl MemorySet {
 
     /// create kernel space, used in [`KERNEL_SPACE`] initialization
     pub fn init_kernel_space() -> Self {
-        let mut memory_set = MemorySet::new_bare(PageTable::new_allocated());
+        let mut memory_set = MemorySet::new_allocated();
         macro_rules! kernel_push_area {
             ($($start:expr, $end:expr, $permission:expr)*) => {
                 $(
@@ -236,25 +237,12 @@ impl MemorySet {
             let esignal = esignal as usize | HIGH_ADDR_OFFSET;
             kernel_push_area!(ssignal, esignal, map_permission!(R, X, U));
         }
-        unsafe {
-            KERNEL_SPACE_ROOT_PPN = memory_set.root_ppn().0;
-            // KERNEL_SPACE_TOKEN.store(memory_set.token(), Ordering::SeqCst);
-            fence(Ordering::SeqCst);
-        }
         memory_set
     }
 
-    /// create a new memory set with kernel space mapped,
-    pub fn new_with_kernel() -> Self {
-        let mut memory_set = Self::new_bare(PageTable::new_bare());
-        memory_set.page_table = SyncUnsafeCell::new(PageTable::clone_from_other(
-            KERNEL_SPACE.lock().page_table(),
-        ));
-        memory_set
-    }
-
+    #[allow(unused)]
     pub fn load_dl_interp(&mut self, elf: &Arc<dyn File>) -> Option<usize> {
-        const DL_INTERP_PATH: &str = "/glibc/lib/libc.so";
+        let path = format!("{ROOT_NAME}/lib/libc.so");
         todo!("load_dl_interp")
     }
 
@@ -262,10 +250,11 @@ impl MemorySet {
         let mut memory_set = Self::new_with_kernel();
         let mut auxs: Vec<AuxEntry> = Vec::new(); // auxiliary vector
         let mut dl_flag = false; // dynamic link flag
-        let elf = xmas_elf::ElfFile::new(file_data.as_slice()).map_err(|x| {
+        let elf_error_map = |x: &str| {
             error!("[load_elf] elf error: {:?}", x);
             Errno::ENOEXEC
-        })?;
+        };
+        let elf = xmas_elf::ElfFile::new(file_data.as_slice()).map_err(elf_error_map)?;
 
         // check: magic
         let magic = elf.header.pt1.magic;
@@ -329,11 +318,11 @@ impl MemorySet {
         debug!("[load_elf] raw_entry: {:#x}", elf_entry);
 
         // user stack
-        let user_stack_base: usize = usize::from(end_va) + PAGE_SIZE; // stack bottom
+        let user_stack_base = end_va + PAGE_SIZE; // stack bottom
         let user_stack_end = user_stack_base + USER_STACK_SIZE; // stack top
         let map_area = MapArea::new(
-            user_stack_base.into(),
-            user_stack_end.into(),
+            user_stack_base,
+            user_stack_base + USER_STACK_SIZE,
             MapType::Framed,
             map_permission!(U, R, W),
             MapAreaType::UserStack,
@@ -341,24 +330,27 @@ impl MemorySet {
         memory_set.stack = map_area;
         info!(
             "[memory_set] user stack mapped! [{:#x}, {:#x})",
-            user_stack_base, user_stack_end
+            user_stack_base.0,
+            user_stack_base.0 + USER_STACK_SIZE
         );
 
         // user heap
-        let user_heap_base: usize = user_stack_end + PAGE_SIZE;
-        memory_set.brk.start = user_heap_base;
-        memory_set.brk.end = user_heap_base;
-        memory_set.brk.area = MapArea::new(
-            user_heap_base.into(),
-            user_heap_base.into(),
-            MapType::Framed,
-            map_permission!(U, R, W),
-            MapAreaType::UserHeap,
-        );
+        let user_heap_base = user_stack_end + PAGE_SIZE;
+        memory_set.brk = BrkAreaInfo {
+            start: user_heap_base.into(),
+            end: user_heap_base.into(),
+            area: MapArea::new(
+                user_heap_base.into(),
+                user_heap_base.into(),
+                MapType::Framed,
+                map_permission!(U, R, W),
+                MapAreaType::UserHeap,
+            ),
+        };
         info!(
             "[memory_set] user heap inserted! [{:#x}, {:#x})",
-            user_heap_base,
-            user_heap_base + USER_HEAP_LIMIT
+            user_heap_base.0,
+            user_heap_base.0 + USER_HEAP_SIZE
         );
 
         // aux vector
@@ -388,7 +380,7 @@ impl MemorySet {
         Ok(ElfMemoryInfo {
             memory_set,
             elf_entry,
-            user_sp: user_stack_end, // stack grows downward, so return stack_end
+            user_sp: user_stack_end.into(), // stack grows downward, so return stack_end
             auxs,
         })
     }
@@ -423,6 +415,8 @@ impl MemorySet {
                     .page_table()
                     .map(vpn, old_pte.ppn().into(), new_flags);
             } else {
+                // fixme: mprotect could cause bugs here since we always share non-writable
+                // memory between threads, maybe we should apply cow as well?
                 new_set
                     .page_table()
                     .map(vpn, old_pte.ppn().into(), old_flags);
@@ -483,9 +477,25 @@ impl MemorySet {
                         .mmap_manager
                         .frame_trackers
                         .insert(vpn, frame_tracker.clone());
+                } else {
+                    error!(
+                        "[clone_cow] mmap page not found in frame trackers, vpn: {:#x}",
+                        vpn.0
+                    );
                 }
             }
         }
+        debug!(
+            "[clone_cow] mmap_start: {:#x}, mmap_top: {:#x}",
+            new_set.mmap_manager.mmap_start.0,
+            new_set.mmap_manager.mmap_top.0,
+            // new_set.mmap_manager.mmap_map.keys().collect::<Vec<_>>(),
+            // new_set
+            //     .mmap_manager
+            //     .frame_trackers
+            //     .keys()
+            //     .collect::<Vec<_>>(),
+        );
 
         // shm
         for shm_area in self.shm.shm_areas.iter() {
@@ -508,23 +518,23 @@ impl MemorySet {
     }
 
     pub fn lazy_alloc_stack(&mut self, vpn: VirtPageNum) {
-        self.stack
-            .map_one(vpn, unsafe { &mut (*self.page_table.get()) });
+        self.stack.map_one(vpn, self.page_table.as_ref_mut());
+        Arch::tlb_flush();
     }
 
     pub fn lazy_alloc_brk(&mut self, vpn: VirtPageNum) {
-        self.brk
-            .area
-            .map_one(vpn, unsafe { &mut (*self.page_table.get()) });
+        self.brk.area.map_one(vpn, self.page_table.as_ref_mut());
+        Arch::tlb_flush();
     }
 
-    pub fn brk_grow(&mut self, new_brk_vpn: VirtPageNum) {
+    pub fn brk_grow(&mut self, new_end_vpn: VirtPageNum) {
         self.brk
             .area
-            .change_end_vpn(new_brk_vpn, unsafe { &mut (*self.page_table.get()) });
+            .change_end_vpn(new_end_vpn, self.page_table.as_ref_mut());
+        Arch::tlb_flush();
     }
 
-    pub fn realloc_cow(&mut self, vpn: VirtPageNum, pte: PageTableEntry) -> SysResult<()> {
+    pub fn realloc_cow(&mut self, vpn: VirtPageNum, pte: &PageTableEntry) -> SysResult<()> {
         let old_ppn = PhysPageNum::from(pte.ppn());
         let old_flags = pte.flags();
         let new_flags = flags_switch_to_rw(&old_flags);
@@ -618,43 +628,32 @@ impl MemorySet {
     }
 }
 
-#[allow(unused)]
-pub fn remap_test() {
-    debug!("remap_test");
-
-    let mut kernel_space = KERNEL_SPACE.lock();
-
-    let mid_text: VirtAddr = (stext as usize / 2 + etext as usize / 2).into();
-    let mid_rodata: VirtAddr = (srodata as usize / 2 + erodata as usize / 2).into();
-    let mid_data: VirtAddr = (sdata as usize / 2 + edata as usize / 2).into();
-    let mid_bss: VirtAddr = (sbss as usize / 2 + ebss as usize / 2).into();
-    let mid_frame: VirtAddr = (ekernel as usize / 2 + KERNEL_VIRT_MEMORY_END as usize / 2).into();
-
-    debug!(
-        "mid_text: {:#x} => {:#x}",
-        mid_text.0,
-        kernel_space.translate_va(mid_text).unwrap().0
-    );
-    debug!(
-        "mid_rodata: {:#x} => {:#x}",
-        mid_rodata.0,
-        kernel_space.translate_va(mid_rodata).unwrap().0
-    );
-    debug!(
-        "mid_data: {:#x} => {:#x}",
-        mid_data.0,
-        kernel_space.translate_va(mid_data).unwrap().0
-    );
-    debug!(
-        "mid_bss: {:#x} => {:#x}",
-        mid_bss.0,
-        kernel_space.translate_va(mid_bss).unwrap().0
-    );
-    debug!(
-        "mid_frame: {:#x} => {:#x}",
-        mid_frame.0,
-        kernel_space.translate_va(mid_frame).unwrap().0
-    );
-
-    debug!("remap_test end");
+pub async fn lazy_alloc_mmap<'a>(
+    memory_set: &Arc<SpinLock<MemorySet>>,
+    vpn: VirtPageNum,
+) -> SysResult<()> {
+    let mut ms = memory_set.lock();
+    if !ms.mmap_manager.frame_trackers.contains_key(&vpn) {
+        let frame = frame_alloc();
+        let ppn = frame.ppn();
+        let kvpn = frame.kernel_vpn();
+        ms.mmap_manager.frame_trackers.insert(vpn, frame);
+        let mut mmap_page = ms.mmap_manager.mmap_map.get(&vpn).cloned().unwrap();
+        drop(ms);
+        mmap_page.lazy_map_page(kvpn).await?;
+        let ms = memory_set.lock();
+        let pte_flags: MappingFlags = MappingFlags::from(mmap_page.prot) | MappingFlags::U;
+        ms.page_table().map(vpn, ppn, pte_flags);
+    } else {
+        // todo: use suspend
+        warn!("[mm] lazy_alloc_mmap: page already mapped, yield for it");
+        while PageTable::from_ppn(Arch::current_root_ppn())
+            .translate_vpn(vpn)
+            .is_none()
+        {
+            yield_now().await;
+        }
+    }
+    Arch::tlb_flush();
+    Ok(())
 }

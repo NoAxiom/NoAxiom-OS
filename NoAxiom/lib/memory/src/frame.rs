@@ -59,7 +59,7 @@ impl FrameTracker {
         self.inner.ppn
     }
     #[inline(always)]
-    pub fn into_kernel_vpn(&self) -> VirtPageNum {
+    pub fn kernel_vpn(&self) -> VirtPageNum {
         VirtPageNum::from(kernel_ppn_to_vpn(self.inner.ppn.0))
     }
 }

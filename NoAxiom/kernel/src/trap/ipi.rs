@@ -88,21 +88,17 @@ pub fn ipi_handler() {
     Arch::clear_ipi();
 }
 
-// pub fn send_ipi_test() {
-//     let boot_hart_id =
-// crate::entry::init::BOOT_HART_ID.load(core::sync::atomic::Ordering::SeqCst);
-//     let from_hartid = get_hartid();
-//     if from_hartid != boot_hart_id {
-//         return;
-//     }
-
-//     debug!("send ipi test begin!");
-//     for to_hartid in 0..CPU_NUM {
-//         if to_hartid == from_hartid {
-//             continue;
-//         }
-//         debug!("send ipi to hart {}", to_hartid);
-//         send_ipi(to_hartid, IpiType::TlbShootdown);
-//     }
-//     debug!("send ipi test done!");
-// }
+#[allow(unused)]
+pub fn send_ipi_test() {
+    let from_hartid = get_hartid();
+    debug!("send ipi test begin!");
+    for to_hartid in 0..CPU_NUM {
+        if to_hartid == from_hartid {
+            continue;
+        }
+        debug!("send ipi to hart {}", to_hartid);
+        send_ipi(to_hartid, IpiType::TlbShootdown);
+        send_ipi(to_hartid, IpiType::LoadBalance);
+    }
+    debug!("send ipi test done!");
+}
