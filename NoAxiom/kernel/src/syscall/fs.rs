@@ -122,30 +122,29 @@ impl Syscall<'_> {
         );
 
         let flags = FileFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
-        let split_path = path_str.split('/').collect::<Vec<&str>>();
-        let target = root_dentry().find_path(&split_path);
 
-        if flags.contains(FileFlags::O_CREATE) {
+        let path = if flags.contains(FileFlags::O_CREATE) {
             info!("[sys_openat] O_CREATE");
             // check if the file already exists
-            if let Ok(dentry) = target {
-                if flags.contains(FileFlags::O_EXCL) && !dentry.is_negative() {
-                    return Err(Errno::EEXIST);
-                }
+            let path = get_path_or_create(
+                self.task.clone(),
+                filename,
+                fd,
+                mode.union(InodeMode::FILE),
+                "sys_openat",
+            )
+            .await?;
+            let dentry = path.dentry();
+            if flags.contains(FileFlags::O_EXCL) && !dentry.is_negative() {
+                return Err(Errno::EEXIST);
             }
+            path
         } else {
-            target?;
-        }
+            get_path(self.task.clone(), filename, fd, "sys_openat")?
+        };
 
         // fixme: now if has O_CREATE flag, and the file already exists, we just open it
-        let path = get_path_or_create(
-            self.task.clone(),
-            filename,
-            fd as isize,
-            mode.union(InodeMode::FILE),
-            "sys_openat",
-        )
-        .await?;
+
         let dentry = path.dentry();
         let inode = dentry.inode()?;
         if flags.contains(FileFlags::O_DIRECTORY) && !inode.file_type() == InodeMode::DIR {
@@ -633,6 +632,7 @@ impl Syscall<'_> {
         let fd_table = self.task.fd_table();
         let out_file = fd_table.get(out_fd).ok_or(Errno::EBADF)?;
         let in_file = fd_table.get(in_fd).ok_or(Errno::EBADF)?;
+        drop(fd_table);
         if !out_file.meta().writable() || !in_file.meta().readable() {
             return Err(Errno::EBADF);
         }
