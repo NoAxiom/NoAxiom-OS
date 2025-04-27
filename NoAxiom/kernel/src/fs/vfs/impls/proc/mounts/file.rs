@@ -1,4 +1,4 @@
-use alloc::boxed::Box;
+use alloc::{boxed::Box, sync::Arc};
 
 use async_trait::async_trait;
 use include::errno::Errno;
@@ -27,13 +27,15 @@ impl File for MountsFile {
         &self.meta
     }
 
-    async fn base_read(&self, offset: usize, buf: &mut [u8]) -> SyscallResult {
+    async fn base_read(&self, _offset: usize, buf: &mut [u8]) -> SyscallResult {
         // todo: maybe can just read empty
-        let data = FS_MANAGER.get_list();
-        let data = data.join("\n");
-        assert!(data.len() > offset);
-        let len = core::cmp::min(data.len() - offset, buf.len());
-        buf[..len].copy_from_slice(&data.as_bytes()[offset..offset + len]);
+        let data = FS_MANAGER.get_list().join("\n");
+        let pos = self.meta().pos.load(core::sync::atomic::Ordering::Relaxed);
+        let len = data.len();
+        if pos > len {
+            return Ok(0);
+        }
+        buf[..len].copy_from_slice(&data.as_bytes());
         Ok(len as isize)
     }
 
