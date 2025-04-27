@@ -7,7 +7,7 @@ use alloc::{
 };
 use core::{marker::PhantomData, ptr::null, task::Waker};
 
-use arch::{Arch, ArchMemory, ArchTrapContext, TrapContext};
+use arch::{Arch, ArchFull, ArchMemory, ArchTrapContext, TrapContext};
 use config::fs::ROOT_NAME;
 use ksync::{
     cell::SyncUnsafeCell,
@@ -413,11 +413,13 @@ impl Task {
     /// init user stack with pushing arg, env, and auxv
     pub fn init_user_stack(
         &self,
-        user_sp: usize,
+        mut user_sp: usize,
         args: Vec<String>,        // argv & argc
         envs: Vec<String>,        // env vec
         auxs: &mut Vec<AuxEntry>, // aux vec
     ) -> (usize, usize, usize, usize) {
+        /// push a data slice with alignment
+        /// this func will update user_sp
         fn push_slice<T: Copy>(user_sp: &mut usize, slice: &[T]) {
             let mut sp = *user_sp;
             sp -= core::mem::size_of_val(slice);
@@ -426,15 +428,20 @@ impl Task {
                 .copy_from_slice(slice);
             *user_sp = sp
         }
-        let mut user_sp = user_sp;
+        /// align sp with 16 bytes (usize*2)
+        macro_rules! align_16 {
+            ($sp:ident) => {
+                $sp = $sp & !0xf;
+            };
+        }
 
-        // argv is a vector of each arg's addr
+        // argv, envp are vectors of each arg's/env's addr
         let mut argv = vec![0; args.len()];
-        // envp is a vector of each env's addr
         let mut envp = vec![0; envs.len()];
-        // Copy each env to the newly allocated stack
+
+        // copy each env to the newly allocated stack
         for i in 0..envs.len() {
-            // Here we leave one byte to store a '\0' as a terminator
+            // here we leave one byte to store a '\0' as a terminator
             user_sp -= envs[i].len() + 1;
             let p: *mut u8 = user_sp as *mut u8;
             unsafe {
@@ -443,9 +450,9 @@ impl Task {
                 *((p as usize + envs[i].len()) as *mut u8) = 0;
             }
         }
-        user_sp -= user_sp % core::mem::size_of::<usize>();
+        align_16!(user_sp);
 
-        // Copy each arg to the newly allocated stack
+        // copy each arg to the newly allocated stack
         for i in 0..args.len() {
             user_sp -= args[i].len() + 1;
             let p = user_sp as *mut u8;
@@ -455,26 +462,25 @@ impl Task {
                 *((p as usize + args[i].len()) as *mut u8) = 0;
             }
         }
-        user_sp -= user_sp % core::mem::size_of::<usize>();
+        align_16!(user_sp);
 
-        // Copy `platform`
-        let platform = "RISC-V64";
+        // copy platform
+        let platform = Arch::ARCH_NAME;
         user_sp -= platform.len() + 1;
-        user_sp -= user_sp % core::mem::size_of::<usize>();
+        align_16!(user_sp);
         let p = user_sp as *mut u8;
         unsafe {
             p.copy_from(platform.as_ptr(), platform.len());
             *((p as usize + platform.len()) as *mut u8) = 0;
         }
 
-        // Copy 16 random bytes(here is 0)
+        // copy 16 random bytes (here is 0)
         user_sp -= 16;
         auxs.push(AuxEntry(AT_RANDOM, user_sp as usize));
-        // Padding
-        user_sp -= user_sp % 16;
         auxs.push(AuxEntry(AT_NULL, 0 as usize));
+        align_16!(user_sp);
 
-        // Construct auxv
+        // construct auxv
         let len = auxs.len() * core::mem::size_of::<AuxEntry>();
         user_sp -= len;
         for i in 0..auxs.len() {
@@ -485,7 +491,7 @@ impl Task {
             }
         }
 
-        // Construct envp
+        // construct envp
         let len = (envs.len() + 1) * core::mem::size_of::<usize>();
         user_sp -= len;
         let envp_base = user_sp;
@@ -499,7 +505,6 @@ impl Task {
         push_slice(&mut user_sp, argv.as_slice());
         let argv_base = user_sp;
         push_slice(&mut user_sp, &[args.len()]);
-
         (user_sp, args.len(), argv_base, envp_base)
     }
 
