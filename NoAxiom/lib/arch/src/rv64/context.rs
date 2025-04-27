@@ -260,18 +260,18 @@ impl ArchTrapContext for TrapContext {
         cx.x[reg_id::SP] = sp;
         cx
     }
-    fn update_cx(&mut self, entry: usize, sp: usize, argc: usize, argv: usize, envp: usize) {
-        use TrapArgs::*;
-        self.sepc = entry;
-        self[SP] = sp;
-        self[A0] = argc;
-        self[A1] = argv;
-        self[A2] = envp;
-        let sstatus = MySstatus::read();
-        self.freg = UserFloatContext::new();
-        // sstatus.set_spp(SPP::User);
-        self.sstatus = sstatus;
-    }
+    // fn update_cx(&mut self, entry: usize, sp: usize, argc: usize, argv: usize, envp: usize) {
+    //     use TrapArgs::*;
+    //     self.sepc = entry;
+    //     self[SP] = sp;
+    //     self[A0] = argc;
+    //     self[A1] = argv;
+    //     self[A2] = envp;
+    //     let sstatus = MySstatus::read();
+    //     self.freg = UserFloatContext::new();
+    //     // sstatus.set_spp(SPP::User);
+    //     self.sstatus = sstatus;
+    // }
     fn gprs(&self) -> &[usize; 32] {
         &self.x
     }

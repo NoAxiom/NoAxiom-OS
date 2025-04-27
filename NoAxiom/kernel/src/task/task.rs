@@ -5,11 +5,7 @@ use alloc::{
     sync::{Arc, Weak},
     vec::Vec,
 };
-use core::{
-    marker::PhantomData,
-    ptr::{self, null},
-    task::Waker,
-};
+use core::{marker::PhantomData, ptr::null, task::Waker};
 
 use arch::{Arch, ArchMemory, ArchTrapContext, TrapContext};
 use config::fs::ROOT_NAME;
@@ -620,10 +616,9 @@ impl Task {
         self.terminate_threads();
         self.change_memory_set(memory_set);
         trace!("init usatck");
-        let (user_sp, argc, argv_base, envp_base) =
+        let (user_sp, _argc, _argv_base, _envp_base) =
             self.init_user_stack(user_sp, args, envs, &mut auxs);
-        self.trap_context_mut()
-            .update_cx(entry_point, user_sp, argc, argv_base, envp_base);
+        *self.trap_context_mut() = TrapContext::app_init_cx(entry_point, user_sp);
         self.sa_list().reset();
         self.fd_table().close_on_exec();
         Ok(())

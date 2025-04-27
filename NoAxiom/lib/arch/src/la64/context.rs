@@ -174,14 +174,14 @@ impl ArchTrapContext for TrapContext {
         cx
     }
 
-    fn update_cx(&mut self, entry: usize, sp: usize, argc: usize, argv: usize, envp: usize) {
-        use TrapArgs::*;
-        self.set_prmd();
-        self[EPC] = entry;
-        self[SP] = sp;
-        self[A0] = argc;
-        self[A1] = argv;
-        self[A2] = envp;
-        self.freg = UserFloatContext::new();
-    }
+    // fn update_cx(&mut self, entry: usize, sp: usize, argc: usize, argv: usize,
+    // envp: usize) {     use TrapArgs::*;
+    //     self.set_prmd();
+    //     self[EPC] = entry;
+    //     self[SP] = sp;
+    //     self[A0] = argc;
+    //     self[A1] = argv;
+    //     self[A2] = envp;
+    //     self.freg = UserFloatContext::new();
+    // }
 }

@@ -50,7 +50,8 @@ pub trait ArchTrapContext:
 {
     type FloatContext: ArchUserFloatContext;
     fn app_init_cx(entry: usize, sp: usize) -> Self;
-    fn update_cx(&mut self, entry: usize, sp: usize, argc: usize, argv: usize, envp: usize);
+    // fn update_cx(&mut self, entry: usize, sp: usize, argc: usize, argv: usize,
+    // envp: usize);
     fn freg_mut(&mut self) -> &mut Self::FloatContext;
     fn gprs(&self) -> &[usize; 32];
     fn gprs_mut(&mut self) -> &mut [usize; 32];
