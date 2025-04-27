@@ -5,9 +5,13 @@ use alloc::{
     sync::{Arc, Weak},
     vec::Vec,
 };
-use core::{marker::PhantomData, ptr::null, task::Waker};
+use core::{
+    marker::PhantomData,
+    ptr::{self, null},
+    task::Waker,
+};
 
-use arch::{Arch, ArchFull, ArchMemory, ArchTrapContext, TrapArgs, TrapContext};
+use arch::{Arch, ArchMemory, ArchTrapContext, TrapContext};
 use config::fs::ROOT_NAME;
 use ksync::{
     cell::SyncUnsafeCell,
@@ -237,8 +241,8 @@ impl Task {
     pub fn set_self_as_tg_leader(self: &Arc<Self>) {
         self.tg_leader.call_once(|| Arc::downgrade(self));
     }
-    pub fn set_tg_leader(&self, task: &Arc<Self>) {
-        self.tg_leader.call_once(|| Arc::downgrade(task));
+    pub fn set_tg_leader_weakly(&self, task: &Weak<Self>) {
+        self.tg_leader.call_once(|| task.clone());
     }
     pub fn get_tg_leader(&self) -> Arc<Task> {
         self.tg_leader.get().unwrap().upgrade().unwrap()
@@ -373,7 +377,7 @@ impl Task {
         trace!("[kernel] spawn new process from elf");
         let ElfMemoryInfo {
             memory_set,
-            elf_entry,
+            entry_point: elf_entry,
             user_sp,
             auxs: _,
         } = elf;
@@ -402,7 +406,6 @@ impl Task {
                 ..Default::default()
             }),
         });
-        task.trap_context_mut()[TrapArgs::SP] -= 16;
         task.thread_group().insert(&task);
         task.tg_leader.call_once(|| Arc::downgrade(&task));
         TASK_MANAGER.insert(&task);
@@ -411,30 +414,7 @@ impl Task {
         task
     }
 
-    /// init user stack
-    ///
-    /// stack construction
-    /// +---------------------------+
-    /// | argc                      | <-- sp (lower address)
-    /// | *argv                     |
-    /// | *envp                     |
-    /// | Padding (16-byte align)   |
-    /// +---------------------------+
-    /// | argv[0]                   |
-    /// | argv[1]                   |
-    /// | ...                       |
-    /// | NULL (argv terminator)    |
-    /// +---------------------------+
-    /// | envp[0]                   |
-    /// | envp[1]                   |
-    /// | ...                       |
-    /// | NULL (envp terminator)    |
-    /// +---------------------------+
-    /// | auxv[0].key, auxv[0].val  |
-    /// | auxv[1].key, auxv[1].val  |
-    /// | ...                       |
-    /// | NULL (auxv terminator)    | <-- stack base (higher address)
-    /// +---------------------------+
+    /// init user stack with pushing arg, env, and auxv
     pub fn init_user_stack(
         &self,
         user_sp: usize,
@@ -482,7 +462,7 @@ impl Task {
         user_sp -= user_sp % core::mem::size_of::<usize>();
 
         // Copy `platform`
-        let platform = Arch::ARCH_NAME;
+        let platform = "RISC-V64";
         user_sp -= platform.len() + 1;
         user_sp -= user_sp % core::mem::size_of::<usize>();
         let p = user_sp as *mut u8;
@@ -501,7 +481,6 @@ impl Task {
         // Construct auxv
         let len = auxs.len() * core::mem::size_of::<AuxEntry>();
         user_sp -= len;
-        // let auxv_base = user_sp;
         for i in 0..auxs.len() {
             unsafe {
                 *((user_sp + i * core::mem::size_of::<AuxEntry>()) as *mut usize) = auxs[i].0;
@@ -583,8 +562,9 @@ impl Task {
                     ..Default::default()
                 }),
             });
-            new_thread.set_tg_leader(self);
+            new_thread.set_tg_leader_weakly(self.tg_leader.get().unwrap());
             new_thread.thread_group.lock().insert(&new_thread);
+            TASK_MANAGER.insert(&new_thread);
             new_thread
         } else {
             // fork as a new process
@@ -615,10 +595,7 @@ impl Task {
             });
             new_process.thread_group().insert(&new_process);
             new_process.set_self_as_tg_leader();
-            self.get_tg_leader()
-                .pcb()
-                .children
-                .push(new_process.clone());
+            self.pcb().children.push(new_process.clone()); // fixme: might use tg leader
             TASK_MANAGER.insert(&new_process);
             PROCESS_GROUP_MANAGER.insert_process(new_pgid, &new_process);
             new_process
@@ -635,7 +612,7 @@ impl Task {
     ) -> SysResult<()> {
         let ElfMemoryInfo {
             memory_set,
-            elf_entry,
+            entry_point,
             user_sp,
             mut auxs,
         } = MemorySet::load_from_path(path).await?;
@@ -646,7 +623,7 @@ impl Task {
         let (user_sp, argc, argv_base, envp_base) =
             self.init_user_stack(user_sp, args, envs, &mut auxs);
         self.trap_context_mut()
-            .update_cx(elf_entry, user_sp, argc, argv_base, envp_base);
+            .update_cx(entry_point, user_sp, argc, argv_base, envp_base);
         self.sa_list().reset();
         self.fd_table().close_on_exec();
         Ok(())

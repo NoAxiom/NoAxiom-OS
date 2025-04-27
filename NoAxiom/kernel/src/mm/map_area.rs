@@ -1,18 +1,21 @@
 //! map area
 
-use alloc::collections::btree_map::BTreeMap;
+use alloc::{collections::btree_map::BTreeMap, sync::Arc};
 
 use arch::{Arch, ArchMemory, ArchPageTableEntry};
 
 use super::{
     address::{VirtAddr, VirtPageNum, VpnRange},
     frame::{frame_alloc, FrameTracker},
+    memory_set::MapAreaLoadDataInfo,
     page_table::PageTable,
     permission::{MapPermission, MapType},
 };
 use crate::{
     config::mm::PAGE_SIZE,
+    fs::vfs::basic::file::File,
     mm::address::{PhysPageNum, StepOne},
+    syscall::SysResult,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -43,6 +46,11 @@ pub struct MapArea {
 
     /// area type
     pub area_type: MapAreaType,
+
+    /// file to be mapped
+    pub file: Option<Arc<dyn File>>,
+    // /// file offset
+    // pub file_offset: usize,
 }
 
 impl MapArea {
@@ -53,6 +61,8 @@ impl MapArea {
             map_permission: MapPermission::empty(),
             map_type: MapType::Identical,
             area_type: MapAreaType::None,
+            file: None,
+            // file_offset: 0,
         }
     }
 
@@ -63,6 +73,8 @@ impl MapArea {
         map_type: MapType,
         map_permission: MapPermission,
         map_area_type: MapAreaType,
+        file: Option<Arc<dyn File>>,
+        // file_offset: usize,
     ) -> Self {
         Self {
             vpn_range: VpnRange::new_from_va(start_va, end_va),
@@ -70,8 +82,8 @@ impl MapArea {
             map_permission,
             map_type,
             area_type: map_area_type,
-            // file: None,
-            // file_offset: 0,
+            file,
+            // file_offset,
         }
     }
 
@@ -83,7 +95,7 @@ impl MapArea {
             map_permission: other.map_permission.clone(),
             map_type: other.map_type.clone(),
             area_type: other.area_type.clone(),
-            // file: other.file.clone(),
+            file: other.file.clone(),
             // file_offset: other.file_offset,
         }
     }
@@ -179,33 +191,71 @@ impl MapArea {
         }
     }
 
+    // /// load data from byte slice
+    // pub fn load_data(&mut self, page_table: &PageTable, data: &[u8], offset:
+    // usize) {     // should only load user data
+    //     assert_eq!(self.map_type, MapType::Framed);
+    //     let mut cur_st: usize = 0;
+    //     let mut current_vpn = self.vpn_range.start();
+    //     let len = data.len();
+    //     if offset != 0 {
+    //         let src = &data[0..len.min(PAGE_SIZE - offset)];
+    //         cur_st += PAGE_SIZE - offset;
+    //         let ppn =
+    // PhysPageNum::from(page_table.translate_vpn(current_vpn).unwrap().ppn());
+    //         let dst = &mut ppn.get_bytes_array()[offset..src.len() + offset];
+    //         dst.copy_from_slice(src);
+    //         current_vpn.step();
+    //     }
+    //     while cur_st < len {
+    //         let src = &data[cur_st..len.min(cur_st + PAGE_SIZE)];
+    //         cur_st += PAGE_SIZE;
+    //         let ppn =
+    // PhysPageNum::from(page_table.translate_vpn(current_vpn).unwrap().ppn());
+    //         let dst = &mut ppn.get_bytes_array()[0..src.len()];
+    //         dst.copy_from_slice(src);
+    //         current_vpn.step();
+    //     }
+    //     trace!(
+    //         "[load_data]: cur_st = {:#x}, area: {:?}",
+    //         cur_st,
+    //         self.vpn_range
+    //     );
+    // }
+
     /// load data from byte slice
-    pub fn load_data(&mut self, page_table: &PageTable, data: &[u8], offset: usize) {
-        // should only load user data
+    pub async fn load_data(
+        &mut self,
+        page_table: &mut PageTable,
+        data_info: MapAreaLoadDataInfo,
+    ) -> SysResult<()> {
         assert_eq!(self.map_type, MapType::Framed);
-        let mut cur_st: usize = 0;
+        let start = data_info.start;
+        let mut len = data_info.len;
+        let mut page_offset = data_info.offset;
+        let mut offset: usize = 0;
         let mut current_vpn = self.vpn_range.start();
-        let len = data.len();
-        if offset != 0 {
-            let src = &data[0..len.min(PAGE_SIZE - offset)];
-            cur_st += PAGE_SIZE - offset;
+        let file = self.file.as_ref().unwrap();
+
+        loop {
+            let mut buf = vec![0u8; len.min(PAGE_SIZE)];
+            file.base_read((start + offset) as usize, &mut buf).await?;
+            let data_slice = buf.as_slice();
+
+            let src = &data_slice[0..len.min(PAGE_SIZE - page_offset)];
             let ppn = PhysPageNum::from(page_table.translate_vpn(current_vpn).unwrap().ppn());
-            let dst = &mut ppn.get_bytes_array()[offset..src.len() + offset];
+            let dst = &mut ppn.get_bytes_array()[page_offset..page_offset + src.len()];
             dst.copy_from_slice(src);
+            offset += PAGE_SIZE - page_offset;
+
+            page_offset = 0;
+            len -= src.len();
+            if len == 0 {
+                break;
+            }
             current_vpn.step();
         }
-        while cur_st < len {
-            let src = &data[cur_st..len.min(cur_st + PAGE_SIZE)];
-            cur_st += PAGE_SIZE;
-            let ppn = PhysPageNum::from(page_table.translate_vpn(current_vpn).unwrap().ppn());
-            let dst = &mut ppn.get_bytes_array()[0..src.len()];
-            dst.copy_from_slice(src);
-            current_vpn.step();
-        }
-        trace!(
-            "[load_data]: cur_st = {:#x}, area: {:?}",
-            cur_st,
-            self.vpn_range
-        );
+
+        Ok(())
     }
 }

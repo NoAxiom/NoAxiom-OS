@@ -12,8 +12,9 @@ impl Syscall<'_> {
         if len != RobustList::HEAD_SIZE {
             return_errno!(Errno::EINVAL, "robust list head len missmatch:{:?}", len);
         }
-        let task = self.task;
-        task.pcb().robust_list.head = head;
+        let mut pcb = self.task.pcb();
+        pcb.robust_list.head = head;
+        pcb.robust_list.len = len;
         Ok(0)
     }
 

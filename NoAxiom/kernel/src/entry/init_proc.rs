@@ -1,4 +1,4 @@
-use alloc::{string::ToString, vec::Vec};
+use alloc::vec::Vec;
 
 use config::fs::ROOT_NAME;
 
@@ -42,19 +42,19 @@ macro_rules! use_app {
 #[cfg(feature = "busybox")]
 use_app!("run_busybox");
 
-#[allow(unused)]
-pub fn schedule_spawn_with_kernel_app() {
-    println!(
-        "[kernel] spawn initproc with app name = {}, path = {}",
-        INIT_PROC_NAME, ROOT_NAME
-    );
-    spawn_ktask(async move {
-        let file_data = get_file();
-        let elf = MemorySet::load_from_vec(file_data).await.unwrap();
-        let task = Task::new_process(elf).await;
-        spawn_utask(task);
-    });
-}
+// #[allow(unused)]
+// pub fn schedule_spawn_with_kernel_app() {
+//     println!(
+//         "[kernel] spawn initproc with app name = {}, path = {}",
+//         INIT_PROC_NAME, ROOT_NAME
+//     );
+//     spawn_ktask(async move {
+//         let file_data = get_file();
+//         let elf = MemorySet::load_from_vec(file_data).await.unwrap();
+//         let task = Task::new_process(elf).await;
+//         spawn_utask(task);
+//     });
+// }
 
 fn get_file() -> Vec<u8> {
     let start = app_start as usize;

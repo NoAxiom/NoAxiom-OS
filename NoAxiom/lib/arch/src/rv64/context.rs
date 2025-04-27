@@ -267,9 +267,9 @@ impl ArchTrapContext for TrapContext {
         self[A0] = argc;
         self[A1] = argv;
         self[A2] = envp;
-        let mut sstatus = MySstatus::read();
+        let sstatus = MySstatus::read();
         self.freg = UserFloatContext::new();
-        sstatus.set_spp(SPP::User);
+        // sstatus.set_spp(SPP::User);
         self.sstatus = sstatus;
     }
     fn gprs(&self) -> &[usize; 32] {

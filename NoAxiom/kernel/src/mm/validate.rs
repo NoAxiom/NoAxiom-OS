@@ -37,9 +37,8 @@ pub async fn validate(
     if let Some(pte) = pte {
         let flags = pte.flags();
         if flags.contains(MappingFlags::COW) {
-            trace!("[validate] realloc COW, vpn={:#x}", vpn.0);
+            debug!("[validate] realloc COW, vpn={:#x}", vpn.0);
             memory_set.lock().realloc_cow(vpn, pte)?;
-            Arch::tlb_flush();
             Ok(())
         } else if trap_type.is_some() && matches!(trap_type.unwrap(), TrapType::StorePageFault(_)) {
             error!(

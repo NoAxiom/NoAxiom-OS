@@ -39,7 +39,12 @@ impl<'a> Syscall<'a> {
         { *CURRENT_SYSCALL.lock() = id; }
 
         if id.is_debug_on() {
-            println!("[syscall] tid: {}, id: {:?}, args: {:X?}", self.task.tid(), id, args);
+            let cx = self.task.trap_context();
+            use arch::TrapArgs::*;
+            info!(
+                "[syscall] tid: {}, sp: {:#x}, pc: {:#x}, ra: {:#x}, id: {:?}, args: {:X?}",
+                self.task.tid(), cx[SP], cx[EPC], cx[RA], id, args
+            );
         }
         use SyscallID::*;
         #[rustfmt::skip]
@@ -182,7 +187,10 @@ impl<'a> Syscall<'a> {
                 Err(Errno::ENOSYS)
             }
         };
-        trace!("[syscall(out)] syscall id: {:?}, res: {:?}", id, res);
+        #[cfg(feature = "debug_sig")]
+        if id.is_debug_on() {
+            info!("[syscall(out)] syscall id: {:?}, res: {:?}", id, res);
+        }
         res
     }
 

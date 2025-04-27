@@ -259,7 +259,9 @@ impl Syscall<'_> {
     pub async fn sys_writev(&self, fd: usize, iovp: usize, iovcnt: usize) -> SyscallResult {
         trace!(
             "[sys_writev] fd: {}, iovp: {:#x}, iovcnt: {}",
-            fd, iovp, iovcnt
+            fd,
+            iovp,
+            iovcnt
         );
         let fd_table = self.task.fd_table();
         let file = fd_table.get(fd).ok_or(Errno::EBADF)?;
@@ -558,12 +560,18 @@ impl Syscall<'_> {
                 "[sys_prlimit64] pid: {}, resource: {:?}, new_limit: {:?}",
                 pid,
                 resource,
-                new_limit.read()
+                new_limit.read(),
             );
             // todo: check before read??
             *fd_table.rlimit_mut() = new_limit.read();
         }
-        info!("[sys_prlimit64] pid: {}, resource: {:?}", pid, resource);
+        info!(
+            "[sys_prlimit64] pid: {}, resource: {:?} new_limit_addr: {:#x}, old_limit_addr: {:#x}",
+            pid,
+            resource,
+            new_limit.addr_usize(),
+            old_limit.addr_usize(),
+        );
         Ok(0)
     }
 

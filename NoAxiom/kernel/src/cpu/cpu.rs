@@ -38,10 +38,10 @@ impl Cpu {
 }
 
 const DEFAULT_CPU: SyncUnsafeCell<Cpu> = SyncUnsafeCell::new(Cpu::new());
-pub static mut CPUS: [SyncUnsafeCell<Cpu>; CPU_NUM] = [DEFAULT_CPU; CPU_NUM];
+pub static CPUS: [SyncUnsafeCell<Cpu>; CPU_NUM] = [DEFAULT_CPU; CPU_NUM];
 
 pub fn current_cpu() -> &'static mut Cpu {
-    unsafe { &mut CPUS[get_hartid()] }.get_mut()
+    CPUS[get_hartid()].as_ref_mut()
 }
 
 pub fn current_task() -> &'static Arc<Task> {

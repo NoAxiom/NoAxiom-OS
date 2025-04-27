@@ -21,7 +21,7 @@ extern "C" {
     /// user_sigreturn: we set RA to this function before entering sig hander
     /// when returning from user sigaction handler,
     /// it will jump to this func and trigger syscall_SIGRETURN
-    fn user_sigreturn();
+    pub fn user_sigreturn();
 }
 
 impl Task {

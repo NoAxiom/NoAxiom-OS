@@ -196,9 +196,9 @@ impl PageTable {
         new_flags: MappingFlags,
     ) {
         let pte = self.create_pte(vpn);
-        *pte = PageTableEntry::new(ppn.0, new_flags);
         ppn.get_bytes_array()
             .copy_from_slice(old_ppn.get_bytes_array());
+        *pte = PageTableEntry::new(ppn.0, new_flags);
     }
 }
 

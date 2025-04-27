@@ -10,7 +10,10 @@ use crate::{
         sig_num::SigNum,
     },
     syscall::Syscall,
-    task::{manager::{PROCESS_GROUP_MANAGER, TASK_MANAGER}, status::TaskStatus},
+    task::{
+        manager::{PROCESS_GROUP_MANAGER, TASK_MANAGER},
+        status::TaskStatus,
+    },
 };
 
 pub async fn init_proc_exit_handler(task: &Arc<Task>) {
@@ -62,12 +65,8 @@ impl Task {
                 "[exit_handler] clear child tid {:#x}, (unimpl futex)",
                 tidaddress
             );
-            let ptr = UserPtr::<u8>::new(tidaddress);
-            let res = ptr
-                .as_slice_mut_checked_raw(core::mem::size_of::<usize>())
-                .await
-                .unwrap();
-            res[0] = 0;
+            let ptr = UserPtr::<usize>::new(tidaddress);
+            ptr.write(0);
             // FIXME: IMPL THIS AFTER FUTEX
             // task.futex_queue.lock().wake(tidaddress as u32, 1);
         }

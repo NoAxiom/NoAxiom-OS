@@ -43,13 +43,13 @@ impl Task {
         let brk_end = ms.brk.end;
 
         // for debug
-        let range = ms.brk.area.vpn_range.clone();
-        drop(ms);
-        for vpn in range {
-            let ptr = vpn.as_va_usize() as *const u8;
-            let value = unsafe { ptr.read_volatile() };
-            debug!("[brk] ptr: {:#x}, value: {:#x}", ptr as usize, value);
-        }
+        // let range = ms.brk.area.vpn_range.clone();
+        // drop(ms);
+        // for vpn in range {
+        //     let ptr = vpn.as_va_usize() as *const u8;
+        //     let value = unsafe { ptr.read_volatile() };
+        //     debug!("[brk] ptr: {:#x}, value: {:#x}", ptr as usize, value);
+        // }
 
         Ok(brk_end as isize)
     }

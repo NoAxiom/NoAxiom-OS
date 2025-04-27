@@ -1,7 +1,6 @@
 use alloc::vec::Vec;
 
 use arch::TrapArgs;
-use config::fs::ROOT_NAME;
 
 use super::{Syscall, SyscallResult};
 use crate::{
@@ -38,18 +37,18 @@ impl Syscall<'_> {
 
     pub fn sys_fork(
         &self,
-        flags: usize, // 创建的标志，如SIGCHLD
-        stack: usize, // 指定新进程的栈，可为0
-        ptid: usize,  // 父线程ID, addr
-        tls: usize,   // TLS线程本地存储描述符
-        ctid: usize,  // 子线程ID, addr
+        flags: usize,
+        stack: usize,
+        ptid: usize,
+        tls: usize,
+        ctid: usize,
     ) -> SyscallResult {
         let flags = CloneFlags::from_bits(flags & !0xff).unwrap();
         let new_task = self.task.fork(flags);
         let new_tid = new_task.tid();
         let new_cx = new_task.trap_context_mut();
         debug!(
-            "[sys_fork] flags: {:?} stack: {:?} ptid: {:?} tls: {:?} ctid: {:?}",
+            "[sys_fork] flags: {:?} stack: {:#x} ptid: {:#x} tls: {:#x} ctid: {:#x}",
             flags, stack, ptid, tls, ctid
         );
         use TrapArgs::*;
@@ -83,17 +82,18 @@ impl Syscall<'_> {
         let mut envs = Vec::new();
 
         // args and envs init
+        use config::fs::ROOT_NAME;
         if path.contains(".sh") {
-            path = format!("busybox");
+            path = format!("{ROOT_NAME}/busybox");
             args.push(format!("busybox"));
             args.push(format!("sh"));
         } else if path.ends_with("ls") || path.ends_with("sleep") {
             debug!("executing ls or sleep");
-            path = format!("busybox");
+            path = format!("{ROOT_NAME}/busybox");
             args.push(format!("busybox"));
         }
-        // envs.push(format!("PATH={ROOT_NAME}"));
-        // envs.push(format!("LD_LIBRARY_PATH={ROOT_NAME}"));
+        envs.push(format!("PATH={ROOT_NAME}"));
+        envs.push(format!("LD_LIBRARY_PATH={ROOT_NAME}"));
 
         let file_path = if !path.starts_with('/') {
             let cwd = self.task.cwd();
@@ -114,7 +114,7 @@ impl Syscall<'_> {
 
         // On success, execve() does not return, on error -1 is returned, and errno is
         // set to indicate the error.
-        Ok(self.task.trap_context()[TrapArgs::RES] as isize)
+        Ok(0 as isize)
     }
 
     pub async fn sys_wait4(

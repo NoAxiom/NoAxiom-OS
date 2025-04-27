@@ -88,7 +88,7 @@ impl Syscall<'_> {
                 let old_flags = pte.flags();
                 let flags = pte.flags().union(mapping_flags);
                 pte.set_flags(flags);
-                debug!(
+                trace!(
                     "[sys_mprotect] set flags in page table, vpn: {:#x}, flags: {:?} => {:?}, pte_raw: {:?}",
                     vpn.0, old_flags, flags, pte.raw_flag()
                 );
@@ -139,18 +139,18 @@ impl Syscall<'_> {
         Ok(0)
     }
 
-    pub fn sys_shmat(&self, key: usize, address: usize, _shmflg: usize) -> SyscallResult {
-        info!("attach shm key {:?} shm address {:#x}", key, address);
+    pub fn sys_shmat(&self, key: usize, addr: usize, _shmflg: usize) -> SyscallResult {
+        info!("attach shm key {:?} shm address {:#x}", key, addr);
         let task = self.task;
         let mut memory_set = task.memory_set().lock();
-        let address = if address == 0 {
+        let addr = if addr == 0 {
             memory_set.shm.shm_top
         } else {
-            address
+            addr
         };
-        memory_set.attach_shm(key, address.into());
+        memory_set.attach_shm(key, addr.into());
         drop(memory_set);
-        Ok(address as isize)
+        Ok(addr as isize)
     }
 
     pub fn sys_shmdt(&self, address: usize) -> SyscallResult {

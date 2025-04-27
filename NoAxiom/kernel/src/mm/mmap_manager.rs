@@ -90,7 +90,7 @@ impl MmapManager {
         start_va: VirtAddr,
         length: usize,
         prot: MmapProts,
-        _flags: MmapFlags,
+        flags: MmapFlags,
         st_offset: usize,
         file: Option<Arc<dyn File>>,
     ) -> usize {

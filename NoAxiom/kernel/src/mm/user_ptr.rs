@@ -1,9 +1,16 @@
 use alloc::{string::String, vec::Vec};
+use core::marker::PhantomData;
 
 use arch::{consts::KERNEL_ADDR_OFFSET, Arch, ArchMemory};
+use memory::address::VirtPageNum;
 
 use super::{address::VirtAddr, page_table::PageTable, validate::validate};
-use crate::{cpu::current_task, mm::address::VpnRange, syscall::SysResult};
+use crate::{
+    cpu::{current_cpu, current_task, get_hartid, CPUS},
+    mm::address::VpnRange,
+    sched::utils::block_on,
+    syscall::SysResult,
+};
 
 /// the UserPtr is a wrapper for user-space pointer
 /// NOTE THAT: it will NOT validate the pointer
@@ -33,8 +40,9 @@ use crate::{cpu::current_task, mm::address::VpnRange, syscall::SysResult};
 /// ```
 #[repr(C)]
 #[derive(Clone, Copy)]
-pub struct UserPtr<T> {
-    ptr: *mut T,
+pub struct UserPtr<T = u8> {
+    _phantom: PhantomData<T>,
+    addr: usize,
 }
 
 impl<T> UserPtr<T> {
@@ -43,33 +51,51 @@ impl<T> UserPtr<T> {
             addr & KERNEL_ADDR_OFFSET == 0,
             "shouldn't pass kernel address"
         );
-        Self {
-            ptr: addr as *mut T,
-        }
+        let res = Self {
+            _phantom: PhantomData,
+            addr,
+        };
+        // Arch::tlb_flush();
+        // let vpn = VirtPageNum::from(addr >> 12);
+        // if let Some(task) = CPUS[get_hartid()].as_ref().task.as_ref() {
+        //     let _res = block_on(validate(
+        //         task.memory_set(),
+        //         vpn,
+        //         None,
+        //         PageTable::from_ppn(Arch::current_root_ppn()).translate_vpn(vpn),
+        //     ));
+        // }
+        res
     }
 
+    #[inline(always)]
+    pub const fn ptr(&self) -> *mut T {
+        self.addr as *mut T
+    }
+
+    #[inline(always)]
     pub fn new_null() -> Self {
         Self::new(0)
     }
 
     #[inline(always)]
     pub fn is_null(&self) -> bool {
-        self.ptr.is_null()
+        self.ptr().is_null()
     }
 
     #[inline(always)]
     pub fn inc(&mut self, count: usize) {
-        self.ptr = unsafe { self.ptr.add(count) };
+        self.addr = unsafe { self.ptr().add(count) } as usize;
     }
 
     #[inline(always)]
-    pub fn addr(&self) -> VirtAddr {
-        VirtAddr(self.ptr as usize)
+    pub const fn addr(&self) -> VirtAddr {
+        VirtAddr(self.addr as usize)
     }
 
     #[inline(always)]
-    pub fn addr_usize(&self) -> usize {
-        self.ptr as usize
+    pub const fn addr_usize(&self) -> usize {
+        self.addr as usize
     }
 
     #[inline(always)]
@@ -77,7 +103,7 @@ impl<T> UserPtr<T> {
     where
         T: Copy,
     {
-        unsafe { self.ptr.read_volatile() }
+        unsafe { self.ptr().read_volatile() }
         // unsafe { *self.ptr }
     }
 
@@ -86,18 +112,18 @@ impl<T> UserPtr<T> {
     where
         T: Copy,
     {
-        unsafe { self.ptr.read_volatile() }
+        unsafe { self.ptr().read_volatile() }
     }
 
     #[inline(always)]
     pub fn write(&self, value: T) {
-        unsafe { self.ptr.write_volatile(value) };
+        unsafe { self.ptr().write_volatile(value) };
         // unsafe { *self.ptr = value };
     }
 
     #[inline(always)]
     pub fn write_volatile(&self, value: T) {
-        unsafe { self.ptr.write_volatile(value) };
+        unsafe { self.ptr().write_volatile(value) };
     }
 
     /// clone a slice as vec from user space
@@ -105,7 +131,7 @@ impl<T> UserPtr<T> {
     where
         T: Copy,
     {
-        let mut ptr = self.ptr as usize;
+        let mut ptr = self.addr as usize;
         let mut res = Vec::with_capacity(len);
         let step = core::mem::size_of::<T>();
         trace!("[as_vec] ptr: {:#x}", ptr);
@@ -122,7 +148,7 @@ impl<T> UserPtr<T> {
     where
         T: Copy,
     {
-        let mut ptr = self.ptr as usize;
+        let mut ptr = self.addr as usize;
         let mut res = Vec::new();
         let step = core::mem::size_of::<T>();
         loop {
@@ -138,7 +164,7 @@ impl<T> UserPtr<T> {
     }
 
     pub async fn as_slice_mut_checked<'a>(&self, len: usize) -> SysResult<&mut [T]> {
-        let ptr_u8 = UserPtr::<u8>::new(self.ptr as usize);
+        let ptr_u8 = UserPtr::<u8>::new(self.addr as usize);
         let len_u8 = len * core::mem::size_of::<T>();
         let slice = ptr_u8.as_slice_mut_checked_raw(len_u8).await?;
         Ok(unsafe { core::slice::from_raw_parts_mut(slice.as_ptr() as *mut T, len) })
@@ -174,7 +200,7 @@ impl UserPtr<u8> {
                 validate(memory_set, vpn, None, None).await?;
             }
         }
-        Ok(unsafe { core::slice::from_raw_parts_mut(self.ptr, len) })
+        Ok(unsafe { core::slice::from_raw_parts_mut(self.ptr(), len) })
     }
 }
 

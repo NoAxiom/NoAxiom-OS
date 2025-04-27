@@ -82,10 +82,11 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
     // user exit when detect unexpected trap
     let user_exit = |msg: &str| {
         error!(
-            "[user_trap_handler] unexpected exit!!! msg: {}, trap_type: {:#x?}, sepc = {:#x}",
+            "[user_trap_handler] unexpected exit!!! msg: {}, trap_type: {:#x?}, sepc = {:#x}, cx = {:#x?}",
             msg,
             trap_type,
             cx[TrapArgs::EPC],
+            cx,
         );
         task.recv_siginfo(
             &mut task.pcb(),

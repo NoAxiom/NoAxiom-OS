@@ -12,7 +12,7 @@ impl Syscall<'_> {
     /// get a random number
     pub async fn sys_getrandom(&self, buf: usize, buflen: usize, _flags: usize) -> SyscallResult {
         info!("[sys_getrandom] buf: {:#x}, buflen: {}", buf, buflen);
-        let user_ptr = UserPtr::<u8>::new(buf);
+        let user_ptr = UserPtr::new(buf);
         let buf_slice = user_ptr.as_slice_mut_checked(buflen).await?;
 
         let mut remaining = buf_slice.len();
