@@ -403,7 +403,7 @@ impl Task {
             }),
         });
         task.thread_group().insert(&task);
-        task.tg_leader.call_once(|| Arc::downgrade(&task));
+        task.set_self_as_tg_leader();
         TASK_MANAGER.insert(&task);
         PROCESS_GROUP_MANAGER.insert_new_group(&task);
         info!("[spawn] new task spawn complete, tid {}", task.tid.0);
@@ -596,7 +596,10 @@ impl Task {
             });
             new_process.thread_group().insert(&new_process);
             new_process.set_self_as_tg_leader();
-            self.pcb().children.push(new_process.clone()); // fixme: might use tg leader
+            self.get_tg_leader()
+                .pcb()
+                .children
+                .push(new_process.clone()); // fixme: might use tg leader
             TASK_MANAGER.insert(&new_process);
             PROCESS_GROUP_MANAGER.insert_process(new_pgid, &new_process);
             new_process
