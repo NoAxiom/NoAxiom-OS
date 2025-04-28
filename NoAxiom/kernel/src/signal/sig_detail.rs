@@ -1,4 +1,5 @@
 #[derive(Copy, Clone, Debug)]
+#[allow(unused)]
 pub enum SigDetail {
     None,
     Child(SigChildDetail),
@@ -6,6 +7,7 @@ pub enum SigDetail {
 }
 
 #[derive(Copy, Clone, Debug)]
+#[allow(unused)]
 pub struct SigChildDetail {
     // pub _si_uid: u32,     // Real user ID of sending process
     pub pid: u32,            // Sending process ID
@@ -15,6 +17,7 @@ pub struct SigChildDetail {
 }
 
 #[derive(Copy, Clone, Debug)]
+#[allow(unused)]
 pub struct SigKillDetail {
     pub pid: usize,
 }

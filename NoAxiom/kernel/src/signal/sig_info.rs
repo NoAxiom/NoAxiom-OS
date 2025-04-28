@@ -1,35 +1,13 @@
-use arch::TrapContext;
-
 use super::{
     sig_detail::SigDetail,
     sig_num::{SigErrno, Signo},
-    sig_set::SigMask,
 };
-
-pub struct SigContext {
-    pub cx: TrapContext,
-    pub mask: SigMask,
-}
-
-impl SigContext {
-    // pub const fn empty() -> Self {
-    //     Self {
-    //         cx: TrapContext::empty(),
-    //         mask: SigMask::empty(),
-    //     }
-    // }
-    pub fn from_another(cx: &TrapContext, mask: SigMask) -> Self {
-        Self {
-            cx: cx.clone(),
-            mask: mask.clone(),
-        }
-    }
-}
 
 /// signal code
 /// when value <= 0, it means the signal is sent by user mode
 #[derive(Copy, Debug, Clone)]
 #[repr(i32)]
+#[allow(unused)]
 pub enum SigCode {
     /// sent by kill, sigsend, raise
     User = 0,
@@ -49,8 +27,36 @@ pub enum SigCode {
 
 #[derive(Clone, Copy, Debug)]
 pub struct SigInfo {
-    pub signo: Signo,      // signal number
-    pub code: SigCode,     // signal code
-    pub errno: SigErrno,   // errno value
-    pub detail: SigDetail, // detailed info
+    /// signal number
+    pub signo: Signo,
+
+    /// signal code
+    pub code: SigCode,
+
+    /// errno value
+    #[allow(unused)]
+    pub errno: SigErrno,
+
+    /// detailed info
+    #[allow(unused)]
+    pub detail: SigDetail,
+}
+
+impl SigInfo {
+    pub fn new_simple(signo: Signo, code: SigCode) -> Self {
+        Self {
+            signo,
+            code,
+            errno: 0,
+            detail: SigDetail::None,
+        }
+    }
+    pub fn new_detailed(signo: Signo, code: SigCode, errno: SigErrno, detail: SigDetail) -> Self {
+        Self {
+            signo,
+            code,
+            errno,
+            detail,
+        }
+    }
 }

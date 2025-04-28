@@ -2,16 +2,14 @@
 //! [`UserTaskFuture`] represents a user task future,
 //! use [`spawn_utask`] to spawn user tasks
 
-use alloc::{string::String, sync::Arc};
-use core::future::{self, Future};
+use alloc::sync::Arc;
+use core::future::Future;
 
 use async_task::{Builder, WithInfo};
 
 use super::{runtime::RUNTIME, sched_entity::SchedEntity, sched_info::SchedInfo, vsched::Runtime};
 use crate::{
     cpu::get_hartid,
-    fs::path::Path,
-    include::fs::InodeMode,
     task::{
         task_main::{task_main, UserTaskFuture},
         Task,

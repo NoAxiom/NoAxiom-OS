@@ -599,7 +599,7 @@ impl Task {
             self.get_tg_leader()
                 .pcb()
                 .children
-                .push(new_process.clone()); // fixme: might use tg leader
+                .push(new_process.clone());
             TASK_MANAGER.insert(&new_process);
             PROCESS_GROUP_MANAGER.insert_process(new_pgid, &new_process);
             new_process

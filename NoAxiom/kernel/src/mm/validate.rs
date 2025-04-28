@@ -97,11 +97,13 @@ impl Task {
         self: &Arc<Self>,
         addr: usize,
         trap_type: Option<TrapType>,
+        is_blockon: bool,
     ) -> SysResult<()> {
         debug!(
-            "[memory_validate] {:x?} at pc={:#x}",
+            "[memory_validate] {:x?} at user_pc={:#x}, is_kernel: {}",
             trap_type,
-            self.trap_context()[arch::TrapArgs::EPC]
+            self.trap_context()[arch::TrapArgs::EPC],
+            is_blockon,
         );
         let ms = self.memory_set();
         let vpn = VirtAddr::from(addr).floor();

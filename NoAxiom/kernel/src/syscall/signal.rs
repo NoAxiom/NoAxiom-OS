@@ -145,12 +145,12 @@ impl Syscall<'_> {
                 {
                     task.recv_siginfo(
                         &mut task.pcb(),
-                        SigInfo {
+                        SigInfo::new_detailed(
                             signo,
-                            code: SigCode::User,
-                            errno: 0,
-                            detail: SigDetail::Kill(SigKillDetail { pid: pgid }),
-                        },
+                            SigCode::User,
+                            0,
+                            SigDetail::Kill(SigKillDetail { pid: pgid }),
+                        ),
                         false,
                     );
                 }
@@ -161,12 +161,12 @@ impl Syscall<'_> {
                     if task.tgid() != INIT_PROCESS_ID && task.is_group_leader() {
                         task.recv_siginfo(
                             &mut task.pcb(),
-                            SigInfo {
+                            SigInfo::new_detailed(
                                 signo,
-                                code: SigCode::User,
-                                errno: 0,
-                                detail: SigDetail::Kill(SigKillDetail { pid: task.tgid() }),
-                            },
+                                SigCode::User,
+                                0,
+                                SigDetail::Kill(SigKillDetail { pid: task.tgid() }),
+                            ),
                             false,
                         );
                     }
@@ -177,12 +177,12 @@ impl Syscall<'_> {
                     if task.is_group_leader() {
                         task.recv_siginfo(
                             &mut task.pcb(),
-                            SigInfo {
+                            SigInfo::new_detailed(
                                 signo,
-                                code: SigCode::User,
-                                errno: 0,
-                                detail: SigDetail::Kill(SigKillDetail { pid: task.tgid() }),
-                            },
+                                SigCode::User,
+                                0,
+                                SigDetail::Kill(SigKillDetail { pid: task.tgid() }),
+                            ),
                             false,
                         );
                     } else {
@@ -206,12 +206,12 @@ impl Syscall<'_> {
                     if task.tgid() == -pid as usize {
                         task.recv_siginfo(
                             &mut task.pcb(),
-                            SigInfo {
+                            SigInfo::new_detailed(
                                 signo,
-                                code: SigCode::User,
-                                errno: 0,
-                                detail: SigDetail::Kill(SigKillDetail { pid: pgid }),
-                            },
+                                SigCode::User,
+                                0,
+                                SigDetail::Kill(SigKillDetail { pid: pgid }),
+                            ),
                             false,
                         );
                         return Ok(0);

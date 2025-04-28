@@ -49,6 +49,7 @@ fn panic(info: &PanicInfo) -> ! {
             info.message().unwrap()
         );
     }
-    loop {}
+    println!("[PANIC] press any key to shutdown");
+    while platform::getchar() as i8 == -1 {}
     platform::shutdown()
 }

@@ -9,7 +9,6 @@ use crate::{
     cpu::{current_cpu, current_task, get_hartid},
     sched::utils::{block_on, yield_now},
     signal::{
-        sig_detail::SigDetail,
         sig_info::{SigCode, SigInfo},
         sig_num::SigNum,
     },
@@ -40,7 +39,7 @@ fn kernel_trap_handler() {
                     "[kernel] block on memory_validate, epc: {:#x}, addr: {:#x}",
                     epc, addr
                 );
-                match block_on(task.memory_validate(addr, Some(trap_type))) {
+                match block_on(task.memory_validate(addr, Some(trap_type), true)) {
                     Ok(_) => trace!("[memory_validate] success in kernel_trap_handler"),
                     Err(_) => kernel_panic("memory_validate failed"),
                 }
@@ -90,12 +89,7 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
         );
         task.recv_siginfo(
             &mut task.pcb(),
-            SigInfo {
-                signo: SigNum::SIGSEGV.into(),
-                code: SigCode::Kernel,
-                errno: 0,
-                detail: SigDetail::None,
-            },
+            SigInfo::new_simple(SigNum::SIGSEGV.into(), SigCode::Kernel),
             false,
         );
     };
@@ -113,10 +107,10 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
         TrapType::LoadPageFault(addr)
         | TrapType::StorePageFault(addr)
         | TrapType::InstructionPageFault(addr) => {
-            match task.memory_validate(addr, Some(trap_type)).await {
+            match task.memory_validate(addr, Some(trap_type), false).await {
                 Ok(_) => trace!("[memory_validate] success in user_trap_handler"),
                 Err(_) => {
-                    panic!(
+                    error!(
                         "[user_trap] page fault at hart: {}, tid: {}, epc = {:#x}, addr = {:#x}, user_sp = {:#x}, ra = {:#x}",
                         get_hartid(),
                         task.tid(),

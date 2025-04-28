@@ -85,17 +85,17 @@ impl Task {
                 par_pcb.zombie_children.push(self.clone());
 
                 // send SIGCHLD
-                let siginfo = SigInfo {
-                    signo: SigNum::SIGCHLD.into(),
-                    code: SigCode::User,
-                    errno: 0,
-                    detail: SigDetail::Child(SigChildDetail {
+                let siginfo = SigInfo::new_detailed(
+                    SigNum::SIGCHLD.into(),
+                    SigCode::User,
+                    0,
+                    SigDetail::Child(SigChildDetail {
                         pid: self.tgid() as u32,
                         status: Some(pcb.exit_code()),
                         utime: None,
                         stime: None,
                     }),
-                };
+                );
                 parent.recv_siginfo(&mut par_pcb, siginfo, false);
                 drop(par_pcb);
             } else {
@@ -118,6 +118,7 @@ impl ExitCode {
     pub fn new(code: i32) -> Self {
         Self((code & 0xFF) << 8)
     }
+    #[allow(unused)]
     pub fn new_raw(code: i32) -> Self {
         Self(code)
     }

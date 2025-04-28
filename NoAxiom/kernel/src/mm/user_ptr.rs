@@ -2,15 +2,9 @@ use alloc::{string::String, vec::Vec};
 use core::marker::PhantomData;
 
 use arch::{consts::KERNEL_ADDR_OFFSET, Arch, ArchMemory};
-use memory::address::VirtPageNum;
 
 use super::{address::VirtAddr, page_table::PageTable, validate::validate};
-use crate::{
-    cpu::{current_cpu, current_task, get_hartid, CPUS},
-    mm::address::VpnRange,
-    sched::utils::block_on,
-    syscall::SysResult,
-};
+use crate::{cpu::current_task, mm::address::VpnRange, syscall::SysResult};
 
 /// the UserPtr is a wrapper for user-space pointer
 /// NOTE THAT: it will NOT validate the pointer
@@ -51,21 +45,10 @@ impl<T> UserPtr<T> {
             addr & KERNEL_ADDR_OFFSET == 0,
             "shouldn't pass kernel address"
         );
-        let res = Self {
+        Self {
             _phantom: PhantomData,
             addr,
-        };
-        // Arch::tlb_flush();
-        // let vpn = VirtPageNum::from(addr >> 12);
-        // if let Some(task) = CPUS[get_hartid()].as_ref().task.as_ref() {
-        //     let _res = block_on(validate(
-        //         task.memory_set(),
-        //         vpn,
-        //         None,
-        //         PageTable::from_ppn(Arch::current_root_ppn()).translate_vpn(vpn),
-        //     ));
-        // }
-        res
+        }
     }
 
     #[inline(always)]
@@ -103,11 +86,12 @@ impl<T> UserPtr<T> {
     where
         T: Copy,
     {
-        unsafe { self.ptr().read_volatile() }
-        // unsafe { *self.ptr }
+        // unsafe { self.ptr().read_volatile() }
+        unsafe { *self.ptr() }
     }
 
     #[inline(always)]
+    #[allow(unused)]
     pub fn read_volatile(&self) -> T
     where
         T: Copy,
@@ -117,11 +101,12 @@ impl<T> UserPtr<T> {
 
     #[inline(always)]
     pub fn write(&self, value: T) {
-        unsafe { self.ptr().write_volatile(value) };
-        // unsafe { *self.ptr = value };
+        // unsafe { self.ptr().write_volatile(value) };
+        unsafe { *self.ptr() = value };
     }
 
     #[inline(always)]
+    #[allow(unused)]
     pub fn write_volatile(&self, value: T) {
         unsafe { self.ptr().write_volatile(value) };
     }
@@ -173,7 +158,8 @@ impl<T> UserPtr<T> {
 
 impl UserPtr<u8> {
     /// get user string with length provided
-    pub fn as_string(&self, len: usize) -> String {
+    #[allow(unused)]
+    pub fn as_string_with_len(&self, len: usize) -> String {
         let vec = self.clone_as_vec(len);
         let res = String::from_utf8(vec).unwrap();
         res
