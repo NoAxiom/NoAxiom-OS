@@ -1,4 +1,3 @@
-
 extern crate rlibc;
 use rlibc::memcmp;
 #[no_mangle]

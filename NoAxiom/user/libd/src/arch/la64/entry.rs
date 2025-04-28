@@ -2,7 +2,6 @@ use core::arch::asm;
 
 use crate::entry::entry;
 
-#[linkage = "weak"]
 #[no_mangle]
 #[link_section = ".text.entry"]
 pub unsafe extern "C" fn _start() -> ! {

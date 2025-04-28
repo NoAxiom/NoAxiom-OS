@@ -408,10 +408,15 @@ impl MemorySet {
         auxs.push(AuxEntry(AT_CLKTCK, Arch::get_freq() as usize));
         auxs.push(AuxEntry(AT_SECURE, 0));
 
+        let user_sp = user_stack_end.into();
+        info!(
+            "[load_elf] done, entry: {:#x}, sp: {:#x}",
+            entry_point, user_sp
+        );
         Ok(ElfMemoryInfo {
             memory_set,
             entry_point,
-            user_sp: user_stack_end.into(), // stack grows downward, so return stack_end
+            user_sp, // stack grows downward, so return stack_end
             auxs,
         })
     }
