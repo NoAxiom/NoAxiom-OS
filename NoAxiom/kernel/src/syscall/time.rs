@@ -1,6 +1,5 @@
 use core::time::Duration;
 
-use ext4_rs::return_errno;
 use include::errno::Errno;
 
 use super::{Syscall, SyscallResult};

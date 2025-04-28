@@ -6,9 +6,8 @@ use super::{Syscall, SyscallResult};
 use crate::{
     fs::path::Path,
     include::{
-        process::{PidSel, WaitOption},
+        process::{CloneFlags, PidSel, WaitOption},
         result::Errno,
-        sched::CloneFlags,
     },
     mm::user_ptr::UserPtr,
     sched::spawn::spawn_utask,

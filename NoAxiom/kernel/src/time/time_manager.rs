@@ -1,3 +1,6 @@
+//! reference: Phoenix
+//! https://gitlab.eduxiji.net/educg-group-22026-2376550/T202418123993075-1053/-/blob/265a693df30be6e11d9b96a3466bd5a70cd0f6af/modules/timer/src/lib.rs
+
 use alloc::{boxed::Box, collections::binary_heap::BinaryHeap};
 use core::{cmp::Reverse, task::Waker, time::Duration};
 
@@ -45,7 +48,6 @@ impl Timer {
                 None
             }
         }
-
         Self {
             expire,
             data: Box::new(WakerData { waker }),

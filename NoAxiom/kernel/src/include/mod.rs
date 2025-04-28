@@ -6,7 +6,6 @@ pub mod mm;
 pub mod net;
 pub mod process;
 pub mod resource;
-pub mod sched;
-pub mod syscall;
+pub mod syscall_id;
 
 pub use include::errno as result;

@@ -4,7 +4,7 @@ use arch::{ArchTrapContext, TrapContext};
 
 use super::SyscallResult;
 use crate::{
-    include::{result::Errno, syscall::SyscallID},
+    include::{result::Errno, syscall_id::SyscallID},
     task::Task,
 };
 
