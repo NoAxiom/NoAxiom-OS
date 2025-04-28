@@ -11,6 +11,7 @@ export ROOT := $(shell pwd)
 export LOG ?= DEBUG
 export ELF_PATH ?=   # This is for mk_fs.sh
 export TEST_TYPE ?= Official
+export USER_PROJECT := NoAxiom-OS-User
 export ERROR := "\e[31m"
 export WARN := "\e[33m"
 export NORMAL := "\e[32m"
@@ -80,7 +81,7 @@ build_kernel: $(FS_IMG)
 	@cd $(PROJECT)/kernel && make build
 
 build_user:
-	@cd $(PROJECT)/user && make build
+	@cd $(USER_PROJECT) && make build
 
 asm:
 	@echo -e $(NORMAL)"Building Kernel and Generating Assembly..."$(RESET)
@@ -89,7 +90,7 @@ asm:
 
 user_asm:
 	@echo -e "Building User and Generating Assembly..."
-	@cd $(PROJECT)/user && make asm
+	@cd $(USER_PROJECT) && make asm
 
 # backup: 
 # 	@cp $(ROOTFS) $(SDCARD_BAK) 
@@ -138,7 +139,7 @@ clean:
 vendor:
 	@cargo clean
 	@cargo vendor
-	@cd $(PROJECT)/user && make vendor
+	@cd $(USER_PROJECT) && make vendor
 
 count:
 	@echo "kernel code statistic:"

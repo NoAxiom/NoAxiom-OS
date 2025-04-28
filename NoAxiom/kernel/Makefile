@@ -65,10 +65,7 @@ kernel:
 build: kernel
 	@echo -e $(NORMAL)"Kernel Build Finished."$(RESET)
 
-initproc:
-	@cd ../user/apps && make build
-
 asm:
 	@cargo objdump $(CARGO_ARGS) --target $(TARGET) --quiet -- -d > $(ROOT)/log/kernel.asm
 
-.PHONY: kernel build initproc asm
+.PHONY: kernel build asm

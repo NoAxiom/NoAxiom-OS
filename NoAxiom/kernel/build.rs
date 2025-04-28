@@ -4,16 +4,16 @@ use std::{
 };
 
 fn main() {
-    println!("cargo:rerun-if-changed=../user/apps/");
+    println!("cargo:rerun-if-changed=../../NoAxiom-OS-User/apps/");
     println!("cargo:rerun-if-changed={}", TARGET_PATH);
     insert_app_data().unwrap();
 }
 
-static TARGET_PATH: &str = "./NoAxiom/user/bin/";
+static TARGET_PATH: &str = "./NoAxiom-OS-User/bin/";
 
 fn insert_app_data() -> Result<()> {
     let mut f = File::create("src/link_apps.S").unwrap();
-    let mut apps: Vec<String> = read_dir("../user/bin")?
+    let mut apps: Vec<String> = read_dir("../../NoAxiom-OS-User/bin")?
         .filter_map(|entry| entry.ok())
         .map(|entry| entry.file_name().into_string().unwrap())
         .collect();
