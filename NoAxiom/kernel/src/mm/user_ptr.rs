@@ -129,7 +129,7 @@ impl<T> UserPtr<T> {
     }
 
     /// get user slice until the checker returns true
-    pub fn clone_as_vec_until(&self, checker: &dyn Fn(&T) -> bool) -> Vec<T>
+    pub fn clone_as_vec_until(&self, checker: impl Fn(&T) -> bool) -> Vec<T>
     where
         T: Copy,
     {
@@ -167,8 +167,7 @@ impl UserPtr<u8> {
 
     /// get user string
     pub fn get_cstr(&self) -> String {
-        let checker = |&c: &u8| c as char == '\0';
-        let slice = self.clone_as_vec_until(&checker);
+        let slice = self.clone_as_vec_until(|&c: &u8| c as char == '\0');
         trace!("slice: {:?}", slice);
         let res = String::from_utf8(Vec::from(slice)).unwrap();
         res

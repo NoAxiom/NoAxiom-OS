@@ -66,7 +66,7 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
     trace!("[trap_handler] call trap handler");
 
     // check if need schedule
-    if task.tcb().time_stat.need_schedule() {
+    if task.tcb().time_stat.is_timeup() {
         trace!(
             "task {} yield by time = {:?}",
             task.tid(),

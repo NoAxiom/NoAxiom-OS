@@ -14,7 +14,7 @@ use crate::{
         memory_set::{kernel_space_activate, kernel_space_init},
     },
     sched::{runtime, utils::block_on},
-    time::{clock::ktime_init, sleep::sleep_handler},
+    time::{clock::ktime_init, sleep::timer_handler},
 };
 
 /// awake other core
@@ -94,7 +94,7 @@ pub extern "C" fn _boot_hart_init(_hartid: usize, dtb: usize) -> ! {
 pub fn run_tasks() -> ! {
     println!("[kernel] hart id {} has been booted", get_hartid());
     loop {
-        sleep_handler();
+        timer_handler();
         runtime::run();
     }
 }

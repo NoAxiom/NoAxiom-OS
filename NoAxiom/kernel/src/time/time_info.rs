@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use core::time::Duration;
 
 use super::{gettime::get_time_duration, time_slice::TIME_SLICE_DURATION};
@@ -10,9 +12,6 @@ pub struct KernelDuration {
     pub stime: Duration,
 }
 impl KernelDuration {
-    pub fn new(utime: Duration, stime: Duration) -> Self {
-        Self { utime, stime }
-    }
     pub const fn zero() -> Self {
         Self {
             utime: Duration::ZERO,
@@ -123,7 +122,7 @@ impl TimeInfo {
         }
         self.user_time_start = current_time;
     }
-    pub fn need_schedule(&self) -> bool {
+    pub fn is_timeup(&self) -> bool {
         get_time_duration() - self.schedule_time_start >= TIME_SLICE_DURATION
     }
 }

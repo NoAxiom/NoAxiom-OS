@@ -23,8 +23,7 @@ pub fn align_up(addr: usize, align: usize) -> usize {
 }
 
 pub fn get_string_from_ptr(ptr: &UserPtr<u8>) -> String {
-    let checker = |&c: &u8| c == 0;
-    let slice = ptr.clone_as_vec_until(&checker);
+    let slice = ptr.clone_as_vec_until(|&c: &u8| c == 0);
     let res = String::from_utf8(Vec::from(slice)).unwrap();
     trace!("get_string_from_ptr: {}", res);
     res
@@ -40,9 +39,4 @@ pub fn intermit(f: impl FnOnce()) {
     if crossover.trigger() {
         f();
     }
-}
-
-pub fn lowbit(x: usize) -> usize {
-    let x = x as isize;
-    (x & -x) as usize
 }
