@@ -243,7 +243,7 @@ impl MapArea {
             let data_slice = buf.as_slice();
 
             let src = &data_slice[0..len.min(PAGE_SIZE - page_offset)];
-            let ppn = PhysPageNum::from(page_table.translate_vpn(current_vpn).unwrap().ppn());
+            let ppn = PhysPageNum::from(page_table.find_pte(current_vpn).unwrap().ppn());
             let dst = &mut ppn.get_bytes_array()[page_offset..page_offset + src.len()];
             dst.copy_from_slice(src);
             offset += PAGE_SIZE - page_offset;

@@ -174,7 +174,7 @@ impl MemorySet {
         map_area.map_each(self.page_table());
         let pte = self
             .page_table()
-            .translate_vpn(map_area.vpn_range().start())
+            .find_pte(map_area.vpn_range().start())
             .unwrap();
         trace!(
             "create pte: ppn: {:#x}, flags: {:?}, raw_flag: {:?}",
@@ -684,7 +684,7 @@ pub async fn lazy_alloc_mmap<'a>(
         // todo: use suspend
         warn!("[mm] lazy_alloc_mmap: page already mapped, yield for it");
         while PageTable::from_ppn(Arch::current_root_ppn())
-            .translate_vpn(vpn)
+            .find_pte(vpn)
             .is_none()
         {
             yield_now().await;

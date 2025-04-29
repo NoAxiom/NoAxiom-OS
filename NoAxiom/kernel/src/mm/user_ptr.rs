@@ -181,7 +181,7 @@ impl UserPtr<u8> {
             VirtAddr::from(self.addr_usize()),
             VirtAddr::from(self.addr_usize() + len),
         ) {
-            if page_table.translate_vpn(vpn).is_none() {
+            if page_table.find_pte(vpn).is_none() {
                 validate(memory_set, vpn, None, None).await?;
             }
         }

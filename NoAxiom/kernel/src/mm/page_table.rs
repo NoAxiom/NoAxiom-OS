@@ -136,12 +136,6 @@ impl PageTable {
         }
     }
 
-    /// translate vpn into pte
-    /// returns None if nothing is mapped
-    pub fn translate_vpn(&self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
-        self.find_pte(vpn)
-    }
-
     /// translate va into pa
     /// returns None if nothing is mapped
     pub fn translate_va(&self, va: VirtAddr) -> Option<PhysAddr> {
@@ -151,20 +145,6 @@ impl PageTable {
             let aligned_pa: PhysAddr = pte.ppn().into();
             let offset = va.offset();
             let aligned_pa_usize: usize = aligned_pa.into();
-            (aligned_pa_usize + offset).into()
-        })
-    }
-
-    #[allow(unused)]
-    pub fn translate_va_debug(&self, va: VirtAddr) -> Option<PhysAddr> {
-        self.find_pte(va.clone().floor()).map(|pte| {
-            let aligned_pa: PhysAddr = pte.ppn().into();
-            let offset = va.offset();
-            let aligned_pa_usize: usize = aligned_pa.into();
-            debug!(
-                "translate_va_debug: va: {:#x}, pa: {:#x}, offset: {:#x}",
-                va.0, aligned_pa_usize, offset
-            );
             (aligned_pa_usize + offset).into()
         })
     }

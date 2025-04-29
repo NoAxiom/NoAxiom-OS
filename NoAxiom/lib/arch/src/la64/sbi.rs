@@ -2,10 +2,7 @@ use config::mm::KERNEL_STACK_SIZE;
 use loongArch64::ipi::{csr_mail_send, send_ipi_single};
 
 use super::LA64;
-use crate::{
-    la64::{boot::BOOT_STACK, memory::KERNEL_ADDR_OFFSET},
-    Arch, ArchInt, ArchSbi,
-};
+use crate::{la64::boot::BOOT_STACK, ArchSbi};
 
 impl ArchSbi for LA64 {
     fn hart_start(hartid: usize, start_addr: usize) {

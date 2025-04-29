@@ -1,6 +1,7 @@
 mod asm;
 mod boot;
 mod context;
+mod info;
 mod interrupt;
 mod memory;
 mod sbi;
@@ -10,6 +11,4 @@ mod trap;
 pub struct RV64;
 pub use boot::{_entry, _entry_other_hart};
 
-impl crate::ArchFull for RV64 {
-    const ARCH_NAME: &'static str = "riscv64";
-}
+impl crate::ArchFull for RV64 {}

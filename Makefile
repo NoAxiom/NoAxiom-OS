@@ -4,7 +4,7 @@
 export PROJECT := NoAxiom
 export MODE ?= release
 export KERNEL ?= kernel
-export ARCH_NAME ?= riscv64
+export ARCH_NAME ?= loongarch64
 export LIB_NAME ?= glibc
 export INIT_PROC ?= busybox
 export ROOT := $(shell pwd)
@@ -23,7 +23,7 @@ ifeq ($(ARCH_NAME),riscv64)
 	export OBJCOPY := rust-objcopy --binary-architecture=riscv64
 	export SBI ?= $(ROOT)/$(PROJECT)/bootloader/rustsbi-qemu.bin
 	export QEMU := qemu-system-riscv64
-	export MULTICORE := 1
+	export MULTICORE := 2
 else ifeq ($(ARCH_NAME),loongarch64)
 	export TARGET := loongarch64-unknown-linux-gnu
 	export OBJDUMP := loongarch64-linux-gnu-objdump

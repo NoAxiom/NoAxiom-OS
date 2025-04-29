@@ -108,7 +108,7 @@ impl Task {
         let ms = self.memory_set();
         let vpn = VirtAddr::from(addr).floor();
         let pt = PageTable::from_ppn(Arch::current_root_ppn());
-        let pte = pt.translate_vpn(vpn);
+        let pte = pt.find_pte(vpn);
         validate(ms, vpn, trap_type, pte).await
     }
 }

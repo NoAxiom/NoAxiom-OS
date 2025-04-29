@@ -1,4 +1,5 @@
-use arch::{Arch, ArchBoot, ArchInt, ArchSbi, _entry_other_hart, consts::KERNEL_ADDR_OFFSET};
+use arch::{Arch, ArchBoot, ArchInt, ArchSbi, _entry_other_hart, consts::KERNEL_ADDR_OFFSET, ArchInfo};
+use config::fs::LIB_NAME;
 
 use crate::{
     config::cpu::CPU_NUM,
@@ -57,10 +58,22 @@ pub extern "C" fn _boot_hart_init(_hartid: usize, dtb: usize) -> ! {
     // log init
     Arch::arch_init();
     driver::log_init();
+
+    // print basic info
     #[cfg(feature = "multicore")]
-    println!("multicore(on): CPU_NUM = {}", CPU_NUM);
+    println!(
+        "[kernel] MULTICORE: CPU_NUM = {}, BOOT_HART = {}",
+        CPU_NUM,
+        get_hartid()
+    );
     #[cfg(not(feature = "multicore"))]
-    println!("multicore(off): CPU_NUM = {}", CPU_NUM);
+    println!("[kernel] SINGLECORE: CPU_NUM = {}", CPU_NUM);
+    println!("[kernel] ARCH = {}, LIB = {}", Arch::ARCH_NAME, LIB_NAME);
+    info!(
+        "[first_init] entry init hart_id: {}, dtb_addr: {:#x}",
+        get_hartid(),
+        dtb as usize,
+    );
 
     // kernel space init
     frame_init();
@@ -74,25 +87,23 @@ pub extern "C" fn _boot_hart_init(_hartid: usize, dtb: usize) -> ! {
     block_on(fs::init());
 
     // spawn init_proc and wake other harts
-    // crate::entry::init_proc::schedule_spawn_all_apps();
     ktime_init();
     schedule_spawn_with_path();
     wake_other_hart(get_hartid());
 
-    // main
+    // print hello message
+    println!("[kernel] Hello, NoAxiom!");
     println!("{}", NOAXIOM_BANNER);
-    info!(
-        "[first_init] entry init hart_id: {}, dtb_addr: {:#x}",
-        get_hartid(),
-        dtb as usize,
-    );
+    println!("=============================================\n");
+
+    // start task runner
     run_tasks()
 }
 
 /// run_tasks: only act as a task runner
 #[no_mangle]
 pub fn run_tasks() -> ! {
-    println!("[kernel] hart id {} has been booted", get_hartid());
+    info!("[kernel] hart {} has been booted", get_hartid());
     loop {
         timer_handler();
         runtime::run();

@@ -7,7 +7,7 @@ use alloc::{
 };
 use core::{marker::PhantomData, ptr::null, task::Waker};
 
-use arch::{Arch, ArchFull, ArchMemory, ArchTrapContext, TrapContext};
+use arch::{Arch, ArchInfo, ArchMemory, ArchTrapContext, TrapContext};
 use config::fs::ROOT_NAME;
 use ksync::{
     cell::SyncUnsafeCell,

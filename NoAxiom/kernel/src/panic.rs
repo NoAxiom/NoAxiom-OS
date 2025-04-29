@@ -2,7 +2,7 @@
 
 use core::panic::PanicInfo;
 
-use arch::{Arch, ArchBoot};
+use arch::{Arch, ArchInfo};
 
 use crate::{
     cpu::{current_cpu, get_hartid},
