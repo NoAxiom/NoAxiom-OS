@@ -25,7 +25,7 @@ pub struct FileMeta {
     /// File flags, may be modified by multiple tasks
     flags: Mutex<FileFlags>,
     /// The position of the file, may be modified by multiple tasks
-    pos: AtomicUsize,
+    pub pos: AtomicUsize,
     /// Pointer to the Dentry
     dentry: Arc<dyn Dentry>,
     /// Pointer to the Inode
@@ -104,19 +104,11 @@ pub trait File: Send + Sync + DowncastSync {
 impl_downcast!(sync File);
 
 impl dyn File {
-    fn pos(&self) -> usize {
-        self.meta().pos.load(Ordering::Relaxed)
-    }
-
-    fn set_pos(&self, pos: usize) {
-        self.meta().pos.store(pos, Ordering::Relaxed);
-    }
-
     /// Called when the VFS needs to move the file position index.
     ///
     /// Return the result offset.
     pub fn seek(&self, pos: SeekFrom) -> SyscallResult {
-        let mut res_pos = self.pos();
+        let mut res_pos = self.meta().pos.load(Ordering::Acquire);
         match pos {
             SeekFrom::Current(offset) => {
                 if offset < 0 {
@@ -140,7 +132,7 @@ impl dyn File {
                 }
             }
         }
-        self.set_pos(res_pos);
+        self.meta().pos.store(res_pos, Ordering::Release);
         Ok(res_pos as isize)
     }
 
@@ -151,15 +143,15 @@ impl dyn File {
         Ok(buf)
     }
     pub async fn read(&self, buf: &mut [u8]) -> SyscallResult {
-        let offset = self.pos();
+        let offset = self.meta().pos.load(Ordering::Acquire);
         let len = self.base_read(offset, buf).await?;
-        self.meta().pos.fetch_add(len as usize, Ordering::Relaxed);
+        self.meta().pos.fetch_add(len as usize, Ordering::Release);
         Ok(len)
     }
     pub async fn write(&self, buf: &[u8]) -> SyscallResult {
-        let offset = self.pos();
+        let offset = self.meta().pos.load(Ordering::Acquire);
         let len = self.base_write(offset, buf).await?;
-        self.meta().pos.fetch_add(len as usize, Ordering::Relaxed);
+        self.meta().pos.fetch_add(len as usize, Ordering::Release);
         Ok(len)
     }
     pub fn name(&self) -> String {
@@ -185,7 +177,7 @@ impl dyn File {
         let mut buf_it = buf;
         let dentry = self.dentry();
         let children = dentry.children();
-        let offset = self.pos();
+        let offset = self.meta().pos.load(Ordering::Relaxed);
         for dentry in children.values().skip(offset) {
             if dentry.is_negative() {
                 self.seek(SeekFrom::Current(1))?;
