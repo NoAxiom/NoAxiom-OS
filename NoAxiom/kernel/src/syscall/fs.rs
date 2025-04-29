@@ -116,12 +116,11 @@ impl Syscall<'_> {
         let ptr = UserPtr::<u8>::new(filename);
         let path_str = get_string_from_ptr(&ptr);
         let mode = InodeMode::from_bits_truncate(mode);
+        let flags = FileFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
         info!(
-            "[sys_openat] dirfd {}, flags {:#x}, filename {}, mode {:?}",
+            "[sys_openat] dirfd {}, flags {:?}, filename {}, mode {:?}",
             fd, flags, path_str, mode
         );
-
-        let flags = FileFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
 
         let path = if flags.contains(FileFlags::O_CREATE) {
             info!("[sys_openat] O_CREATE");
@@ -158,7 +157,7 @@ impl Syscall<'_> {
         let fd = fd_table.alloc_fd()?;
         fd_table.set(fd, file);
 
-        trace!("[sys_openat] succeed fd: {}, path: {:?}", fd, file_path);
+        info!("[sys_openat] succeed fd: {}, path: {:?}", fd, file_path);
         Ok(fd as isize)
     }
 
@@ -673,9 +672,13 @@ impl Syscall<'_> {
         dirfd: isize,
         path: usize,
         times: usize,
-        _flags: usize,
+        flags: usize,
     ) -> SyscallResult {
-        info!("[sys_utimensat] dirfd: {}, times: {:#x}", dirfd, times);
+        let flags = FileFlags::from_bits(flags as u32).ok_or(Errno::EINVAL)?;
+        info!(
+            "[sys_utimensat] dirfd: {}, times: {:#x}, flags: {:?}",
+            dirfd, times, flags
+        );
         let fd_table = self.task.fd_table();
         let path_ptr = UserPtr::<u8>::new(path);
         let times_ptr = UserPtr::<TimeSpec>::new(times);

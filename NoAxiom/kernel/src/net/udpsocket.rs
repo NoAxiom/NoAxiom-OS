@@ -1,7 +1,6 @@
 use alloc::{boxed::Box, vec};
 
 use async_trait::async_trait;
-use futures_lite::future::yield_now;
 use smoltcp::{
     iface::SocketHandle,
     socket::udp,
@@ -19,6 +18,7 @@ use crate::{
         net::{ShutdownType, SocketOptions, SocketType},
         result::Errno,
     },
+    sched::utils::yield_now,
     syscall::SysResult,
 };
 

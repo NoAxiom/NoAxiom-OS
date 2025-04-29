@@ -111,7 +111,7 @@ impl Dentry for Ext4Dentry {
         // }
         if mode.contains(InodeMode::FILE) {
             debug!(
-                "create file: {}, this_inode: {}",
+                "create file: {}, parent_inode: {}",
                 child_path, this_inode_num
             );
             let new_file_inode = ext4

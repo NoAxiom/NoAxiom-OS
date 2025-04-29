@@ -327,6 +327,7 @@ pub struct Kstat {
     pub st_ctime_sec: isize,
     /// 最后一次改变状态时间 (纳秒)
     pub st_ctime_nsec: isize,
+    __unused: [u32; 2],
 }
 
 impl Kstat {
@@ -350,6 +351,7 @@ impl Kstat {
             st_mtime_nsec: stat.st_mtime_nsec as isize,
             st_ctime_sec: stat.st_ctime_sec as isize,
             st_ctime_nsec: stat.st_ctime_nsec as isize,
+            __unused: [0; 2],
         }
     }
 }

@@ -595,6 +595,7 @@ version = "0.1.0"
 dependencies = [
  "arch",
  "config",
+ "futures-lite",
  "kernel-sync",
  "spin 0.9.8",
 ]

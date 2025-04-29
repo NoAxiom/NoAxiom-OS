@@ -246,7 +246,11 @@ impl dyn Dentry {
                 current = child.clone();
                 idx += 1;
             } else {
-                warn!("[kernel] [find_path] file not exist");
+                #[cfg(feature = "debug_sig")]
+                {
+                    let path_str = path.join("/");
+                    warn!("[kernel] [find_path] {} not exist", path_str);
+                }
                 return Err(Errno::ENOENT);
             }
         }
