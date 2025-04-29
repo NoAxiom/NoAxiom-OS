@@ -4,7 +4,7 @@
 export PROJECT := NoAxiom
 export MODE ?= release
 export KERNEL ?= kernel
-export ARCH_NAME ?= loongarch64
+export ARCH_NAME ?= riscv64
 export LIB_NAME ?= glibc
 export INIT_PROC ?= busybox
 export ROOT := $(shell pwd)

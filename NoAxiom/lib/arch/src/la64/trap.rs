@@ -66,6 +66,7 @@ fn get_trap_type(tf: Option<&mut TrapContext>) -> TrapType {
             | Exception::PageNonReadableFault
             | Exception::MemoryAccessAddressError
             | Exception::PagePrivilegeIllegal => TrapType::LoadPageFault(badv),
+            Exception::InstructionNotExist => TrapType::IllegalInstruction(badv),
             _ => {
                 error!(
                     "[get_trap_type] unhandled exception: {:?}, pc = {:#x}, BADV = {:#x}, BADI = {:#x}",

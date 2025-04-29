@@ -2,9 +2,10 @@ use alloc::sync::Arc;
 
 use arch::{ArchTrapContext, TrapContext};
 
-use super::SyscallResult;
+use super::{utils::clear_current_syscall, SyscallResult};
 use crate::{
     include::{result::Errno, syscall_id::SyscallID},
+    syscall::utils::{current_syscall, update_current_syscall},
     task::Task,
 };
 
@@ -13,42 +14,12 @@ pub struct Syscall<'a> {
     pub task: &'a Arc<Task>,
 }
 
-#[cfg(feature = "debug_sig")]
-pub static CURRENT_SYSCALL: ksync::mutex::SpinLock<SyscallID> = ksync::mutex::SpinLock::new(SyscallID::NO_SYSCALL);
-
+#[rustfmt::skip]
 impl<'a> Syscall<'a> {
-    pub fn new(task: &'a Arc<Task>) -> Self {
-        Self { task }
-    }
-    pub async fn syscall(&mut self, id: usize, args: [usize; 6]) -> SyscallResult {
-        #[cfg(feature = "interruptable_async")]
-        {
-            // fixme: turn on the interrupt. When call trap_handler, cpu would turn off
-            // the interrupt until cpu ertn. But if we switch to another task, the whole
-            // life time is in the interrupt off state until previous task ertn.
-            use arch::ArchInt;
-            assert!(!arch::Arch::is_interrupt_enabled());
-            arch::Arch::enable_interrupt();
-        }
-        let id = SyscallID::from_repr(id as usize).ok_or_else(|| {
-            error!("invalid syscall id: {}", id);
-            Errno::ENOSYS
-        })?;
-
-        #[cfg(feature = "debug_sig")]
-        { *CURRENT_SYSCALL.lock() = id; }
-
-        if id.is_debug_on() {
-            let cx = self.task.trap_context();
-            use arch::TrapArgs::*;
-            info!(
-                "[syscall] tid: {}, sp: {:#x}, pc: {:#x}, ra: {:#x}, id: {:?}, args: {:X?}",
-                self.task.tid(), cx[SP], cx[EPC], cx[RA], id, args
-            );
-        }
+    /// syscall implementation inner, with syscall lookup table
+    async fn syscall_inner(&mut self, id: SyscallID, args: [usize; 6]) -> SyscallResult {
         use SyscallID::*;
-        #[rustfmt::skip]
-        let res = match id {
+        match id {
             // fs
             SYS_FCHMODAT =>         Self::empty_syscall("fchmodat", 0),
             SYS_UMASK =>            Self::empty_syscall("umask", 0x777),
@@ -186,14 +157,50 @@ impl<'a> Syscall<'a> {
                 // let _ = self.sys_exit(Errno::ENOSYS as usize);
                 Err(Errno::ENOSYS)
             }
-        };
+        }
+    }
+}
+
+impl<'a> Syscall<'a> {
+    pub fn new(task: &'a Arc<Task>) -> Self {
+        Self { task }
+    }
+    /// syscall implementation with debug info
+    pub async fn syscall(&mut self, id: usize, args: [usize; 6]) -> SyscallResult {
+        #[cfg(feature = "interruptable_async")]
+        {
+            // fixme: turn on the interrupt. When call trap_handler, cpu would turn off
+            // the interrupt until cpu ertn. But if we switch to another task, the whole
+            // life time is in the interrupt off state until previous task ertn.
+            use arch::ArchInt;
+            assert!(!arch::Arch::is_interrupt_enabled());
+            arch::Arch::enable_interrupt();
+        }
+        let id = SyscallID::from_repr(id as usize).ok_or_else(|| {
+            error!("invalid syscall id: {}", id);
+            Errno::ENOSYS
+        })?;
         #[cfg(feature = "debug_sig")]
+        update_current_syscall(id);
+        if id.is_debug_on() {
+            let cx = self.task.trap_context();
+            use arch::TrapArgs::*;
+            info!(
+                "[syscall] tid: {}, sp: {:#x}, pc: {:#x}, ra: {:#x}, id: {:?}, args: {:X?}",
+                self.task.tid(),
+                cx[SP],
+                cx[EPC],
+                cx[RA],
+                id,
+                args
+            );
+        }
+        let res = self.syscall_inner(id, args).await;
         if id.is_debug_on() {
             info!("[syscall(out)] syscall id: {:?}, res: {:?}", id, res);
         }
         res
     }
-
     fn empty_syscall(name: &str, res: isize) -> SyscallResult {
         info!("[sys_{}] do nothing.", name);
         Ok(res)
@@ -209,9 +216,9 @@ impl Task {
             Ok(res) => res,
             Err(errno) => {
                 #[cfg(feature = "debug_sig")]
-                error!("during {:?}",CURRENT_SYSCALL.lock());
+                error!("during {:?}", current_syscall());
                 error!("syscall error: {:?}", errno);
-                let errno = errno as isize;
+                let errno: isize = errno as isize;
                 match errno > 0 {
                     true => -errno,
                     false => errno,
@@ -219,7 +226,7 @@ impl Task {
             }
         };
         #[cfg(feature = "debug_sig")]
-        { *CURRENT_SYSCALL.lock() = SyscallID::NO_SYSCALL; }
+        clear_current_syscall();
         ret
     }
 }

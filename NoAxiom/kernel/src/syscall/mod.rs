@@ -13,6 +13,7 @@ pub mod signal;
 pub mod syscall;
 pub mod system;
 pub mod time;
+pub mod utils;
 
 #[macro_use]
 pub mod macros;

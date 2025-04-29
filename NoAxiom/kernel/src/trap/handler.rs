@@ -21,13 +21,10 @@ fn kernel_trap_handler() {
     let trap_type = Arch::read_trap_type(None);
     let epc = Arch::read_epc();
     let kernel_panic = |msg: &str| {
-        error!(
+        panic!(
             "[kernel trap] msg: {}, trap_type: {:#x?}, epc: {:#x} ",
             msg, trap_type, epc,
         );
-        let cx = current_task().trap_context();
-        error!("[kernel trap] cx: {:#x?}", cx);
-        panic!();
     };
     match trap_type {
         TrapType::StorePageFault(addr)
@@ -78,22 +75,6 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
     // def: context, user trap pc, trap type
     let cx = task.trap_context_mut();
 
-    // user exit when detect unexpected trap
-    let user_exit = |msg: &str| {
-        error!(
-            "[user_trap_handler] unexpected exit!!! msg: {}, trap_type: {:#x?}, sepc = {:#x}, cx = {:#x?}",
-            msg,
-            trap_type,
-            cx[TrapArgs::EPC],
-            cx,
-        );
-        task.recv_siginfo(
-            &mut task.pcb(),
-            SigInfo::new_simple(SigNum::SIGSEGV.into(), SigCode::Kernel),
-            false,
-        );
-    };
-
     // user trap handler vector
     match trap_type {
         // syscall
@@ -111,15 +92,25 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
                 Ok(_) => trace!("[memory_validate] success in user_trap_handler"),
                 Err(_) => {
                     error!(
-                        "[user_trap] page fault at hart: {}, tid: {}, epc = {:#x}, addr = {:#x}, user_sp = {:#x}, ra = {:#x}",
+                        "[user_trap] page fault at hart: {}, tid: {}, trap_type: {:x?}, epc = {:#x}, user_sp = {:#x}, ra = {:#x}",
                         get_hartid(),
                         task.tid(),
+                        trap_type,
                         cx[TrapArgs::EPC],
-                        addr,
                         cx[TrapArgs::SP],
                         cx[TrapArgs::RA],
                     );
-                    user_exit("memory_validate failed");
+                    println!(
+                        "[kernel] task {} trigger SIGSEGV at pc={:#x}, addr={:#x}",
+                        task.tid(),
+                        cx[TrapArgs::EPC],
+                        addr,
+                    );
+                    task.recv_siginfo(
+                        &mut task.pcb(),
+                        SigInfo::new_simple(SigNum::SIGSEGV.into(), SigCode::Kernel),
+                        false,
+                    );
                 }
             }
         }
@@ -150,7 +141,7 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
         }
         TrapType::None => {}
         _ => {
-            user_exit("unsupported trap type");
+            panic!("unsupported trap type: {trap_type:x?}");
         }
     }
 }

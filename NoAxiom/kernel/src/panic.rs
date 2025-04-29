@@ -6,6 +6,7 @@ use arch::{Arch, ArchInfo};
 
 use crate::{
     cpu::{current_cpu, get_hartid},
+    syscall::utils::current_syscall,
     time::gettime::get_time_ms,
 };
 
@@ -25,10 +26,7 @@ fn panic(info: &PanicInfo) -> ! {
         get_time_ms(),
     );
     #[cfg(feature = "debug_sig")]
-    println!(
-        "[PANIC] during syscall {:?}",
-        crate::syscall::syscall::CURRENT_SYSCALL.lock()
-    );
+    println!("[PANIC] during syscall {:?}", current_syscall());
     if let Some(task) = current_cpu().task.as_ref() {
         let cx = task.trap_context();
         println!("[PANIC] cx detected: {:#x?}", cx);
