@@ -74,7 +74,7 @@ fn get_trap_type(tf: Option<&mut TrapContext>) -> TrapType {
                     badv,
                     badi::read().inst(),
                 );
-                error!("[get_trap_type] trap_cx: {:#x?}", tf);
+                // error!("[get_trap_type] trap_cx: {:#x?}", tf);
                 TrapType::Unknown
             }
         },
@@ -96,7 +96,7 @@ fn get_trap_type(tf: Option<&mut TrapContext>) -> TrapType {
                     era::read().pc(),
                     badv,
                 );
-                error!("[get_trap_type] trap_cx: {:#x?}", tf);
+                // error!("[get_trap_type] trap_cx: {:#x?}", tf);
                 TrapType::Unknown
             }
         },

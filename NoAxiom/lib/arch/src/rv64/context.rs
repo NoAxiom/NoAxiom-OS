@@ -146,7 +146,7 @@ pub struct TrapContext {
 impl core::fmt::Debug for TrapContext {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("TrapContext")
-            .field("r0 /zero", &self.x[0])
+            .field("r0  / r0", &self.x[0])
             .field("r1  / ra", &self.x[1])
             .field("r2  / sp", &self.x[2])
             .field("r3  / gp", &self.x[3])

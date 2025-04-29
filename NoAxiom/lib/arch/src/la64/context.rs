@@ -7,7 +7,7 @@ use crate::{ArchTrapContext, ArchUserFloatContext, TrapArgs};
 /// Saved registers when a trap (interrupt or exception) occurs.
 #[repr(C)]
 #[repr(align(64))]
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Default, Clone, Copy)]
 pub struct TrapContext {
     /// [0~31]/[0~255]: General Registers
     pub(crate) x: [usize; 32],
@@ -91,6 +91,54 @@ impl IndexMut<TrapArgs> for TrapContext {
             TrapArgs::TLS => &mut self.x[2],
             TrapArgs::SYSCALL => &mut self.x[11],
         }
+    }
+}
+
+impl core::fmt::Debug for TrapContext {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("TrapContext")
+            .field("r0  / r0", &self.x[0])
+            .field("r1  / ra", &self.x[1])
+            .field("r2  / tp", &self.x[2])
+            .field("r3  / sp", &self.x[3])
+            .field("r4  / a0", &self.x[4])
+            .field("r5  / a1", &self.x[5])
+            .field("r6  / a2", &self.x[6])
+            .field("r7  / a3", &self.x[7])
+            .field("r8  / a4", &self.x[8])
+            .field("r9  / a5", &self.x[9])
+            .field("r10 / a6", &self.x[10])
+            .field("r11 / a7", &self.x[11])
+            .field("r12 / t0", &self.x[12])
+            .field("r13 / t1", &self.x[13])
+            .field("r14 / t2", &self.x[14])
+            .field("r15 / t3", &self.x[15])
+            .field("r16 / t4", &self.x[16])
+            .field("r17 / t5", &self.x[17])
+            .field("r18 / t6", &self.x[18])
+            .field("r19 / t7", &self.x[19])
+            .field("r20 / t8", &self.x[20])
+            .field("r21 / ??", &self.x[21])
+            .field("r22 / fp", &self.x[22])
+            .field("r23 / s0", &self.x[23])
+            .field("r24 / s1", &self.x[24])
+            .field("r25 / s2", &self.x[25])
+            .field("r26 / s3", &self.x[26])
+            .field("r27 / s4", &self.x[27])
+            .field("r28 / s5", &self.x[28])
+            .field("r29 / s6", &self.x[29])
+            .field("r30 / s7", &self.x[30])
+            .field("r31 / s8", &self.x[31])
+            .field("prmd", &self.prmd)
+            .field("era", &self.era)
+            .field("kernel_sp", &self.kernel_sp)
+            .finish()?;
+        if self.freg.user_fx.iter().any(|x| *x != 0f64) {
+            write!(f, "\nFloat Register: {:?}", self.freg)?;
+        } else {
+            write!(f, "\nFloat Register: Empty")?;
+        }
+        core::fmt::Result::Ok(())
     }
 }
 
