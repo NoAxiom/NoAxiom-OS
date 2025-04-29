@@ -1,69 +1,106 @@
 use core::{
-    future::Future,
-    pin::Pin,
-    task::{Context, Poll, Waker},
+    cell::UnsafeCell,
+    ops::{Deref, DerefMut},
+    sync::atomic::{AtomicBool, Ordering},
 };
 
-use crate::mutex::SpinLock;
+use futures_lite::future::yield_now;
 
-pub struct AsyncSpinLock<T> {
-    inner: SpinLock<AsyncLockInner<T>>,
+/// Async Mutex implemented with `AtomicBool`
+///
+/// When calling [`lock`], it will NOT block the current thread.
+/// Instead, it will return a [`Future`] that can be awaited to avoid
+/// wasting CPU time.
+pub struct AsyncMutex<T> {
+    locked: AtomicBool,
+    data: UnsafeCell<T>,
 }
 
-struct AsyncLockInner<T> {
-    data: Option<T>,
-    waker: Option<Waker>,
-    locked: bool,
-}
-
-impl<T> AsyncSpinLock<T> {
+impl<T> AsyncMutex<T> {
+    /// Create a new `AsyncMutex`
     pub const fn new(data: T) -> Self {
         Self {
-            inner: SpinLock::new(AsyncLockInner {
-                data: Some(data),
-                waker: None,
-                locked: false,
+            locked: AtomicBool::new(false),
+            data: UnsafeCell::new(data),
+        }
+    }
+
+    /// Try to get the lock, returning `true` if successful
+    pub fn try_lock(&self) -> Result<AsyncMutexGuard<'_, T>, ()> {
+        // `Ordering::Acquire` gaurantees that the lock read is sync after the lock
+        // write
+        match self
+            .locked
+            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+            .is_ok()
+        {
+            true => Ok(AsyncMutexGuard {
+                data: unsafe { &mut *self.data.get() },
+                lock: &self.locked,
             }),
+            false => Err(()),
         }
     }
 
-    pub fn lock(&self) -> AsyncLockFuture<'_, T> {
-        AsyncLockFuture { lock: self }
-    }
-}
-
-pub struct AsyncLockFuture<'a, T> {
-    lock: &'a AsyncSpinLock<T>,
-}
-
-impl<'a, T> Future for AsyncLockFuture<'a, T> {
-    type Output = AsyncLockGuard<'a, T>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut inner = self.lock.inner.lock();
-        if inner.locked {
-            inner.waker = Some(cx.waker().clone());
-            Poll::Pending
-        } else {
-            inner.locked = true;
-            Poll::Ready(AsyncLockGuard { lock: self.lock })
+    /// Lock the source
+    ///
+    /// This will return a [`Future`] that can be awaited.
+    pub async fn lock(&self) -> AsyncMutexGuard<'_, T> {
+        loop {
+            match self.try_lock() {
+                Ok(guard) => return guard,
+                Err(_) => {
+                    // todo: save wakers and wake them up when unlocked, discard the `yield_now`
+                    yield_now().await;
+                }
+            }
         }
     }
 }
 
-pub struct AsyncLockGuard<'a, T> {
-    lock: &'a AsyncSpinLock<T>,
+pub struct AsyncMutexGuard<'a, T> {
+    data: &'a mut T,
+    lock: &'a AtomicBool,
 }
 
-impl<'a, T> Drop for AsyncLockGuard<'a, T> {
+impl<T> Deref for AsyncMutexGuard<'_, T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        return self.data;
+    }
+}
+
+impl<T> DerefMut for AsyncMutexGuard<'_, T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        return &mut *self.data;
+    }
+}
+
+impl<T> Drop for AsyncMutexGuard<'_, T> {
     fn drop(&mut self) {
-        let mut inner = self.lock.inner.lock();
-        inner.locked = false;
-        if let Some(waker) = inner.waker.take() {
-            waker.wake();
-        }
+        self.lock.store(false, Ordering::Release);
     }
 }
 
-unsafe impl<T: Send> Send for AsyncSpinLock<T> {}
-unsafe impl<T: Send> Sync for AsyncSpinLock<T> {}
+unsafe impl<T> Sync for AsyncMutex<T> {}
+
+mod test {
+    #[test]
+    fn test_async_mutex() {
+        for i in 0..10000 {
+            spawn_ktask(async move {
+                let mut guard = SOURCE.lock().await;
+                let mut k = 998244353;
+                for j in 0..118713 {
+                    k = k * (k + j + i);
+                    if (i * j) % 97572 == 3572 {
+                        // use sleep
+                        yield_now().await;
+                    }
+                }
+                debug!("[asyncmutex]count: {}, hash: {}", *guard, k);
+                *guard += 1;
+            });
+        }
+    }
+}

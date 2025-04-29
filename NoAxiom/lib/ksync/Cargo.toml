@@ -8,3 +8,6 @@ spin = "0.9"
 kernel-sync = { git = "https://github.com/os-module/kernel-sync.git" }
 arch = { workspace = true }
 config = { workspace = true }
+futures-lite = { version = "1.13.0", default-features = false, features = [
+    "alloc",
+] }
