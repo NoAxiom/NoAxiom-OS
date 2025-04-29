@@ -116,8 +116,8 @@ impl FdTable {
         if self.table.len() >= self.rslimit() {
             Err(Errno::EMFILE)
         } else {
-            self.table.push(None);
-            Ok(self.table.len() - 1)
+            self.fill_to(fd + 1)?;
+            Ok(fd + 1)
         }
     }
 

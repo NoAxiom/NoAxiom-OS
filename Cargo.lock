@@ -556,7 +556,6 @@ dependencies = [
  "ext4_rs",
  "fatfs",
  "futures",
- "futures-lite",
  "hashbrown 0.14.5",
  "include",
  "ksync",

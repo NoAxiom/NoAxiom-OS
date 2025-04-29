@@ -31,8 +31,14 @@ impl File for MemInfoFile {
 
     async fn base_read(&self, offset: usize, buf: &mut [u8]) -> SyscallResult {
         // todo: maybe can just read empty
+        return Ok(0);
         let data = self.meminfo.serialize();
-        assert!(data.len() > offset);
+        assert!(
+            data.len() > offset,
+            "data's len: {}, offset: {}",
+            data.len(),
+            offset
+        );
         let len = core::cmp::min(data.len() - offset, buf.len());
         buf[..len].copy_from_slice(&data.as_bytes()[offset..offset + len]);
         Ok(len as isize)
