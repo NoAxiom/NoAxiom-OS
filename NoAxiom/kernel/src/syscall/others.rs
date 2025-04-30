@@ -1,5 +1,5 @@
 use super::{Syscall, SyscallResult};
-use crate::{mm::user_ptr::UserPtr, sched::utils::yield_now, time::gettime::get_time_ns};
+use crate::{mm::user_ptr::UserPtr, sched::utils::yield_now, utils::random};
 
 impl Syscall<'_> {
     /// yield current task
@@ -19,8 +19,7 @@ impl Syscall<'_> {
         let mut offset = 0;
 
         while remaining > 0 {
-            let rand = get_time_ns(); // use time as rand
-            let rand_bytes = rand.to_le_bytes();
+            let rand_bytes = random().to_le_bytes();
             let chunk_size = remaining.min(4);
             buf_slice[offset..offset + chunk_size].copy_from_slice(&rand_bytes[..chunk_size]);
             remaining -= chunk_size;

@@ -17,6 +17,7 @@ use crate::{
     },
     net::socket::Socket,
     syscall::{SysResult, SyscallResult},
+    utils::random,
 };
 
 pub enum Sock {
@@ -80,7 +81,7 @@ impl SocketFile {
             AddressFamily::AF_UNIX => todo!("Unsupported address family AF_UNIX"),
         };
 
-        let empty_dentry = EmptyDentry::new();
+        let empty_dentry = EmptyDentry::new(&format!("socket-{}", random()));
         let empty_inode = EmptyInode::new();
         let meta = FileMeta::new(Arc::new(empty_dentry), Arc::new(empty_inode));
         meta.set_flags(FileFlags::O_RDWR);
@@ -89,7 +90,7 @@ impl SocketFile {
     }
 
     pub fn new_from_socket(socket: Arc<SocketFile>, sock: Sock) -> Self {
-        let empty_dentry = EmptyDentry::new();
+        let empty_dentry = EmptyDentry::new(&format!("socket-{}", random()));
         let empty_inode = EmptyInode::new();
         let meta = FileMeta::new(Arc::new(empty_dentry), Arc::new(empty_inode));
         meta.set_flags(FileFlags::O_RDWR);

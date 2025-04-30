@@ -873,7 +873,6 @@ async fn get_path_or_create(
     debug_syscall_name: &str,
 ) -> SysResult<Path> {
     let path_str = get_string_from_ptr(&UserPtr::<u8>::new(rawpath));
-    debug!("path: {}", path_str);
     if !path_str.starts_with('/') {
         if fd == AT_FDCWD {
             let cwd = task.cwd().clone();

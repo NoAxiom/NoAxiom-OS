@@ -17,7 +17,11 @@ pub struct Path {
 impl Path {
     /// Get the path from absolute path, the path should exist
     pub fn try_from(abs_path: String) -> SysResult<Self> {
-        assert!(abs_path.starts_with('/'));
+        assert!(
+            abs_path.starts_with('/'),
+            "{} is not absolute path!",
+            abs_path
+        );
         trace!("Path::from: {}", abs_path);
         let mut split_path = abs_path.split('/').collect::<Vec<&str>>();
         if split_path.ends_with(&[""]) {
@@ -32,7 +36,11 @@ impl Path {
 
     /// Get the path from absolute path, create the path if not exist
     pub async fn from_or_create(abs_path: String, mode: InodeMode) -> Self {
-        assert!(abs_path.starts_with('/'));
+        assert!(
+            abs_path.starts_with('/'),
+            "{} is not absolute path!",
+            abs_path
+        );
         trace!("Path::from_or_create: {}", abs_path);
         let mut split_path = abs_path.split('/').collect::<Vec<&str>>();
         if split_path.ends_with(&[""]) {
@@ -62,7 +70,7 @@ impl Path {
                     if result_parts.len() > 1 {
                         result_parts.pop();
                     } else {
-                        error!("Path::from_cd: path underflow");
+                        panic!("Path::from_cd: path underflow");
                     }
                 }
                 _ => result_parts.push(part.to_string()),

@@ -208,4 +208,16 @@ impl FdTable {
             }
         }
     }
+
+    #[allow(unused)]
+    pub fn check_all_has_name(&self) -> bool {
+        for entry in self.table.iter() {
+            if let Some(entry) = entry {
+                if entry.file.name().is_empty() {
+                    return false;
+                }
+            }
+        }
+        true
+    }
 }

@@ -149,7 +149,7 @@ impl<'a> Syscall<'a> {
             // system
             SYS_SYSINFO =>  Self::empty_syscall("info", 0),
             SYS_UNAME =>    Self::sys_uname(args[0]),
-            SYS_SYSLOG =>   Self::sys_syslog(args[0], args[1], args[2]).await,
+            SYS_SYSLOG =>   Self::sys_syslog(args[0] as u32, args[1], args[2]).await,
 
             // unsupported
             _ => {

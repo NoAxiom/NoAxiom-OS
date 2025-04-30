@@ -43,7 +43,7 @@ impl FileMeta {
     }
     #[allow(unused)]
     pub fn empty() -> Self {
-        let dentry = Arc::new(dentry::EmptyDentry::new());
+        let dentry = Arc::new(dentry::EmptyDentry::new("empty-file"));
         let inode = Arc::new(inode::EmptyInode::new());
         Self::new(dentry, inode)
     }
@@ -221,7 +221,7 @@ pub struct EmptyFile {
 impl EmptyFile {
     #[allow(unused)]
     pub fn new() -> Self {
-        let dentry = Arc::new(dentry::EmptyDentry::new());
+        let dentry = Arc::new(dentry::EmptyDentry::new("empty-file"));
         let inode = Arc::new(inode::EmptyInode::new());
         Self {
             meta: FileMeta::new(dentry, inode),

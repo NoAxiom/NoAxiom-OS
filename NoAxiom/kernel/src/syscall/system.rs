@@ -1,5 +1,10 @@
+use include::errno::Errno;
+
 use super::{Syscall, SyscallResult};
-use crate::{include::info::Utsname, mm::user_ptr::UserPtr};
+use crate::{
+    include::info::{SyslogAction, Utsname},
+    mm::user_ptr::UserPtr,
+};
 
 impl Syscall<'_> {
     /// Get system UTS name
@@ -11,10 +16,17 @@ impl Syscall<'_> {
     }
 
     /// Get system log
-    pub async fn sys_syslog(_log_type: usize, buf: usize, len: usize) -> SyscallResult {
+    pub async fn sys_syslog(log_type: u32, buf: usize, len: usize) -> SyscallResult {
         let user_ptr = UserPtr::<u8>::new(buf);
-        user_ptr.as_slice_mut_checked(len).await?;
-        warn!("[sys_log] just check buf");
-        Ok(0)
+        let log_type = SyslogAction::from_repr(log_type).ok_or(Errno::EINVAL)?;
+        match log_type {
+            SyslogAction::OPEN | SyslogAction::CLOSE => Ok(0),
+            SyslogAction::READ | SyslogAction::ReadAll | SyslogAction::ReadClear => {
+                user_ptr.as_slice_mut_checked(len).await?;
+                Ok(0)
+            }
+            SyslogAction::Unknown => Err(Errno::EINVAL),
+            _ => Ok(0),
+        }
     }
 }

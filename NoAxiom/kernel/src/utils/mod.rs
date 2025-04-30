@@ -40,3 +40,13 @@ pub fn intermit(f: impl FnOnce()) {
         f();
     }
 }
+
+#[inline(always)]
+/// Generate a **Random** number at an extremely efficient way
+pub fn random() -> usize {
+    static mut seed: usize = 253496567482;
+    unsafe {
+        seed = seed * 1103515245 + 12345;
+        seed
+    }
+}

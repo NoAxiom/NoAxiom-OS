@@ -25,11 +25,14 @@ use core::{
 use async_trait::async_trait;
 use ksync::mutex::SpinLock;
 
-use super::vfs::basic::{
-    dentry::EmptyDentry,
-    file::{File, FileMeta},
-    inode::InodeMeta,
-    superblock::EmptySuperBlock,
+use super::vfs::{
+    basic::{
+        dentry::{Dentry, DentryMeta},
+        file::{File, FileMeta},
+        inode::InodeMeta,
+        superblock::EmptySuperBlock,
+    },
+    root_dentry,
 };
 use crate::{
     config::fs::PIPE_BUF_SIZE,
@@ -39,6 +42,7 @@ use crate::{
         result::Errno,
     },
     syscall::{SysResult, SyscallResult},
+    utils::random,
 };
 
 #[derive(PartialEq)]
@@ -216,6 +220,42 @@ impl PipeBuffer {
     }
 }
 
+pub struct PipeDentry {
+    meta: DentryMeta,
+}
+
+impl PipeDentry {
+    /// we mount all the pipes to the root dentry
+    pub fn new(name: &str) -> Arc<Self> {
+        let parent = root_dentry();
+        let super_block = parent.super_block();
+        let pipe_dentry = Arc::new(Self {
+            meta: DentryMeta::new(Some(parent.clone()), name, super_block),
+        });
+        parent.add_child_directly(pipe_dentry.clone());
+        pipe_dentry
+    }
+}
+
+#[async_trait]
+impl Dentry for PipeDentry {
+    fn meta(&self) -> &DentryMeta {
+        &self.meta
+    }
+
+    fn from_name(self: Arc<Self>, _name: &str) -> Arc<dyn Dentry> {
+        unreachable!("pipe dentry should not have child");
+    }
+
+    fn open(self: Arc<Self>) -> SysResult<Arc<dyn File>> {
+        unreachable!("pipe dentry should not open");
+    }
+
+    async fn create(self: Arc<Self>, _name: &str, _mode: InodeMode) -> SysResult<Arc<dyn Dentry>> {
+        unreachable!("pipe dentry should not create child");
+    }
+}
+
 pub struct PipeInode {
     meta: InodeMeta,
 }
@@ -272,13 +312,19 @@ impl PipeFile {
         self.clone()
     }
     fn new_read_end(buffer: Arc<SpinLock<PipeBuffer>>) -> Arc<Self> {
-        let meta = FileMeta::new(Arc::new(EmptyDentry::new()), Arc::new(PipeInode::new()));
+        let meta = FileMeta::new(
+            PipeDentry::new(&format!("pipe-{}", random())),
+            Arc::new(PipeInode::new()),
+        );
         let res = Arc::new(Self { buffer, meta });
         res.clone().into_dyn().set_flags(FileFlags::O_RDONLY);
         res
     }
     fn new_write_end(buffer: Arc<SpinLock<PipeBuffer>>) -> Arc<Self> {
-        let meta = FileMeta::new(Arc::new(EmptyDentry::new()), Arc::new(PipeInode::new()));
+        let meta = FileMeta::new(
+            PipeDentry::new(&format!("pipe-{}", random())),
+            Arc::new(PipeInode::new()),
+        );
         let res = Arc::new(Self { buffer, meta });
         res.clone().into_dyn().set_flags(FileFlags::O_WRONLY);
         res

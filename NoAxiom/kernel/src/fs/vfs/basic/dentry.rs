@@ -401,10 +401,10 @@ pub struct EmptyDentry {
 }
 
 impl EmptyDentry {
-    pub fn new() -> Self {
+    pub fn new(name: &str) -> Self {
         let super_block = Arc::new(EmptySuperBlock::new());
         Self {
-            meta: DentryMeta::new(None, "", super_block),
+            meta: DentryMeta::new(None, name, super_block),
         }
     }
 }

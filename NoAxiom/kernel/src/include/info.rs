@@ -1,4 +1,5 @@
 use arch::{Arch, ArchInfo};
+use strum::FromRepr;
 
 #[repr(C)]
 pub struct Utsname {
@@ -36,4 +37,21 @@ impl Utsname {
         let size = core::mem::size_of::<Self>();
         unsafe { core::slice::from_raw_parts(self as *const _ as usize as *const u8, size) }
     }
+}
+
+#[repr(u32)]
+#[derive(FromRepr, Eq, PartialEq, Debug, Copy, Clone)]
+pub enum SyslogAction {
+    CLOSE = 0,
+    OPEN = 1,
+    READ = 2,
+    ReadAll = 3,
+    ReadClear = 4,
+    CLEAR = 5,
+    ConsoleOff = 6,
+    ConsoleOn = 7,
+    ConsoleLevel = 8,
+    SizeUnread = 9,
+    SizeBuffer = 10,
+    Unknown = 11,
 }
