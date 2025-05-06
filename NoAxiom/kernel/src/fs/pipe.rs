@@ -262,12 +262,10 @@ pub struct PipeInode {
 
 impl PipeInode {
     pub fn new() -> Self {
+        let parent = root_dentry();
+        let super_block = parent.super_block();
         Self {
-            meta: InodeMeta::new(
-                Arc::new(EmptySuperBlock::new()),
-                InodeMode::FIFO,
-                PIPE_BUF_SIZE,
-            ),
+            meta: InodeMeta::new(super_block, InodeMode::FIFO, PIPE_BUF_SIZE),
         }
     }
 }
@@ -312,19 +310,19 @@ impl PipeFile {
         self.clone()
     }
     fn new_read_end(buffer: Arc<SpinLock<PipeBuffer>>) -> Arc<Self> {
-        let meta = FileMeta::new(
-            PipeDentry::new(&format!("pipe-{}", random())),
-            Arc::new(PipeInode::new()),
-        );
+        let dentry = PipeDentry::new(&format!("pipe-{}", random()));
+        let inode = Arc::new(PipeInode::new());
+        dentry.set_inode(inode.clone());
+        let meta = FileMeta::new(dentry, inode);
         let res = Arc::new(Self { buffer, meta });
         res.clone().into_dyn().set_flags(FileFlags::O_RDONLY);
         res
     }
     fn new_write_end(buffer: Arc<SpinLock<PipeBuffer>>) -> Arc<Self> {
-        let meta = FileMeta::new(
-            PipeDentry::new(&format!("pipe-{}", random())),
-            Arc::new(PipeInode::new()),
-        );
+        let dentry = PipeDentry::new(&format!("pipe-{}", random()));
+        let inode = Arc::new(PipeInode::new());
+        dentry.set_inode(inode.clone());
+        let meta = FileMeta::new(dentry, inode);
         let res = Arc::new(Self { buffer, meta });
         res.clone().into_dyn().set_flags(FileFlags::O_WRONLY);
         res

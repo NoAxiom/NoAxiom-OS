@@ -72,12 +72,12 @@ pub trait Dentry: Send + Sync + DowncastSync {
     async fn create(self: Arc<Self>, name: &str, mode: InodeMode) -> SysResult<Arc<dyn Dentry>>;
     /// Get the inode of the dentry
     fn inode(&self) -> SysResult<Arc<dyn Inode>> {
-        self.meta()
-            .inode
-            .lock()
-            .as_ref()
-            .ok_or(Errno::ENOENT)
-            .cloned()
+        if let Some(inode) = self.meta().inode.lock().as_ref() {
+            Ok(inode.clone())
+        } else {
+            warn!("[kernel] [dentry] {} inode not exist", self.name());
+            Err(Errno::ENOENT)
+        }
     }
     /// Get the name of the dentry
     fn name(&self) -> String {
