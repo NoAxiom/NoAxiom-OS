@@ -19,7 +19,11 @@ pub fn schedule_spawn_with_path() {
         let path_str = format!("{}/{}", ROOT_NAME, INIT_PROC_NAME);
         let path = Path::from_or_create(path_str, InodeMode::FILE).await;
         let file = path.dentry().open().unwrap();
-        file.base_write(0, get_file()).await.unwrap();
+        let content = get_file();
+        let mut slice_offset = 0;
+        for slicer in content.chunks(0x1000) {
+            slice_offset += file.base_write(slice_offset, &slicer).await.unwrap() as usize;
+        }
         let elf = MemorySet::load_from_path(path.clone()).await.unwrap();
         let task = Task::new_process(elf).await;
         spawn_utask(task);
