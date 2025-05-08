@@ -1,4 +1,5 @@
 use alloc::{boxed::Box, sync::Arc};
+use core::task::Waker;
 
 use async_trait::async_trait;
 use smoltcp::wire::IpEndpoint;
@@ -12,6 +13,7 @@ use crate::{
     },
     include::{
         fs::FileFlags,
+        io::PollEvent,
         net::{AddressFamily, PosixSocketType, SockAddr, SocketOptions},
         result::Errno,
     },
@@ -162,5 +164,8 @@ impl File for SocketFile {
     fn ioctl(&self, _cmd: usize, _arg: usize) -> SyscallResult {
         warn!("[Socket::ioctl] not supported now, return 0 instead");
         Ok(0)
+    }
+    fn poll(&self, _req: &PollEvent, _waker: Waker) -> PollEvent {
+        unimplemented!("Socket::poll not supported now");
     }
 }

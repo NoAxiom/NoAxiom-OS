@@ -1,7 +1,10 @@
 // ! **File** is the file system file instance opened in memory
 
 use alloc::{boxed::Box, string::String, sync::Arc, vec::Vec};
-use core::sync::atomic::{AtomicUsize, Ordering};
+use core::{
+    sync::atomic::{AtomicUsize, Ordering},
+    task::Waker,
+};
 
 use async_trait::async_trait;
 use downcast_rs::{impl_downcast, DowncastSync};
@@ -89,16 +92,17 @@ pub trait File: Send + Sync + DowncastSync {
     /// IOCTL command
     #[allow(unused)]
     fn ioctl(&self, cmd: usize, arg: usize) -> SyscallResult;
-    fn poll(&self, req: &PollEvent) -> PollEvent {
-        let mut res = PollEvent::empty();
-        if req.contains(PollEvent::POLLIN) {
-            res |= PollEvent::POLLIN;
-        }
-        if req.contains(PollEvent::POLLOUT) {
-            res |= PollEvent::POLLOUT;
-        }
-        res
-    }
+    fn poll(&self, req: &PollEvent, waker: Waker) -> PollEvent;
+    // {
+    //     let mut res = PollEvent::empty();
+    //     if req.contains(PollEvent::POLLIN) {
+    //         res |= PollEvent::POLLIN;
+    //     }
+    //     if req.contains(PollEvent::POLLOUT) {
+    //         res |= PollEvent::POLLOUT;
+    //     }
+    //     res
+    // }
 }
 
 impl_downcast!(sync File);
@@ -135,7 +139,7 @@ impl dyn File {
         self.meta().pos.store(res_pos, Ordering::Release);
         Ok(res_pos as isize)
     }
-
+    #[allow(unused)]
     pub async fn read_all(&self) -> SysResult<Vec<u8>> {
         let len = self.meta().inode.size();
         let mut buf = vec![0; len];
@@ -250,6 +254,9 @@ impl File for EmptyFile {
         unreachable!()
     }
     fn ioctl(&self, _cmd: usize, _arg: usize) -> SyscallResult {
+        unreachable!()
+    }
+    fn poll(&self, _req: &PollEvent, _waker: Waker) -> PollEvent {
         unreachable!()
     }
 }

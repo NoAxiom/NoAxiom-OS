@@ -1,4 +1,5 @@
 use alloc::{boxed::Box, sync::Arc, vec::Vec};
+use core::task::Waker;
 
 use async_trait::async_trait;
 use include::errno::Errno;
@@ -10,6 +11,7 @@ use super::{
 };
 use crate::{
     fs::vfs::basic::file::{File, FileMeta},
+    include::io::PollEvent,
     syscall::{SysResult, SyscallResult},
 };
 
@@ -32,7 +34,6 @@ impl File for RamFsFile {
     fn meta(&self) -> &FileMeta {
         &self.meta
     }
-
     async fn base_read(&self, offset: usize, buf: &mut [u8]) -> SyscallResult {
         let data = self.data.read();
         assert!(data.len() > offset);
@@ -40,11 +41,9 @@ impl File for RamFsFile {
         buf[..len].copy_from_slice(&data[offset..offset + len]);
         Ok(len as isize)
     }
-
     async fn base_readlink(&self, _buf: &mut [u8]) -> SyscallResult {
         unreachable!()
     }
-
     async fn base_write(&self, offset: usize, buf: &[u8]) -> SyscallResult {
         let mut data = self.data.write();
         if offset + buf.len() > data.len() {
@@ -54,7 +53,6 @@ impl File for RamFsFile {
         dst.copy_from_slice(&buf[..dst.len()]);
         Ok(buf.len() as isize)
     }
-
     async fn load_dir(&self) -> SysResult<()> {
         Err(Errno::ENOSYS)
     }
@@ -63,6 +61,9 @@ impl File for RamFsFile {
     }
     fn ioctl(&self, _cmd: usize, _arg: usize) -> SyscallResult {
         Err(Errno::ENOTTY)
+    }
+    fn poll(&self, _req: &PollEvent, _waker: Waker) -> PollEvent {
+        unreachable!("RamfsFile::poll not supported now");
     }
 }
 
@@ -83,28 +84,26 @@ impl File for RamFsDir {
     fn meta(&self) -> &FileMeta {
         &self.meta
     }
-
     async fn base_read(&self, _offset: usize, _buf: &mut [u8]) -> SyscallResult {
         Err(Errno::EISDIR)
     }
-
     async fn base_readlink(&self, _buf: &mut [u8]) -> SyscallResult {
         unreachable!()
     }
-
     async fn base_write(&self, _offset: usize, _buf: &[u8]) -> SyscallResult {
         Err(Errno::EISDIR)
     }
-
     async fn load_dir(&self) -> SysResult<()> {
         Ok(())
     }
-
     /// Ram fs does not really has child or parent
     async fn delete_child(&self, _name: &str) -> SysResult<()> {
         Ok(())
     }
     fn ioctl(&self, _cmd: usize, _arg: usize) -> SyscallResult {
         Err(Errno::ENOTTY)
+    }
+    fn poll(&self, _req: &PollEvent, _waker: Waker) -> PollEvent {
+        unreachable!("RamfsDir::poll not supported now");
     }
 }

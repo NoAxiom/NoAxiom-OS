@@ -16,7 +16,7 @@ pub enum TimeLimitedType<T> {
 /// A future that will timeout after a certain amount of time().  
 ///
 /// `future`: the target future  
-/// `timeout`: the timeout duration
+/// `timeout`: the timeout duration  
 /// `limit`(don't care): the time limit for the future to finish
 ///
 /// based on poll  

@@ -1,4 +1,5 @@
 use alloc::boxed::Box;
+use core::task::Waker;
 
 use async_trait::async_trait;
 use include::errno::Errno;
@@ -6,6 +7,7 @@ use include::errno::Errno;
 use crate::{
     cpu::current_task,
     fs::vfs::basic::file::{File, FileMeta},
+    include::io::PollEvent,
     syscall::{SysResult, SyscallResult},
 };
 
@@ -24,7 +26,6 @@ impl File for ExeFile {
     fn meta(&self) -> &FileMeta {
         &self.meta
     }
-
     async fn base_readlink(&self, buf: &mut [u8]) -> SyscallResult {
         let exe = current_task().cwd().as_string();
         if buf.len() < exe.len() + 1 {
@@ -35,15 +36,12 @@ impl File for ExeFile {
         buf[exe.len()] = '\0' as u8;
         Ok((exe.len() + 1) as isize)
     }
-
     async fn base_read(&self, _offset: usize, _buf: &mut [u8]) -> SyscallResult {
         unreachable!("read from exe");
     }
-
     async fn base_write(&self, _offset: usize, _buf: &[u8]) -> SyscallResult {
         unreachable!("write to exe");
     }
-
     async fn load_dir(&self) -> SysResult<()> {
         Err(Errno::ENOSYS)
     }
@@ -52,5 +50,8 @@ impl File for ExeFile {
     }
     fn ioctl(&self, _cmd: usize, _arg: usize) -> SyscallResult {
         Err(Errno::ENOTTY)
+    }
+    fn poll(&self, _req: &PollEvent, _waker: Waker) -> PollEvent {
+        unimplemented!("ExeFile::poll not supported now");
     }
 }

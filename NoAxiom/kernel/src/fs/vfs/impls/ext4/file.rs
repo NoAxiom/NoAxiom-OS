@@ -1,4 +1,5 @@
 use alloc::{boxed::Box, sync::Arc};
+use core::task::Waker;
 
 use async_trait::async_trait;
 use ext4_rs::InodeFileType;
@@ -12,7 +13,7 @@ use crate::{
         },
         impls::ext4::{fs_err, inode::Ext4DirInode},
     },
-    include::{fs::InodeMode, result::Errno},
+    include::{fs::InodeMode, io::PollEvent, result::Errno},
     syscall::SyscallResult,
 };
 
@@ -98,6 +99,16 @@ impl File for Ext4File {
     }
     fn ioctl(&self, _cmd: usize, _arg: usize) -> SyscallResult {
         Err(Errno::ENOTTY)
+    }
+    fn poll(&self, req: &PollEvent, _waker: Waker) -> PollEvent {
+        let mut res = PollEvent::empty();
+        if req.contains(PollEvent::POLLIN) {
+            res |= PollEvent::POLLIN;
+        }
+        if req.contains(PollEvent::POLLOUT) {
+            res |= PollEvent::POLLOUT;
+        }
+        res
     }
 }
 
@@ -192,6 +203,17 @@ impl File for Ext4Dir {
 
     fn ioctl(&self, _cmd: usize, _arg: usize) -> SyscallResult {
         Err(Errno::ENOTTY)
+    }
+
+    fn poll(&self, req: &PollEvent, _waker: Waker) -> PollEvent {
+        let mut res = PollEvent::empty();
+        if req.contains(PollEvent::POLLIN) {
+            res |= PollEvent::POLLIN;
+        }
+        if req.contains(PollEvent::POLLOUT) {
+            res |= PollEvent::POLLOUT;
+        }
+        res
     }
 }
 

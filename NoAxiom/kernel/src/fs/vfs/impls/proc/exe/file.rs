@@ -1,4 +1,5 @@
 use alloc::boxed::Box;
+use core::task::Waker;
 
 use async_trait::async_trait;
 use include::errno::Errno;
@@ -6,6 +7,7 @@ use include::errno::Errno;
 use crate::{
     cpu::current_task,
     fs::vfs::basic::file::{File, FileMeta},
+    include::io::PollEvent,
     syscall::{SysResult, SyscallResult},
 };
 
@@ -52,5 +54,8 @@ impl File for ExeFile {
     }
     fn ioctl(&self, _cmd: usize, _arg: usize) -> SyscallResult {
         Err(Errno::ENOTTY)
+    }
+    fn poll(&self, _req: &PollEvent, _waker: Waker) -> PollEvent {
+        unreachable!("ExeFile::poll not supported now");
     }
 }

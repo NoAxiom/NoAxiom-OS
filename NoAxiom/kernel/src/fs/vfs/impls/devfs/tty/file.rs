@@ -1,4 +1,5 @@
 use alloc::{boxed::Box, vec::Vec};
+use core::task::Waker;
 
 use async_trait::async_trait;
 use include::errno::Errno;
@@ -6,10 +7,13 @@ use ksync::mutex::SpinLock;
 
 use crate::{
     fs::vfs::basic::file::{File, FileMeta},
-    include::fs::{
-        Termios,
-        TtyIoctlCmd::{self, *},
-        WinSize,
+    include::{
+        fs::{
+            Termios,
+            TtyIoctlCmd::{self, *},
+            WinSize,
+        },
+        io::PollEvent,
     },
     syscall::{SysResult, SyscallResult},
 };
@@ -47,11 +51,9 @@ impl File for TtyFile {
     fn meta(&self) -> &FileMeta {
         &self.meta
     }
-
     async fn base_readlink(&self, _buf: &mut [u8]) -> SyscallResult {
         unreachable!("readlink from tty");
     }
-
     async fn base_read(&self, _offset: usize, buf: &mut [u8]) -> SyscallResult {
         // todo: use yield_now.await
         let mut c = platform::getchar() as i8;
@@ -64,7 +66,6 @@ impl File for TtyFile {
         buf[0] = c as u8;
         Ok(1 as isize)
     }
-
     async fn base_write(&self, _offset: usize, buf: &[u8]) -> SyscallResult {
         #[cfg(feature = "log_print")]
         {
@@ -155,6 +156,16 @@ impl File for TtyFile {
             TCSBRK => Ok(0),
             _ => todo!(),
         }
+    }
+    fn poll(&self, req: &PollEvent, _waker: Waker) -> PollEvent {
+        let mut res = PollEvent::empty();
+        if req.contains(PollEvent::POLLIN) {
+            res |= PollEvent::POLLIN;
+        }
+        if req.contains(PollEvent::POLLOUT) {
+            res |= PollEvent::POLLOUT;
+        }
+        res
     }
 }
 

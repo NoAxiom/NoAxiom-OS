@@ -1,4 +1,5 @@
 use alloc::{boxed::Box, sync::Arc, vec::Vec};
+use core::task::Waker;
 
 use async_trait::async_trait;
 type Mutex<T> = ksync::mutex::SpinLock<T>;
@@ -15,7 +16,7 @@ use crate::{
         },
         vfs::basic::file::{File, FileMeta},
     },
-    include::{fs::InodeMode, result::Errno},
+    include::{fs::InodeMode, io::PollEvent, result::Errno},
     syscall::SyscallResult,
 };
 
@@ -76,6 +77,16 @@ impl File for FAT32File {
     }
     fn ioctl(&self, _cmd: usize, _arg: usize) -> SyscallResult {
         Err(Errno::ENOTTY)
+    }
+    fn poll(&self, req: &PollEvent, _waker: Waker) -> PollEvent {
+        let mut res = PollEvent::empty();
+        if req.contains(PollEvent::POLLIN) {
+            res |= PollEvent::POLLIN;
+        }
+        if req.contains(PollEvent::POLLOUT) {
+            res |= PollEvent::POLLOUT;
+        }
+        res
     }
 }
 
@@ -143,8 +154,17 @@ impl File for FAT32Directory {
     async fn delete_child(&self, _name: &str) -> Result<(), Errno> {
         todo!()
     }
-
     fn ioctl(&self, _cmd: usize, _arg: usize) -> SyscallResult {
         Err(Errno::ENOTTY)
+    }
+    fn poll(&self, req: &PollEvent, _waker: Waker) -> PollEvent {
+        let mut res = PollEvent::empty();
+        if req.contains(PollEvent::POLLIN) {
+            res |= PollEvent::POLLIN;
+        }
+        if req.contains(PollEvent::POLLOUT) {
+            res |= PollEvent::POLLOUT;
+        }
+        res
     }
 }

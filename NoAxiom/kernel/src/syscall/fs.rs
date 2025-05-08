@@ -171,10 +171,12 @@ impl Syscall<'_> {
     ///     - file_remain_size == 0: 0, which means EOF
     /// 3. fd is closed: -1
     pub async fn sys_read(&self, fd: usize, buf: usize, len: usize) -> SyscallResult {
-        trace!("[sys_read] fd: {}, buf: {:?}, len: {}", fd, buf, len);
+        info!("[sys_read] fd: {}, buf: {:?}, len: {}", fd, buf, len);
         let fd_table = self.task.fd_table();
         let file = fd_table.get(fd).ok_or(Errno::EBADF)?;
         drop(fd_table);
+        let file_name = file.dentry().path();
+        info!("[sys_read] file_name: {:?}", file_name);
 
         // todo: INTERRUPT_BY_SIGNAL FUTURE
 
@@ -237,10 +239,12 @@ impl Syscall<'_> {
 
     /// Write data to a file descriptor
     pub async fn sys_write(&self, fd: usize, buf: usize, len: usize) -> SyscallResult {
-        trace!("[sys_write] fd: {}, buf: {:?}, len: {}", fd, buf, len);
+        info!("[sys_write] fd: {}, buf: {:?}, len: {}", fd, buf, len);
         let fd_table = self.task.fd_table();
         let file = fd_table.get(fd).ok_or(Errno::EBADF)?;
         drop(fd_table);
+        let file_name = file.dentry().path();
+        info!("[sys_write] file_name: {:?}", file_name);
 
         let user_ptr = UserPtr::<u8>::new(buf);
         let buf_slice = user_ptr.as_slice_mut_checked(len).await?;
@@ -631,6 +635,11 @@ impl Syscall<'_> {
         let fd_table = self.task.fd_table();
         let out_file = fd_table.get(out_fd).ok_or(Errno::EBADF)?;
         let in_file = fd_table.get(in_fd).ok_or(Errno::EBADF)?;
+        info!(
+            "[sys_sendfile] out_file: {}, in_file: {}",
+            out_file.name(),
+            in_file.name()
+        );
         drop(fd_table);
         if !out_file.meta().writable() || !in_file.meta().readable() {
             return Err(Errno::EBADF);

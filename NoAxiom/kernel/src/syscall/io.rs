@@ -7,6 +7,7 @@ use core::{
 };
 
 use include::errno::Errno;
+use ksync::mutex::check_no_lock;
 
 use super::{Syscall, SyscallResult};
 use crate::{
@@ -43,17 +44,18 @@ impl PpollFuture {
 impl Future for PpollFuture {
     type Output = Vec<(usize, PollEvent)>;
 
-    fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut result = Vec::new();
         for poll_item in &self.fds {
             let id = poll_item.id;
             let req = &poll_item.events;
-            let res = poll_item.file.poll(req);
+            let res = poll_item.file.poll(req, cx.waker().clone());
             if !res.is_empty() {
                 result.push((id, res));
             }
         }
         if result.is_empty() {
+            debug!("[sys_ppoll]: poll result empty");
             Poll::Pending
         } else {
             Poll::Ready(result)
@@ -83,12 +85,9 @@ impl Syscall<'_> {
             Some(sigmask_ptr.read())
         };
 
-        trace!(
+        info!(
             "[sys_ppoll]: fds_ptr {:#x}, nfds {}, timeout:{:?}, sigmask:{:?}",
-            fds_ptr,
-            nfds,
-            timeout,
-            sigmask
+            fds_ptr, nfds, timeout, sigmask
         );
 
         let fd_table = self.task.fd_table();
@@ -104,6 +103,7 @@ impl Syscall<'_> {
             poll_items.push(PpollItem::new(i, events, file));
             fds.push((fd_ptr, poll_fd));
         }
+        drop(fd_table);
         let ppoll_future = PpollFuture::new(poll_items);
 
         let mut pcb = self.task.pcb();
@@ -115,6 +115,14 @@ impl Syscall<'_> {
         let sig_mask = pcb.sig_mask();
         pcb.set_wake_signal(!sig_mask);
 
+        // we can't hold pcb lock than call .await, but we should ensure the pcb's
+        // sig_mask not changed
+
+        // todo: hold a resource and can use .await, maybe asyncmutex
+
+        drop(pcb);
+
+        assert!(check_no_lock());
         let res = match TimeLimitedFuture::new(ppoll_future, timeout).await {
             TimeLimitedType::Ok(res) => res,
             TimeLimitedType::TimeOut => {
@@ -131,6 +139,8 @@ impl Syscall<'_> {
             trace!("[sys_ppoll]: after poll: poll_fd {:#x?}", fds[id].0.read());
         }
 
+        let mut pcb = self.task.pcb();
+        assert_eq!(sig_mask, pcb.sig_mask(), "sig_mask not equal");
         if let Some(old_mask) = old_mask {
             *pcb.sig_mask_mut() = old_mask;
         }

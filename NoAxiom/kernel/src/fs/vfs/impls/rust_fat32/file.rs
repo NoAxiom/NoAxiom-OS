@@ -1,4 +1,5 @@
 use alloc::{boxed::Box, sync::Arc};
+use core::task::Waker;
 
 use async_trait::async_trait;
 use fatfs::{Read, Seek, SeekFrom::Start, Write};
@@ -15,7 +16,7 @@ use crate::{
         file::{File, FileMeta},
         inode::Inode,
     },
-    include::{fs::InodeMode, result::Errno},
+    include::{fs::InodeMode, io::PollEvent, result::Errno},
     syscall::SyscallResult,
 };
 
@@ -108,6 +109,9 @@ impl File for Fat32File {
     fn ioctl(&self, _cmd: usize, _arg: usize) -> SyscallResult {
         Err(Errno::ENOTTY)
     }
+    fn poll(&self, _req: &PollEvent, _waker: Waker) -> PollEvent {
+        unreachable!("Fat32file::poll not supported now");
+    }
 }
 
 pub struct Fat32Dir {
@@ -171,5 +175,8 @@ impl File for Fat32Dir {
     }
     fn ioctl(&self, _cmd: usize, _arg: usize) -> SyscallResult {
         Err(Errno::ENOTTY)
+    }
+    fn poll(&self, _req: &PollEvent, _waker: Waker) -> PollEvent {
+        unreachable!("Fat32dir::poll not supported now");
     }
 }
