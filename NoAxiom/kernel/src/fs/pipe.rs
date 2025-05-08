@@ -8,8 +8,8 @@
 //! 3. 0 read ends && x write ends: write end process get SIGPIPE
 //!
 //! 4. x read ends && x write ends:
-//!   - read until get expected data
-//!   - write until finish writing
+//!   - read until pipe empty or buf end
+//!   - write until pipe full or buf end
 
 use alloc::{
     boxed::Box,
@@ -30,7 +30,6 @@ use super::vfs::{
         dentry::{Dentry, DentryMeta},
         file::{File, FileMeta},
         inode::InodeMeta,
-        superblock::EmptySuperBlock,
     },
     root_dentry,
 };
@@ -39,6 +38,7 @@ use crate::{
     fs::vfs::basic::inode::Inode,
     include::{
         fs::{FileFlags, InodeMode, Stat},
+        io::PollEvent,
         result::Errno,
     },
     syscall::{SysResult, SyscallResult},
@@ -58,8 +58,8 @@ struct PipeBuffer {
     head: usize,
     tail: usize,
     status: PipeBufferStatus,
-    read_wakers: Vec<(usize, Waker)>,
-    write_wakers: Vec<(usize, Waker)>,
+    read_wakers: Vec<Waker>,
+    write_wakers: Vec<Waker>,
     /// used to count the number of read and write ends
     read_end: Option<Weak<PipeFile>>,
     write_end: Option<Weak<PipeFile>>,
@@ -78,11 +78,11 @@ impl PipeBuffer {
             write_end: None,
         }
     }
-    fn add_read_event(&mut self, len: usize, waker: Waker) {
-        self.read_wakers.push((len, waker));
+    fn add_read_event(&mut self, waker: Waker) {
+        self.read_wakers.push(waker);
     }
-    fn add_write_event(&mut self, len: usize, waker: Waker) {
-        self.write_wakers.push((len, waker));
+    fn add_write_event(&mut self, waker: Waker) {
+        self.write_wakers.push(waker);
     }
     fn set_read_end(&mut self, read_end: Weak<PipeFile>) {
         self.read_end = Some(read_end);
@@ -91,10 +91,10 @@ impl PipeBuffer {
         self.write_end = Some(write_end);
     }
     fn has_writend(&self) -> bool {
-        self.write_end.as_ref().unwrap().upgrade().is_some()
+        self.write_end.is_some()
     }
     fn has_readend(&self) -> bool {
-        self.read_end.as_ref().unwrap().upgrade().is_some()
+        self.read_end.is_some()
     }
     fn read_available(&self) -> usize {
         match self.status {
@@ -122,34 +122,21 @@ impl PipeBuffer {
             }
         }
     }
-    fn notify_read_wakers(&mut self) {
-        let mut new_read_wakers = Vec::new();
-        let read_available = self.read_available();
-        for (len, waker) in self.read_wakers.drain(..) {
-            if len <= read_available {
-                waker.wake();
-            } else {
-                new_read_wakers.push((len, waker));
-            }
+    fn notify_read_waker(&mut self) {
+        if let Some(waker) = self.read_wakers.pop() {
+            waker.wake();
         }
-        self.read_wakers = new_read_wakers;
     }
-    fn notify_write_wakers(&mut self) {
-        let mut new_write_wakers = Vec::new();
-        let write_available = self.write_available();
-        for (len, waker) in self.write_wakers.drain(..) {
-            if len <= write_available {
-                waker.wake();
-            } else {
-                new_write_wakers.push((len, waker));
-            }
+    fn notify_write_waker(&mut self) {
+        if let Some(waker) = self.write_wakers.pop() {
+            waker.wake();
         }
-        self.write_wakers = new_write_wakers;
     }
     /// Read `len` bytes as much as possible from the buffer, make sure buffer's
     /// size >= len, return the number of bytes read
-    fn read(&mut self, buf: &mut [u8], len: usize) -> usize {
-        assert!(len <= buf.len());
+    fn read(&mut self, buf: &mut [u8]) -> usize {
+        trace!("[PipeBuffer] read buf");
+        let len = buf.len();
         let res = match self.status {
             PipeBufferStatus::Empty => 0,
             _ => {
@@ -179,8 +166,7 @@ impl PipeBuffer {
         }
         res
     }
-    /// Write `len` bytes as much as possible to the buffer, make sure
-    /// buffer's size >= len, return the number of bytes read
+    /// Write `buf` as much as possible to the buffer
     fn write(&mut self, buf: &[u8]) -> usize {
         trace!(
             "[PipeBuffer] write buf as string: {}",
@@ -309,8 +295,9 @@ impl PipeFile {
     pub fn into_dyn(self: Arc<Self>) -> Arc<dyn File> {
         self.clone()
     }
-    fn new_read_end(buffer: Arc<SpinLock<PipeBuffer>>) -> Arc<Self> {
-        let dentry = PipeDentry::new(&format!("pipe-{}", random()));
+    fn new_read_end(buffer: Arc<SpinLock<PipeBuffer>>, name: &str) -> Arc<Self> {
+        let name = format!("{}-read", name);
+        let dentry = PipeDentry::new(&name);
         let inode = Arc::new(PipeInode::new());
         dentry.set_inode(inode.clone());
         let meta = FileMeta::new(dentry, inode);
@@ -318,8 +305,9 @@ impl PipeFile {
         res.clone().into_dyn().set_flags(FileFlags::O_RDONLY);
         res
     }
-    fn new_write_end(buffer: Arc<SpinLock<PipeBuffer>>) -> Arc<Self> {
-        let dentry = PipeDentry::new(&format!("pipe-{}", random()));
+    fn new_write_end(buffer: Arc<SpinLock<PipeBuffer>>, name: &str) -> Arc<Self> {
+        let name = format!("{}-write", name);
+        let dentry = PipeDentry::new(&name);
         let inode = Arc::new(PipeInode::new());
         dentry.set_inode(inode.clone());
         let meta = FileMeta::new(dentry, inode);
@@ -336,8 +324,9 @@ impl PipeFile {
     /// Create a new pipe, return (read end, write end)
     pub fn new_pipe() -> (Arc<Self>, Arc<Self>) {
         let buffer = Arc::new(SpinLock::new(PipeBuffer::new()));
-        let read_end = Self::new_read_end(buffer.clone());
-        let write_end = Self::new_write_end(buffer.clone());
+        let name = format!("pipe-{}", random());
+        let read_end = Self::new_read_end(buffer.clone(), &name);
+        let write_end = Self::new_write_end(buffer.clone(), &name);
         let read_end_weak = Arc::downgrade(&read_end);
         let write_end_weak = Arc::downgrade(&write_end);
         buffer.lock().set_read_end(read_end_weak);
@@ -353,11 +342,16 @@ impl File for PipeFile {
     }
     async fn base_read(&self, _offset: usize, buf: &mut [u8]) -> SyscallResult {
         assert!(self.is_read_end());
-        let len = buf.len();
-        PipeReadFuture::new(self.buffer.clone(), len).await?;
+        debug!("[pipe] {} read, {}", self.meta.dentry().name(), buf.len());
+        PipeReadFuture::new(self.buffer.clone()).await?;
         let mut buffer = self.buffer.lock();
-        let ret = buffer.read(buf, len);
-        buffer.notify_write_wakers();
+        let ret = buffer.read(buf);
+        debug!(
+            "[pipe] {} read buf as string: {}",
+            self.meta.dentry().name(),
+            alloc::string::String::from_utf8_lossy(buf)
+        );
+        buffer.notify_write_waker();
         Ok(ret as isize)
     }
     async fn base_readlink(&self, _buf: &mut [u8]) -> SyscallResult {
@@ -365,16 +359,16 @@ impl File for PipeFile {
     }
     async fn base_write(&self, _offset: usize, buf: &[u8]) -> SyscallResult {
         assert!(self.is_write_end());
-        let len = buf.len();
-        trace!(
-            "[PipeWriteFile] buf as string: {}",
-            alloc::string::String::from_utf8_lossy(buf)
-        );
-        PipeWriteFuture::new(self.buffer.clone(), len).await?;
+        debug!("[pipe] {} write, {}", self.meta.dentry().name(), buf.len());
+        PipeWriteFuture::new(self.buffer.clone()).await?;
         let mut buffer = self.buffer.lock();
         let ret = buffer.write(buf);
-        trace!("[PipeWriteFile] write {} bytes", ret);
-        buffer.notify_read_wakers();
+        debug!(
+            "[pipe] {} write buf as string: {}",
+            self.meta.dentry().name(),
+            alloc::string::String::from_utf8_lossy(buf)
+        );
+        buffer.notify_read_waker();
         Ok(ret as isize)
     }
     async fn load_dir(&self) -> Result<(), Errno> {
@@ -386,37 +380,95 @@ impl File for PipeFile {
     fn ioctl(&self, _cmd: usize, _arg: usize) -> SyscallResult {
         Err(Errno::ENOTTY)
     }
+    fn poll(&self, req: &PollEvent, waker: Waker) -> PollEvent {
+        let mut buffer = self.buffer.lock();
+        let mut ret = PollEvent::empty();
+        if self.is_read_end() {
+            debug!("[PipeFile] poll read end, req: {:?}", req);
+            if !buffer.has_writend() {
+                debug!("[PipeFile] read end has no write end");
+                ret |= PollEvent::POLLHUP;
+            }
+            if req.contains(PollEvent::POLLIN) && buffer.read_available() > 0 {
+                debug!("[PipeFile] read end has data");
+                ret |= PollEvent::POLLIN;
+            } else {
+                debug!("[PipeFile] read end has no data");
+                buffer.add_read_event(waker);
+            }
+        } else {
+            debug!("[PipeFile] poll write end, req: {:?}", req);
+            if !buffer.has_readend() {
+                debug!("[PipeFile] write end has no read end");
+                ret |= PollEvent::POLLERR;
+            }
+            if req.contains(PollEvent::POLLOUT) && buffer.write_available() > 0 {
+                debug!("[PipeFile] write end has space");
+                ret |= PollEvent::POLLOUT;
+            } else {
+                debug!("[PipeFile] write end has no space");
+                buffer.add_write_event(waker);
+            }
+        }
+        ret
+    }
+}
+
+impl Drop for PipeFile {
+    fn drop(&mut self) {
+        let mut buffer = self.buffer.lock();
+        if self.is_read_end() {
+            #[cfg(feature = "debug_sig")]
+            let name = self.meta.dentry().name();
+            #[cfg(not(feature = "debug_sig"))]
+            let name = "read end";
+            debug!("[PipeFile] {} dropped!", name);
+            buffer.read_end = None;
+            for waker in buffer.write_wakers.drain(..) {
+                waker.wake();
+            }
+        } else {
+            #[cfg(feature = "debug_sig")]
+            let name = self.meta.dentry().name();
+            #[cfg(not(feature = "debug_sig"))]
+            let name = "write end";
+            debug!("[PipeFile] {} dropped!", name);
+            buffer.write_end = None;
+            for waker in buffer.read_wakers.drain(..) {
+                waker.wake();
+            }
+        }
+    }
 }
 
 /// Pipe read future, only continue if it can be read
 struct PipeReadFuture {
     pipe_buffer: Arc<SpinLock<PipeBuffer>>,
-    len: usize,
 }
 
 impl PipeReadFuture {
-    fn new(pipe_buffer: Arc<SpinLock<PipeBuffer>>, len: usize) -> Self {
-        Self { pipe_buffer, len }
+    fn new(pipe_buffer: Arc<SpinLock<PipeBuffer>>) -> Self {
+        Self { pipe_buffer }
     }
 }
 
 impl Future for PipeReadFuture {
     // just for error handling
-    type Output = SyscallResult;
+    type Output = SysResult<()>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut buffer = self.pipe_buffer.lock();
         if buffer.has_writend() {
             // only continue if it can be read
-            if self.len <= buffer.read_available() {
-                Poll::Ready(Ok(0))
+            if buffer.read_available() > 0 {
+                Poll::Ready(Ok(()))
             } else {
                 // ? will add multiple wakers?
-                buffer.add_read_event(self.len, cx.waker().clone());
+                buffer.add_read_event(cx.waker().clone());
                 Poll::Pending
             }
         } else {
-            Poll::Ready(Ok(0))
+            Poll::Ready(Ok(()))
         }
     }
 }
@@ -424,31 +476,30 @@ impl Future for PipeReadFuture {
 /// Pipe write future, only continue if it can be written
 struct PipeWriteFuture {
     pipe_buffer: Arc<SpinLock<PipeBuffer>>,
-    len: usize,
 }
 
 impl PipeWriteFuture {
-    fn new(pipe_buffer: Arc<SpinLock<PipeBuffer>>, len: usize) -> Self {
-        Self { pipe_buffer, len }
+    fn new(pipe_buffer: Arc<SpinLock<PipeBuffer>>) -> Self {
+        Self { pipe_buffer }
     }
 }
 
 impl Future for PipeWriteFuture {
     // just for error handling
-    type Output = SyscallResult;
+    type Output = SysResult<()>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut buffer = self.pipe_buffer.lock();
         if buffer.has_readend() {
             trace!("[PipeWriteFile] has read end");
             // only continue if it can be written
-            if self.len <= buffer.write_available() {
+            if buffer.write_available() > 0 {
                 trace!("[PipeWriteFile] write available");
-                Poll::Ready(Ok(0))
+                Poll::Ready(Ok(()))
             } else {
                 trace!("[PipeWriteFile] write pending, save waker");
                 // ? will add multiple wakers?
-                buffer.add_write_event(self.len, cx.waker().clone());
+                buffer.add_write_event(cx.waker().clone());
                 Poll::Pending
             }
         } else {
