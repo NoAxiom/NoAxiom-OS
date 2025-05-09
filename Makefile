@@ -104,9 +104,7 @@ asm-all: asm asm-user
 
 run: $(FS_IMG)
 	@cp $(KERNEL_BIN) kernel-qemu
-	@echo -e $(NORMAL)"Running QEMU..."$(RESET)
-	$(QEMU) $(QFLAGS) | tee qemu.log
-	@echo "QEMU exited. See qemu.log for console trace details."
+	$(QEMU) $(QFLAGS) | tee log/$(shell date +%m.%d-%H:%M).log
 
 gdb-server: build-kernel
 	$(QEMU) $(QFLAGS) -s -S
