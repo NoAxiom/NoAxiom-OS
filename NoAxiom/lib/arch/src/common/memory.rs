@@ -16,21 +16,10 @@ bitflags! {
         const A = bit!(6);
         const D = bit!(7);
         const COW = bit!(8);
-
-        const Device = bit!(9);
-        const Cache = bit!(10);
-
-        /// virt bit for page table
+        /// OS-specific: virt bit to specify the invalid page
+        const NV = bit!(62);
+        /// OS-specific: virt bit for page table
         const PT = bit!(63);
-
-        /// Read | Write | Executeable Flags
-        const RWX = Self::R.bits() | Self::W.bits() | Self::X.bits();
-        /// User | Read | Write Flags
-        const URW = Self::U.bits() | Self::R.bits() | Self::W.bits();
-        /// User | Read | Executeable Flags
-        const URX = Self::U.bits() | Self::R.bits() | Self::X.bits();
-        /// User | Read | Write | Executeable Flags
-        const URWX = Self::URW.bits() | Self::X.bits();
     }
 }
 
@@ -46,7 +35,7 @@ pub trait ArchPageTableEntry: Into<usize> + From<usize> + Clone {
     /// clear all data
     fn reset(&mut self);
     /// is valid dir
-    fn is_valid_dir(&self) -> bool;
+    fn is_valid(&self) -> bool;
 }
 
 pub trait ArchPageTable {

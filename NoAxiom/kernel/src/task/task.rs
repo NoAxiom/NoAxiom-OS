@@ -514,9 +514,9 @@ impl Task {
         let memory_set = if flags.contains(CloneFlags::VM) {
             self.memory_set().clone()
         } else {
-            let (ms, _) = self.memory_set().lock().clone_cow();
+            let new_memory_set = self.memory_set().lock().clone_cow();
             Arch::tlb_flush();
-            Shared::new(ms)
+            Shared::new(new_memory_set)
         };
 
         let sa_list = if flags.contains(CloneFlags::SIGHAND) {

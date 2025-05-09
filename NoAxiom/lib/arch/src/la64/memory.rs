@@ -61,7 +61,7 @@ impl From<MappingFlags> for PTEFlags {
         // V D PLV P MAT W NX NR COW
         // V R X W D U COW
         let mut res = PTEFlags::P | PTEFlags::MAT_CC;
-        if flags.contains(MappingFlags::V) {
+        if flags.contains(MappingFlags::V) && !flags.contains(MappingFlags::NV) {
             res |= PTEFlags::V;
         }
         if !flags.contains(MappingFlags::R) {
@@ -165,7 +165,7 @@ impl ArchPageTableEntry for PageTableEntry {
         self.0 = 0;
     }
     /// is valid
-    fn is_valid_dir(&self) -> bool {
+    fn is_valid(&self) -> bool {
         self.ppn() != 0
     }
 }

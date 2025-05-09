@@ -81,9 +81,9 @@ impl PageTable {
                 break;
             }
             trace!("pte addr: {:#x}", pte as *mut PageTableEntry as usize);
-            if !pte.is_valid_dir() {
+            if !pte.is_valid() {
                 let frame = frame_alloc();
-                *pte = PageTableEntry::new(frame.ppn().raw(), pte_flags!(V, PT));
+                *pte = PageTableEntry::new(frame.ppn().raw(), pte_flags!(PT));
                 self.frames.push(frame);
             }
             ppn = PhysPageNum::from(pte.ppn());
@@ -101,7 +101,7 @@ impl PageTable {
     pub fn map(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: MappingFlags) {
         let pte = self.create_pte(vpn);
         assert!(
-            !pte.flags().contains(MappingFlags::V),
+            !pte.is_valid(),
             "{:#x?} is mapped before mapping, flags: {:?}, ppn: {:#x}",
             vpn,
             pte.flags(),
@@ -115,21 +115,13 @@ impl PageTable {
             pte as *mut PageTableEntry as usize
         );
         *pte = PageTableEntry::new(ppn.raw(), flags | pte_flags!(V, D, A));
-
-        let find_res = self.find_pte(vpn).unwrap();
-        assert!(
-            find_res.flags().contains(MappingFlags::V),
-            "error vpn: {:#x}, flags: {:?}",
-            vpn.raw(),
-            find_res.flags()
-        );
     }
 
     /// unmap a vpn
     pub fn unmap(&mut self, vpn: VirtPageNum) {
         // warn!("unmap vpn: {:#x}", vpn.0);
         if let Some(pte) = self.find_pte(vpn) {
-            if !pte.flags().contains(MappingFlags::V) {
+            if !pte.is_valid() {
                 error!("{:?} is invalid before unmapping", vpn);
             }
             pte.reset();
@@ -199,7 +191,7 @@ pub fn translate_vpn_into_pte<'a>(
     let mut result: Option<&mut PageTableEntry> = None;
     for (i, idx) in index.iter().enumerate() {
         let pte = &mut ppn.get_pte_array()[*idx];
-        if !pte.is_valid_dir() {
+        if !pte.is_valid() {
             return None;
         }
         if i == INDEX_LEVELS - 1 {
@@ -213,9 +205,9 @@ pub fn translate_vpn_into_pte<'a>(
 
 #[inline(always)]
 pub fn flags_switch_to_cow(flags: &MappingFlags) -> MappingFlags {
-    *flags & !MappingFlags::W | MappingFlags::COW
+    *flags | MappingFlags::NV | MappingFlags::COW
 }
 #[inline(always)]
 pub fn flags_switch_to_rw(flags: &MappingFlags) -> MappingFlags {
-    *flags & !MappingFlags::COW | MappingFlags::W
+    *flags & !MappingFlags::NV | MappingFlags::V | MappingFlags::W
 }

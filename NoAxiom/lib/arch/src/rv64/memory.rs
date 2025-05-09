@@ -66,8 +66,8 @@ impl ArchPageTableEntry for PageTableEntry {
         self.0 = 0;
     }
     /// is valid
-    fn is_valid_dir(&self) -> bool {
-        self.raw_flag().contains(PTEFlags::V)
+    fn is_valid(&self) -> bool {
+        self.ppn() != 0
     }
 }
 
@@ -117,6 +117,8 @@ impl From<MappingFlags> for PTEFlags {
     fn from(flags: MappingFlags) -> Self {
         if flags.is_empty() {
             Self::empty()
+        } else if flags.contains(MappingFlags::PT) {
+            Self::V
         } else {
             let mut res = Self::empty();
             macro_rules! set {
@@ -128,7 +130,10 @@ impl From<MappingFlags> for PTEFlags {
                     )*
                 };
             }
-            set!(V, R, W, X, U, G, A, D, COW);
+            if flags.contains(MappingFlags::V) && !flags.contains(MappingFlags::NV) {
+                res |= PTEFlags::V;
+            }
+            set!(R, W, X, U, G, A, D, COW);
             res
         }
     }

@@ -10,12 +10,7 @@ use crate::{
         result::Errno,
     },
     mm::user_ptr::UserPtr,
-    return_errno,
-    sched::{
-        spawn::spawn_utask,
-        utils::{raw_suspend_now, suspend_now},
-    },
-    signal::{sig_detail::{SigChildDetail, SigDetail}, sig_set::SigSet},
+    sched::spawn::spawn_utask,
     task::{
         exit::ExitCode,
         manager::{PROCESS_GROUP_MANAGER, TASK_MANAGER},
@@ -44,14 +39,13 @@ impl Syscall<'_> {
         flags: usize,
         stack: usize,
         ptid: usize,
-        mut tls: usize,
-        mut ctid: usize,
+        #[allow(unused_mut)] mut tls: usize,
+        #[allow(unused_mut)] mut ctid: usize,
     ) -> SyscallResult {
         /*
            On x86-32, and several other common architectures (including
            score, ARM, ARM 64, PA-RISC, arc, Power PC, xtensa, and MIPS), the
            order of the last two arguments is reversed.
-
            And so on loongarch64.
            ref1: https://www.man7.org/linux/man-pages/man2/clone.2.html#VERSIONS
            ref2: https://inbox.vuxu.org/musl/1a5a097f.12d7.1794a6de3a8.Coremail.zhaixiaojuan%40loongson.cn/t/
@@ -70,7 +64,6 @@ impl Syscall<'_> {
         );
         use TrapArgs::*;
         if stack != 0 {
-            // fixme: maybe we should update stack area in memoryspace?
             new_cx[SP] = stack;
         }
         if flags.contains(CloneFlags::SETTLS) {
@@ -136,12 +129,7 @@ impl Syscall<'_> {
         Ok(0 as isize)
     }
 
-    pub async fn sys_wait4(
-        &self,
-        pid: isize,
-        status_addr: usize,
-        options: usize,
-    ) -> SyscallResult {
+    pub async fn sys_wait4(&self, pid: isize, status_addr: usize, options: usize) -> SyscallResult {
         trace!(
             "[sys_wait4] pid: {:?}, status_addr: {:?}, options: {:?}",
             pid,

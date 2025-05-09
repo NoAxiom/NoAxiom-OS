@@ -4,7 +4,7 @@
 export PROJECT := NoAxiom
 export MODE ?= release
 export KERNEL ?= kernel
-export ARCH_NAME ?= loongarch64
+export ARCH_NAME ?= riscv64
 export LIB_NAME ?= glibc
 export INIT_PROC ?= busybox
 export ROOT := $(shell pwd)
@@ -51,7 +51,7 @@ MKFS_SH := ./mk_fs.sh
 # Qemu flags config
 QFLAGS := 
 ifeq ($(ARCH_NAME),riscv64) # RISC-V64
-QFLAGS += -machine virt -kernel kernel-qemu
+QFLAGS += -machine virt -kernel $(KERNEL_BIN)
 QFLAGS += -m 128
 QFLAGS += -nographic
 QFLAGS += -smp $(MULTICORE)
@@ -79,6 +79,9 @@ endif
 default: build run
 
 build: build-user build-kernel
+	@mkdir -p $(OUTPUT_DIR)
+	@cp $(KERNEL_BIN) $(OUTPUT_DIR)/kernel-$(ARCH_NAME)-$(LIB_NAME).bin
+	@cp $(KERNEL_ELF) $(OUTPUT_DIR)/kernel-$(ARCH_NAME)-$(LIB_NAME)
 
 $(FS_IMG):
 	cd $(TEST_DIR) && make all
@@ -188,16 +191,13 @@ git-update:
 
 env: add-target git-update vendor
 
-build-move: build
-	@cp $(KERNEL_BIN) $(OUTPUT_DIR)/kernel-$(ARCH_NAME)-$(LIB_NAME).bin
-
 build-all:
-	@make build-move ARCH_NAME=riscv64 LIB_NAME=glibc
-	@make build-move ARCH_NAME=riscv64 LIB_NAME=musl
-	@make build-move ARCH_NAME=loongarch64 LIB_NAME=glibc
-	@make build-move ARCH_NAME=loongarch64 LIB_NAME=musl
+	@make build ARCH_NAME=riscv64 LIB_NAME=glibc LOG=OFF
+	@make build ARCH_NAME=riscv64 LIB_NAME=musl LOG=OFF
+	@make build ARCH_NAME=loongarch64 LIB_NAME=glibc LOG=OFF
+	@make build ARCH_NAME=loongarch64 LIB_NAME=musl LOG=OFF
 
-all: env build-all
+all: clean env build-all
 
 .PHONY: default all build run clean         # basic make
 .PHONY: gdb-server gdb                      # debug client
@@ -205,4 +205,4 @@ all: env build-all
 .PHONY: build-user build-kernel             # for more specific build
 .PHONY: add-target env git-update vendor    # environment setup
 .PHONY: info help count                     # information utils
-.PHONY: docker build-all build-move         # for competition
+.PHONY: docker build-all                    # for competition

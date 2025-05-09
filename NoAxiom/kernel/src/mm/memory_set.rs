@@ -146,10 +146,6 @@ impl MemorySet {
         self.page_table.as_ref_mut()
     }
 
-    pub fn root_ppn(&self) -> PhysPageNum {
-        self.page_table().root_ppn()
-    }
-
     /// switch into this memory set
     #[inline(always)]
     pub fn memory_activate(&self) {
@@ -422,7 +418,7 @@ impl MemorySet {
     /// clone current memory set,
     /// and mark the new memory set as copy-on-write
     /// used in sys_fork
-    pub fn clone_cow(&mut self) -> (Self, usize) {
+    pub fn clone_cow(&mut self) -> Self {
         trace!("[clone_cow] start");
         let mut new_set = Self::new_user_space();
         fn remap_cow(
@@ -441,8 +437,6 @@ impl MemorySet {
                     .page_table()
                     .map(vpn, old_pte.ppn().into(), new_flags);
             } else {
-                // fixme: mprotect could cause bugs here since we always share non-writable
-                // memory between threads, maybe we should apply cow as well?
                 new_set
                     .page_table()
                     .map(vpn, old_pte.ppn().into(), old_flags);
@@ -453,7 +447,7 @@ impl MemorySet {
         // normal areas
         for area in self.areas.iter() {
             match area.area_type {
-                MapAreaType::ElfBinary | MapAreaType::UserStack => {
+                MapAreaType::ElfBinary => {
                     let mut new_area = MapArea::from_another(area);
                     for vpn in area.vpn_range {
                         let frame_tracker = area.frame_map.get(&vpn).unwrap();
@@ -537,8 +531,7 @@ impl MemorySet {
             new_set.shm.shm_trackers.insert(*va, new_shm_tracker);
         }
 
-        let root_ppn = new_set.root_ppn();
-        (new_set, root_ppn.raw())
+        new_set
     }
 
     pub fn map_sig_trampoline(&mut self) {
