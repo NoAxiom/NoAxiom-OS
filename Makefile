@@ -189,6 +189,11 @@ git-update:
 	@echo "Checking submodule status..."
 	@git submodule status
 
+vscode:
+	@echo "Copying vscode template..."
+	@cp -r vscode-template/ .vscode/
+	@echo "VSCode template copied."
+
 env: add-target git-update vendor
 
 build-all:
@@ -199,10 +204,10 @@ build-all:
 
 all: clean env build-all
 
-.PHONY: default all build run clean         # basic make
-.PHONY: gdb-server gdb                      # debug client
-.PHONY: asm asm-user asm-all                # generate assembly info
-.PHONY: build-user build-kernel             # for more specific build
-.PHONY: add-target env git-update vendor    # environment setup
-.PHONY: info help count                     # information utils
-.PHONY: docker build-all                    # for competition
+.PHONY: default all build run clean             # basic make
+.PHONY: gdb-server gdb                          # debug client
+.PHONY: asm asm-user asm-all                    # generate assembly info
+.PHONY: build-user build-kernel                 # for more specific build
+.PHONY: add-target env git-update vendor vscode # environment setup
+.PHONY: info help count                         # information utils
+.PHONY: docker build-all                        # for competition

@@ -1,0 +1,13 @@
+{
+  "rust-analyzer.cargo.target": "riscv64gc-unknown-none-elf",
+  "rust-analyzer.check.allTargets": false,
+  "rust-analyzer.cargo.features": [
+    "multicore",
+    "async",
+    "qemu",
+    "glibc",
+    "busybox",
+    "log_print",
+    "debug_sig"
+  ]
+}

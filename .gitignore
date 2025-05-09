@@ -1,10 +1,8 @@
 target/
 tmp/
 .*/
-.*
 !.gitmodules
 !.cargo/
-!.vscode/
 vendor/
 log/
 *-qemu

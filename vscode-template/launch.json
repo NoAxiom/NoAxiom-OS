@@ -29,6 +29,6 @@
         "-ex 'file target/riscv64gc-unknown-none-elf/release/kernel.bin'"
       ],
       "preLaunchTask": "qemu"
-    },
+    }
   ]
 }
