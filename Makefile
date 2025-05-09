@@ -26,6 +26,7 @@ export OBJCOPY := rust-objcopy --binary-architecture=riscv64
 export SBI ?= $(ROOT)/$(PROJECT)/bootloader/rustsbi-qemu.bin
 export QEMU := qemu-system-riscv64
 export MULTICORE := 1
+export GDB := riscv64-unknown-elf-gdb
 else ifeq ($(ARCH_NAME),loongarch64) # LoongArch64
 export TARGET := loongarch64-unknown-linux-gnu
 export OBJDUMP := loongarch64-linux-gnu-objdump
@@ -33,6 +34,7 @@ export OBJCOPY := loongarch64-linux-gnu-objcopy
 export SBI ?= $(ROOT)/$(PROJECT)/bootloader/u-boot-with-spl.bin
 export QEMU := qemu-system-loongarch64
 export MULTICORE := 1
+export GDB := ./toolchain/loongarch64-linux-gnu-gdb
 endif
 
 # Kernel config
@@ -76,31 +78,27 @@ endif
 
 default: build run
 
-build: build_user build_kernel
+build: build-user build-kernel
 
 $(FS_IMG):
 	cd $(TEST_DIR) && make all
 
-build_kernel: $(FS_IMG)
+build-kernel: $(FS_IMG)
 	@cd $(PROJECT)/kernel && make build
 
-build_user:
+build-user:
 	@cd $(USER_PROJECT) && make build
 
-asm:
+asm: info
 	@echo -e $(NORMAL)"Building Kernel and Generating Assembly..."$(RESET)
 	@cd $(PROJECT)/kernel && make asm
 	@echo -e $(NORMAL)"Assembly saved to $(ROOT)/log/kernel.asm"$(RESET)
 
-user_asm:
+asm-user:
 	@echo -e "Building User and Generating Assembly..."
 	@cd $(USER_PROJECT) && make asm
 
-# backup: 
-# 	@cp $(ROOTFS) $(SDCARD_BAK) 
-
-# fs-backup: 
-# 	@cp $(TESTFS) $(FS_BAK) 
+asm-all: asm asm-user
 
 run: sbi-qemu
 	@cp $(KERNEL_BIN) kernel-qemu
@@ -108,30 +106,19 @@ run: sbi-qemu
 	$(QEMU) $(QFLAGS) | tee qemu.log
 	@echo QEMU exited. See $(NORMAL)qemu.log$(RESET) for console trace details.
 
-# rm -f $(SDCARD_BAK)
-
-# qemu-dtb:backup
-# 	qemu-system-riscv64 $(QFLAGS) -machine dumpdtb=qemu.dtb
-# 	@dtc -o qemu.dts -O dts -I dtb qemu.dtb
-# 	rm -f $(ROOTFS)
-# 	mv $(SDCARD_BAK) $(ROOTFS)
-
-# KERNEL_ENTRY_PA := 0x80200000
-# QEMU_ARGS := -machine virt \
-# 			 -nographic \
-# 			 -bios $(SBI) \
-# 			 -device loader,file=$(KERNEL_BIN),addr=$(KERNEL_ENTRY_PA)
-
-# gdb-server: build
-# 	qemu-system-riscv64 $(QEMU_ARGS) -s -S
-
-gdb-server: build_kernel
+gdb-server: build-kernel
 	$(QEMU) $(QFLAGS) -s -S
 
-
-debug-client:
-# loongarch64 does not support gdb
-	@riscv64-unknown-elf-gdb -ex 'file $(KERNEL_BIN)' -ex 'set arch riscv:rv64' -ex 'target remote localhost:1234'
+GDB_FLAGS := 
+GDB_FLAGS += -ex 'file $(KERNEL_BIN)'
+GDB_FLAGS += -ex 'target remote localhost:1234'
+ifeq ($(ARCH_NAME),riscv64) # RISC-V64
+GDB_FLAGS += -ex 'set arch riscv:rv64'
+else ifeq ($(ARCH_NAME),loongarch64) # LoongArch64
+GDB_FLAGS += -ex 'set arch Loongarch64'
+endif
+gdb:
+	@$(GDB) $(GDB_FLAGS)
 
 clean:
 	@rm -f kernel-qemu
@@ -152,7 +139,6 @@ count:
 	@cd $(PROJECT) && cloc $(KERNEL) lib --exclude-dir=.trash,.trashbin --exclude-ext=md,toml
 
 DOCKER ?= docker.educg.net/cg/os-contest:20250226
-
 docker:
 	docker run --rm -it -v .:/code --entrypoint bash -w /code --privileged $(DOCKER)
 
@@ -160,7 +146,7 @@ info:
 	@echo "TARGET: $(TARGET)"
 	@echo "ARCH_NAME: $(ARCH_NAME)"
 	@echo "LIB_NAME: $(LIB_NAME)"
-	@echo "  INIT_PROC: $(INIT_PROC)"
+	@echo "INIT_PROC: $(INIT_PROC)"
 	@echo "MODE: $(MODE)"
 	@echo "MULTICORE: $(MULTICORE)"
 	@echo "SBI: $(SBI)"
@@ -185,13 +171,13 @@ help:
 	@echo "  LOG: specify the log level (DEBUG, INFO, WARN, ERROR, OFF)"
 	@echo "  INIT_PROC: specify the init process (busybox, ...)"
 
-add_target:
+add-target:
 	@echo $(NORMAL)"Adding target to rustup"$(RESET)
 	@rustup target add loongarch64-unknown-linux-gnu
 	@rustup target add riscv64gc-unknown-none-elf
 
-env: add_target vendor
+env: add-target vendor
 
 all: env build
 
-.PHONY: default all build run clean debug-client sbi-qemu backup sdcard build-gui board vendor count asm test build_user build_kernel env info help
+.PHONY: default all build run clean gdb sbi-qemu backup sdcard build-gui board vendor count asm asm-user asm-all test build-user build-kernel env info help

@@ -1,9 +1,6 @@
 use alloc::{sync::Arc, vec::Vec};
 
-use arch::{
-    consts::KERNEL_VIRT_MEMORY_END, Arch, ArchMemory, ArchPageTableEntry, ArchTime, MappingFlags,
-    PageTableEntry,
-};
+use arch::{Arch, ArchMemory, ArchPageTableEntry, ArchTime, MappingFlags, PageTableEntry};
 use config::{
     fs::ROOT_NAME,
     mm::{DL_INTERP_OFFSET, SIG_TRAMPOLINE, USER_HEAP_SIZE},
@@ -33,7 +30,7 @@ use crate::{
         permission::MapType,
     },
     pte_flags,
-    sched::utils::{block_on, yield_now},
+    sched::utils::yield_now,
     syscall::SysResult,
     task::impl_signal::user_sigreturn,
 };
@@ -192,26 +189,28 @@ impl MemorySet {
     /// create kernel space, used in [`KERNEL_SPACE`] initialization
     pub fn init_kernel_space() -> Self {
         let mut memory_set = MemorySet::new_allocated();
-        macro_rules! kernel_push_area {
-            ($($start:expr, $end:expr, $permission:expr)*) => {
-                $(
-                    block_on(memory_set.push_area(
-                        MapArea::new(
-                            ($start as usize).into(),
-                            ($end as usize).into(),
-                            MapType::Direct,
-                            $permission,
-                            MapAreaType::KernelSpace,
-                            None,
-                        ),
-                        None,
-                    )).expect("[init_kernel_space] push area error");
-                )*
-            };
-        }
         #[cfg(target_arch = "riscv64")]
         {
-            use arch::consts::KERNEL_ADDR_OFFSET;
+            use arch::consts::{KERNEL_ADDR_OFFSET, KERNEL_VIRT_MEMORY_END};
+            macro_rules! kernel_push_area {
+                ($($start:expr, $end:expr, $permission:expr)*) => {
+                    $(
+                        crate::sched::utils::block_on(
+                            memory_set.push_area(
+                                MapArea::new(
+                                    ($start as usize).into(),
+                                    ($end as usize).into(),
+                                    MapType::Direct,
+                                    $permission,
+                                    MapAreaType::KernelSpace,
+                                    None,
+                                ),
+                                None,
+                            )
+                        ).expect("[init_kernel_space] push area error");
+                    )*
+                };
+            }
             info!(
                 "[kernel].text [{:#x}, {:#x})",
                 stext as usize, etext as usize

@@ -24,7 +24,7 @@
         }
       ],
       "miDebuggerServerAddress": "localhost:1234",
-      "miDebuggerPath": "${workspaceFolder}/NoAxiom/toolchain/riscv64-unknown-elf-gdb",
+      "miDebuggerPath": "${workspaceFolder}/toolchain/riscv64-unknown-elf-gdb",
       "args": [
         "-ex 'file target/riscv64gc-unknown-none-elf/release/kernel.bin'"
       ],
