@@ -191,7 +191,8 @@ git-update:
 
 vscode:
 	@echo "Copying vscode template..."
-	@cp -r utils/vscode-template/ .vscode/
+	@mkdir -p $(ROOT)/.vscode
+	@cp -f $(ROOT)/utils/vscode-template/* $(ROOT)/.vscode/
 	@echo "VSCode template copied."
 
 env: add-target git-update vendor
