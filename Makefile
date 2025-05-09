@@ -4,7 +4,7 @@
 export PROJECT := NoAxiom
 export MODE ?= release
 export KERNEL ?= kernel
-export ARCH_NAME ?= loongarch64
+export ARCH_NAME ?= riscv64
 export LIB_NAME ?= glibc
 export INIT_PROC ?= busybox
 export ROOT := $(shell pwd)
@@ -17,13 +17,13 @@ export WARN := "\e[33m"
 export NORMAL := "\e[32m"
 export RESET := "\e[0m"
 export TARGET_DIR := $(ROOT)/target/$(TARGET)/$(MODE)
+export TOOLCHAIN_DIR := $(ROOT)/toolchain
 
 # Arch config
 ifeq ($(ARCH_NAME),riscv64) # RISC-V64
 export TARGET := riscv64gc-unknown-none-elf
 export OBJDUMP := riscv64-unknown-elf-objdump
 export OBJCOPY := rust-objcopy --binary-architecture=riscv64
-export SBI ?= $(ROOT)/$(PROJECT)/bootloader/rustsbi-qemu.bin
 export QEMU := qemu-system-riscv64
 export MULTICORE := 1
 export GDB := riscv64-unknown-elf-gdb
@@ -31,10 +31,9 @@ else ifeq ($(ARCH_NAME),loongarch64) # LoongArch64
 export TARGET := loongarch64-unknown-linux-gnu
 export OBJDUMP := loongarch64-linux-gnu-objdump
 export OBJCOPY := loongarch64-linux-gnu-objcopy
-export SBI ?= $(ROOT)/$(PROJECT)/bootloader/u-boot-with-spl.bin
 export QEMU := qemu-system-loongarch64
 export MULTICORE := 1
-export GDB := ./toolchain/loongarch64-linux-gnu-gdb
+export GDB := $(TOOLCHAIN_DIR)/loongarch64-linux-gnu-gdb
 endif
 
 # Kernel config
@@ -104,7 +103,7 @@ run: sbi-qemu
 	@cp $(KERNEL_BIN) kernel-qemu
 	@echo -e $(NORMAL)"Running QEMU..."$(RESET)
 	$(QEMU) $(QFLAGS) | tee qemu.log
-	@echo QEMU exited. See $(NORMAL)qemu.log$(RESET) for console trace details.
+	@echo "QEMU exited. See qemu.log for console trace details."
 
 gdb-server: build-kernel
 	$(QEMU) $(QFLAGS) -s -S
