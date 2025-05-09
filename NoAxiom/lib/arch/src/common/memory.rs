@@ -35,7 +35,7 @@ pub trait ArchPageTableEntry: Into<usize> + From<usize> + Clone {
     /// clear all data
     fn reset(&mut self);
     /// is valid dir
-    fn is_valid(&self) -> bool;
+    fn is_allocated(&self) -> bool;
 }
 
 pub trait ArchPageTable {

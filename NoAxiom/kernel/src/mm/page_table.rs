@@ -81,7 +81,7 @@ impl PageTable {
                 break;
             }
             trace!("pte addr: {:#x}", pte as *mut PageTableEntry as usize);
-            if !pte.is_valid() {
+            if !pte.is_allocated() {
                 let frame = frame_alloc();
                 *pte = PageTableEntry::new(frame.ppn().raw(), pte_flags!(PT));
                 self.frames.push(frame);
@@ -101,7 +101,7 @@ impl PageTable {
     pub fn map(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: MappingFlags) {
         let pte = self.create_pte(vpn);
         assert!(
-            !pte.is_valid(),
+            !pte.is_allocated(),
             "{:#x?} is mapped before mapping, flags: {:?}, ppn: {:#x}",
             vpn,
             pte.flags(),
@@ -121,7 +121,7 @@ impl PageTable {
     pub fn unmap(&mut self, vpn: VirtPageNum) {
         // warn!("unmap vpn: {:#x}", vpn.0);
         if let Some(pte) = self.find_pte(vpn) {
-            if !pte.is_valid() {
+            if !pte.is_allocated() {
                 error!("{:?} is invalid before unmapping", vpn);
             }
             pte.reset();
@@ -191,7 +191,7 @@ pub fn translate_vpn_into_pte<'a>(
     let mut result: Option<&mut PageTableEntry> = None;
     for (i, idx) in index.iter().enumerate() {
         let pte = &mut ppn.get_pte_array()[*idx];
-        if !pte.is_valid() {
+        if !pte.is_allocated() {
             return None;
         }
         if i == INDEX_LEVELS - 1 {
