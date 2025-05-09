@@ -164,8 +164,8 @@ impl ArchPageTableEntry for PageTableEntry {
     fn reset(&mut self) {
         self.0 = 0;
     }
-    /// is valid
-    fn is_valid(&self) -> bool {
+    /// is allocated
+    fn is_allocated(&self) -> bool {
         self.ppn() != 0
     }
 }
