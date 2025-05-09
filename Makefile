@@ -17,7 +17,7 @@ export WARN := "\e[33m"
 export NORMAL := "\e[32m"
 export RESET := "\e[0m"
 export TARGET_DIR := $(ROOT)/target/$(TARGET)/$(MODE)
-export TOOLCHAIN_DIR := $(ROOT)/toolchain
+export TOOLCHAIN_DIR := $(ROOT)/utils/toolchain
 export OUTPUT_DIR := $(ROOT)/output
 
 # Arch config
@@ -191,7 +191,7 @@ git-update:
 
 vscode:
 	@echo "Copying vscode template..."
-	@cp -r vscode-template/ .vscode/
+	@cp -r utils/vscode-template/ .vscode/
 	@echo "VSCode template copied."
 
 env: add-target git-update vendor
