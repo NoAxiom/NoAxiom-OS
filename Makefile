@@ -1,6 +1,6 @@
 # NoAxiom Makefile
 
-# general config
+# General config
 export PROJECT := NoAxiom
 export MODE ?= release
 export KERNEL ?= kernel
@@ -16,61 +16,64 @@ export ERROR := "\e[31m"
 export WARN := "\e[33m"
 export NORMAL := "\e[32m"
 export RESET := "\e[0m"
-
-ifeq ($(ARCH_NAME),riscv64)
-	export TARGET := riscv64gc-unknown-none-elf
-	export OBJDUMP := riscv64-unknown-elf-objdump
-	export OBJCOPY := rust-objcopy --binary-architecture=riscv64
-	export SBI ?= $(ROOT)/$(PROJECT)/bootloader/rustsbi-qemu.bin
-	export QEMU := qemu-system-riscv64
-	export MULTICORE := 1
-else ifeq ($(ARCH_NAME),loongarch64)
-	export TARGET := loongarch64-unknown-linux-gnu
-	export OBJDUMP := loongarch64-linux-gnu-objdump
-	export OBJCOPY := loongarch64-linux-gnu-objcopy
-	export SBI ?= $(ROOT)/$(PROJECT)/bootloader/u-boot-with-spl.bin
-	export QEMU := qemu-system-loongarch64
-	export MULTICORE := 1
-endif
-
 export TARGET_DIR := $(ROOT)/target/$(TARGET)/$(MODE)
 
-# kernel config
+# Arch config
+ifeq ($(ARCH_NAME),riscv64) # RISC-V64
+export TARGET := riscv64gc-unknown-none-elf
+export OBJDUMP := riscv64-unknown-elf-objdump
+export OBJCOPY := rust-objcopy --binary-architecture=riscv64
+export SBI ?= $(ROOT)/$(PROJECT)/bootloader/rustsbi-qemu.bin
+export QEMU := qemu-system-riscv64
+export MULTICORE := 1
+else ifeq ($(ARCH_NAME),loongarch64) # LoongArch64
+export TARGET := loongarch64-unknown-linux-gnu
+export OBJDUMP := loongarch64-linux-gnu-objdump
+export OBJCOPY := loongarch64-linux-gnu-objcopy
+export SBI ?= $(ROOT)/$(PROJECT)/bootloader/u-boot-with-spl.bin
+export QEMU := qemu-system-loongarch64
+export MULTICORE := 1
+endif
+
+# Kernel config
 KERNEL_O_PATH := ./target/$(TARGET)/$(MODE)
 KERNEL_ELF := $(KERNEL_O_PATH)/$(KERNEL)
 KERNEL_BIN := $(KERNEL_ELF).bin
 KERNEL_SYMBOL_TABLE := $(KERNEL_ELF).txt
 
+# Test and fs image config
 TEST_DIR := $(ROOT)/$(PROJECT)-OS-Test
 FS_IMG := $(TEST_DIR)/fs-$(ARCH_NAME).img
 MKFS_SH := ./mk_fs.sh
 
+# Qemu flags config
 QFLAGS := 
-ifeq ($(ARCH_NAME),loongarch64)
-	QFLAGS += -kernel $(KERNEL_ELF)
-	QFLAGS += -m 1024
-	QFLAGS += -nographic
-	QFLAGS += -smp $(MULTICORE)
-	QFLAGS += -drive file=$(FS_IMG),if=none,format=raw,id=x0
-	QFLAGS += -device virtio-blk-pci,drive=x0 -no-reboot # Official says bus=virtio-mmio-bus.0, but it's wrong
-	# QFLAGS += -device virtio-net-pci,netdev=net0
-	QFLAGS += -netdev user,id=net0,hostfwd=tcp::5555-:5555,hostfwd=udp::5555-:5555
-	QFLAGS += -rtc base=utc
-	# QFLAGS += -drive file=disk-la.img,if=none,format=raw,id=x1
-	# QFLAGS += -device virtio-blk-pci,drive=x1,bus=virtio-mmio-bus.1
-else
-	QFLAGS += -machine virt -kernel kernel-qemu
-	QFLAGS += -m 128
-	QFLAGS += -nographic
-	QFLAGS += -smp $(MULTICORE)
-	QFLAGS += -bios default
-	QFLAGS += -drive file=$(FS_IMG),if=none,format=raw,id=x0
-	QFLAGS += -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 
-	QFLAGS += -no-reboot -device virtio-net-device,netdev=net -netdev user,id=net
-	QFLAGS += -rtc base=utc
-	# QFLAGS += -drive file=disk.img,if=none,format=raw,id=x1 
-	# QFLAGS += -device virtio-blk-device,drive=x1,bus=virtio-mmio-bus.1
+ifeq ($(ARCH_NAME),riscv64) # RISC-V64
+QFLAGS += -machine virt -kernel kernel-qemu
+QFLAGS += -m 128
+QFLAGS += -nographic
+QFLAGS += -smp $(MULTICORE)
+QFLAGS += -bios default
+QFLAGS += -drive file=$(FS_IMG),if=none,format=raw,id=x0
+QFLAGS += -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 
+QFLAGS += -no-reboot -device virtio-net-device,netdev=net -netdev user,id=net
+QFLAGS += -rtc base=utc
+# QFLAGS += -drive file=disk.img,if=none,format=raw,id=x1 
+# QFLAGS += -device virtio-blk-device,drive=x1,bus=virtio-mmio-bus.1
+else ifeq ($(ARCH_NAME),loongarch64) # LoongArch64
+QFLAGS += -kernel $(KERNEL_ELF)
+QFLAGS += -m 1024
+QFLAGS += -nographic
+QFLAGS += -smp $(MULTICORE)
+QFLAGS += -drive file=$(FS_IMG),if=none,format=raw,id=x0
+QFLAGS += -device virtio-blk-pci,drive=x0 -no-reboot # Official says bus=virtio-mmio-bus.0, but it's wrong
+QFLAGS += -netdev user,id=net0,hostfwd=tcp::5555-:5555,hostfwd=udp::5555-:5555
+QFLAGS += -rtc base=utc
+# QFLAGS += -device virtio-net-pci,netdev=net0
+# QFLAGS += -drive file=disk-la.img,if=none,format=raw,id=x1
+# QFLAGS += -device virtio-blk-pci,drive=x1,bus=virtio-mmio-bus.1
 endif
+
 
 default: build_user build_kernel run
 
@@ -102,6 +105,7 @@ run: sbi-qemu
 	@cp $(KERNEL_BIN) kernel-qemu
 	@echo -e $(NORMAL)"Running QEMU... See qemu.log"$(RESET)
 	$(QEMU) $(QFLAGS) | tee qemu.log
+	@echo -e $(NORMAL)"QEMU exited. See qemu.log for console trace details."$(RESET)
 
 # rm -f $(SDCARD_BAK)
 
