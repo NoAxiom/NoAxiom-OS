@@ -1,0 +1,30 @@
+# workspace for kernel
+[workspace]
+members = ["kernel"]
+resolver = "2"
+
+[workspace.dependencies]
+log = "0.4.22"
+bitflags = "2.6.0"
+arch = { path = "lib/arch" }
+ksync = { path = "lib/ksync" }
+console = { path = "lib/console" }
+fatfs = { path = "lib/fatfs", default-features = false, features = [
+    "alloc",
+    "lfn",
+    "log_level_info",
+] }
+config = { path = "lib/config" }
+driver = { path = "lib/driver" }
+include = { path = "lib/include" }
+memory = { path = "lib/memory" }
+platform = { path = "lib/platform" }
+
+[profile.release]
+debug = true
+# 优化级别,最低是0,最高是3, 0方便debug
+opt-level = 3
+# 关闭整数溢出检查
+overflow-checks = false
+# for loongarch64, tell the compiler to abort on panic instead of unwinding
+panic = "abort"

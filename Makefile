@@ -16,9 +16,6 @@ export ERROR := "\e[31m"
 export WARN := "\e[33m"
 export NORMAL := "\e[32m"
 export RESET := "\e[0m"
-export TARGET_DIR := $(ROOT)/target/$(TARGET)/$(MODE)
-export TOOLCHAIN_DIR := $(ROOT)/utils/toolchain
-export OUTPUT_DIR := $(ROOT)/output
 
 # Arch config
 ifeq ($(ARCH_NAME),riscv64) # RISC-V64
@@ -38,10 +35,12 @@ export GDB := $(TOOLCHAIN_DIR)/loongarch64-linux-gnu-gdb
 endif
 
 # Kernel config
-KERNEL_O_PATH := ./target/$(TARGET)/$(MODE)
-KERNEL_ELF := $(KERNEL_O_PATH)/$(KERNEL)
-KERNEL_BIN := $(KERNEL_ELF).bin
-KERNEL_SYMBOL_TABLE := $(KERNEL_ELF).txt
+export TARGET_DIR := $(ROOT)/$(PROJECT)/target/$(TARGET)/$(MODE)
+export TOOLCHAIN_DIR := $(ROOT)/utils/toolchain
+export OUTPUT_DIR := $(ROOT)/output
+export KERNEL_ELF := $(TARGET_DIR)/$(KERNEL)
+export KERNEL_BIN := $(KERNEL_ELF).bin
+export KERNEL_SYMBOL_TABLE := $(KERNEL_ELF).txt
 
 # Test and fs image config
 TEST_DIR := $(ROOT)/$(PROJECT)-OS-Test
@@ -130,11 +129,11 @@ clean:
 	@rm -rf $(TEST_DIR)/build
 	@rm -rf $(TEST_DIR)/riscv64
 	@rm -rf $(OUTPUT_DIR)
-	cargo clean
+	@cd $(PROJECT) && cargo clean
 
 vendor:
-	@cargo clean
-	@cargo vendor
+	@cd $(PROJECT) && cargo clean
+	@cd $(PROJECT) && cargo vendor
 	@cd $(USER_PROJECT) && make vendor
 
 count:

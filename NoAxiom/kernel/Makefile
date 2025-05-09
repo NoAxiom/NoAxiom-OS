@@ -1,6 +1,3 @@
-KERNEL_ELF := ../../target/$(TARGET)/$(MODE)/$(KERNEL)
-KERNEL_BIN := $(KERNEL_ELF).bin
-
 ifeq ($(MODE),release)
     CARGO_ARGS += --release
 endif

@@ -10,4 +10,4 @@ components = [
     "clippy",
     "llvm-tools-preview",
 ]
-targets = ["riscv64gc-unknown-none-elf"]
+targets = ["riscv64gc-unknown-none-elf", "loongarch64-unknown-none"]

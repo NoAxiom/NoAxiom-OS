@@ -9,7 +9,7 @@ fn main() {
     insert_app_data().unwrap();
 }
 
-static TARGET_PATH: &str = "./NoAxiom-OS-User/bin/";
+static TARGET_PATH: &str = "../NoAxiom-OS-User/bin/";
 
 fn insert_app_data() -> Result<()> {
     let mut f = File::create("src/link_apps.S").unwrap();
