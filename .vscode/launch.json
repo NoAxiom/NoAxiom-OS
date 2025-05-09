@@ -30,24 +30,5 @@
       ],
       "preLaunchTask": "qemu"
     },
-    {
-      "name": "C/C++ Runner: Debug Session",
-      "type": "cppdbg",
-      "request": "launch",
-      "args": [],
-      "stopAtEntry": false,
-      "externalConsole": false,
-      "cwd": "/home/crpboy/os/NoAxiom-OS/NoAxiom/init_proc",
-      "program": "/home/crpboy/os/NoAxiom-OS/NoAxiom/init_proc/build/Debug/outDebug",
-      "MIMode": "gdb",
-      "miDebuggerPath": "gdb",
-      "setupCommands": [
-        {
-          "description": "Enable pretty-printing for gdb",
-          "text": "-enable-pretty-printing",
-          "ignoreFailures": true
-        }
-      ]
-    }
   ]
 }

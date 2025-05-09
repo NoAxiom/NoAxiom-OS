@@ -54,7 +54,7 @@ impl Syscall<'_> {
         info!(
             "[sys_clock_gettime] clock_id: {:?}, ts_addr: {:#x}",
             clockid,
-            ts.addr_usize(),
+            ts.addr(),
         );
         use ClockId::*;
         match clockid {

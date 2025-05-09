@@ -4,7 +4,6 @@ use lazy_static::lazy_static;
 
 use crate::{cpu::get_hartid, include::syscall_id::SyscallID};
 
-#[cfg(feature = "debug_sig")]
 lazy_static! {
     pub static ref CURRENT_SYSCALL: [SyncUnsafeCell<SyscallID>; CPU_NUM] =
         array_init::array_init(|_| SyncUnsafeCell::new(SyscallID::NO_SYSCALL));

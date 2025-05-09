@@ -89,9 +89,9 @@ impl<'a> Syscall<'a> {
             SYS_GETEGID =>              Self::empty_syscall("getegid", 0),
             SYS_EXIT =>                 self.sys_exit(args[0] as i32),
             SYS_EXIT_GROUP =>           self.sys_exit_group(args[0] as i32),
-            SYS_CLONE =>                self.sys_fork(args[0], args[1], args[2], args[3], args[4]),
+            SYS_CLONE =>                self.sys_clone(args[0], args[1], args[2], args[3], args[4]),
             SYS_EXECVE =>               self.sys_execve(args[0], args[1], args[2]).await,
-            SYS_WAIT4 =>                self.sys_wait4(args[0] as isize, args[1], args[2], args[3]).await,
+            SYS_WAIT4 =>                self.sys_wait4(args[0] as isize, args[1], args[2]).await,
             SYS_GETTID =>               self.sys_gettid(),
             SYS_GETPID =>               self.sys_getpid(),
             SYS_GETPPID =>              self.sys_getppid(),
@@ -142,9 +142,9 @@ impl<'a> Syscall<'a> {
             SYS_GETTIMEOFDAY =>     Self::sys_gettimeofday(args[0]),
             SYS_NANOSLEEP =>        self.sys_nanosleep(args[0], args[1]).await,
             SYS_CLOCK_GETTIME =>    self.sys_clock_gettime(args[0], args[1]),
+            // SYS_CLOCK_NANOSLEEP =>  todo!(),
             // SYS_SETITIMER =>        todo!(),
             // SYS_CLOCK_GETRES =>     todo!(),
-            // SYS_CLOCK_NANOSLEEP =>  todo!(),
 
             // system
             SYS_SYSINFO =>  Self::empty_syscall("info", 0),
@@ -153,8 +153,10 @@ impl<'a> Syscall<'a> {
 
             // unsupported
             _ => {
-                error!("unsupported syscall id: {:?}, args: {:#x?}", id, args);
-                // let _ = self.sys_exit(Errno::ENOSYS as usize);
+                println!(
+                    "[kernel] unsupported syscall id: {:?}, tid: {}, args: {:x?}",
+                    id, self.task.tid(), args,
+                );
                 Err(Errno::ENOSYS)
             }
         }
@@ -186,18 +188,18 @@ impl<'a> Syscall<'a> {
             let cx = self.task.trap_context();
             use arch::TrapArgs::*;
             info!(
-                "[syscall] tid: {}, sp: {:#x}, pc: {:#x}, ra: {:#x}, id: {:?}, args: {:X?}",
+                "[syscall] id: {:?}, tid: {}, sp: {:#x}, pc: {:#x}, ra: {:#x}, args: {:X?}",
+                id,
                 self.task.tid(),
                 cx[SP],
                 cx[EPC],
                 cx[RA],
-                id,
                 args
             );
         }
         let res = self.syscall_inner(id, args).await;
         if id.is_debug_on() {
-            info!("[syscall(out)] syscall id: {:?}, res: {:?}", id, res);
+            info!("[syscall(out)] id: {:?}, res: {:x?}", id, res);
         }
         res
     }
@@ -216,8 +218,7 @@ impl Task {
             Ok(res) => res,
             Err(errno) => {
                 #[cfg(feature = "debug_sig")]
-                error!("during {:?}", current_syscall());
-                error!("syscall error: {:?}", errno);
+                warn!("syscall error: {:?} during {:?}", errno, current_syscall());
                 let errno: isize = errno as isize;
                 match errno > 0 {
                     true => -errno,

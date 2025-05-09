@@ -10,11 +10,15 @@ use crate::{
         result::Errno,
     },
     mm::user_ptr::UserPtr,
-    sched::spawn::spawn_utask,
+    return_errno,
+    sched::{
+        spawn::spawn_utask,
+        utils::{raw_suspend_now, suspend_now},
+    },
+    signal::{sig_detail::{SigChildDetail, SigDetail}, sig_set::SigSet},
     task::{
         exit::ExitCode,
         manager::{PROCESS_GROUP_MANAGER, TASK_MANAGER},
-        wait::WaitChildFuture,
     },
 };
 
@@ -34,14 +38,28 @@ impl Syscall<'_> {
         Ok(0)
     }
 
-    pub fn sys_fork(
+    /// clone current task
+    pub fn sys_clone(
         &self,
         flags: usize,
         stack: usize,
         ptid: usize,
-        tls: usize,
-        ctid: usize,
+        mut tls: usize,
+        mut ctid: usize,
     ) -> SyscallResult {
+        /*
+           On x86-32, and several other common architectures (including
+           score, ARM, ARM 64, PA-RISC, arc, Power PC, xtensa, and MIPS), the
+           order of the last two arguments is reversed.
+
+           And so on loongarch64.
+           ref1: https://www.man7.org/linux/man-pages/man2/clone.2.html#VERSIONS
+           ref2: https://inbox.vuxu.org/musl/1a5a097f.12d7.1794a6de3a8.Coremail.zhaixiaojuan%40loongson.cn/t/
+           sys_clone(u64 flags, u64 ustack_base, u64 parent_tidptr, u64 child_tidptr, u64 tls)
+        */
+        #[cfg(target_arch = "loongarch64")]
+        core::mem::swap(&mut tls, &mut ctid);
+
         let flags = CloneFlags::from_bits(flags & !0xff).unwrap();
         let new_task = self.task.fork(flags);
         let new_tid = new_task.tid();
@@ -75,6 +93,8 @@ impl Syscall<'_> {
         Ok(new_tid as isize)
     }
 
+    /// execve syscall impl
+    /// execute a new program, replacing the current process image
     pub async fn sys_execve(&mut self, path: usize, argv: usize, envp: usize) -> SyscallResult {
         let mut path = UserPtr::new(path).get_cstr();
         let mut args = Vec::new();
@@ -121,7 +141,6 @@ impl Syscall<'_> {
         pid: isize,
         status_addr: usize,
         options: usize,
-        _rusage: usize,
     ) -> SyscallResult {
         trace!(
             "[sys_wait4] pid: {:?}, status_addr: {:?}, options: {:?}",
@@ -142,12 +161,11 @@ impl Syscall<'_> {
         };
 
         // wait for child exit
-        let (exit_code, tid) =
-            WaitChildFuture::new(self.task.clone(), pid_type, wait_option)?.await?;
-        if !status.is_null() {
+        let (exit_code, tid) = self.task.wait_child(pid_type, wait_option).await?;
+        if status.not_null() {
             trace!(
                 "[sys_wait4]: write exit_code at status_addr = {:#x}",
-                status.addr().0,
+                status.va_addr().raw(),
             );
             status.write(ExitCode::new(exit_code).inner());
             trace!("[sys_wait4]: write exit code {:#x}", exit_code);

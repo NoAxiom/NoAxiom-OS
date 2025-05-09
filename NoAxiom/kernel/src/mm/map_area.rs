@@ -56,7 +56,7 @@ pub struct MapArea {
 impl MapArea {
     pub fn new_bare() -> Self {
         Self {
-            vpn_range: VpnRange::new(VirtPageNum(0), VirtPageNum(0)),
+            vpn_range: VpnRange::new(VirtPageNum::from(0), VirtPageNum::from(0)),
             frame_map: BTreeMap::new(),
             map_permission: MapPermission::empty(),
             map_type: MapType::Identical,
@@ -133,6 +133,14 @@ impl MapArea {
                 let flags = self.map_permission.into();
                 page_table.map(vpn, ppn, flags);
             }
+            // linear: for special usage
+            MapType::Linear { ppn_offset } => {
+                let ppn = VirtPageNum::from((vpn.raw() as isize + ppn_offset) as usize)
+                    .kernel_translate_into_ppn();
+                let flags = self.map_permission.into();
+                page_table.map(vpn, ppn, flags);
+                todo!("linear map");
+            }
         }
     }
 
@@ -143,8 +151,8 @@ impl MapArea {
         trace!(
             "map_each: va_range = {:?}, ppn_range = [{:#x},{:#x}), type: {:?}",
             self.vpn_range,
-            self.vpn_range.start().kernel_translate_into_ppn().0,
-            self.vpn_range.end().kernel_translate_into_ppn().0,
+            self.vpn_range.start().kernel_translate_into_ppn().raw(),
+            self.vpn_range.end().kernel_translate_into_ppn().raw(),
             self.map_type
         );
         for vpn in self.vpn_range.into_iter() {
@@ -163,7 +171,7 @@ impl MapArea {
                 self.frame_map.remove(&vpn);
                 page_table.unmap(vpn);
             }
-            MapType::Direct => {
+            _ => {
                 page_table.unmap(vpn);
             }
         }
@@ -175,13 +183,14 @@ impl MapArea {
         self.vpn_range = VpnRange::new(self.vpn_range.start(), new_end_vpn);
         trace!(
             "[change_end_vpn]: old: {:#x}, new: {:#x}",
-            old_end_vpn.0,
-            new_end_vpn.0
+            old_end_vpn.raw(),
+            new_end_vpn.raw()
         );
         if new_end_vpn < old_end_vpn {
             debug!(
                 "[change_end_vpn] remove pages in [{:#x}, {:#x})",
-                new_end_vpn.0, old_end_vpn.0
+                new_end_vpn.raw(),
+                old_end_vpn.raw()
             );
             for vpn in VpnRange::new(new_end_vpn, old_end_vpn).into_iter() {
                 self.frame_map.remove(&vpn);

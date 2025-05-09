@@ -10,7 +10,8 @@ impl Syscall<'_> {
     pub fn sys_set_robust_list(&self, head: usize, len: usize) -> SyscallResult {
         info!("[sys_set_robust_list] head {:#x}, len {:#x}", head, len);
         if len != RobustList::HEAD_SIZE {
-            return_errno!(Errno::EINVAL, "robust list head len missmatch:{:?}", len);
+            error!("robust list head len mismatch: len={}", len);
+            return_errno!(Errno::EINVAL);
         }
         let mut pcb = self.task.pcb();
         pcb.robust_list.head = head;

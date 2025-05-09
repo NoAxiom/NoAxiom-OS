@@ -81,7 +81,10 @@ impl MmapManager {
     }
 
     pub fn new_bare() -> Self {
-        Self::new(VirtAddr(MMAP_BASE_ADDR), VirtAddr(MMAP_BASE_ADDR))
+        Self::new(
+            VirtAddr::from(MMAP_BASE_ADDR),
+            VirtAddr::from(MMAP_BASE_ADDR),
+        )
     }
 
     /// push a mmap range in mmap space (not actually mapped)
@@ -94,7 +97,7 @@ impl MmapManager {
         st_offset: usize,
         file: Option<Arc<dyn File>>,
     ) -> usize {
-        let end_va = VirtAddr(start_va.0 + length);
+        let end_va = VirtAddr::from(start_va.raw() + length);
         let mut offset = st_offset;
         for vpn in VpnRange::new_from_va(start_va, end_va) {
             // created a mmap page with lazy-mapping
@@ -108,14 +111,14 @@ impl MmapManager {
             offset += PAGE_SIZE;
         }
         if self.mmap_top <= start_va {
-            self.mmap_top = (start_va.0 + length).into();
+            self.mmap_top = (start_va.raw() + length).into();
         }
-        start_va.0
+        start_va.raw()
     }
 
     /// remove a mmap range in mmap space
     pub fn remove(&mut self, start_va: VirtAddr, length: usize) {
-        let end_va = VirtAddr(start_va.0 + length);
+        let end_va = VirtAddr::from(start_va.raw() + length);
         for vpn in VpnRange::new_from_va(start_va, end_va) {
             self.mmap_map.remove(&vpn);
             self.frame_trackers.remove(&vpn);

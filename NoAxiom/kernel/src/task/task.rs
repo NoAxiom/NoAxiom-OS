@@ -377,6 +377,7 @@ impl Task {
             user_sp,
             auxs: _,
         } = elf;
+        let user_sp = user_sp - 16;
         trace!("[kernel] succeed to load elf data");
         // identifier
         let tid = tid_alloc();

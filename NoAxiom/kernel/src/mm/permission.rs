@@ -14,6 +14,10 @@ pub enum MapType {
 
     /// Direct mapping, with simple translation, only for kernel
     Direct,
+
+    /// Shifted mapping, with page table translation
+    /// isize is the shift offset (phys page num offset)
+    Linear { ppn_offset: isize },
 }
 
 bitflags! {

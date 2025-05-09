@@ -37,7 +37,7 @@ pub async fn validate(
     if let Some(pte) = pte {
         let flags = pte.flags();
         if flags.contains(MappingFlags::COW) {
-            debug!("[validate] realloc COW, vpn={:#x}", vpn.0);
+            debug!("[validate] realloc COW, vpn={:#x}", vpn.raw());
             memory_set.lock().realloc_cow(vpn, pte)?;
             Ok(())
         } else if trap_type.is_some() && matches!(trap_type.unwrap(), TrapType::StorePageFault(_)) {
@@ -50,7 +50,8 @@ pub async fn validate(
         } else {
             error!(
                 "[validate] unknown error, vpn: {:#x}, flag: {:?}",
-                vpn.0, flags
+                vpn.raw(),
+                flags
             );
             Err(Errno::EFAULT)
         }
@@ -61,7 +62,7 @@ pub async fn validate(
             info!(
                 "[validate] stack, tid: {}, vpn: {:#x?}, epc: {:#x}",
                 task.tid(),
-                vpn.0,
+                vpn.raw(),
                 task.trap_context()[arch::TrapArgs::EPC],
             );
             ms.lazy_alloc_stack(vpn);
@@ -70,7 +71,7 @@ pub async fn validate(
             info!(
                 "[validate] brk, tid: {}, vpn: {:x?}, epc: {:#x}",
                 current_task().tid(),
-                vpn.0,
+                vpn.raw(),
                 current_task().trap_context()[arch::TrapArgs::EPC],
             );
             ms.lazy_alloc_brk(vpn);
@@ -80,13 +81,14 @@ pub async fn validate(
             info!(
                 "[validate] mmap, tid: {}, vpn: {:x?}, epc: {:#x}",
                 current_task().tid(),
-                vpn.0,
+                vpn.raw(),
                 current_task().trap_context()[arch::TrapArgs::EPC],
             );
             drop(ms);
             lazy_alloc_mmap(memory_set, vpn).await?;
             Ok(())
         } else {
+            error!("[validate] not in any area, vpn: {:#x}", vpn.raw());
             Err(Errno::EFAULT)
         }
     }

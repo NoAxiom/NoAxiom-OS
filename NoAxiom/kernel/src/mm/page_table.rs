@@ -31,7 +31,7 @@ impl PageTable {
     /// used in raw memory_set initialization
     pub fn new_allocated() -> Self {
         let frame = frame_alloc();
-        info!("[page_table] root_ppn = {:#x}", frame.ppn().0);
+        info!("[page_table] root_ppn = {:#x}", frame.ppn().raw());
         PageTable {
             root_ppn: frame.ppn(),
             frames: vec![frame],
@@ -83,7 +83,7 @@ impl PageTable {
             trace!("pte addr: {:#x}", pte as *mut PageTableEntry as usize);
             if !pte.is_valid_dir() {
                 let frame = frame_alloc();
-                *pte = PageTableEntry::new(frame.ppn().0, pte_flags!(V, PT));
+                *pte = PageTableEntry::new(frame.ppn().raw(), pte_flags!(V, PT));
                 self.frames.push(frame);
             }
             ppn = PhysPageNum::from(pte.ppn());
@@ -101,7 +101,7 @@ impl PageTable {
     pub fn map(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: MappingFlags) {
         let pte = self.create_pte(vpn);
         assert!(
-            (!pte.flags().contains(MappingFlags::V)),
+            !pte.flags().contains(MappingFlags::V),
             "{:#x?} is mapped before mapping, flags: {:?}, ppn: {:#x}",
             vpn,
             pte.flags(),
@@ -114,13 +114,13 @@ impl PageTable {
             flags,
             pte as *mut PageTableEntry as usize
         );
-        *pte = PageTableEntry::new(ppn.0, flags | pte_flags!(V, D, A));
+        *pte = PageTableEntry::new(ppn.raw(), flags | pte_flags!(V, D, A));
 
         let find_res = self.find_pte(vpn).unwrap();
         assert!(
             find_res.flags().contains(MappingFlags::V),
             "error vpn: {:#x}, flags: {:?}",
-            vpn.0,
+            vpn.raw(),
             find_res.flags()
         );
     }
@@ -164,7 +164,7 @@ impl PageTable {
     /// PLEASE make sure context around is mapped into both page tables
     #[inline(always)]
     pub fn memory_activate(&self) {
-        Arch::activate(self.root_ppn().0, self.is_kernel);
+        Arch::activate(self.root_ppn().raw(), self.is_kernel);
     }
 
     /// remap a cow page
@@ -178,7 +178,7 @@ impl PageTable {
         let pte = self.create_pte(vpn);
         ppn.get_bytes_array()
             .copy_from_slice(old_ppn.get_bytes_array());
-        *pte = PageTableEntry::new(ppn.0, new_flags);
+        *pte = PageTableEntry::new(ppn.raw(), new_flags);
     }
 }
 

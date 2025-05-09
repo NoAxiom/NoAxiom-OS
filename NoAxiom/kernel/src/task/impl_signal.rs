@@ -1,7 +1,8 @@
 use alloc::{sync::Arc, vec::Vec};
 use core::mem::size_of;
 
-use arch::{consts::HIGH_ADDR_OFFSET, ArchTrapContext, ArchUserFloatContext, TrapArgs};
+use arch::{ArchTrapContext, ArchUserFloatContext, TrapArgs};
+use config::mm::SIG_TRAMPOLINE;
 use ksync::mutex::SpinLockGuard;
 
 use super::task::PCB;
@@ -114,9 +115,12 @@ impl Task {
                     // fixme: should we update gp & tp?
                     // fixme: memory mapping is incorrect for no U flag used
                     cx[EPC] = handler;
-                    cx[RA] = user_sigreturn as usize | HIGH_ADDR_OFFSET;
+                    cx[RA] = if action.flags.contains(SAFlags::SA_RESTORER) {
+                        action.restorer
+                    } else {
+                        SIG_TRAMPOLINE
+                    };
                     cx[SP] = new_sp;
-
                     return Some(old_mask);
                 }
             }

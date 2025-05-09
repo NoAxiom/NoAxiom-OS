@@ -21,8 +21,6 @@ pub const INDEX_LEVELS: usize = pt_const!(INDEX_LEVELS);
 pub const KERNEL_ADDR_OFFSET: usize = mem_const!(KERNEL_ADDR_OFFSET);
 /// kernel phys memory end address
 pub const KERNEL_PHYS_MEMORY_END: usize = mem_const!(PHYS_MEMORY_END);
-/// high-half address offset
-pub const HIGH_ADDR_OFFSET: usize = !((1 << (VA_WIDTH - 1)) - 1);
 
 /// kernle pagenum offset from phys to virt
 pub const KERNEL_PAGENUM_MASK: usize = (KERNEL_ADDR_OFFSET as isize >> PAGE_WIDTH) as usize;

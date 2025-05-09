@@ -67,6 +67,7 @@ pub struct KSigAction {
     pub handler: SAHandlerType,
     pub mask: SigMask,
     pub flags: SAFlags,
+    pub restorer: usize,
 }
 
 impl KSigAction {
@@ -75,6 +76,7 @@ impl KSigAction {
             handler: SAHandlerType::new_default(sig),
             mask: SigMask::empty(),
             flags: SAFlags::empty(),
+            restorer: 0,
         }
     }
 }
@@ -87,11 +89,13 @@ impl KSigAction {
                 handler: SAHandlerType::Ignore,
                 flags: sa.flags,
                 mask: sa.mask,
+                restorer: sa.restorer,
             },
             handler => Self {
                 handler: SAHandlerType::User { handler },
                 flags: sa.flags,
                 mask: sa.mask,
+                restorer: sa.restorer,
             },
         }
     }

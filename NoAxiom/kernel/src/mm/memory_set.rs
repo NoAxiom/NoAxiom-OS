@@ -6,7 +6,7 @@ use arch::{
 };
 use config::{
     fs::ROOT_NAME,
-    mm::{DL_INTERP_OFFSET, USER_HEAP_SIZE},
+    mm::{DL_INTERP_OFFSET, SIG_TRAMPOLINE, USER_HEAP_SIZE},
 };
 use include::errno::Errno;
 use ksync::{cell::SyncUnsafeCell, mutex::SpinLock};
@@ -38,6 +38,7 @@ use crate::{
     task::impl_signal::user_sigreturn,
 };
 
+#[allow(unused)]
 extern "C" {
     fn stext();
     fn ssignal();
@@ -60,9 +61,7 @@ pub fn kernel_space_activate() {
 
 #[inline(always)]
 pub fn kernel_space_init() {
-    let ms = MemorySet::init_kernel_space();
-    ms.page_table().mark_as_kernel();
-    KERNEL_SPACE.call_once(|| ms);
+    KERNEL_SPACE.call_once(|| MemorySet::init_kernel_space());
     kernel_space_activate();
 }
 
@@ -138,10 +137,11 @@ impl MemorySet {
     }
 
     /// create a new memory set with kernel space mapped,
-    pub fn new_with_kernel() -> Self {
-        Self::new(PageTable::clone_from_other(
-            KERNEL_SPACE.get().unwrap().page_table(),
-        ))
+    pub fn new_user_space() -> Self {
+        let kernel_pt = KERNEL_SPACE.get().unwrap().page_table();
+        let mut user_space = Self::new(PageTable::clone_from_other(&kernel_pt));
+        user_space.map_sig_trampoline();
+        user_space
     }
 
     #[inline(always)]
@@ -168,8 +168,8 @@ impl MemorySet {
     ) -> SysResult<()> {
         trace!(
             "push_area: [{:#X}, {:#X})",
-            map_area.vpn_range().start().0 << PAGE_WIDTH,
-            map_area.vpn_range().end().0 << PAGE_WIDTH
+            map_area.vpn_range().start().raw() << PAGE_WIDTH,
+            map_area.vpn_range().end().raw() << PAGE_WIDTH
         );
         map_area.map_each(self.page_table());
         let pte = self
@@ -234,9 +234,7 @@ impl MemorySet {
                 ekernel as usize, KERNEL_VIRT_MEMORY_END as usize
             );
             kernel_push_area!(
-                stext,   ssignal, map_permission!(R, X)
-                ssignal, esignal, map_permission!(R, X, U)
-                esignal, etext,   map_permission!(R, X)
+                stext,   etext,   map_permission!(R, X)
                 srodata, erodata, map_permission!(R)
                 sdata,   edata,   map_permission!(R, W)
                 sbss,    ebss,    map_permission!(R, W)
@@ -249,16 +247,9 @@ impl MemorySet {
                 debug!("[kernel] pushing MMIO area: [{:#x},{:#x})", s_addr, e_addr);
                 kernel_push_area!(s_addr, e_addr, map_permission!(R, W));
             }
-            // trace!("[memory_set] sp: {:#x}", crate::arch::regs::get_sp());
-            info!("[kernel] space initialized");
         }
-        #[cfg(target_arch = "loongarch64")]
-        {
-            use arch::consts::HIGH_ADDR_OFFSET;
-            let ssignal = ssignal as usize | HIGH_ADDR_OFFSET;
-            let esignal = esignal as usize | HIGH_ADDR_OFFSET;
-            kernel_push_area!(ssignal, esignal, map_permission!(R, X, U));
-        }
+        memory_set.page_table().mark_as_kernel();
+        info!("[kernel] space initialized");
         memory_set
     }
 
@@ -292,7 +283,7 @@ impl MemorySet {
         let elf = ElfFile::new(elf_buf.as_slice()).map_err(elf_error_handler)?;
 
         // construct new memory set to hold elf data
-        let mut memory_set = Self::new_with_kernel();
+        let mut memory_set = Self::new_user_space();
         let mut auxs: Vec<AuxEntry> = Vec::new(); // auxiliary vector
         let mut dl_flag = false; // dynamic link flag
         let mut entry_point = elf.header.pt2.entry_point() as usize;
@@ -307,7 +298,7 @@ impl MemorySet {
                     let start_va: VirtAddr = (ph.virtual_addr() as usize).into();
                     let end_va: VirtAddr = ((ph.virtual_addr() + ph.mem_size()) as usize).into();
                     if head_va == 0 {
-                        head_va = start_va.0;
+                        head_va = start_va.raw();
                     }
                     let permission = map_permission!(U).merge_from_elf_flags(ph.flags());
                     let map_area = MapArea::new(
@@ -321,7 +312,7 @@ impl MemorySet {
                     );
                     debug!(
                         "[map_elf] [{:#x}, {:#x}], permission: {:?}, ph offset {:#x}, file size {:#x}, mem size {:#x}",
-                        start_va.0, end_va.0, permission,
+                        start_va.raw(), end_va.raw(), permission,
                         ph.offset(),
                         ph.file_size(),
                         ph.mem_size()
@@ -361,8 +352,8 @@ impl MemorySet {
         memory_set.stack = map_area;
         info!(
             "[memory_set] user stack mapped! [{:#x}, {:#x})",
-            user_stack_base.0,
-            user_stack_base.0 + USER_STACK_SIZE
+            user_stack_base.raw(),
+            user_stack_base.raw() + USER_STACK_SIZE
         );
 
         // user heap
@@ -381,8 +372,8 @@ impl MemorySet {
         };
         info!(
             "[memory_set] user heap inserted! [{:#x}, {:#x})",
-            user_heap_base.0,
-            user_heap_base.0 + USER_HEAP_SIZE
+            user_heap_base.raw(),
+            user_heap_base.raw() + USER_HEAP_SIZE
         );
 
         // aux vector
@@ -434,7 +425,7 @@ impl MemorySet {
     /// used in sys_fork
     pub fn clone_cow(&mut self) -> (Self, usize) {
         trace!("[clone_cow] start");
-        let mut new_set = Self::new_with_kernel();
+        let mut new_set = Self::new_user_space();
         fn remap_cow(
             old_set: &MemorySet,
             vpn: VirtPageNum,
@@ -501,7 +492,7 @@ impl MemorySet {
         new_set.mmap_manager = self.mmap_manager.clone();
         for (vpn, frame_tracker) in self.mmap_manager.frame_trackers.iter() {
             let vpn = vpn.clone();
-            debug!("[clone_cow] mmap vpn {:#x} is mapped as cow", vpn.0);
+            debug!("[clone_cow] mmap vpn {:#x} is mapped as cow", vpn.raw());
             let old_pte = self.page_table().find_pte(vpn).unwrap();
             let old_flags = old_pte.flags();
             if old_flags.contains(MappingFlags::W) {
@@ -523,7 +514,8 @@ impl MemorySet {
         }
         debug!(
             "[clone_cow] mmap_start: {:#x}, mmap_top: {:#x}",
-            new_set.mmap_manager.mmap_start.0, new_set.mmap_manager.mmap_top.0,
+            new_set.mmap_manager.mmap_start.raw(),
+            new_set.mmap_manager.mmap_top.raw(),
         );
 
         // shm
@@ -547,7 +539,16 @@ impl MemorySet {
         }
 
         let root_ppn = new_set.root_ppn();
-        (new_set, root_ppn.0)
+        (new_set, root_ppn.raw())
+    }
+
+    pub fn map_sig_trampoline(&mut self) {
+        let sig_vpn = VirtAddr::from(SIG_TRAMPOLINE).floor();
+        let sig_ppn = VirtAddr::from(user_sigreturn as usize)
+            .floor()
+            .kernel_translate_into_ppn();
+        self.page_table()
+            .map(sig_vpn.into(), sig_ppn.into(), pte_flags!(R, X, U));
     }
 
     pub fn lazy_alloc_stack(&mut self, vpn: VirtPageNum) {
@@ -605,9 +606,9 @@ impl MemorySet {
                 .remap_cow(vpn, new_ppn, old_ppn, new_flags);
             debug!(
                 "[realloc_cow] done, refcount: old: [{:#x}: {:#x}], new: [{:#x}: {:#x}], flag: {:?}",
-                old_ppn.0,
+                old_ppn.raw(),
                 frame_refcount(old_ppn),
-                new_ppn.0,
+                new_ppn.raw(),
                 frame_refcount(new_ppn),
                 new_flags,
             );
@@ -624,19 +625,19 @@ impl MemorySet {
         let mut offset = 0;
 
         while offset < size {
-            let va: VirtAddr = (start_va.0 + offset).into();
-            let pa: PhysAddr = (start_pa.0 + offset).into();
+            let va: VirtAddr = (start_va.raw() + offset).into();
+            let pa: PhysAddr = (start_pa.raw() + offset).into();
             // println!("attach map va:{:x?} to pa{:x?}",va,pa);
             self.page_table().map(va.into(), pa.into(), flags);
             offset += PAGE_SIZE;
         }
-        self.shm.shm_top = self.shm.shm_top.max(start_va.0 + size);
+        self.shm.shm_top = self.shm.shm_top.max(start_va.raw() + size);
         let shm_tracker = ShmTracker::new(key);
 
         self.shm.shm_trackers.insert(start_va, shm_tracker);
         let vma = MapArea::new(
             start_va,
-            (start_va.0 + size).into(),
+            (start_va.raw() + size).into(),
             MapType::Framed,
             map_permission!(R, W),
             MapAreaType::Shared,
@@ -652,7 +653,7 @@ impl MemorySet {
         // println!("detach size:{:?}",size);
         let mut offset = 0;
         while offset < size {
-            let va: VirtAddr = (start_va.0 + offset).into();
+            let va: VirtAddr = (start_va.raw() + offset).into();
             // println!("detach va:{:?}",va);
             unsafe { &mut (*self.page_table.get()) }.unmap(va.into());
             offset += PAGE_SIZE

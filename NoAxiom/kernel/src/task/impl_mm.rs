@@ -39,7 +39,7 @@ impl Task {
             }
             ms.brk.end = new_brk;
         }
-        ms.brk_grow(VirtAddr(new_brk).ceil());
+        ms.brk_grow(VirtAddr::from(new_brk).ceil());
         let brk_end = ms.brk.end;
 
         // for debug
@@ -95,11 +95,11 @@ impl Task {
         // push mmap range (without immediate mapping)
         debug!(
             "[mmap] addr: {:#x}, start_va: {:#x}, length: {:#x}, prot: {:?}, flags: {:?}, fd: {}, offset: {:#x}",
-            addr, start_va.0, length, prot, flags, fd, offset
+            addr, start_va.raw(), length, prot, flags, fd, offset
         );
         memory_set
             .mmap_manager
             .insert(start_va, length, prot, flags, offset, file);
-        Ok(start_va.0)
+        Ok(start_va.raw())
     }
 }

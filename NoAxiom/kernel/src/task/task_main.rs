@@ -2,6 +2,7 @@ use alloc::sync::Arc;
 use core::{
     future::Future,
     pin::Pin,
+    sync::atomic::{fence, Ordering},
     task::{Context, Poll},
 };
 
@@ -73,6 +74,35 @@ pub async fn task_main(task: Arc<Task>) {
         task.tcb_mut().time_stat.record_trap_out();
 
         // check sigmask and status
+        // unsafe {
+        //     let bottom = 0x120b32630usize;
+        //     let top = 0x120b327a0usize;
+        //     let ptr = bottom as *const u8;
+        //     static mut LAST_HASH: u64 = 0;
+        //     if task
+        //         .memory_set()
+        //         .lock()
+        //         .page_table()
+        //         .find_pte(VirtAddr::from(bottom).floor())
+        //         .is_some()
+        //     {
+        //         let slice = core::slice::from_raw_parts(ptr, top - bottom);
+        //         let mut res: u64 = 0;
+        //         for it in slice {
+        //             res = (res * 20040409 + *it as u64) % 998244353;
+        //         }
+        //         debug!("[test] hash value: {:#x}", res);
+        //         if res != LAST_HASH {
+        //             debug!("[test] hash value changed: {:#x} -> {:#x}", LAST_HASH,
+        // res);             let slice_res: Vec<_> = slice.iter().collect();
+        //             debug!("[test] slice: {:?}", slice_res);
+        //             LAST_HASH = res;
+        //         }
+        //     } else {
+        //         debug!("[test] not allocated");
+        //     }
+        // };
+        fence(Ordering::SeqCst);
         assert!(check_no_lock());
         let mut pcb = task.pcb();
         if let Some(old_mask) = old_mask.take() {

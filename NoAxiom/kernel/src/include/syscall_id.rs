@@ -299,14 +299,14 @@ pub enum SyscallID {
 impl SyscallID {
     pub fn is_debug_on(&self) -> bool {
         match self {
-            SyscallID::SYS_READ
-            | SyscallID::SYS_WRITE
-            | SyscallID::SYS_PPOLL
-            | SyscallID::SYS_IOCTL
-            | SyscallID::SYS_FSTAT
-            | SyscallID::SYS_NEWFSTATAT
-            | SyscallID::SYS_WRITEV
-            | SyscallID::SYS_READV => false,
+            // SyscallID::SYS_READ
+            // | SyscallID::SYS_WRITE
+            // | SyscallID::SYS_PPOLL
+            // | SyscallID::SYS_IOCTL
+            // | SyscallID::SYS_FSTAT
+            // | SyscallID::SYS_NEWFSTATAT
+            // | SyscallID::SYS_WRITEV
+            // | SyscallID::SYS_READV => false,
             _ => true,
         }
     }

@@ -571,8 +571,8 @@ impl Syscall<'_> {
             "[sys_prlimit64] pid: {}, resource: {:?} new_limit_addr: {:#x}, old_limit_addr: {:#x}",
             pid,
             resource,
-            new_limit.addr_usize(),
-            old_limit.addr_usize(),
+            new_limit.addr(),
+            old_limit.addr(),
         );
         Ok(0)
     }

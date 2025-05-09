@@ -23,7 +23,7 @@ pub async fn init_proc_exit_handler(task: &Arc<Task>) {
         let ch_tid: Vec<usize> = inner.children.iter().map(|it| it.tid()).collect();
         warn!("[exit_handler] child info: {:?}", ch_tid);
         while !inner.children.is_empty() {
-            let pid = Syscall::new(task).sys_wait4(-1, 0, 0, 0).await;
+            let pid = Syscall::new(task).sys_wait4(-1, 0, 0).await;
             if let Ok(pid) = pid {
                 info!("[exit_handler] child finally exited: {:?}", pid);
             }

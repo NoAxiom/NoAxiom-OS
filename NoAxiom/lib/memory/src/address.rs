@@ -17,13 +17,38 @@ macro_rules! gen_new_type {
     ($name:ident) => {
         #[repr(C)]
         #[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq)]
-        pub struct $name(pub usize);
+        pub struct $name(pub(crate) usize);
     };
 }
 gen_new_type!(PhysAddr);
 gen_new_type!(VirtAddr);
 gen_new_type!(PhysPageNum);
 gen_new_type!(VirtPageNum);
+
+impl PhysAddr {
+    #[inline(always)]
+    pub const fn raw(&self) -> usize {
+        self.0
+    }
+}
+impl VirtAddr {
+    #[inline(always)]
+    pub const fn raw(&self) -> usize {
+        self.0
+    }
+}
+impl PhysPageNum {
+    #[inline(always)]
+    pub const fn raw(&self) -> usize {
+        self.0
+    }
+}
+impl VirtPageNum {
+    #[inline(always)]
+    pub const fn raw(&self) -> usize {
+        self.0
+    }
+}
 
 /// signed extend for number without 64/32 bits width
 #[inline(always)]

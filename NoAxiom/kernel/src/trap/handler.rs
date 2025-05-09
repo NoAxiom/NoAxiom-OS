@@ -22,7 +22,7 @@ fn kernel_trap_handler() {
     let epc = Arch::read_epc();
     let kernel_panic = |msg: &str| {
         panic!(
-            "[kernel trap] msg: {}, trap_type: {:#x?}, epc: {:#x} ",
+            "[kernel trap] msg: {}, trap_type: {:x?}, epc: {:#x} ",
             msg, trap_type, epc,
         );
     };
@@ -111,6 +111,7 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
                         SigInfo::new_simple(SigNum::SIGSEGV.into(), SigCode::Kernel),
                         false,
                     );
+                    panic!();
                 }
             }
         }

@@ -1,5 +1,5 @@
 use config::mm::PAGE_WIDTH;
-use loongArch64::register::{pgd, pgdh, pgdl};
+use loongArch64::register::{dmw2, pgd, pgdh, pgdl, MemoryAccessType};
 
 use super::{
     tlb::{tlb_flush_all, tlb_init_inner},
@@ -205,6 +205,15 @@ impl ArchPageTable for PageTable {
 pub(crate) fn tlb_init() {
     tlb_init_inner();
     tlb_flush_all();
+}
+
+#[allow(unused)]
+pub(crate) fn user_trampoline_init() {
+    dmw2::set_mat(MemoryAccessType::StronglyOrderedUnCached);
+    dmw2::set_plv0(true);
+    dmw2::set_plv3(true);
+    dmw2::set_vseg(0xA);
+    assert!(dmw2::read().vseg() == 0xA);
 }
 
 impl ArchMemory for LA64 {

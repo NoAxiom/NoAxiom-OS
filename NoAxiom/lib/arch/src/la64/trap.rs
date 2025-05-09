@@ -40,7 +40,7 @@ fn get_trap_type(tf: Option<&mut TrapContext>) -> TrapType {
         Trap::Exception(Exception::Syscall) | Trap::Interrupt(_) => {}
         _ => {
             info!(
-                "[get_trap_type] estat: {:#x?}, badv: {:#x}, pc: {:#x}",
+                "[get_trap_type] estat: {:x?}, badv: {:#x}, pc: {:#x}",
                 estat.cause(),
                 badv,
                 era::read().pc(),
@@ -48,37 +48,45 @@ fn get_trap_type(tf: Option<&mut TrapContext>) -> TrapType {
         }
     }
     match estat.cause() {
-        Trap::Exception(e) => match e {
-            Exception::Breakpoint => TrapType::Breakpoint,
-            Exception::AddressNotAligned => {
-                unsafe { emulate_load_store_insn(tf.unwrap()) }
-                TrapType::None
-            }
-            Exception::Syscall => TrapType::SysCall,
-            Exception::StorePageFault | Exception::PageModifyFault => {
-                TrapType::StorePageFault(badv)
-            }
-            Exception::PageNonExecutableFault
-            | Exception::FetchPageFault
-            | Exception::FetchInstructionAddressError
-            | Exception::InstructionPrivilegeIllegal => TrapType::InstructionPageFault(badv),
-            Exception::LoadPageFault
-            | Exception::PageNonReadableFault
-            | Exception::MemoryAccessAddressError
-            | Exception::PagePrivilegeIllegal => TrapType::LoadPageFault(badv),
-            Exception::InstructionNotExist => TrapType::IllegalInstruction(badv),
-            _ => {
-                error!(
+        Trap::Exception(e) => {
+            match e {
+                Exception::Breakpoint => TrapType::Breakpoint,
+                Exception::AddressNotAligned => {
+                    unsafe { emulate_load_store_insn(tf.unwrap()) }
+                    TrapType::None
+                }
+                Exception::Syscall => TrapType::SysCall,
+                Exception::StorePageFault | Exception::PageModifyFault => {
+                    TrapType::StorePageFault(badv)
+                }
+                Exception::PageNonExecutableFault
+                | Exception::FetchPageFault
+                | Exception::FetchInstructionAddressError
+                | Exception::InstructionPrivilegeIllegal => TrapType::InstructionPageFault(badv),
+                Exception::LoadPageFault
+                | Exception::PageNonReadableFault
+                | Exception::MemoryAccessAddressError
+                | Exception::PagePrivilegeIllegal => TrapType::LoadPageFault(badv),
+                Exception::InstructionNotExist => {
+                    error!(
+                        "[get_trap_type] InstructionNotExist, pc = {:#x}, BADV = {:#x}, BADI = {:#x}",
+                        era::read().pc(), badv, badi::read().inst()
+                    );
+                    TrapType::IllegalInstruction(badv)
+                }
+                _ => {
+                    error!(
                     "[get_trap_type] unhandled exception: {:?}, pc = {:#x}, BADV = {:#x}, BADI = {:#x}",
                     e,
                     era::read().pc(),
                     badv,
                     badi::read().inst(),
                 );
-                // error!("[get_trap_type] trap_cx: {:#x?}", tf);
-                TrapType::Unknown
+                    // error!("[get_trap_type] trap_cx: {:#x?}", tf);
+                    TrapType::Unknown
+                }
             }
-        },
+        }
         Trap::Interrupt(int) => match int {
             Interrupt::Timer => TrapType::Timer,
             Interrupt::HWI0

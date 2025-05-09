@@ -58,7 +58,7 @@ impl Syscall<'_> {
             .memory_set()
             .lock()
             .mmap_manager
-            .remove(VirtAddr(start), length);
+            .remove(VirtAddr::from(start), length);
         Ok(0)
     }
 
@@ -90,7 +90,7 @@ impl Syscall<'_> {
                 pte.set_flags(flags);
                 trace!(
                     "[sys_mprotect] set flags in page table, vpn: {:#x}, flags: {:?} => {:?}, pte_raw: {:?}",
-                    vpn.0, old_flags, flags, pte.raw_flag()
+                    vpn.raw(), old_flags, flags, pte.raw_flag()
                 );
             } else {
                 let task = self.task;

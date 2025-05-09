@@ -18,18 +18,18 @@ pub struct VirtioHalImpl;
 
 unsafe impl Hal for VirtioHalImpl {
     fn dma_alloc(pages: usize, _direction: BufferDirection) -> (VirtioPhysAddr, NonNull<u8>) {
-        let mut ppn_base = PhysPageNum(0);
+        let mut ppn_base = PhysPageNum::from(0);
         for i in 0..pages {
             let frame = frame_alloc();
             if i == 0 {
                 ppn_base = frame.ppn();
             }
-            assert_eq!(frame.ppn().0, ppn_base.0 + i);
+            assert_eq!(frame.ppn().raw(), ppn_base.raw() + i);
             QUEUE_FRAMES.as_ref_mut().push(frame);
         }
         let paddr = PhysAddr::from(PhysPageNum::from(ppn_base));
-        let vaddr = NonNull::new((paddr.0 | KERNEL_ADDR_OFFSET) as *mut u8).unwrap();
-        (paddr.0, vaddr)
+        let vaddr = NonNull::new((paddr.raw() | KERNEL_ADDR_OFFSET) as *mut u8).unwrap();
+        (paddr.raw(), vaddr)
     }
     unsafe fn dma_dealloc(paddr: VirtioPhysAddr, _vaddr: NonNull<u8>, pages: usize) -> i32 {
         let pa = PhysAddr::from(paddr);
