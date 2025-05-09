@@ -4,7 +4,7 @@
 export PROJECT := NoAxiom
 export MODE ?= release
 export KERNEL ?= kernel
-export ARCH_NAME ?= riscv64
+export ARCH_NAME ?= loongarch64
 export LIB_NAME ?= glibc
 export INIT_PROC ?= busybox
 export ROOT := $(shell pwd)
@@ -99,7 +99,7 @@ asm-user:
 
 asm-all: asm asm-user
 
-run: sbi-qemu
+run:
 	@cp $(KERNEL_BIN) kernel-qemu
 	@echo -e $(NORMAL)"Running QEMU..."$(RESET)
 	$(QEMU) $(QFLAGS) | tee qemu.log
@@ -119,13 +119,12 @@ endif
 gdb:
 	@$(GDB) $(GDB_FLAGS)
 
+# todo: might should support img clean
 clean:
 	@rm -f kernel-qemu
-	@rm -f sbi-qemu
 	@rm -f $(FS_IMG)
 	@rm -rf $(TEST_DIR)/build
 	@rm -rf $(TEST_DIR)/riscv64
-	# @rm -f sdcard.img
 	cargo clean
 
 vendor:
@@ -175,8 +174,21 @@ add-target:
 	@rustup target add loongarch64-unknown-linux-gnu
 	@rustup target add riscv64gc-unknown-none-elf
 
-env: add-target vendor
+git-update:
+	@echo "Updating git submodules..."
+	@git submodule init
+	@git submodule update
+	@echo "Submodules updated."
+	@echo "Checking submodule status..."
+	@git submodule status
+
+env: add-target git-update vendor
 
 all: env build
 
-.PHONY: default all build run clean gdb sbi-qemu backup sdcard build-gui board vendor count asm asm-user asm-all test build-user build-kernel env info help
+.PHONY: default all build run clean      # basic make
+.PHONY: gdb-server gdb docker            # debug client
+.PHONY: asm asm-user asm-all             # generate assembly info
+.PHONY: build-user build-kernel          # for more specific build
+.PHONY: add-target env git-update vendor # environment setup
+.PHONY: info help count                  # information utils
