@@ -18,6 +18,7 @@ export NORMAL := "\e[32m"
 export RESET := "\e[0m"
 export TARGET_DIR := $(ROOT)/target/$(TARGET)/$(MODE)
 export TOOLCHAIN_DIR := $(ROOT)/toolchain
+export OUTPUT_DIR := $(ROOT)/output
 
 # Arch config
 ifeq ($(ARCH_NAME),riscv64) # RISC-V64
@@ -125,6 +126,7 @@ clean:
 	@rm -f $(FS_IMG)
 	@rm -rf $(TEST_DIR)/build
 	@rm -rf $(TEST_DIR)/riscv64
+	@rm -rf $(OUTPUT_DIR)
 	cargo clean
 
 vendor:
@@ -152,6 +154,8 @@ info:
 	@echo "TEST_DIR: $(TEST_DIR)"
 	@echo "FS_IMG: $(FS_IMG)"
 	@echo "QFLAGS: $(QFLAGS)"
+	@echo "KERNEL_BIN: $(KERNEL_BIN)"
+	@echo "KERNEL_ELF: $(KERNEL_ELF)"
 
 help:
 	@echo "NoAxiom Makefile"
@@ -184,11 +188,21 @@ git-update:
 
 env: add-target git-update vendor
 
-all: env build
+build-move: build
+	@cp $(KERNEL_BIN) $(OUTPUT_DIR)/kernel-$(ARCH_NAME)-$(LIB_NAME).bin
 
-.PHONY: default all build run clean      # basic make
-.PHONY: gdb-server gdb docker            # debug client
-.PHONY: asm asm-user asm-all             # generate assembly info
-.PHONY: build-user build-kernel          # for more specific build
-.PHONY: add-target env git-update vendor # environment setup
-.PHONY: info help count                  # information utils
+build-all:
+	@make build-move ARCH_NAME=riscv64 LIB_NAME=glibc
+	@make build-move ARCH_NAME=riscv64 LIB_NAME=musl
+	@make build-move ARCH_NAME=loongarch64 LIB_NAME=glibc
+	@make build-move ARCH_NAME=loongarch64 LIB_NAME=musl
+
+all: env build-all
+
+.PHONY: default all build run clean         # basic make
+.PHONY: gdb-server gdb                      # debug client
+.PHONY: asm asm-user asm-all                # generate assembly info
+.PHONY: build-user build-kernel             # for more specific build
+.PHONY: add-target env git-update vendor    # environment setup
+.PHONY: info help count                     # information utils
+.PHONY: docker build-all build-move         # for competition

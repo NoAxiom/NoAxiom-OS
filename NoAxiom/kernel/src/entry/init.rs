@@ -1,4 +1,6 @@
-use arch::{Arch, ArchBoot, ArchInt, ArchSbi, _entry_other_hart, consts::KERNEL_ADDR_OFFSET, ArchInfo};
+use arch::{
+    Arch, ArchBoot, ArchInt, ArchSbi, _entry_other_hart, consts::KERNEL_ADDR_OFFSET, ArchInfo,
+};
 use config::fs::LIB_NAME;
 
 use crate::{
@@ -7,7 +9,6 @@ use crate::{
     cpu::get_hartid,
     driver,
     entry::init_proc::schedule_spawn_with_path,
-    fs::{self},
     mm::{
         bss::bss_init,
         frame::frame_init,
@@ -84,7 +85,7 @@ pub extern "C" fn _boot_hart_init(_hartid: usize, dtb: usize) -> ! {
 
     // fs init
     Arch::enable_interrupt();
-    block_on(fs::init());
+    block_on(crate::fs::init());
 
     // spawn init_proc and wake other harts
     ktime_init();
