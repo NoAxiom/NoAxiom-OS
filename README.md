@@ -1,28 +1,40 @@
 # NoAxiom-OS
 
-## Run
+## Tutorial
 
-Note that if it's first time to run this project, you may update vendor files:
+### Quick Start
 
-```shell
-make vendor
-```
-
-Then you can run NoAxiom-OS in shell:
+Just run `make all`, and see the output in [`./output/`](./output/)
 
 ```shell
-make
+make all
 ```
 
-## Toolchain
+### Environment Setup
 
-View `./rust-toolchain.toml` for further infomation.
+Before starting, you should set up the environment.
 
-Basic information is listed as below.
+If you are not running on Linux, you may use `make docker` to create a virtual machine environment.
 
- - rust version: `nightly-2024-05-01`
+Run `make env` to automatically set up the environment. It will initialize Rust targets, vendor sources, and Git submodules.
 
- - rust target `riscv64gc-unknown-none-elf`
+Note: If you want to debug in VSCode, use `make vscode` to quickly generate VSCode settings.
+
+Use `make help` and `make info` to get more detailed information.
+
+### Build
+
+Considering that our kernel supports multiple architectures, we provide a convenient way to build all variants: run `make build-all`, which will generate kernel binaries for all supported architectures and libraries.
+
+To build a specific architecture and library, use `make build ARCH_NAME= LIB_NAME=`.
+
+You can also use `make all` to set up the environment and build all targets. The binary and ELF files will be copied to `./output/`.
+
+### Run
+
+Currently, the kernel runs only on QEMU. Use `make run` to launch it with the default architecture and library. You can also specify them via `ARCH_NAME` and `LIB_NAME`.
+
+Use `make default` or simply `make` to build and run.
 
 ## Thanks
 
