@@ -74,8 +74,9 @@ QFLAGS += -rtc base=utc
 # QFLAGS += -device virtio-blk-pci,drive=x1,bus=virtio-mmio-bus.1
 endif
 
+default: build run
 
-default: build_user build_kernel run
+build: build_user build_kernel
 
 $(FS_IMG):
 	cd $(TEST_DIR) && make all
@@ -103,9 +104,9 @@ user_asm:
 
 run: sbi-qemu
 	@cp $(KERNEL_BIN) kernel-qemu
-	@echo -e $(NORMAL)"Running QEMU... See qemu.log"$(RESET)
+	@echo -e $(NORMAL)"Running QEMU..."$(RESET)
 	$(QEMU) $(QFLAGS) | tee qemu.log
-	@echo -e $(NORMAL)"QEMU exited. See qemu.log for console trace details."$(RESET)
+	@echo QEMU exited. See $(NORMAL)qemu.log$(RESET) for console trace details.
 
 # rm -f $(SDCARD_BAK)
 
@@ -158,6 +159,8 @@ docker:
 info:
 	@echo "TARGET: $(TARGET)"
 	@echo "ARCH_NAME: $(ARCH_NAME)"
+	@echo "LIB_NAME: $(LIB_NAME)"
+	@echo "  INIT_PROC: $(INIT_PROC)"
 	@echo "MODE: $(MODE)"
 	@echo "MULTICORE: $(MULTICORE)"
 	@echo "SBI: $(SBI)"
@@ -166,13 +169,29 @@ info:
 	@echo "FS_IMG: $(FS_IMG)"
 	@echo "QFLAGS: $(QFLAGS)"
 
+help:
+	@echo "NoAxiom Makefile"
+	@echo "Usage: make [target] [options]"
+	@echo "Targets:"
+	@echo "  all: setup and build the kernel"
+	@echo "  default: build and run the kernel"
+	@echo "  build: build the kernel and user"
+	@echo "  run: run the kernel in QEMU without build"
+	@echo "  clean: clean the build files"
+	@echo "  env: setup the environment and update vendor files"
+	@echo "Options:"
+	@echo "  ARCH_NAME: specify the architecture name (riscv64, loongarch64)"
+	@echo "  LIB_NAME: specify the library name (glibc, musl)"
+	@echo "  LOG: specify the log level (DEBUG, INFO, WARN, ERROR, OFF)"
+	@echo "  INIT_PROC: specify the init process (busybox, ...)"
+
 add_target:
 	@echo $(NORMAL)"Adding target to rustup"$(RESET)
-	@rustup target add loongarch64-unknown-none
+	@rustup target add loongarch64-unknown-linux-gnu
 	@rustup target add riscv64gc-unknown-none-elf
 
-env: info add_target vendor
+env: add_target vendor
 
-all: env default
+all: env build
 
-.PHONY: all build run debug clean debug-client sbi-qemu backup sdcard build-gui board vendor count asm test build_user env info
+.PHONY: default all build run clean debug-client sbi-qemu backup sdcard build-gui board vendor count asm test build_user build_kernel env info help
