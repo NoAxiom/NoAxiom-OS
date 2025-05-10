@@ -418,21 +418,17 @@ impl Drop for PipeFile {
     fn drop(&mut self) {
         let mut buffer = self.buffer.lock();
         if self.is_read_end() {
-            #[cfg(feature = "debug_sig")]
             let name = self.meta.dentry().name();
-            #[cfg(not(feature = "debug_sig"))]
-            let name = "read end";
             debug!("[PipeFile] {} dropped!", name);
+            root_dentry().remove_child(&name);
             buffer.read_end = None;
             for waker in buffer.write_wakers.drain(..) {
                 waker.wake();
             }
         } else {
-            #[cfg(feature = "debug_sig")]
             let name = self.meta.dentry().name();
-            #[cfg(not(feature = "debug_sig"))]
-            let name = "write end";
             debug!("[PipeFile] {} dropped!", name);
+            root_dentry().remove_child(&name);
             buffer.write_end = None;
             for waker in buffer.read_wakers.drain(..) {
                 waker.wake();
