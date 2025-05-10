@@ -1,22 +1,20 @@
 use alloc::{boxed::Box, sync::Arc, vec::Vec};
 
 use async_trait::async_trait;
+use driver::devices::impls::block::BlockDevice;
 use fatfs::*;
 
-use crate::{
-    config::fs::BLOCK_SIZE,
-    fs::blockcache::{AsyncBlockCache, CacheData},
-};
+use crate::config::fs::BLOCK_SIZE;
 
 #[derive(Clone)]
 pub struct DiskCursor {
-    blk: Arc<AsyncBlockCache<CacheData>>,
+    blk: Arc<&'static dyn BlockDevice>,
     blk_id: usize,
     offset: usize,
 }
 
 impl DiskCursor {
-    pub fn new(blk: Arc<AsyncBlockCache<CacheData>>, blk_id: usize, offset: usize) -> Self {
+    pub fn new(blk: Arc<&'static dyn BlockDevice>, blk_id: usize, offset: usize) -> Self {
         Self {
             blk,
             blk_id,
@@ -59,7 +57,7 @@ impl DiskCursor {
             0 => {
                 let mut data = [[0u8; BLOCK_SIZE]; BLK_NUMS];
                 for i in 0..BLK_NUMS {
-                    data[i] = *blk.read_sector(blk_id + i).await.data;
+                    blk.read_block(blk_id + i, &mut data[i]).await;
                 }
                 for i in 0..BLK_NUMS {
                     res[i * BLOCK_SIZE..(i + 1) * BLOCK_SIZE].copy_from_slice(&data[i]);
@@ -68,7 +66,7 @@ impl DiskCursor {
             _ => {
                 let mut data = [[0u8; BLOCK_SIZE]; BLK_NUMS + 1];
                 for i in 0..BLK_NUMS + 1 {
-                    data[i] = *blk.read_sector(blk_id + i).await.data;
+                    blk.read_block(blk_id + i, &mut data[i]).await;
                 }
 
                 // sector 0
@@ -119,17 +117,19 @@ impl DiskCursor {
         );
 
         if st_blk_id == ed_blk_id {
-            let mut data = *blk.read_sector(st_blk_id).await.data;
+            let mut data = [0u8; BLOCK_SIZE];
+            blk.read_block(st_blk_id, &mut data).await;
             data[st_offset..ed_offset].copy_from_slice(&buf);
-            blk.write_sector(st_blk_id, &data).await;
+            blk.write_block(st_blk_id, &data).await;
             log::trace!("base_write_exact_offset ok");
             return;
         }
 
         // sector 0
-        let mut data = *blk.read_sector(st_blk_id).await.data;
+        let mut data = [0u8; BLOCK_SIZE];
+        blk.read_block(st_blk_id, &mut data).await;
         data[st_offset..].copy_from_slice(&buf[..BLOCK_SIZE - st_offset]);
-        blk.write_sector(st_blk_id, &data).await;
+        blk.write_block(st_blk_id, &data).await;
 
         // sector mid
         let mid_offset = BLOCK_SIZE - st_offset;
@@ -139,14 +139,15 @@ impl DiskCursor {
             data.copy_from_slice(
                 &buf[mid_offset + kth * BLOCK_SIZE..mid_offset + (kth + 1) * BLOCK_SIZE],
             );
-            blk.write_sector(i, &data).await;
+            blk.write_block(i, &data).await;
         }
 
         // sector ed
         if ed_offset != 0 {
-            let mut data = *blk.read_sector(ed_blk_id).await.data;
+            let mut data = [0u8; BLOCK_SIZE];
+            blk.read_block(ed_blk_id, &mut data).await;
             data[..ed_offset].copy_from_slice(&buf[buf.len() - ed_offset..]);
-            blk.write_sector(ed_blk_id, &data).await;
+            blk.write_block(ed_blk_id, &data).await;
         }
         log::trace!("base_write_exact_offset ok");
     }
@@ -192,7 +193,8 @@ impl Read for DiskCursor {
     /// `IoError::is_interrupted` returns true is non-fatal and the read
     /// operation should be retried if there is nothing else to do.
     async fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
-        let data = &self.blk.read_sector(self.blk_id).await.data;
+        let mut data = [0u8; BLOCK_SIZE];
+        self.blk.read_block(self.blk_id, &mut data).await;
         let read_size = (BLOCK_SIZE - self.offset).min(buf.len());
         buf[..read_size].copy_from_slice(&data[self.offset..self.offset + read_size]);
         self.move_cursor(read_size);
@@ -215,10 +217,11 @@ impl Write for DiskCursor {
     /// It is not considered an error if the entire buffer could not be written
     /// to this writer.
     async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
-        let mut data = *self.blk.read_sector(self.blk_id).await.data;
+        let mut data = [0u8; BLOCK_SIZE];
+        self.blk.read_block(self.blk_id, &mut data).await;
         let write_size = (BLOCK_SIZE - self.offset).min(buf.len());
         data[self.offset..self.offset + write_size].copy_from_slice(&buf[..write_size]);
-        self.blk.write_sector(self.blk_id as usize, &data).await;
+        self.blk.write_block(self.blk_id as usize, &data).await;
         self.move_cursor(write_size);
         Ok(write_size)
     }

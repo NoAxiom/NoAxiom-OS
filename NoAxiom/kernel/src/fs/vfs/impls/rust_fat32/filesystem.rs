@@ -5,16 +5,13 @@ use driver::devices::impls::block::BlockDevice;
 
 use super::{dentry::Fat32Dentry, inode::Fat32DirInode, superblock::Fat32SuperBlock, IFatFs};
 use crate::{
-    fs::{
-        blockcache::AsyncBlockCache,
-        vfs::{
-            basic::{
-                dentry::Dentry,
-                filesystem::{FileSystem, FileSystemMeta},
-                superblock::SuperBlockMeta,
-            },
-            impls::disk_cursor::DiskCursor,
+    fs::vfs::{
+        basic::{
+            dentry::Dentry,
+            filesystem::{FileSystem, FileSystemMeta},
+            superblock::SuperBlockMeta,
         },
+        impls::disk_cursor::DiskCursor,
     },
     include::fs::MountFlags,
 };
@@ -49,14 +46,11 @@ impl FileSystem for AsyncSmpFat32 {
         device: Option<Arc<&'static dyn BlockDevice>>,
     ) -> Arc<dyn Dentry> {
         let super_block_meta = SuperBlockMeta::new(device.clone(), self.clone());
-        let blk = AsyncBlockCache::from(device.unwrap());
+        let blk = device.unwrap();
         let unbooted_fs = Arc::new(
-            IFatFs::new(
-                DiskCursor::new(Arc::new(blk), 0, 0),
-                fatfs::FsOptions::new(),
-            )
-            .await
-            .unwrap(),
+            IFatFs::new(DiskCursor::new(blk, 0, 0), fatfs::FsOptions::new())
+                .await
+                .unwrap(),
         );
         let fs_super_block = Arc::new(Fat32SuperBlock::new(super_block_meta, unbooted_fs));
 

@@ -7,16 +7,13 @@ use spin::Mutex;
 
 use super::{dentry::Ext4Dentry, inode::Ext4DirInode, superblock::Ext4SuperBlock, IExtFs};
 use crate::{
-    fs::{
-        blockcache::AsyncBlockCache,
-        vfs::{
-            basic::{
-                dentry::Dentry,
-                filesystem::{FileSystem, FileSystemMeta},
-                superblock::SuperBlockMeta,
-            },
-            impls::disk_cursor::DiskCursor,
+    fs::vfs::{
+        basic::{
+            dentry::Dentry,
+            filesystem::{FileSystem, FileSystemMeta},
+            superblock::SuperBlockMeta,
         },
+        impls::disk_cursor::DiskCursor,
     },
     include::fs::MountFlags,
 };
@@ -49,9 +46,9 @@ impl FileSystem for AsyncSmpExt4 {
         name: &str,
         device: Option<Arc<&'static dyn BlockDevice>>,
     ) -> Arc<dyn Dentry> {
-        let blk = AsyncBlockCache::from(device.clone().unwrap());
-        let super_block_meta = SuperBlockMeta::new(Some(device.unwrap()), self.clone());
-        let disk_cursor = DiskCursor::new(Arc::new(blk), 0, 0);
+        let super_block_meta = SuperBlockMeta::new(device.clone(), self.clone());
+        let blk = device.unwrap();
+        let disk_cursor = DiskCursor::new(blk, 0, 0);
         let unbooted_fs = Arc::new(Mutex::new(IExtFs::open(Arc::new(disk_cursor)).await));
         let fs_super_block = Arc::new(Ext4SuperBlock::new(super_block_meta, unbooted_fs));
 

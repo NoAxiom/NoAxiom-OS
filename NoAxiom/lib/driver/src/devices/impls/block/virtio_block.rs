@@ -1,5 +1,6 @@
 use alloc::boxed::Box;
 
+use config::fs::BLOCK_SIZE;
 use spin::Mutex;
 use virtio_drivers_async::{
     device::blk::VirtIOBlk,
@@ -43,4 +44,21 @@ impl Device for VirtioBlockType {
     }
 }
 
-impl BlockDevice for VirtioBlockType {}
+#[async_trait::async_trait]
+impl BlockDevice for VirtioBlockType {
+    async fn read_block(&self, id: usize, buf: &mut [u8; BLOCK_SIZE]) {
+        match self {
+            VirtioBlockType::Pci(blk) => blk.lock().read_blocks(id, buf).await,
+            VirtioBlockType::Mmio(blk) => blk.lock().read_blocks(id, buf).await,
+        }
+        .unwrap()
+    }
+
+    async fn write_block(&self, id: usize, buf: &[u8; BLOCK_SIZE]) {
+        match self {
+            VirtioBlockType::Pci(blk) => blk.lock().write_blocks(id, buf).await,
+            VirtioBlockType::Mmio(blk) => blk.lock().write_blocks(id, buf).await,
+        }
+        .unwrap()
+    }
+}

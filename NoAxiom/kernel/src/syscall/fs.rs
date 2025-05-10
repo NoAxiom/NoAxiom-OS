@@ -445,7 +445,7 @@ impl Syscall<'_> {
 
         // normally, we should choose the device by special
         // but now we just use the default device
-        let device = driver::get_blk_dev();
+        let device = crate::fs::blockcache::get_block_cache();
 
         let mut split_path = dir.split('/').collect::<Vec<&str>>();
         let name = split_path.pop().unwrap();
