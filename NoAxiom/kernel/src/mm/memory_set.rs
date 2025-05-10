@@ -265,10 +265,15 @@ impl MemorySet {
         base_offset: usize,
         is_dl_interp: bool,
     ) -> SysResult<RawElfInfo> {
+        let handler = |msg| {
+            error!("[load_elf] elf parse error: {}", msg);
+            Errno::ENOEXEC
+        };
+
         // read the beginning bytes to specify the header size
         let mut elf_mini_buf = [0u8; 64];
         elf_file.base_read(0, &mut elf_mini_buf).await?;
-        let mini_elf = ElfFile::new(&elf_mini_buf).map_err(|_| Errno::ENOEXEC)?;
+        let mini_elf = ElfFile::new(&elf_mini_buf).map_err(handler)?;
 
         // check: magic
         let magic = mini_elf.header.pt1.magic;
@@ -283,7 +288,7 @@ impl MemorySet {
         let header_buf_len = ph_offset + ph_count * ph_entry_size;
         let mut elf_buf = vec![0u8; header_buf_len];
         elf_file.base_read(0, elf_buf.as_mut()).await?;
-        let elf = ElfFile::new(elf_buf.as_slice()).map_err(|_| Errno::ENOEXEC)?;
+        let elf = ElfFile::new(elf_buf.as_slice()).map_err(handler)?;
 
         // construct new memory set to hold elf data
         let mut dl_interp = None;
@@ -291,9 +296,9 @@ impl MemorySet {
         let mut end_vpn = None;
 
         for i in 0..ph_count {
-            let ph = elf.program_header(i as u16).unwrap();
+            let ph = elf.program_header(i as u16).map_err(handler)?;
             use xmas_elf::program::Type::*;
-            match ph.get_type().unwrap() {
+            match ph.get_type().map_err(handler)? {
                 Load => {
                     let start_va: VirtAddr = (ph.virtual_addr() as usize + base_offset).into();
                     let end_va: VirtAddr =
