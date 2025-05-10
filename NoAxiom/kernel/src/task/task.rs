@@ -615,12 +615,13 @@ impl Task {
         args: Vec<String>,
         envs: Vec<String>,
     ) -> SysResult<()> {
+        let elf_file = path.dentry().open()?;
         let ElfMemoryInfo {
             memory_set,
             entry_point,
             user_sp,
             mut auxs,
-        } = MemorySet::load_from_path(path).await?;
+        } = MemorySet::load_elf(&elf_file).await?;
         memory_set.memory_activate();
         self.terminate_threads();
         self.change_memory_set(memory_set);

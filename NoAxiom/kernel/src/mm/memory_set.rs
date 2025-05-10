@@ -259,7 +259,7 @@ impl MemorySet {
         memory_set
     }
 
-    pub async fn load_elf(
+    pub async fn map_elf(
         self: &mut Self,
         elf_file: &Arc<dyn File>,
         base_offset: usize,
@@ -370,9 +370,9 @@ impl MemorySet {
         })
     }
 
-    pub async fn elf_init(file: &Arc<dyn File>) -> SysResult<ElfMemoryInfo> {
+    pub async fn load_elf(file: &Arc<dyn File>) -> SysResult<ElfMemoryInfo> {
         let mut memory_set = MemorySet::new_user_space();
-        let elf = memory_set.load_elf(file, 0, false).await?;
+        let elf = memory_set.map_elf(file, 0, false).await?;
 
         // user stack
         let user_stack_base = elf.end_va + PAGE_SIZE; // stack bottom
@@ -424,7 +424,7 @@ impl MemorySet {
             auxs.push(AuxEntry(AT_BASE, DL_INTERP_OFFSET));
             let dl_interp_file = path.dentry().open()?;
             let dl_interp_info = memory_set
-                .load_elf(&dl_interp_file, DL_INTERP_OFFSET, true)
+                .map_elf(&dl_interp_file, DL_INTERP_OFFSET, true)
                 .await?;
             entry_point = dl_interp_info.entry_point;
         } else {
@@ -451,14 +451,6 @@ impl MemorySet {
             user_sp, // stack grows downward, so return stack_end
             auxs,
         })
-    }
-
-    #[inline]
-    pub async fn load_from_path(path: Path) -> SysResult<ElfMemoryInfo> {
-        trace!("[load_elf] from path: {:?}", path);
-        let elf_file = path.dentry().open()?;
-        trace!("[load_elf] file name: {}", elf_file.name());
-        Self::elf_init(&elf_file).await
     }
 
     /// clone current memory set,

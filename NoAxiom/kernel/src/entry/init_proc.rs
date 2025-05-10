@@ -27,7 +27,8 @@ pub fn schedule_spawn_with_path() {
             let read_size = file.base_read(0, &mut read_buf).await.unwrap();
             assert_eq!(read_buf, content);
         }
-        let elf = MemorySet::load_from_path(path.clone()).await.unwrap();
+        let elf_file = path.dentry().open().unwrap();
+        let elf = MemorySet::load_elf(&elf_file).await.unwrap();
         let task = Task::new_process(elf).await;
         spawn_utask(task);
     });
