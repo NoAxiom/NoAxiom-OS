@@ -107,13 +107,7 @@ impl Syscall<'_> {
         envs.push(format!("PATH={ROOT_NAME}"));
         envs.push(format!("LD_LIBRARY_PATH={ROOT_NAME}"));
 
-        let file_path = if !path.starts_with('/') {
-            let cwd = self.task.cwd();
-            debug!("[sys_exec] cwd: {:?}", cwd);
-            cwd.from_cd(&path)?
-        } else {
-            Path::try_from(path)?
-        };
+        let file_path = Path::from_string(path, self.task)?;
         // append args and envs from user provided
         args.append(&mut UserPtr::<UserPtr<u8>>::new(argv).get_string_vec());
         envs.append(&mut UserPtr::<UserPtr<u8>>::new(envp).get_string_vec());

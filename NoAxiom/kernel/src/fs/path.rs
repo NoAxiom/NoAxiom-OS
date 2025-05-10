@@ -6,7 +6,7 @@ use alloc::{
 use core::fmt::Debug;
 
 use super::vfs::{basic::dentry::Dentry, root_dentry};
-use crate::{include::fs::InodeMode, syscall::SysResult};
+use crate::{include::fs::InodeMode, syscall::SysResult, task::Task};
 
 #[derive(Clone)]
 pub struct Path {
@@ -15,6 +15,15 @@ pub struct Path {
 }
 
 impl Path {
+    /// Get the path from string with cwd or absolute path
+    pub fn from_string(path: String, task: &Arc<Task>) -> SysResult<Self> {
+        if !path.starts_with('/') {
+            task.cwd().from_cd(path.as_str())
+        } else {
+            Path::try_from(path)
+        }
+    }
+
     /// Get the path from absolute path, the path should exist
     pub fn try_from(abs_path: String) -> SysResult<Self> {
         assert!(

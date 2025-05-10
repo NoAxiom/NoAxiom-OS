@@ -1,4 +1,4 @@
-use alloc::{sync::Arc, vec::Vec};
+use alloc::{string::String, sync::Arc, vec::Vec};
 
 use arch::{Arch, ArchMemory, ArchPageTableEntry, ArchTime, MappingFlags, PageTableEntry};
 use config::{
@@ -20,6 +20,7 @@ use super::{
 };
 use crate::{
     config::mm::{PAGE_SIZE, PAGE_WIDTH, USER_STACK_SIZE},
+    cpu::current_task,
     fs::{path::Path, vfs::basic::file::File},
     include::process::auxv::*,
     map_permission,
@@ -60,6 +61,16 @@ pub fn kernel_space_activate() {
 pub fn kernel_space_init() {
     KERNEL_SPACE.call_once(|| MemorySet::init_kernel_space());
     kernel_space_activate();
+}
+
+pub struct RawElfInfo {
+    head_va: VirtAddr,
+    end_va: VirtAddr,
+    ph_offset: usize,
+    ph_count: usize,
+    ph_entry_size: usize,
+    entry_point: usize,
+    dl_interp: Option<Path>,
 }
 
 /// elf load result
@@ -248,41 +259,35 @@ impl MemorySet {
         memory_set
     }
 
-    #[allow(unused)]
-    pub fn load_dl_interp(&mut self, elf: &ElfFile) -> Option<usize> {
-        let path = format!("{ROOT_NAME}/lib/libc.so");
-        todo!("load_dl_interp")
-    }
-
-    pub async fn load_elf(elf_file: &Arc<dyn File>) -> SysResult<ElfMemoryInfo> {
+    pub async fn load_elf(
+        self: &mut Self,
+        elf_file: &Arc<dyn File>,
+        base_offset: usize,
+        is_dl_interp: bool,
+    ) -> SysResult<RawElfInfo> {
         // read the beginning bytes to specify the header size
         let mut elf_mini_buf = [0u8; 64];
         elf_file.base_read(0, &mut elf_mini_buf).await?;
-        let elf_error_handler = |x: &str| {
-            error!("[load_elf] elf error: {:?}", x);
-            Errno::ENOEXEC
-        };
-        let elf = ElfFile::new(&elf_mini_buf).map_err(elf_error_handler)?;
+        let mini_elf = ElfFile::new(&elf_mini_buf).map_err(|_| Errno::ENOEXEC)?;
 
         // check: magic
-        let magic = elf.header.pt1.magic;
-        assert_eq!(magic, [0x7f, 0x45, 0x4c, 0x46], "invalid elf!");
+        let magic = mini_elf.header.pt1.magic;
+        if magic != [0x7f, 0x45, 0x4c, 0x46] {
+            return Err(Errno::ENOEXEC);
+        }
 
         // get the real elf header
-        let ph_entry_size = elf.header.pt2.ph_entry_size() as usize;
-        let ph_offset = elf.header.pt2.ph_offset() as usize;
-        let ph_count = elf.header.pt2.ph_count() as usize;
+        let ph_entry_size = mini_elf.header.pt2.ph_entry_size() as usize;
+        let ph_offset = mini_elf.header.pt2.ph_offset() as usize;
+        let ph_count = mini_elf.header.pt2.ph_count() as usize;
         let header_buf_len = ph_offset + ph_count * ph_entry_size;
         let mut elf_buf = vec![0u8; header_buf_len];
         elf_file.base_read(0, elf_buf.as_mut()).await?;
-        let elf = ElfFile::new(elf_buf.as_slice()).map_err(elf_error_handler)?;
+        let elf = ElfFile::new(elf_buf.as_slice()).map_err(|_| Errno::ENOEXEC)?;
 
         // construct new memory set to hold elf data
-        let mut memory_set = Self::new_user_space();
-        let mut auxs: Vec<AuxEntry> = Vec::new(); // auxiliary vector
-        let mut dl_flag = false; // dynamic link flag
-        let mut entry_point = elf.header.pt2.entry_point() as usize;
-        let mut head_va = 0;
+        let mut dl_interp = None;
+        let mut head_va = None;
         let mut end_vpn = None;
 
         for i in 0..ph_count {
@@ -290,10 +295,11 @@ impl MemorySet {
             use xmas_elf::program::Type::*;
             match ph.get_type().unwrap() {
                 Load => {
-                    let start_va: VirtAddr = (ph.virtual_addr() as usize).into();
-                    let end_va: VirtAddr = ((ph.virtual_addr() + ph.mem_size()) as usize).into();
-                    if head_va == 0 {
-                        head_va = start_va.raw();
+                    let start_va: VirtAddr = (ph.virtual_addr() as usize + base_offset).into();
+                    let end_va: VirtAddr =
+                        ((ph.virtual_addr() + ph.mem_size()) as usize + base_offset).into();
+                    if head_va.is_none() {
+                        head_va = Some(start_va);
                     }
                     let permission = map_permission!(U).merge_from_elf_flags(ph.flags());
                     let map_area = MapArea::new(
@@ -313,28 +319,63 @@ impl MemorySet {
                         ph.mem_size()
                     );
                     end_vpn = Some(map_area.vpn_range.end());
-                    memory_set
-                        .push_area(
-                            map_area,
-                            Some(MapAreaLoadDataInfo {
-                                start: ph.offset() as usize,
-                                len: ph.file_size() as usize,
-                                offset: start_va.offset(),
-                            }),
-                        )
-                        .await?;
+                    self.push_area(
+                        map_area,
+                        Some(MapAreaLoadDataInfo {
+                            start: ph.offset() as usize,
+                            len: ph.file_size() as usize,
+                            offset: start_va.offset(),
+                        }),
+                    )
+                    .await?;
                 }
                 Interp => {
-                    info!("elf Interp");
-                    dl_flag = true;
+                    // iozone: /glibc/lib/ld-linux-riscv64-lp64d.so.1
+                    if is_dl_interp {
+                        error!("[load_elf] detect recursive dl_interp, skip dl_interp loading");
+                        return Err(Errno::ENOEXEC);
+                    }
+                    if dl_interp.is_some() {
+                        error!("[load_elf] dl_interp already set");
+                        return Err(Errno::ENOEXEC);
+                    }
+                    let mut buf = vec![0u8; ph.file_size() as usize];
+                    elf_file
+                        .base_read(ph.offset() as usize, buf.as_mut_slice())
+                        .await?;
+                    let path = format!(
+                        "{ROOT_NAME}/{}",
+                        String::from_utf8(buf)
+                            .map_err(|_| Errno::ENOEXEC)?
+                            .trim_end()
+                            .trim_start_matches('/')
+                    );
+                    info!("[load_elf] find interp path: {}", path);
+                    dl_interp = Some(Path::from_string(path, current_task())?);
                 }
                 _ => {}
             }
         }
+        let head_va = head_va.ok_or(Errno::ENOMEM)?;
         let end_va = VirtAddr::from(end_vpn.ok_or(Errno::ENOMEM)?);
+        let entry_point = elf.header.pt2.entry_point() as usize + base_offset;
+        Ok(RawElfInfo {
+            head_va,
+            end_va,
+            ph_offset,
+            ph_count,
+            ph_entry_size,
+            entry_point,
+            dl_interp,
+        })
+    }
+
+    pub async fn elf_init(file: &Arc<dyn File>) -> SysResult<ElfMemoryInfo> {
+        let mut memory_set = MemorySet::new_user_space();
+        let elf = memory_set.load_elf(file, 0, false).await?;
 
         // user stack
-        let user_stack_base = end_va + PAGE_SIZE; // stack bottom
+        let user_stack_base = elf.end_va + PAGE_SIZE; // stack bottom
         let user_stack_end = user_stack_base + USER_STACK_SIZE; // stack top
         let map_area = MapArea::new(
             user_stack_base,
@@ -372,20 +413,25 @@ impl MemorySet {
         );
 
         // aux vector
-        let ph_head_addr = head_va as u64 + elf.header.pt2.ph_offset() as u64;
+        let mut auxs: Vec<AuxEntry> = Vec::new(); // auxiliary vector
+        let mut entry_point = elf.entry_point;
+        let ph_head_addr = elf.head_va.raw() as u64 + elf.ph_offset as u64;
         auxs.push(AuxEntry(AT_PHDR, ph_head_addr as usize));
-        auxs.push(AuxEntry(AT_PHENT, elf.header.pt2.ph_entry_size() as usize)); // ELF64 header 64bytes
-        auxs.push(AuxEntry(AT_PHNUM, ph_count as usize));
+        auxs.push(AuxEntry(AT_PHENT, elf.ph_entry_size as usize)); // ELF64 header 64bytes
+        auxs.push(AuxEntry(AT_PHNUM, elf.ph_count as usize));
         auxs.push(AuxEntry(AT_PAGESZ, PAGE_SIZE as usize));
-        if dl_flag {
-            let interp_entry_point = memory_set.load_dl_interp(&elf);
+        if let Some(path) = elf.dl_interp {
             auxs.push(AuxEntry(AT_BASE, DL_INTERP_OFFSET));
-            entry_point = interp_entry_point.unwrap();
+            let dl_interp_file = path.dentry().open()?;
+            let dl_interp_info = memory_set
+                .load_elf(&dl_interp_file, DL_INTERP_OFFSET, true)
+                .await?;
+            entry_point = dl_interp_info.entry_point;
         } else {
             auxs.push(AuxEntry(AT_BASE, 0));
         }
         auxs.push(AuxEntry(AT_FLAGS, 0));
-        auxs.push(AuxEntry(AT_ENTRY, elf.header.pt2.entry_point() as usize));
+        auxs.push(AuxEntry(AT_ENTRY, elf.entry_point as usize)); // use old entry
         auxs.push(AuxEntry(AT_UID, 0));
         auxs.push(AuxEntry(AT_EUID, 0));
         auxs.push(AuxEntry(AT_GID, 0));
@@ -412,7 +458,7 @@ impl MemorySet {
         trace!("[load_elf] from path: {:?}", path);
         let elf_file = path.dentry().open()?;
         trace!("[load_elf] file name: {}", elf_file.name());
-        Self::load_elf(&elf_file).await
+        Self::elf_init(&elf_file).await
     }
 
     /// clone current memory set,
