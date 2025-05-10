@@ -20,9 +20,12 @@ pub fn schedule_spawn_with_path() {
         let path = Path::from_or_create(path_str, InodeMode::FILE).await;
         let file = path.dentry().open().unwrap();
         let content = get_file();
-        let mut slice_offset = 0;
-        for slicer in content.chunks(0x1000) {
-            slice_offset += file.base_write(slice_offset, &slicer).await.unwrap() as usize;
+        file.base_write(0, content).await.unwrap();
+        #[cfg(feature = "debug_sig")]
+        {
+            let mut read_buf = vec![0u8; content.len()];
+            let read_size = file.base_read(0, &mut read_buf).await.unwrap();
+            assert_eq!(read_buf, content);
         }
         let elf = MemorySet::load_from_path(path.clone()).await.unwrap();
         let task = Task::new_process(elf).await;

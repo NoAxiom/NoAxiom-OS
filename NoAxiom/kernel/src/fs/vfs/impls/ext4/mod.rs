@@ -1,14 +1,6 @@
-use alloc::sync::Arc;
-
-use driver::devices::impls::block::BlockDevice;
 use ext4_rs::{Errno as ext4Errno, Ext4Error};
 
-use super::disk_cursor::DiskCursor;
-use crate::{
-    fs::blockcache::AsyncBlockCache,
-    include::{fs::Ext4DirEntryType, result::Errno},
-    sched::utils::block_on,
-};
+use crate::{fs::vfs::impls::disk_cursor::DiskCursor, include::result::Errno};
 
 pub mod dentry;
 mod disk_cursor;
@@ -34,64 +26,49 @@ pub const fn fs_err(err: Ext4Error) -> Errno {
     }
 }
 
+use alloc::sync::Arc;
+
+use driver::devices::impls::block::BlockDevice;
 #[allow(dead_code, unused_variables)]
-pub async fn ext4_rs_test(device: Arc<&'static dyn BlockDevice>) {
-    let blk = AsyncBlockCache::from(device);
-    let disk_cursor = DiskCursor::new(Arc::new(blk), 0, 0);
-    let ext4 = IExtFs::open(Arc::new(disk_cursor)).await;
+pub fn ext4_rs_test(device: Arc<&'static dyn BlockDevice>) {
+    use ext4_rs::ext4_defs::*;
 
-    const ROOT_INODE: u32 = 2;
-    let inode = block_on(ext4.get_inode_ref(ROOT_INODE));
+    use crate::sched::utils::block_on;
 
-    debug!(
-        "inode {}, file_type: {:?}",
-        inode.inode_num,
-        inode.inode.file_type()
-    );
+    let disk = Arc::new(DiskCursor::new(device, 0, 0));
+    let ext4 = block_on(Ext4::open(disk));
 
-    // dir ls
-    let entries = block_on(ext4.dir_get_entries(ROOT_INODE));
-    log::info!("dir ls root");
-    for entry in entries.clone() {
-        log::info!("{:?}", entry.get_name());
-    }
+    log::debug!("test write");
+    /*
+    The maximum size of the `write` operation:
 
-    let self_path = "/";
-    for entry in entries {
-        let child_name = entry.get_name();
-        if child_name == "." || child_name == ".." {
-            debug!("load_dir: {:?}, passed", child_name);
-            continue;
+    loongarch64: 0x4000  (16384 or 32 BLOCKS)
+    riscv64:     0x10000 (40960 or 80 BLOCKS)
+     */
+
+    log::info!("----create file----");
+    let inode_mode = InodeFileType::S_IFREG.bits();
+    let inode_perm = (InodePerm::S_IREAD | InodePerm::S_IWRITE).bits();
+    let inode_ref =
+        block_on(ext4.create(ROOT_INODE, "JUSTTEST.txt", inode_mode | inode_perm)).unwrap();
+    log::info!("----write file----");
+    let test_offset = 0x4000;
+    let test_size = 0x100;
+    let test_buf_size = 0x100000;
+    const BLOCK_SIZE: usize = 512;
+    let write_buf = vec![0x41 as u8; test_buf_size];
+    let r = block_on(ext4.write_at(inode_ref.inode_num, 0, &write_buf));
+    // let buf = vec![0u8; test_size];
+    // let r = block_on(ext4.read_at(inode_ref.inode_num, test_offset, &mut buf));
+    let mut all = vec![0u8; test_buf_size];
+    let r = block_on(ext4.read_at(inode_ref.inode_num, 0, &mut all));
+
+    for i in 0..test_buf_size {
+        if all[i] != write_buf[i] {
+            panic!(
+                "write and read failed at {}: {} != {}",
+                i, all[i], write_buf[i]
+            );
         }
-        let child_path = if self_path != "/" {
-            format!("{}/{}", self_path, entry.get_name())
-        } else {
-            format!("/{}", entry.get_name())
-        };
-        if entry.get_de_type() == Ext4DirEntryType::EXT4_DE_DIR.bits() {
-            let inode_num = block_on(ext4.ext4_dir_open(&child_path)).unwrap();
-            let inode = block_on(ext4.get_inode_ref(inode_num));
-            debug!("load_dir [{inode_num}] {child_path}: {:?}", child_name);
-        } else if entry.get_de_type() == Ext4DirEntryType::EXT4_DE_REG_FILE.bits() {
-            let inode_num = block_on(ext4.ext4_file_open(&child_path, "r+")).unwrap();
-            let inode = block_on(ext4.get_inode_ref(inode_num));
-            debug!("load_file [{inode_num}] {child_path}: {:?}", child_name);
-        } else {
-            unreachable!();
-        };
-    }
-
-    let child_path = "/test_chdirA";
-    let inode_num = block_on(ext4.ext4_file_open(&child_path, &"w+")).unwrap();
-    debug!("OK inode_num: {}", inode_num);
-
-    let child_path = "/test_chdirB";
-    block_on(ext4.dir_mk(&child_path)).unwrap();
-    let inode_num = block_on(ext4.ext4_dir_open(&child_path)).unwrap();
-
-    let entries = block_on(ext4.dir_get_entries(ROOT_INODE));
-    log::info!("dir ls root here");
-    for entry in entries.clone() {
-        log::info!("{:?}", entry.get_name());
     }
 }

@@ -2,7 +2,6 @@ use alloc::sync::Arc;
 
 use basic::dentry::Dentry;
 use config::fs::ROOT_NAME;
-use driver::devices::impls::block::BlockDevice;
 use impls::{
     devfs::filesystem::DevFs, ext4::filesystem::AsyncSmpExt4, proc::filesystem::ProcDevFs,
     rust_fat32::filesystem::AsyncSmpFat32,
@@ -10,28 +9,16 @@ use impls::{
 use ksync::Once;
 
 use crate::{
-    config::fs::BLOCK_SIZE,
-    fs::{manager::FS_MANAGER, path::Path},
+    fs::{blockcache::get_block_cache, manager::FS_MANAGER, path::Path},
     include::fs::{InodeMode, MountFlags},
 };
 pub mod basic;
-mod impls;
+pub mod impls;
 
 pub use impls::devfs::TTYFILE;
 
 lazy_static::lazy_static! {
     static ref ROOT_DENTRY: Once<Arc<dyn Dentry>> = Once::new();
-}
-
-pub async fn device_test(device: Arc<&'static dyn BlockDevice>) {
-    let mut read_buf = [0u8; BLOCK_SIZE];
-    for i in 0..4 {
-        device
-            .read(i as usize, &mut read_buf)
-            .await
-            .expect("Blk dev read failed");
-    }
-    info!("Block Device works well!");
 }
 
 /// Create the root dentry, mount multiple fs
@@ -45,8 +32,7 @@ pub async fn fs_init() {
     FS_MANAGER.register(Arc::new(DevFs::new(DevFs::name())));
 
     info!("[vfs] [{}] mounting", RootRealFs::name());
-    let device = driver::get_blk_dev();
-    device_test(device.clone()).await;
+    let device = get_block_cache();
 
     let disk_fs = FS_MANAGER.get(RootRealFs::name()).unwrap();
     let root = disk_fs

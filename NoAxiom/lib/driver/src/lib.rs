@@ -54,3 +54,27 @@ pub fn handle_irq() {
         unreachable!("sync fs shouldn't accept interrupt!");
     }
 }
+
+/// just for test blk_dev and return `!`
+#[allow(unused)]
+pub async fn blk_dev_test(start: usize, len: usize) -> ! {
+    use alloc::vec;
+    let device = get_blk_dev();
+
+    log::debug!("[driver] test block device");
+    let write_buf = vec![0x41 as u8; 512];
+    for sector in start..start + len {
+        device.write(sector, &write_buf).await.unwrap();
+    }
+    for sector in start..start + len {
+        let mut read_buf = vec![0u8; 512];
+        device.read(sector, &mut read_buf).await.unwrap();
+        if read_buf != write_buf {
+            panic!(
+                "read and write failed at {}: {} != {}",
+                sector, read_buf[0], write_buf[0]
+            );
+        }
+    }
+    panic!("[driver] test block device success")
+}

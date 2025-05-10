@@ -44,7 +44,7 @@ export KERNEL_SYMBOL_TABLE := $(KERNEL_ELF).txt
 
 # Test and fs image config
 TEST_DIR := $(ROOT)/$(PROJECT)-OS-Test
-FS_IMG := $(TEST_DIR)/fs-$(ARCH_NAME).img
+FS_IMG := fs.img
 MKFS_SH := ./mk_fs.sh
 
 # Qemu flags config
@@ -82,10 +82,8 @@ build: build-user build-kernel
 	@cp $(KERNEL_BIN) $(OUTPUT_DIR)/kernel-$(ARCH_NAME)-$(LIB_NAME).bin
 	@cp $(KERNEL_ELF) $(OUTPUT_DIR)/kernel-$(ARCH_NAME)-$(LIB_NAME)
 
-$(FS_IMG):
-	cd $(TEST_DIR) && make all
-
-build-kernel:
+build_kernel:
+	cp $(TEST_DIR)/fs-$(ARCH_NAME).img $(FS_IMG)
 	@cd $(PROJECT)/kernel && make build
 
 build-user:

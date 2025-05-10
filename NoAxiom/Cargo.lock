@@ -322,7 +322,7 @@ checksum = "5443807d6dff69373d433ab9ef5378ad8df50ca6298caf15de6e52e24aaf54d5"
 [[package]]
 name = "ext4_rs"
 version = "1.3.0"
-source = "git+https://github.com/YuXuaann/ext4_rs-async-smp#7449bb709759c930d87d22b8b537dfd5c8d0677c"
+source = "git+https://github.com/YuXuaann/ext4_rs-async-smp#16213bc497fe36414b56d4cc495d4f9f919f2d83"
 dependencies = [
  "async-trait",
  "bitflags 2.6.0",

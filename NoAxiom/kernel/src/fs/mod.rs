@@ -1,8 +1,7 @@
 // ignore warnings for this module
 // #![allow(warnings)]
 
-mod blockcache;
-pub mod fat32;
+pub mod blockcache;
 pub mod fdtable;
 pub mod manager;
 pub mod path;
@@ -18,4 +17,15 @@ pub async fn init() {
         Arch::is_external_interrupt_enabled()
     );
     vfs::fs_init().await;
+}
+
+#[allow(unused)]
+pub fn test() {
+    use blockcache::get_block_cache;
+    use driver::get_blk_dev;
+    // crate::sched::utils::block_on(driver::blk_dev_test(1000, 100000));
+    // let dev = get_block_cache();
+    let dev = get_blk_dev();
+
+    vfs::impls::ext4::ext4_rs_test(dev);
 }
