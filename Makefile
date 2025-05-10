@@ -85,7 +85,7 @@ build: build-user build-kernel
 $(FS_IMG):
 	cd $(TEST_DIR) && make all
 
-build-kernel: $(FS_IMG)
+build-kernel:
 	@cd $(PROJECT)/kernel && make build
 
 build-user:
@@ -102,7 +102,7 @@ asm-user:
 
 asm-all: asm asm-user
 
-run:
+run: $(FS_IMG)
 	@cp $(KERNEL_BIN) kernel-qemu
 	@echo -e $(NORMAL)"Running QEMU..."$(RESET)
 	$(QEMU) $(QFLAGS) | tee qemu.log
