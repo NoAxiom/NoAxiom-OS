@@ -169,15 +169,6 @@ impl<'a> Syscall<'a> {
     }
     /// syscall implementation with debug info
     pub async fn syscall(&mut self, id: usize, args: [usize; 6]) -> SyscallResult {
-        #[cfg(feature = "interruptable_async")]
-        {
-            // fixme: turn on the interrupt. When call trap_handler, cpu would turn off
-            // the interrupt until cpu ertn. But if we switch to another task, the whole
-            // life time is in the interrupt off state until previous task ertn.
-            use arch::ArchInt;
-            assert!(!arch::Arch::is_interrupt_enabled());
-            arch::Arch::enable_interrupt();
-        }
         let id = SyscallID::from_repr(id as usize).ok_or_else(|| {
             error!("invalid syscall id: {}", id);
             Errno::ENOSYS

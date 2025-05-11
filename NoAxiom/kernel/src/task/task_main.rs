@@ -32,6 +32,8 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
     type Output = F::Output;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        // ===== interrupt disabled =====
+        let old = Arch::is_interrupt_enabled();
         Arch::disable_interrupt();
 
         // ===== before executing task future =====
@@ -43,7 +45,18 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
         current_cpu().set_task(task);
         // ===== before executing task future =====
 
+        // ===== interrupt restore =====
+        if old {
+            Arch::enable_interrupt();
+        }
+
         let ret = unsafe { Pin::new_unchecked(future).poll(cx) };
+
+        // ===== interrupt disabled =====
+        let old = Arch::is_interrupt_enabled();
+        if old {
+            Arch::disable_interrupt();
+        }
 
         // ===== after executing task future =====
         let time_out = get_time_us();
@@ -53,7 +66,10 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
         current_cpu().clear_task();
         // ===== after executing task future =====
 
-        Arch::enable_interrupt();
+        // ===== interrupt restore =====
+        if old {
+            Arch::enable_interrupt();
+        }
         ret
     }
 }

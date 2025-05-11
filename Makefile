@@ -23,7 +23,7 @@ export TARGET := riscv64gc-unknown-none-elf
 export OBJDUMP := riscv64-unknown-elf-objdump
 export OBJCOPY := rust-objcopy --binary-architecture=riscv64
 export QEMU := qemu-system-riscv64
-export MULTICORE := 1
+export MULTICORE := 2
 export GDB := riscv64-unknown-elf-gdb
 else ifeq ($(ARCH_NAME),loongarch64) # LoongArch64
 export TARGET := loongarch64-unknown-linux-gnu

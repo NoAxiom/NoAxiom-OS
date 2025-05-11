@@ -6,7 +6,7 @@ use arch::{Arch, ArchInt, ArchTrap, TrapArgs, TrapType};
 
 use super::{ext_int::ext_int_handler, ipi::ipi_handler};
 use crate::{
-    cpu::{current_cpu, current_task, get_hartid},
+    cpu::{current_cpu, get_hartid},
     sched::utils::{block_on, yield_now},
     signal::{
         sig_info::{SigCode, SigInfo},
@@ -59,7 +59,8 @@ fn kernel_trap_handler() {
 /// user trap handler
 #[no_mangle]
 pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
-    assert!(!Arch::is_interrupt_enabled());
+    assert!(!arch::Arch::is_interrupt_enabled());
+    arch::Arch::enable_interrupt();
     trace!("[trap_handler] call trap handler");
 
     // check if need schedule

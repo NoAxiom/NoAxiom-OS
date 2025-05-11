@@ -1,6 +1,6 @@
 use alloc::{string::String, sync::Arc, vec::Vec};
 
-use arch::{Arch, ArchMemory, ArchPageTableEntry, ArchTime, MappingFlags, PageTableEntry};
+use arch::{Arch, ArchInt, ArchMemory, ArchPageTableEntry, ArchTime, MappingFlags, PageTableEntry};
 use config::{
     fs::ROOT_NAME,
     mm::{DL_INTERP_OFFSET, SIG_TRAMPOLINE, USER_HEAP_SIZE},
@@ -356,6 +356,7 @@ impl MemorySet {
                             .trim_start_matches('/')
                     );
                     info!("[load_elf] find interp path: {}", path);
+                    assert!(Arch::is_external_interrupt_enabled());
                     dl_interp = Some(Path::from_string(path, current_task())?);
                 }
                 _ => {}

@@ -23,6 +23,7 @@ use crate::{
         fs::{InodeMode, RenameFlags},
         result::Errno,
     },
+    sched::utils::block_on,
     syscall::{SysResult, SyscallResult},
 };
 
@@ -237,7 +238,17 @@ impl dyn Dentry {
                 idx += 1;
                 continue;
             }
-
+            assert!(current.clone().inode().unwrap().file_type() == InodeMode::DIR);
+            if current.clone().children().is_empty() {
+                if let Ok(current_dir) = current.clone().open() {
+                    warn!(
+                        "[find_path] the {} is not open! Now open it.",
+                        current.name()
+                    );
+                    assert!(check_no_lock());
+                    block_on(current_dir.load_dir()).unwrap();
+                }
+            }
             if let Some(child) = current.clone().meta().children.lock().get(name) {
                 if idx < max_idx {
                     let inode = child.inode()?;
@@ -274,7 +285,7 @@ impl dyn Dentry {
         let mut current = self.clone();
         while idx <= max_idx {
             let name = path[idx];
-            if name.is_empty() {
+            if name.is_empty() || name == "." {
                 idx += 1;
                 continue;
             }
