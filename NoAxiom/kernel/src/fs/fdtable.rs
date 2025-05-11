@@ -109,8 +109,8 @@ impl FdTable {
     /// Allocate a new fd slot greater than `fd`, if has empty slot, return the
     /// first empty slot, you should use tht fd after alloc immediately
     pub fn alloc_fd_after(&mut self, fd: usize) -> SysResult<usize> {
-        if let Some(fd) = self.table[fd + 1..].iter().position(|x| x.is_none()) {
-            return Ok(fd);
+        if let Some(empty_fd) = self.table[fd + 1..].iter().position(|x| x.is_none()) {
+            return Ok(fd + empty_fd + 1);
         }
 
         if self.table.len() >= self.rslimit() {
