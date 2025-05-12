@@ -34,14 +34,14 @@
 #![feature(decl_macro)]
 #![feature(error_in_core)]
 #![feature(negative_impls)]
+#![feature(core_intrinsics)]
 #![feature(naked_functions)]
 #![feature(panic_info_message)]
 #![feature(alloc_error_handler)]
 #![feature(slice_from_ptr_range)]
-#![allow(deprecated)]
+#![allow(deprecated, internal_features)]
 // #![allow(dead_code, unused_imports, unused_variables)]
 // #![feature(custom_mir)]
-// #![feature(core_intrinsics)]
 
 #[macro_use]
 extern crate alloc;

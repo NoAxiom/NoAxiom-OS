@@ -2,7 +2,7 @@ use alloc::boxed::Box;
 use core::{
     future::Future,
     pin::Pin,
-    task::{Context, Poll, Waker},
+    task::{Context, Poll},
     time::Duration,
 };
 
@@ -22,6 +22,8 @@ pub enum TimeLimitedType<T> {
 /// based on poll  
 ///
 /// todo: maybe can based on Interrupt, save waker
+///
+/// fixme: register on TIME_MANAGER, add current time duration to limit
 pub struct TimeLimitedFuture<T: Future> {
     future: Pin<Box<T>>,
     limit: Duration,
@@ -33,13 +35,12 @@ impl<T: Future> TimeLimitedFuture<T> {
     /// `future`: the target future  
     /// `timeout`: the timeout duration, None for infinity
     pub fn new(future: T, timeout: Option<Duration>) -> Self {
-        let limit = match timeout {
-            Some(t) => t,
-            None => Duration::MAX,
-        };
         Self {
             future: Box::pin(future),
-            limit,
+            limit: match timeout {
+                Some(t) => t + get_time_duration(),
+                None => Duration::MAX,
+            },
         }
     }
 }
@@ -59,19 +60,4 @@ impl<T: Future> Future for TimeLimitedFuture<T> {
             }
         }
     }
-}
-
-struct GetWakerFuture;
-
-impl Future for GetWakerFuture {
-    type Output = Waker;
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        Poll::Ready(cx.waker().clone())
-    }
-}
-
-/// Get the waker of the current future.
-#[allow(unused)]
-pub async fn get_current_waker() -> Waker {
-    GetWakerFuture.await
 }

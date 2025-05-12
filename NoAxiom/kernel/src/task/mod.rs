@@ -1,4 +1,5 @@
 pub mod exit;
+pub mod futex;
 pub mod impl_mm;
 pub mod impl_signal;
 pub mod manager;

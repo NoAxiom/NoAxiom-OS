@@ -98,6 +98,9 @@ impl<'a> Syscall<'a> {
             SYS_SET_TID_ADDRESS =>      self.sys_set_tid_address(args[0]),
             SYS_GETPGID =>              self.sys_getpgid(args[0]),
             SYS_SETPGID =>              self.sys_setpgid(args[0], args[1]),
+            SYS_GET_ROBUST_LIST =>      self.sys_get_robust_list(args[0], args[1], args[2]),
+            SYS_SET_ROBUST_LIST =>      self.sys_set_robust_list(args[0], args[1]),
+            SYS_FUTEX =>                self.sys_futex(args[0] as _, args[1] as _, args[2] as _, args[3] as _, args[4] as _, args[5] as _).await,
             // SYS_SCHED_GETAFFINITY =>    todo!(),
             // SYS_SCHED_SETAFFINITY =>    todo!(),
             // SYS_SCHEED_GETSCHEDULER =>  todo!(),
@@ -108,11 +111,6 @@ impl<'a> Syscall<'a> {
             // SYS_SETSID =>               todo!(),
             // SYS_SYSTEMSHUTDOWN =>       todo!(),
             
-            // futex
-            SYS_GET_ROBUST_LIST =>  self.sys_get_robust_list(args[0], args[1], args[2]),
-            SYS_SET_ROBUST_LIST =>  self.sys_set_robust_list(args[0], args[1]),
-            SYS_FUTEX =>            todo!(),
-
             // signal
             SYS_SIGTIMEDWAIT => Self::empty_syscall("sigtimedwait", 0),
             SYS_SIGACTION =>    self.sys_sigaction(args[0] as i32, args[1], args[2]),

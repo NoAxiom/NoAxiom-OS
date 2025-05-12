@@ -1,5 +1,5 @@
 use alloc::{string::String, vec::Vec};
-use core::marker::PhantomData;
+use core::{intrinsics::atomic_load_acquire, marker::PhantomData};
 
 use arch::{consts::KERNEL_ADDR_OFFSET, Arch, ArchMemory};
 
@@ -101,6 +101,14 @@ impl<T> UserPtr<T> {
         T: Copy,
     {
         unsafe { self.ptr().read_volatile() }
+    }
+
+    #[inline(always)]
+    pub fn atomic_load_acquire(&self) -> T
+    where
+        T: Copy,
+    {
+        unsafe { atomic_load_acquire(self.ptr()) }
     }
 
     #[inline(always)]

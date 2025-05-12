@@ -1,4 +1,5 @@
 use alloc::vec::Vec;
+use core::time::Duration;
 
 use arch::TrapArgs;
 
@@ -6,15 +7,20 @@ use super::{Syscall, SyscallResult};
 use crate::{
     fs::path::Path,
     include::{
-        process::{CloneFlags, PidSel, WaitOption},
+        futex::{FUTEX_CLOCK_REALTIME, FUTEX_CMD_MASK, FUTEX_REQUEUE, FUTEX_WAIT, FUTEX_WAKE},
+        process::{robust_list::RobustList, CloneFlags, PidSel, WaitOption},
         result::Errno,
     },
     mm::user_ptr::UserPtr,
-    sched::spawn::spawn_utask,
+    return_errno,
+    sched::{spawn::spawn_utask, utils::yield_now},
     task::{
         exit::ExitCode,
+        futex::FutexFuture,
         manager::{PROCESS_GROUP_MANAGER, TASK_MANAGER},
     },
+    time::time_spec::TimeSpec,
+    utils::futures::TimeLimitedFuture,
 };
 
 impl Syscall<'_> {
@@ -211,5 +217,97 @@ impl Syscall<'_> {
             }
         }
         Ok(0)
+    }
+
+    pub fn sys_set_robust_list(&self, head: usize, len: usize) -> SyscallResult {
+        info!("[sys_set_robust_list] head {:#x}, len {:#x}", head, len);
+        if len != RobustList::HEAD_SIZE {
+            error!("robust list head len mismatch: len={}", len);
+            return_errno!(Errno::EINVAL);
+        }
+        let mut pcb = self.task.pcb();
+        pcb.robust_list.head = head;
+        pcb.robust_list.len = len;
+        Ok(0)
+    }
+
+    pub fn sys_get_robust_list(
+        &self,
+        pid: usize,
+        head_ptr: usize,
+        len_ptr: usize,
+    ) -> SyscallResult {
+        warn!("[sys_get_robust_list]");
+        info!(
+            "[sys_get_robust_list] pid {:?} head {:#x}, len {:#x}",
+            pid, head_ptr as usize, len_ptr as usize
+        );
+        let tid = if pid == 0 { self.task.tid() } else { pid };
+        let Some(task) = TASK_MANAGER.get(tid) else {
+            return_errno!(Errno::ESRCH);
+        };
+        let robust_list = task.pcb().robust_list;
+        let head_ptr = UserPtr::<usize>::new(head_ptr);
+        let len_ptr = UserPtr::<usize>::new(len_ptr);
+        head_ptr.write(robust_list.head);
+        len_ptr.write(robust_list.len);
+        Ok(0)
+    }
+
+    pub async fn sys_futex(
+        &self,
+        uaddr: usize,
+        futex_op: usize,
+        val: u32,
+        val2: usize,
+        uaddr2: usize,
+        val3: u32,
+    ) -> SyscallResult {
+        let option = futex_op & FUTEX_CMD_MASK;
+        if futex_op & FUTEX_CLOCK_REALTIME != 0 && option != FUTEX_WAIT {
+            return_errno!(Errno::EPERM);
+        }
+        info!(
+            "[sys_futex] uaddr {:#x}, futex_op {:#x}, val {:#x}, val2 {:#x}, uaddr2 {:#x}, val3 {:#x}",
+            uaddr, option, val, val2, uaddr2, val3
+        );
+
+        let uaddr = UserPtr::<u32>::new(uaddr);
+        let uaddr2 = UserPtr::<u32>::new(uaddr2);
+        let task = self.task;
+        match option {
+            FUTEX_WAIT => {
+                if uaddr.atomic_load_acquire() == val {
+                    let limit_time = match val2 {
+                        0 => None,
+                        val2 => {
+                            let val2 = UserPtr::<TimeSpec>::new(val2);
+                            let time_spec = val2.read();
+                            let limit_time = Duration::from(time_spec);
+                            info!("[sys_futex]: timeout {:?}", limit_time);
+                            Some(limit_time)
+                        }
+                    };
+                    TimeLimitedFuture::new(FutexFuture::new(uaddr, val), limit_time).await;
+                    Ok(0)
+                } else {
+                    Err(Errno::EAGAIN)
+                }
+            }
+            FUTEX_WAKE => {
+                // let ret = futex_wake(uaddr as usize, val);
+                let ret = task.futex().wake(uaddr, val);
+                trace!("[sys_futex] futex wake number {:?}", ret);
+                yield_now().await;
+                Ok(ret as isize)
+            }
+            FUTEX_REQUEUE => {
+                // val2 is a limit
+                info!("[sys_futex] futex requeue_waites");
+                let val2 = val2 as u32;
+                Ok(task.futex().requeue_waiters(uaddr, uaddr2, val, val2) as isize)
+            }
+            _ => Err(Errno::EINVAL),
+        }
     }
 }
