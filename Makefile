@@ -25,6 +25,7 @@ export OBJCOPY := rust-objcopy --binary-architecture=riscv64
 export QEMU := qemu-system-riscv64
 export MULTICORE := 2
 export GDB := riscv64-unknown-elf-gdb
+export SIMPLE_ARCH_NAME := rv
 else ifeq ($(ARCH_NAME),loongarch64) # LoongArch64
 export TARGET := loongarch64-unknown-linux-gnu
 export OBJDUMP := loongarch64-linux-gnu-objdump
@@ -32,6 +33,7 @@ export OBJCOPY := loongarch64-linux-gnu-objcopy
 export QEMU := qemu-system-loongarch64
 export MULTICORE := 1
 export GDB := $(TOOLCHAIN_DIR)/loongarch64-linux-gnu-gdb
+export SIMPLE_ARCH_NAME := la
 endif
 
 # Kernel config
@@ -82,8 +84,7 @@ default: build run
 
 build: build-user build-kernel
 	@mkdir -p $(OUTPUT_DIR)
-	@cp $(KERNEL_BIN) $(OUTPUT_DIR)/kernel-$(ARCH_NAME)-$(LIB_NAME).bin
-	@cp $(KERNEL_ELF) $(OUTPUT_DIR)/kernel-$(ARCH_NAME)-$(LIB_NAME)
+	@cp $(KERNEL_ELF) $(OUTPUT_DIR)/kernel-$(SIMPLE_ARCH_NAME)
 
 build-kernel:
 	@cd $(PROJECT)/kernel && make build
@@ -106,16 +107,18 @@ $(RAW_FS_IMG):
 	@echo -e $(NORMAL)"Building FS Image..."$(RESET)
 	@cd $(TEST_DIR) && make all
 
+LOG_SAVE_PATH := log/$(shell date +%m_%d-%H_%M).log
 run: $(RAW_FS_IMG)
 	@python3 $(CHECK_IMG) copy_image --src $(RAW_FS_IMG) --dest ${FS_IMG_2} &
 	@python3 $(CHECK_IMG) check_or_copy --src $(RAW_FS_IMG) --dest ${FS_IMG}
 	@cp $(KERNEL_BIN) kernel-qemu
-	$(QEMU) $(QFLAGS) | tee log/$(shell date +%m.%d-%H:%M).log
+	$(QEMU) $(QFLAGS) | tee $(LOG_SAVE_PATH)
 	@echo -e $(WARN)"Please waiting for the image copy!"$(RESET)
 	wait
 	@rm -f $(FS_IMG)
 	@mv $(FS_IMG_2) $(FS_IMG)
 	@echo -e $(NORMAL)"Image copied success."$(RESET)
+	@echo -e $(NORMAL)"Log saved to: $(LOG_SAVE_PATH)"$(RESET)
 
 gdb-server: build-kernel
 	$(QEMU) $(QFLAGS) -s -S
@@ -218,4 +221,3 @@ all: clean env build-all
 .PHONY: add-target env git-update vendor vscode # environment setup
 .PHONY: info help count                         # information utils
 .PHONY: docker build-all                        # for competition
-# .ONESHELL: run

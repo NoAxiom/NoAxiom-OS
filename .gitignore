@@ -14,3 +14,5 @@ test-2025/
 qemu.log
 NoAxiom/kernel/src/link_apps.S
 output/
+kernel-rv
+kernel-la
