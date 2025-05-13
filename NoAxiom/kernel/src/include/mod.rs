@@ -1,4 +1,5 @@
 pub mod fs;
+pub mod futex;
 pub mod info;
 pub mod io;
 pub mod ipc;

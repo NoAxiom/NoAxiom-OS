@@ -265,12 +265,16 @@ impl MemorySet {
         base_offset: usize,
         is_dl_interp: bool,
     ) -> SysResult<RawElfInfo> {
-        let handler = |msg| {
-            error!("[load_elf] elf parse error: {}", msg);
-            Errno::ENOEXEC
-        };
+        info!("[map_elf] start, dl_interp: {is_dl_interp}");
 
         // read the beginning bytes to specify the header size
+        let handler = |msg| {
+            error!("[load_elf] elf parse error: {}", msg);
+            match is_dl_interp {
+                true => Errno::ELIBBAD,
+                false => Errno::ENOEXEC,
+            }
+        };
         let mut elf_mini_buf = [0u8; 64];
         elf_file.base_read(0, &mut elf_mini_buf).await?;
         let mini_elf = ElfFile::new(&elf_mini_buf).map_err(handler)?;
@@ -278,7 +282,7 @@ impl MemorySet {
         // check: magic
         let magic = mini_elf.header.pt1.magic;
         if magic != [0x7f, 0x45, 0x4c, 0x46] {
-            return Err(Errno::ENOEXEC);
+            handler("invalid magic");
         }
 
         // get the real elf header
@@ -316,7 +320,7 @@ impl MemorySet {
                         Some(Arc::clone(&elf_file)),
                         // start_va.offset(),
                     );
-                    debug!(
+                    info!(
                         "[map_elf] [{:#x}, {:#x}], permission: {:?}, ph offset {:#x}, file size {:#x}, mem size {:#x}",
                         start_va.raw(), end_va.raw(), permission,
                         ph.offset(),
@@ -338,7 +342,7 @@ impl MemorySet {
                     // iozone: /glibc/lib/ld-linux-riscv64-lp64d.so.1
                     if is_dl_interp {
                         error!("[load_elf] detect recursive dl_interp, skip dl_interp loading");
-                        return Err(Errno::ENOEXEC);
+                        return Err(Errno::ELIBBAD);
                     }
                     if dl_interp.is_some() {
                         error!("[load_elf] dl_interp already set");
@@ -355,7 +359,7 @@ impl MemorySet {
                         "{ROOT_NAME}/{}",
                         String::from_utf8(buf)
                             .map_err(|_| Errno::ENOEXEC)?
-                            .trim_end()
+                            .trim_end_matches('\0')
                             .trim_start_matches('/')
                     );
                     info!("[load_elf] find interp path: {}", path);

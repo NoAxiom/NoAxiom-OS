@@ -1,10 +1,12 @@
 use alloc::{string::String, vec::Vec};
-use core::marker::PhantomData;
+use core::{intrinsics::atomic_load_acquire, marker::PhantomData};
 
-use arch::{consts::KERNEL_ADDR_OFFSET, Arch, ArchMemory};
+use arch::{Arch, ArchMemory};
+use include::errno::Errno;
+use memory::address::PhysAddr;
 
 use super::{address::VirtAddr, page_table::PageTable, validate::validate};
-use crate::{cpu::current_task, mm::address::VpnRange, sched::utils::block_on, syscall::SysResult};
+use crate::{cpu::current_task, mm::address::VpnRange, syscall::SysResult};
 
 /// the UserPtr is a wrapper for user-space pointer
 /// NOTE THAT: it will NOT validate the pointer
@@ -40,11 +42,8 @@ pub struct UserPtr<T = u8> {
 }
 
 impl<T> UserPtr<T> {
-    pub fn new(addr: usize) -> Self {
-        assert!(
-            addr & KERNEL_ADDR_OFFSET == 0,
-            "shouldn't pass kernel address"
-        );
+    #[inline(always)]
+    pub const fn new(addr: usize) -> Self {
         Self {
             _phantom: PhantomData,
             addr,
@@ -104,6 +103,14 @@ impl<T> UserPtr<T> {
     }
 
     #[inline(always)]
+    pub fn atomic_load_acquire(&self) -> T
+    where
+        T: Copy,
+    {
+        unsafe { atomic_load_acquire(self.ptr()) }
+    }
+
+    #[inline(always)]
     pub fn write(&self, value: T) {
         unsafe { *self.ptr() = value };
     }
@@ -141,13 +148,19 @@ impl<T> UserPtr<T> {
         Ok(unsafe { core::slice::from_raw_parts_mut(slice.as_ptr() as *mut T, len) })
     }
 
-    pub fn validate_blocked(&self) -> SysResult<()> {
-        block_on(self.validate())
+    /// validate the user pointer
+    /// this will check the page table and allocate valid map areas
+    /// or it will return EFAULT
+    pub async fn validate(&self) -> SysResult<()> {
+        self.as_slice_mut_checked(1).await?;
+        Ok(())
     }
 
-    pub async fn validate(&self) -> SysResult<()> {
-        let _slice = self.as_slice_mut_checked(1).await?;
-        Ok(())
+    /// translate current address to physical address
+    pub async fn translate_pa(&self) -> SysResult<PhysAddr> {
+        self.validate().await?;
+        let page_table = PageTable::from_ppn(Arch::current_root_ppn());
+        page_table.translate_va(self.va_addr()).ok_or(Errno::EFAULT)
     }
 }
 
@@ -202,5 +215,17 @@ unsafe impl<T> Sync for UserPtr<T> {}
 impl<T> From<usize> for UserPtr<T> {
     fn from(value: usize) -> Self {
         Self::new(value)
+    }
+}
+
+impl<T> From<*const T> for UserPtr<T> {
+    fn from(value: *const T) -> Self {
+        Self::new(value as usize)
+    }
+}
+
+impl<T> From<*mut T> for UserPtr<T> {
+    fn from(value: *mut T) -> Self {
+        Self::new(value as usize)
     }
 }

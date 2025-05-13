@@ -14,8 +14,8 @@ use crate::{
         heap::heap_init,
         memory_set::{kernel_space_activate, kernel_space_init},
     },
-    sched::{runtime, utils::block_on},
-    time::{clock::ktime_init, sleep::timer_handler},
+    sched::{runtime::run_tasks, utils::block_on},
+    time::clock::ktime_init,
 };
 
 /// awake other core
@@ -98,14 +98,4 @@ pub extern "C" fn _boot_hart_init(_hartid: usize, dtb: usize) -> ! {
 
     // start task runner
     run_tasks()
-}
-
-/// run_tasks: only act as a task runner
-#[no_mangle]
-pub fn run_tasks() -> ! {
-    info!("[kernel] hart {} has been booted", get_hartid());
-    loop {
-        timer_handler();
-        runtime::run();
-    }
 }

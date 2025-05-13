@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use alloc::collections::{btree_set::BTreeSet, vec_deque::VecDeque};
 use core::cmp::Ordering;
 

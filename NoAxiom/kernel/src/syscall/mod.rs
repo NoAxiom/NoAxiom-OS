@@ -3,7 +3,6 @@ use core::result::Result;
 use crate::include::result::Errno;
 
 pub mod fs;
-pub mod futex;
 pub mod io;
 pub mod mm;
 pub mod net;

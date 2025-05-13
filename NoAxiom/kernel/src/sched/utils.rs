@@ -3,6 +3,8 @@
 //! - use [`block_on`] to block on a future
 //! - use [`suspend_now`] to suspend current task (without immediate wake)
 
+#![allow(unused)]
+
 use alloc::{boxed::Box, sync::Arc, task::Wake};
 use core::{
     future::Future,

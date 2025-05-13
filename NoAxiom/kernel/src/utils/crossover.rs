@@ -33,3 +33,15 @@ impl Crossover {
 lazy_static::lazy_static! {
     pub static ref CrossoverManager: SpinLock<BTreeMap<usize, Crossover>> = SpinLock::new(BTreeMap::new());
 }
+
+#[allow(unused)]
+/// Execute a function every `interval` times
+pub fn intermit(f: impl FnOnce()) {
+    let interval = 89102;
+    let id = &f as *const _ as usize;
+    let mut guard = CrossoverManager.lock();
+    let crossover = guard.entry(id).or_insert(Crossover::new(interval));
+    if crossover.trigger() {
+        f();
+    }
+}
