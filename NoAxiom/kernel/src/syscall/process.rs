@@ -288,7 +288,7 @@ impl Syscall<'_> {
                 };
                 let res = TimeLimitedFuture::new(FutexFuture::new(uaddr, pa, val), timeout)
                     .await
-                    .map_timeout(Err(Errno::EAGAIN))?;
+                    .map_timeout(Err(Errno::ETIMEDOUT))?;
                 Ok(res)
             }
             FUTEX_WAKE => {

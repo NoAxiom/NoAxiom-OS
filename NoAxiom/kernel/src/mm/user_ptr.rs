@@ -1,7 +1,7 @@
 use alloc::{string::String, vec::Vec};
 use core::{intrinsics::atomic_load_acquire, marker::PhantomData};
 
-use arch::{consts::KERNEL_ADDR_OFFSET, Arch, ArchMemory};
+use arch::{Arch, ArchMemory};
 use include::errno::Errno;
 use memory::address::PhysAddr;
 
@@ -42,11 +42,8 @@ pub struct UserPtr<T = u8> {
 }
 
 impl<T> UserPtr<T> {
-    pub fn new(addr: usize) -> Self {
-        assert!(
-            addr & KERNEL_ADDR_OFFSET == 0,
-            "shouldn't pass kernel address"
-        );
+    #[inline(always)]
+    pub const fn new(addr: usize) -> Self {
         Self {
             _phantom: PhantomData,
             addr,
@@ -155,7 +152,7 @@ impl<T> UserPtr<T> {
     /// this will check the page table and allocate valid map areas
     /// or it will return EFAULT
     pub async fn validate(&self) -> SysResult<()> {
-        let _slice = self.as_slice_mut_checked(1).await?;
+        self.as_slice_mut_checked(1).await?;
         Ok(())
     }
 

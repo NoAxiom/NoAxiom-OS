@@ -10,7 +10,8 @@ use crate::{
         gettime::{get_time_duration, get_time_ms, get_timeval},
         time_info::TMS,
         time_spec::TimeSpec,
-        time_val::TimeVal, timeout::sleep_now,
+        time_val::TimeVal,
+        timeout::sleep_now,
     },
 };
 
@@ -91,5 +92,31 @@ impl Syscall<'_> {
                 }
             },
         }
+    }
+    pub async fn sys_clock_nanosleep(
+        &self,
+        _clock_id: usize,
+        flags: usize,
+        request: usize,
+        remain: usize,
+    ) -> SyscallResult {
+        pub const TIMER_ABSTIME: usize = 1;
+        let request = UserPtr::<TimeSpec>::new(request);
+        let remain = UserPtr::<TimeSpec>::new(remain);
+        let request = Duration::from(request.read());
+        let current = get_time_duration();
+        let remain_time = if flags == TIMER_ABSTIME {
+            if request < current {
+                Duration::ZERO
+            } else {
+                sleep_now(request - current).await
+            }
+        } else {
+            sleep_now(request).await
+        };
+        if !remain.is_null() {
+            remain.write(remain_time.into());
+        }
+        Ok(0)
     }
 }

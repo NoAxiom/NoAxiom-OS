@@ -140,7 +140,7 @@ impl<'a> Syscall<'a> {
             SYS_GETTIMEOFDAY =>     Self::sys_gettimeofday(args[0]),
             SYS_NANOSLEEP =>        self.sys_nanosleep(args[0], args[1]).await,
             SYS_CLOCK_GETTIME =>    self.sys_clock_gettime(args[0], args[1]),
-            // SYS_CLOCK_NANOSLEEP =>  todo!(),
+            SYS_CLOCK_NANOSLEEP =>  self.sys_clock_nanosleep(args[0], args[1], args[2], args[3]).await,
             // SYS_SETITIMER =>        todo!(),
             // SYS_CLOCK_GETRES =>     todo!(),
 
