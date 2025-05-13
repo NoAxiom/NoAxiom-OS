@@ -206,10 +206,8 @@ vscode:
 env: add-target git-update vendor
 
 build-all:
-	@make build ARCH_NAME=riscv64 LIB_NAME=glibc LOG=OFF
-	@make build ARCH_NAME=riscv64 LIB_NAME=musl LOG=OFF
-	@make build ARCH_NAME=loongarch64 LIB_NAME=glibc LOG=OFF
-	@make build ARCH_NAME=loongarch64 LIB_NAME=musl LOG=OFF
+	@make build ARCH_NAME=riscv64 LOG=OFF
+	@make build ARCH_NAME=loongarch64 LOG=OFF
 
 all: clean env build-all
 
@@ -220,4 +218,4 @@ all: clean env build-all
 .PHONY: add-target env git-update vendor vscode # environment setup
 .PHONY: info help count                         # information utils
 .PHONY: docker build-all                        # for competition
-.ONESHELL: run
+# .ONESHELL: run
