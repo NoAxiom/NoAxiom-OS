@@ -779,6 +779,8 @@ impl Syscall<'_> {
         let fd_table = self.task.fd_table();
         let file = fd_table.get(fd).ok_or(Errno::EBADF)?;
         drop(fd_table);
+        let file_name = file.dentry().path();
+        info!("[sys_ftruncate] file_name: {:?}", file_name);
         file.inode().truncate(length).await?;
         Ok(0)
     }
@@ -909,6 +911,7 @@ fn get_path(
     debug_syscall_name: &str,
 ) -> SysResult<Path> {
     let path_str = get_string_from_ptr(&UserPtr::<u8>::new(rawpath));
+    debug!("[{debug_syscall_name}] path: {}", path_str);
     if !path_str.starts_with('/') {
         if fd == AT_FDCWD {
             let cwd = task.cwd().clone();

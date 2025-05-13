@@ -25,12 +25,6 @@ ifeq ($(INIT_PROC),busybox)
 	FEATURES += busybox
 endif
 
-ifeq ($(LIB_NAME),glibc)
-	FEATURES += glibc
-else ifeq ($(LIB_NAME),musl)
-	FEATURES += musl
-endif
-
 ifneq ($(INTERRUPTABLE_ASYNC), )
 	FEATURES += interruptable_async
 endif

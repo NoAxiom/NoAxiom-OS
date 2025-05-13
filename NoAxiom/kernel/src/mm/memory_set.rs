@@ -345,6 +345,9 @@ impl MemorySet {
                         return Err(Errno::ENOEXEC);
                     }
                     let mut buf = vec![0u8; ph.file_size() as usize];
+                    if buf.ends_with(&[0u8; 1]) {
+                        buf.pop();
+                    }
                     elf_file
                         .base_read(ph.offset() as usize, buf.as_mut_slice())
                         .await?;

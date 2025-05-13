@@ -10,7 +10,7 @@ pub const FAT32_SECTOR_SIZE: usize = BLOCK_SIZE;
 pub const FAT32_BYTES_PER_CLUSTER_ID: usize = 4;
 
 /// The max LruCache size
-pub const MAX_LRU_CACHE_SIZE: usize = 8192;
+pub const MAX_LRU_CACHE_SIZE: usize = 10 * PAGE_SIZE;
 
 pub const IS_DELETED: u8 = 0xe5;
 pub const SPACE: u8 = 0x20;
@@ -32,22 +32,10 @@ pub const ROOT_FAKE_ENTRY: [u8; 32] = {
 
 pub const PIPE_BUF_SIZE: usize = 4096;
 
-#[cfg(feature = "glibc")]
 mod lib_def {
-    pub const LIB_NAME: &str = "glibc";
-    pub const ROOT_NAME: &str = "/glibc";
-}
-
-#[cfg(feature = "musl")]
-mod lib_def {
-    pub const LIB_NAME: &str = "musl";
-    pub const ROOT_NAME: &str = "/musl";
-}
-
-#[cfg(not(any(feature = "glibc", feature = "musl")))]
-mod lib_def {
-    pub const LIB_NAME: &str = "";
-    pub const ROOT_NAME: &str = "";
+    pub const ROOT_NAME: &str = "/";
 }
 
 pub use lib_def::*;
+
+use crate::mm::PAGE_SIZE;

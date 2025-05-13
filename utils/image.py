@@ -61,11 +61,7 @@ def check_or_copy(src_path, dest_path):
     logging.info(f"Copied image from {src_path} to {dest_path}.")
 
 def copy_image(src_path, dest_path):
-    try:
-        shutil.copy2(src_path, dest_path)
-        logging.info(f"Copied image from {src_path} to {dest_path}.")
-    except Exception as e:
-        logging.error(f"Error copying image in subprocess: {e}")
+    shutil.copy2(src_path, dest_path)
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)

@@ -10,7 +10,7 @@ export INIT_PROC ?= busybox
 export ROOT := $(shell pwd)
 export LOG ?= DEBUG
 export ELF_PATH ?=   # This is for mk_fs.sh
-export TEST_TYPE ?= Official
+export TEST_TYPE ?= custom
 export USER_PROJECT := NoAxiom-OS-User
 export ERROR := "\e[31m"
 export WARN := "\e[33m"
@@ -44,8 +44,11 @@ export KERNEL_SYMBOL_TABLE := $(KERNEL_ELF).txt
 
 # Test and fs image config
 TEST_DIR := $(ROOT)/$(PROJECT)-OS-Test
-FS_IMG := $(TEST_DIR)/fs-$(ARCH_NAME).img
-MKFS_SH := ./mk_fs.sh
+RAW_FS_IMG := $(TEST_DIR)/$(TEST_TYPE)/img/$(ARCH_NAME)-$(LIB_NAME).img
+FS_IMG := $(ROOT)/fs.img
+FS_IMG_2 := $(ROOT)/fs-2.img
+CHECK_IMG := $(ROOT)/utils/image.py
+MKFS_SH := $(ROOT)/mk_fs.sh
 
 # Qemu flags config
 QFLAGS := 
@@ -82,9 +85,6 @@ build: build-user build-kernel
 	@cp $(KERNEL_BIN) $(OUTPUT_DIR)/kernel-$(ARCH_NAME)-$(LIB_NAME).bin
 	@cp $(KERNEL_ELF) $(OUTPUT_DIR)/kernel-$(ARCH_NAME)-$(LIB_NAME)
 
-$(FS_IMG):
-	cd $(TEST_DIR) && make all
-
 build-kernel:
 	@cd $(PROJECT)/kernel && make build
 
@@ -102,9 +102,20 @@ asm-user:
 
 asm-all: asm asm-user
 
-run: $(FS_IMG)
+$(RAW_FS_IMG):
+	@echo -e $(NORMAL)"Building FS Image..."$(RESET)
+	@cd $(TEST_DIR) && make all
+
+run: $(RAW_FS_IMG)
+	@python3 $(CHECK_IMG) copy_image --src $(RAW_FS_IMG) --dest ${FS_IMG_2} &
+	@python3 $(CHECK_IMG) check_or_copy --src $(RAW_FS_IMG) --dest ${FS_IMG}
 	@cp $(KERNEL_BIN) kernel-qemu
 	$(QEMU) $(QFLAGS) | tee log/$(shell date +%m.%d-%H:%M).log
+	@echo -e $(WARN)"Please waiting for the image copy!"$(RESET)
+	wait
+	@rm -f $(FS_IMG)
+	@mv $(FS_IMG_2) $(FS_IMG)
+	@echo -e $(NORMAL)"Image copied success."$(RESET)
 
 gdb-server: build-kernel
 	$(QEMU) $(QFLAGS) -s -S
@@ -209,3 +220,4 @@ all: clean env build-all
 .PHONY: add-target env git-update vendor vscode # environment setup
 .PHONY: info help count                         # information utils
 .PHONY: docker build-all                        # for competition
+.ONESHELL: run

@@ -9,8 +9,6 @@ busybox = []
 qemu = ["platform/qemu"]
 interruptable_async = ["driver/interruptable_async"]
 async = ["driver/async"]
-glibc = ["config/glibc"]
-musl = ["config/musl"]
 debug_sig = []
 log_print = ["debug_sig"]
 

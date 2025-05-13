@@ -1,7 +1,6 @@
 use arch::{
     Arch, ArchBoot, ArchInt, ArchSbi, _entry_other_hart, consts::KERNEL_ADDR_OFFSET, ArchInfo,
 };
-use config::fs::LIB_NAME;
 
 use crate::{
     config::cpu::CPU_NUM,
@@ -69,7 +68,7 @@ pub extern "C" fn _boot_hart_init(_hartid: usize, dtb: usize) -> ! {
     );
     #[cfg(not(feature = "multicore"))]
     println!("[kernel] SINGLECORE: CPU_NUM = {}", CPU_NUM);
-    println!("[kernel] ARCH = {}, LIB = {}", Arch::ARCH_NAME, LIB_NAME);
+    println!("[kernel] ARCH = {}", Arch::ARCH_NAME);
     info!(
         "[first_init] entry init hart_id: {}, dtb_addr: {:#x}",
         get_hartid(),

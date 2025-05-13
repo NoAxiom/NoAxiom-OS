@@ -16,7 +16,10 @@ pub fn schedule_spawn_with_path() {
         INIT_PROC_NAME, ROOT_NAME
     );
     spawn_ktask(async move {
-        let path_str = format!("{}/{}", ROOT_NAME, INIT_PROC_NAME);
+        let path_str = match ROOT_NAME {
+            "/" => format!("/{}", INIT_PROC_NAME),
+            _ => format!("{}/{}", ROOT_NAME, INIT_PROC_NAME),
+        };
         let path = Path::from_or_create(path_str, InodeMode::FILE).await;
         let file = path.dentry().open().unwrap();
         let content = get_file();

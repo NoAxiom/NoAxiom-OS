@@ -94,24 +94,29 @@ impl Path {
     }
 
     /// Get the path from relative path, the path should exist
+    #[inline(always)]
     pub fn from_cd(&self, path: &str) -> SysResult<Self> {
         Self::try_from(self.cd(path))
     }
 
     /// Get the path from relative path, create the path if not exist
+    #[inline(always)]
     pub async fn from_cd_or_create(&self, path: &str, mode: InodeMode) -> Self {
         Self::from_or_create(self.cd(path), mode).await
     }
 
     /// Get dentry
+    #[inline(always)]
     pub fn dentry(&self) -> Arc<dyn Dentry> {
         self.dentry.clone()
     }
 
+    #[inline(always)]
     pub fn as_string(&self) -> String {
         self.inner.clone()
     }
 
+    #[inline(always)]
     pub fn as_str(&self) -> &str {
         self.inner.as_str()
     }

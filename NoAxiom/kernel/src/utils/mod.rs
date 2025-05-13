@@ -41,12 +41,19 @@ pub fn intermit(f: impl FnOnce()) {
     }
 }
 
-#[inline(always)]
-/// Generate a **Random** number at an extremely efficient way
-pub fn random() -> usize {
-    static mut SEED: usize = 253496567482;
+/// Generate a **Random** number at an **EXTREMELY** efficient way
+pub fn random() -> u64 {
+    static mut SEED: u64 = 253496567482;
     unsafe {
         SEED = SEED * 1103515245 + 12345;
         SEED
     }
+}
+
+#[inline(always)]
+pub fn random_fill(buf: &mut [u8]) -> usize {
+    for i in 0..buf.len() {
+        buf[i] = (random() & 0xFF) as u8;
+    }
+    buf.len()
 }

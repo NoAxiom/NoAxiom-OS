@@ -155,7 +155,8 @@ impl File for SocketFile {
     /// Load directory into memory, must be called before read/write explicitly,
     /// only for directories
     async fn load_dir(&self) -> Result<(), Errno> {
-        unreachable!("Socket file is not a directory");
+        error!("Socket file is not a directory");
+        Err(Errno::ENOTDIR)
     }
     /// Delete dentry, only for directories
     async fn delete_child(&self, _name: &str) -> Result<(), Errno> {
