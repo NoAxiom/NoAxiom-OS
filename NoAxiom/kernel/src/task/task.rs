@@ -157,7 +157,7 @@ pub struct Task {
     memory_set: SharedMut<MemorySet>,     // memory set for the task
     thread_group: SharedMut<ThreadGroup>, // thread group
     pgid: SharedMut<PGID>,                // process group id
-    futex: SharedMut<FutexQueue>,
+    futex: SharedMut<FutexQueue>,         // futex wait queue
 }
 
 impl PCB {
@@ -571,7 +571,7 @@ impl Task {
                 tcb: ThreadOnly::new(TCB {
                     ..Default::default()
                 }),
-                futex: Shared::new(FutexQueue::new()),
+                futex: self.futex.clone(),
             });
             new_thread.set_tg_leader_weakly(self.tg_leader.get().unwrap());
             new_thread.thread_group.lock().insert(&new_thread);

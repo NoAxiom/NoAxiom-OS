@@ -272,40 +272,47 @@ impl Syscall<'_> {
             uaddr, option, val, val2, uaddr2, val3
         );
 
-        let uaddr = UserPtr::<u32>::new(uaddr);
-        let uaddr2 = UserPtr::<u32>::new(uaddr2);
         let task = self.task;
         match option {
             FUTEX_WAIT => {
-                if uaddr.atomic_load_acquire() == val {
-                    let limit_time = match val2 {
-                        0 => None,
-                        val2 => {
-                            let val2 = UserPtr::<TimeSpec>::new(val2);
-                            let time_spec = val2.read();
-                            let limit_time = Duration::from(time_spec);
-                            info!("[sys_futex]: timeout {:?}", limit_time);
-                            Some(limit_time)
-                        }
-                    };
-                    TimeLimitedFuture::new(FutexFuture::new(uaddr, val), limit_time).await;
-                    Ok(0)
-                } else {
-                    Err(Errno::EAGAIN)
-                }
+                let futex_word = UserPtr::<u32>::new(uaddr);
+                let pa = futex_word.translate_pa().await?;
+                let timeout = match val2 {
+                    0 => None,
+                    val2 => {
+                        let val2 = UserPtr::<TimeSpec>::new(val2);
+                        let time_spec = val2.read();
+                        let limit_time = Duration::from(time_spec);
+                        info!("[sys_futex]: timeout {:?}", limit_time);
+                        Some(limit_time)
+                    }
+                };
+                let res = TimeLimitedFuture::new(FutexFuture::new(uaddr, pa, val), timeout)
+                    .await
+                    .map_timeout(Err(Errno::EAGAIN))?;
+                Ok(res)
             }
             FUTEX_WAKE => {
-                // let ret = futex_wake(uaddr as usize, val);
-                let ret = task.futex().wake(uaddr, val);
-                trace!("[sys_futex] futex wake number {:?}", ret);
+                let futex_word = UserPtr::<u32>::new(uaddr);
+                let pa = futex_word.translate_pa().await?;
+                let res = task.futex().wake_waiter(pa, val);
+                info!(
+                    "[sys_futex] futex wake, uaddr = {:#x}, val = {}, res: {:?}",
+                    uaddr, val, res
+                );
                 yield_now().await;
-                Ok(ret as isize)
+                Ok(res as isize)
             }
             FUTEX_REQUEUE => {
-                // val2 is a limit
-                info!("[sys_futex] futex requeue_waites");
-                let val2 = val2 as u32;
-                Ok(task.futex().requeue_waiters(uaddr, uaddr2, val, val2) as isize)
+                let old_word = UserPtr::<u32>::new(uaddr);
+                let new_word = UserPtr::<u32>::new(uaddr2);
+                let old_pa = old_word.translate_pa().await?;
+                let new_pa = new_word.translate_pa().await?;
+                warn!(
+                    "[sys_futex] futex requeue: uaddr={:#x}, uaddr2={:#x}, val={}, val2={}",
+                    uaddr, uaddr2, val, val2
+                );
+                Ok(task.futex().requeue(old_pa, new_pa, val, val2 as u32) as isize)
             }
             _ => Err(Errno::EINVAL),
         }

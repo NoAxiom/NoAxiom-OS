@@ -1,7 +1,9 @@
 use alloc::{string::String, vec::Vec};
 use core::{intrinsics::atomic_load_acquire, marker::PhantomData};
 
-use arch::{consts::KERNEL_ADDR_OFFSET, Arch, ArchMemory};
+use arch::{consts::KERNEL_ADDR_OFFSET, Arch, ArchMemory, ArchPageTableEntry};
+use include::errno::Errno;
+use memory::address::PhysAddr;
 
 use super::{address::VirtAddr, page_table::PageTable, validate::validate};
 use crate::{cpu::current_task, mm::address::VpnRange, sched::utils::block_on, syscall::SysResult};
@@ -149,13 +151,19 @@ impl<T> UserPtr<T> {
         Ok(unsafe { core::slice::from_raw_parts_mut(slice.as_ptr() as *mut T, len) })
     }
 
-    pub fn validate_blocked(&self) -> SysResult<()> {
-        block_on(self.validate())
-    }
-
+    /// validate the user pointer
+    /// this will check the page table and allocate valid map areas
+    /// or it will return EFAULT
     pub async fn validate(&self) -> SysResult<()> {
         let _slice = self.as_slice_mut_checked(1).await?;
         Ok(())
+    }
+
+    /// translate current address to physical address
+    pub async fn translate_pa(&self) -> SysResult<PhysAddr> {
+        self.validate().await?;
+        let page_table = PageTable::from_ppn(Arch::current_root_ppn());
+        page_table.translate_va(self.va_addr()).ok_or(Errno::EFAULT)
     }
 }
 
@@ -210,5 +218,17 @@ unsafe impl<T> Sync for UserPtr<T> {}
 impl<T> From<usize> for UserPtr<T> {
     fn from(value: usize) -> Self {
         Self::new(value)
+    }
+}
+
+impl<T> From<*const T> for UserPtr<T> {
+    fn from(value: *const T) -> Self {
+        Self::new(value as usize)
+    }
+}
+
+impl<T> From<*mut T> for UserPtr<T> {
+    fn from(value: *mut T) -> Self {
+        Self::new(value as usize)
     }
 }

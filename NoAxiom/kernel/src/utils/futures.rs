@@ -13,13 +13,20 @@ pub enum TimeLimitedType<T> {
     TimeOut,
 }
 
+impl<T> TimeLimitedType<T> {
+    pub fn map_timeout(self, timeout: T) -> T {
+        match self {
+            TimeLimitedType::Ok(res) => res,
+            TimeLimitedType::TimeOut => timeout,
+        }
+    }
+}
+
 /// A future that will timeout after a certain amount of time().  
 ///
 /// `future`: the target future  
 /// `timeout`: the timeout duration  
 /// `limit`(don't care): the time limit for the future to finish
-///
-/// based on poll  
 ///
 /// todo: maybe can based on Interrupt, save waker
 ///
