@@ -5,7 +5,7 @@ export PROJECT := NoAxiom
 export MODE ?= release
 export KERNEL ?= kernel
 export ARCH_NAME ?= riscv64
-export LIB_NAME ?= glibc
+export LIB_NAME ?= musl
 export INIT_PROC ?= busybox
 export ROOT := $(shell pwd)
 export LOG ?= DEBUG
@@ -80,7 +80,8 @@ QFLAGS += -rtc base=utc
 # QFLAGS += -device virtio-blk-pci,drive=x1,bus=virtio-mmio-bus.1
 endif
 
-default: build run
+default:
+	make _run -j 2
 
 build: build-user build-kernel
 	@mkdir -p $(OUTPUT_DIR)
@@ -103,22 +104,15 @@ asm-user:
 
 asm-all: asm asm-user
 
-$(RAW_FS_IMG):
-	@echo -e $(NORMAL)"Building FS Image..."$(RESET)
-	@cd $(TEST_DIR) && make all
+backup:
+	@cp $(RAW_FS_IMG) $(FS_IMG)
 
-LOG_SAVE_PATH := log/$(shell date +%m_%d-%H_%M).log
-run: $(RAW_FS_IMG)
-	@python3 $(CHECK_IMG) copy_image --src $(RAW_FS_IMG) --dest ${FS_IMG_2} &
-	@python3 $(CHECK_IMG) check_or_copy --src $(RAW_FS_IMG) --dest ${FS_IMG}
+_run: backup build
+	make run
+	
+run:
 	@cp $(KERNEL_BIN) kernel-qemu
-	$(QEMU) $(QFLAGS) | tee $(LOG_SAVE_PATH)
-	@echo -e $(WARN)"Please waiting for the image copy!"$(RESET)
-	wait
-	@rm -f $(FS_IMG)
-	@mv $(FS_IMG_2) $(FS_IMG)
-	@echo -e $(NORMAL)"Image copied success."$(RESET)
-	@echo -e $(NORMAL)"Log saved to: $(LOG_SAVE_PATH)"$(RESET)
+	$(QEMU) $(QFLAGS) | tee log/$(shell date +%m.%d-%H:%M).log
 
 gdb-server: build-kernel
 	$(QEMU) $(QFLAGS) -s -S
