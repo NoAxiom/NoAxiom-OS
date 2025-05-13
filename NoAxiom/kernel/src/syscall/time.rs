@@ -10,7 +10,7 @@ use crate::{
         gettime::{get_time_duration, get_time_ms, get_timeval},
         time_info::TMS,
         time_spec::TimeSpec,
-        time_val::TimeVal, timeout::kernel_sleep,
+        time_val::TimeVal, timeout::sleep_now,
     },
 };
 
@@ -37,7 +37,7 @@ impl Syscall<'_> {
             return Err(Errno::EINVAL);
         }
         let time_spec = ts.read();
-        let remain_time = kernel_sleep(time_spec.into()).await;
+        let remain_time = sleep_now(time_spec.into()).await;
         if !remain.is_null() {
             if remain_time > Duration::ZERO {
                 remain.write(remain_time.into());

@@ -40,8 +40,6 @@
 #![feature(alloc_error_handler)]
 #![feature(slice_from_ptr_range)]
 #![allow(deprecated, internal_features)]
-// #![allow(dead_code, unused_imports, unused_variables)]
-// #![feature(custom_mir)]
 
 #[macro_use]
 extern crate alloc;

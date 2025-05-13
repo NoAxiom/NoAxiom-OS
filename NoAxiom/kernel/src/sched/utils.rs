@@ -3,6 +3,8 @@
 //! - use [`block_on`] to block on a future
 //! - use [`suspend_now`] to suspend current task (without immediate wake)
 
+#![allow(unused)]
+
 use alloc::{boxed::Box, sync::Arc, task::Wake};
 use core::{
     future::Future,
@@ -161,18 +163,4 @@ pub async fn suspend_now_with_sig(pcb: SpinLockGuard<'_, PCB>, sig: SigSet) {
     before_suspend(pcb, Some(sig));
     SuspendFuture::new().await;
     after_suspend(None);
-}
-
-struct PendingFuture;
-impl Future for PendingFuture {
-    type Output = ();
-    fn poll(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Self::Output> {
-        Poll::Pending
-    }
-}
-
-/// pending_now will always return Poll::Pending
-/// use this async function with other future polls
-pub async fn pending_now() {
-    PendingFuture.await
 }

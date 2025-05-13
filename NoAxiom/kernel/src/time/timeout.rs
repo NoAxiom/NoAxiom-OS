@@ -1,13 +1,14 @@
 use alloc::boxed::Box;
 use core::{
-    future::Future,
+    future::{pending, Future},
     pin::Pin,
     task::{Context, Poll},
     time::Duration,
 };
 
 use crate::{
-    sched::utils::pending_now,
+    cpu::current_task,
+    sched::utils::suspend_now,
     time::{
         gettime::get_time_duration,
         time_manager::{Timer, TIMER_MANAGER},
@@ -81,11 +82,19 @@ impl<T: Future> Future for TimeLimitedFuture<T> {
 }
 
 /// sleep will suspend the task
-/// but it can be interrupted, so return the time duration
 /// if the result is zero, it indicates the task is woken by sleep event
-pub async fn kernel_sleep(interval: Duration) -> Duration {
+pub async fn sleep_now(interval: Duration) -> Duration {
     let expire = get_time_duration() + interval;
-    TimeLimitedFuture::new(pending_now(), Some(interval));
+    TimeLimitedFuture::new(suspend_now(current_task().pcb()), Some(interval));
+    let now = get_time_duration();
+    (expire > now)
+        .then_some(expire - now)
+        .unwrap_or(Duration::ZERO)
+}
+
+pub async fn sleep_now_no_int(interval: Duration) -> Duration {
+    let expire = get_time_duration() + interval;
+    TimeLimitedFuture::new(pending::<()>(), Some(interval));
     let now = get_time_duration();
     (expire > now)
         .then_some(expire - now)
