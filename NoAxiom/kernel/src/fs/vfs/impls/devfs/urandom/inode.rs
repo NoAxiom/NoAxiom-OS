@@ -9,11 +9,11 @@ use crate::{
     include::fs::{InodeMode, Stat},
 };
 
-pub struct ZeroInode {
+pub struct UrandomInode {
     meta: InodeMeta,
 }
 
-impl ZeroInode {
+impl UrandomInode {
     pub fn new(superblock: Arc<dyn SuperBlock>) -> Self {
         Self {
             meta: InodeMeta::new(superblock, InodeMode::CHAR, BLOCK_SIZE),
@@ -21,7 +21,7 @@ impl ZeroInode {
     }
 }
 
-impl Inode for ZeroInode {
+impl Inode for UrandomInode {
     fn meta(&self) -> &InodeMeta {
         &self.meta
     }

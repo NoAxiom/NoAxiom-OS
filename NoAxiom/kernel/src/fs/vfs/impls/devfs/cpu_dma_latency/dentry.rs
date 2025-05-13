@@ -2,7 +2,7 @@ use alloc::{boxed::Box, sync::Arc};
 
 use async_trait::async_trait;
 
-use super::file::ZeroFile;
+use super::file::CpuDmaLatencyFile;
 use crate::{
     fs::vfs::basic::{
         dentry::{Dentry, DentryMeta},
@@ -13,11 +13,11 @@ use crate::{
     syscall::SysResult,
 };
 
-pub struct ZeroDentry {
+pub struct CpuDmaLatencyDentry {
     meta: DentryMeta,
 }
 
-impl ZeroDentry {
+impl CpuDmaLatencyDentry {
     pub fn new(
         parent: Option<Arc<dyn Dentry>>,
         name: &str,
@@ -30,23 +30,23 @@ impl ZeroDentry {
 }
 
 #[async_trait]
-impl Dentry for ZeroDentry {
+impl Dentry for CpuDmaLatencyDentry {
     fn meta(&self) -> &DentryMeta {
         &self.meta
     }
 
     fn from_name(self: Arc<Self>, _name: &str) -> Arc<dyn Dentry> {
-        unreachable!("zero dentry should not have child");
+        unreachable!("CpuDmaLatency dentry should not have child");
     }
 
     fn open(self: Arc<Self>) -> SysResult<Arc<dyn File>> {
-        Ok(Arc::new(ZeroFile::new(FileMeta::new(
+        Ok(Arc::new(CpuDmaLatencyFile::new(FileMeta::new(
             self.clone(),
             self.inode()?,
         ))))
     }
 
     async fn create(self: Arc<Self>, _name: &str, _mode: InodeMode) -> SysResult<Arc<dyn Dentry>> {
-        unreachable!("zero dentry should not create child");
+        unreachable!("CpuDmaLatency dentry should not create child");
     }
 }

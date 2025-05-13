@@ -24,7 +24,7 @@ mod superblock;
 pub async fn init(fs_root: Arc<dyn Dentry>) -> SysResult<()> {
     assert_eq!(fs_root.name(), "proc");
 
-    info!("[fs] [proc] create /proc/meminfo");
+    info!("[fs] create /proc/meminfo");
     let mem_info_dentry = Arc::new(MemInfoDentry::new(
         Some(fs_root.clone()),
         "meminfo",
@@ -34,7 +34,7 @@ pub async fn init(fs_root: Arc<dyn Dentry>) -> SysResult<()> {
     mem_info_dentry.set_inode(mem_info_inode);
     fs_root.add_child_directly(mem_info_dentry);
 
-    info!("[fs] [proc] create /proc/mounts");
+    info!("[fs] create /proc/mounts");
     let mounts_dentry = Arc::new(MountsDentry::new(
         Some(fs_root.clone()),
         "mounts",
@@ -44,7 +44,7 @@ pub async fn init(fs_root: Arc<dyn Dentry>) -> SysResult<()> {
     mounts_dentry.set_inode(mounts_inode);
     fs_root.add_child_directly(mounts_dentry);
 
-    info!("[fs] [proc] create /proc/sys");
+    info!("[fs] create /proc/sys");
     let sys_dentry: Arc<dyn Dentry> = Arc::new(RamFsDentry::new(
         Some(fs_root.clone()),
         "sys",
@@ -54,14 +54,14 @@ pub async fn init(fs_root: Arc<dyn Dentry>) -> SysResult<()> {
     sys_dentry.set_inode(sys_inode);
     fs_root.add_child_directly(sys_dentry.clone());
 
-    info!("[fs] [proc] create /proc/sys/kernel/pid_max, write 32768");
+    info!("[fs] create /proc/sys/kernel/pid_max, write 32768");
     let kernel_inode = Arc::new(RamFsDirInode::new(sys_dentry.super_block(), 0));
     let kernel_dentry = sys_dentry.add_child("kernel", kernel_inode);
     let pid_max_inode = Arc::new(RamFsFileInode::new(kernel_dentry.super_block(), 0));
     let pid_max_dentry = kernel_dentry.add_child("pid_max", pid_max_inode);
     pid_max_dentry.open()?.write("32768\0".as_bytes()).await?;
 
-    info!("[fs] [proc] create /proc/self");
+    info!("[fs] create /proc/self");
     let self_dentry: Arc<dyn Dentry> = Arc::new(RamFsDentry::new(
         Some(fs_root.clone()),
         "self",
@@ -71,7 +71,7 @@ pub async fn init(fs_root: Arc<dyn Dentry>) -> SysResult<()> {
     self_dentry.set_inode(self_inode);
     fs_root.add_child_directly(self_dentry.clone());
 
-    info!("[fs] [proc] create /proc/self/exe");
+    info!("[fs] create /proc/self/exe");
     let exe_dentry = Arc::new(ExeDentry::new(
         Some(fs_root.clone()),
         "exe",

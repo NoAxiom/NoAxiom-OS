@@ -372,7 +372,7 @@ impl File for PipeFile {
         Ok(ret as isize)
     }
     async fn load_dir(&self) -> Result<(), Errno> {
-        unreachable!()
+        Err(Errno::ENOTDIR)
     }
     async fn delete_child(&self, _name: &str) -> Result<(), Errno> {
         Err(Errno::ENOSYS)

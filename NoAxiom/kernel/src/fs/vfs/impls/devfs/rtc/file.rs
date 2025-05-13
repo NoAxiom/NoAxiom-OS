@@ -36,7 +36,7 @@ impl File for RtcFile {
         Ok(buf.len() as isize)
     }
     async fn load_dir(&self) -> SysResult<()> {
-        Err(Errno::ENOSYS)
+        Err(Errno::ENOTDIR)
     }
     async fn delete_child(&self, _name: &str) -> SysResult<()> {
         Err(Errno::ENOSYS)

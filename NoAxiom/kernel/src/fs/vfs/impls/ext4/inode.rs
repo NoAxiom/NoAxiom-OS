@@ -1,6 +1,7 @@
 use alloc::{boxed::Box, sync::Arc};
 
 use async_trait::async_trait;
+use include::errno::Errno;
 use spin::Mutex;
 
 use super::{fs_err, superblock::Ext4SuperBlock, IExtInode};
@@ -32,6 +33,7 @@ impl Ext4FileInode {
     }
 }
 
+#[async_trait]
 impl Inode for Ext4FileInode {
     fn meta(&self) -> &InodeMeta {
         &self.meta
@@ -60,6 +62,22 @@ impl Inode for Ext4FileInode {
             st_ctime_nsec: inner.ctime_nsec as u64,
             unused: 0,
         })
+    }
+    async fn truncate(&self, new: usize) -> SysResult<()> {
+        let super_block = &self.meta.super_block;
+        let ext4 = super_block
+            .downcast_ref::<Ext4SuperBlock>()
+            .unwrap()
+            .get_fs();
+        let mut inode = self.ino.lock();
+        debug!(
+            "[Ext4FileInode] truncate inode: {}, new_size: {}",
+            inode.inode_num, new
+        );
+        ext4.truncate_inode(&mut inode, new as u64)
+            .await
+            .map_err(fs_err)?;
+        Ok(())
     }
 }
 
@@ -110,16 +128,7 @@ impl Inode for Ext4DirInode {
             unused: 0,
         })
     }
-    async fn truncate(&self, new: usize) -> SysResult<()> {
-        let super_block = &self.meta.super_block;
-        let ext4 = super_block
-            .downcast_ref::<Ext4SuperBlock>()
-            .unwrap()
-            .get_fs();
-        let mut inode = self.ino.lock();
-        ext4.truncate_inode(&mut inode, new as u64)
-            .await
-            .map_err(fs_err)?;
-        Ok(())
+    async fn truncate(&self, _new: usize) -> SysResult<()> {
+        Err(Errno::EINVAL)
     }
 }

@@ -101,7 +101,7 @@ impl File for Fat32File {
         }
     }
     async fn load_dir(&self) -> Result<(), Errno> {
-        Err(Errno::ENOSYS)
+        Err(Errno::ENOTDIR)
     }
     async fn delete_child(&self, _name: &str) -> Result<(), Errno> {
         Err(Errno::ENOSYS)

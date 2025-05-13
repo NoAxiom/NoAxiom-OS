@@ -5,45 +5,38 @@ use async_trait::async_trait;
 use include::errno::Errno;
 
 use crate::{
-    cpu::current_task,
     fs::vfs::basic::file::{File, FileMeta},
     include::io::PollEvent,
     syscall::{SysResult, SyscallResult},
 };
 
-pub struct ExeFile {
+pub struct ZeroFile {
     meta: FileMeta,
 }
 
-impl ExeFile {
+impl ZeroFile {
     pub fn new(meta: FileMeta) -> Self {
         Self { meta }
     }
 }
 
 #[async_trait]
-impl File for ExeFile {
+impl File for ZeroFile {
     fn meta(&self) -> &FileMeta {
         &self.meta
     }
-    async fn base_readlink(&self, buf: &mut [u8]) -> SyscallResult {
-        let exe = current_task().cwd().as_string();
-        if buf.len() < exe.len() + 1 {
-            warn!("readlink buf not big enough");
-            return Err(Errno::EINVAL);
-        }
-        buf[0..exe.len()].copy_from_slice(exe.as_bytes());
-        buf[exe.len()] = '\0' as u8;
-        Ok((exe.len() + 1) as isize)
+    async fn base_readlink(&self, _buf: &mut [u8]) -> SyscallResult {
+        unreachable!("readlink from zero")
     }
-    async fn base_read(&self, _offset: usize, _buf: &mut [u8]) -> SyscallResult {
-        unreachable!("read from exe");
+    async fn base_read(&self, _offset: usize, buf: &mut [u8]) -> SyscallResult {
+        buf.fill(0);
+        Ok(buf.len() as isize)
     }
-    async fn base_write(&self, _offset: usize, _buf: &[u8]) -> SyscallResult {
-        unreachable!("write to exe");
+    async fn base_write(&self, _offset: usize, buf: &[u8]) -> SyscallResult {
+        Ok(buf.len() as isize)
     }
     async fn load_dir(&self) -> SysResult<()> {
-        Err(Errno::ENOSYS)
+        Err(Errno::ENOTDIR)
     }
     async fn delete_child(&self, _name: &str) -> SysResult<()> {
         Err(Errno::ENOSYS)
@@ -52,6 +45,6 @@ impl File for ExeFile {
         Err(Errno::ENOTTY)
     }
     fn poll(&self, _req: &PollEvent, _waker: Waker) -> PollEvent {
-        unimplemented!("ExeFile::poll not supported now");
+        unimplemented!("ZeroFile::poll not supported now");
     }
 }

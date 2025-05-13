@@ -44,6 +44,9 @@ impl File for Ext4File {
     //  - offset == cursor.offset: normal read
     //  - offset != cursor.offset: seek and read
     async fn base_read(&self, offset: usize, buf: &mut [u8]) -> SyscallResult {
+        if offset > self.meta.inode.size() {
+            return Ok(0);
+        }
         let inode = &self.meta.inode;
         let super_block = self.meta.dentry().super_block();
         let ext4 = super_block
@@ -53,9 +56,7 @@ impl File for Ext4File {
 
         match inode.file_type() {
             InodeMode::FILE => {
-                trace!("read buf: {}", buf.len());
                 let x = ext4.read_at(self.ino, offset, buf).await.map_err(fs_err)? as isize;
-                trace!("read complete");
                 Ok(x)
             }
             InodeMode::DIR => {
@@ -92,7 +93,7 @@ impl File for Ext4File {
         }
     }
     async fn load_dir(&self) -> Result<(), Errno> {
-        Err(Errno::ENOSYS)
+        Err(Errno::ENOTDIR)
     }
     async fn delete_child(&self, _name: &str) -> Result<(), Errno> {
         Err(Errno::ENOSYS)
@@ -150,7 +151,7 @@ impl File for Ext4Dir {
 
     async fn load_dir(&self) -> Result<(), Errno> {
         static mut FIRST: bool = true;
-        debug!("[AsyncSmpExt4]FIle: load_dir");
+        debug!("[AsyncSmpExt4]Dir {}: load_dir", self.meta.dentry().name());
         let super_block = self.meta.dentry().super_block();
         let ext4 = super_block
             .downcast_ref::<Ext4SuperBlock>()
@@ -171,12 +172,15 @@ impl File for Ext4Dir {
             if unsafe { FIRST } {
                 debug!("load {:?}: {}", file_type, child_name);
             }
-            let inode: Arc<dyn Inode> = if entry_inode.inode.file_type() == InodeFileType::S_IFREG {
+            let inode: Arc<dyn Inode> = if file_type.contains(InodeFileType::S_IFREG) {
                 Arc::new(Ext4FileInode::new(super_block.clone(), entry_inode))
-            } else if entry_inode.inode.file_type() == InodeFileType::S_IFDIR {
+            } else if file_type == InodeFileType::S_IFDIR {
                 Arc::new(Ext4DirInode::new(super_block.clone(), entry_inode))
             } else {
-                unreachable!()
+                unreachable!(
+                    "load_dir: unsupportable file {}: type {:?}",
+                    child_name, file_type
+                );
             };
             self.dentry().add_child(&child_name, inode);
         }
