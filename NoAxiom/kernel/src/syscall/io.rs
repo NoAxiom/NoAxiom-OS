@@ -15,8 +15,10 @@ use crate::{
     include::io::{PollEvent, PollFd},
     mm::user_ptr::UserPtr,
     signal::sig_set::SigSet,
-    time::time_spec::TimeSpec,
-    utils::futures::{TimeLimitedFuture, TimeLimitedType},
+    time::{
+        time_spec::TimeSpec,
+        timeout::{TimeLimitedFuture, TimeLimitedType},
+    },
 };
 
 struct PpollItem {

@@ -6,7 +6,13 @@ use core::{
     time::Duration,
 };
 
-use crate::time::gettime::get_time_duration;
+use crate::{
+    sched::utils::pending_now,
+    time::{
+        gettime::get_time_duration,
+        time_manager::{Timer, TIMER_MANAGER},
+    },
+};
 
 pub enum TimeLimitedType<T> {
     Ok(T),
@@ -29,11 +35,10 @@ impl<T> TimeLimitedType<T> {
 /// `limit`(don't care): the time limit for the future to finish
 ///
 /// todo: maybe can based on Interrupt, save waker
-///
-/// fixme: register on TIME_MANAGER, add current time duration to limit
 pub struct TimeLimitedFuture<T: Future> {
     future: Pin<Box<T>>,
     limit: Duration,
+    is_pushed: bool,
 }
 
 impl<T: Future> TimeLimitedFuture<T> {
@@ -48,6 +53,7 @@ impl<T: Future> TimeLimitedFuture<T> {
                 Some(t) => t + get_time_duration(),
                 None => Duration::MAX,
             },
+            is_pushed: false,
         }
     }
 }
@@ -62,9 +68,26 @@ impl<T: Future> Future for TimeLimitedFuture<T> {
                 if now >= self.limit {
                     Poll::Ready(TimeLimitedType::TimeOut)
                 } else {
+                    if !self.is_pushed {
+                        TIMER_MANAGER
+                            .add_timer(Timer::new_waker_timer(self.limit, cx.waker().clone()));
+                        self.is_pushed = true;
+                    }
                     Poll::Pending
                 }
             }
         }
     }
+}
+
+/// sleep will suspend the task
+/// but it can be interrupted, so return the time duration
+/// if the result is zero, it indicates the task is woken by sleep event
+pub async fn kernel_sleep(interval: Duration) -> Duration {
+    let expire = get_time_duration() + interval;
+    TimeLimitedFuture::new(pending_now(), Some(interval));
+    let now = get_time_duration();
+    (expire > now)
+        .then_some(expire - now)
+        .unwrap_or(Duration::ZERO)
 }

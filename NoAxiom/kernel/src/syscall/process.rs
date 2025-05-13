@@ -19,8 +19,7 @@ use crate::{
         futex::FutexFuture,
         manager::{PROCESS_GROUP_MANAGER, TASK_MANAGER},
     },
-    time::time_spec::TimeSpec,
-    utils::futures::TimeLimitedFuture,
+    time::{time_spec::TimeSpec, timeout::TimeLimitedFuture},
 };
 
 impl Syscall<'_> {

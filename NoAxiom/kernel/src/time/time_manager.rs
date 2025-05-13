@@ -48,10 +48,7 @@ impl Timer {
                 None
             }
         }
-        Self {
-            expire,
-            data: Box::new(WakerData { waker }),
-        }
+        Self::new(expire, Box::new(WakerData { waker }))
     }
 
     fn callback(self) -> Option<Timer> {
@@ -125,3 +122,7 @@ impl TimerManager {
 }
 
 pub static TIMER_MANAGER: Lazy<TimerManager> = Lazy::new(TimerManager::new);
+
+pub fn timer_handler() {
+    TIMER_MANAGER.check();
+}

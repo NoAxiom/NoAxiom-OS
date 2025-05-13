@@ -1,12 +1,12 @@
 use alloc::{string::String, vec::Vec};
 use core::{intrinsics::atomic_load_acquire, marker::PhantomData};
 
-use arch::{consts::KERNEL_ADDR_OFFSET, Arch, ArchMemory, ArchPageTableEntry};
+use arch::{consts::KERNEL_ADDR_OFFSET, Arch, ArchMemory};
 use include::errno::Errno;
 use memory::address::PhysAddr;
 
 use super::{address::VirtAddr, page_table::PageTable, validate::validate};
-use crate::{cpu::current_task, mm::address::VpnRange, sched::utils::block_on, syscall::SysResult};
+use crate::{cpu::current_task, mm::address::VpnRange, syscall::SysResult};
 
 /// the UserPtr is a wrapper for user-space pointer
 /// NOTE THAT: it will NOT validate the pointer
