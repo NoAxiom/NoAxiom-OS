@@ -36,6 +36,25 @@ Currently, the kernel runs only on QEMU. Use `make run` to launch it with the de
 
 Use `make default` or simply `make` to build and run.
 
+The optional parameters are as follows:  
+
+| Parameter | Description | Default | Optional |
+| :--- | :--- | :--- | :--- |
+| `TEST_TYPE` | The test suite to run.      | `custom`      | `official`、`custom`(when use `custom`, the `ARCH_NAME` and `LIB_NAME` will just be `riscv64` and `musl`, the parameters input will be ignored) |
+| `ARCH_NAME` | The architecture to run.    | `riscv64`     | `riscv64`、`loongarch64` |
+| `LIB_NAME`  | The library to run.         | `glibc`       | `glibc`、`musl` |
+| `LOG`       | The log level.              | `info`        | `info`、`debug`、`warn`、`error` |
+
+for example, to run the kernel with `loongarch64` and `musl` at `official`, use:
+
+```shell
+make TEST_TYPE=official ARCH_NAME=loongarch64 LIB_NAME=musl
+```
+
+Mention that the images is copy from the `ARCH_NAME`-`LIB_NAME`.img, so **DON'T FREQUENTLY CHANGE** the `ARCH_NAME` and `LIB_NAME`, or you will wait for a long time to copy the image.  
+
+You can run multiple times on the same image, so because we have designed a background backup image function, the efficiency will be **very high**, and you will not feel the time consumed by the copy.
+
 ## Thanks
 
 [Pantheon](https://gitee.com/LiLiangF/pantheon_visionfive)
