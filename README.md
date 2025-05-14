@@ -51,10 +51,6 @@ for example, to run the kernel with `loongarch64` and `musl` at `official`, use:
 make TEST_TYPE=official ARCH_NAME=loongarch64 LIB_NAME=musl
 ```
 
-Mention that the images is copy from the `ARCH_NAME`-`LIB_NAME`.img, so **DON'T FREQUENTLY CHANGE** the `ARCH_NAME` and `LIB_NAME`, or you will wait for a long time to copy the image.  
-
-You can run multiple times on the same image, so because we have designed a background backup image function, the efficiency will be **very high**, and you will not feel the time consumed by the copy.
-
 ## Thanks
 
 [Pantheon](https://gitee.com/LiLiangF/pantheon_visionfive)
