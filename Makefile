@@ -2,8 +2,8 @@
 
 # General config
 export PROJECT := NoAxiom
-export MODE ?= release
-export KERNEL ?= kernel
+export MODE := release
+export KERNEL := kernel
 export ARCH_NAME ?= riscv64
 export LIB_NAME ?= musl
 export INIT_PROC ?= busybox
@@ -134,7 +134,6 @@ endif
 gdb:
 	@$(GDB) $(GDB_FLAGS)
 
-# todo: might should support img clean
 clean:
 	@rm -f kernel-qemu
 	@rm -f $(FS_IMG)
@@ -213,6 +212,7 @@ build-all:
 	@make build ARCH_NAME=loongarch64 LOG=OFF
 
 all: clean env build-all
+	@echo "Kernel build finished. See output elf in $(OUTPUT_DIR)"
 
 .PHONY: default all build run clean             # basic make
 .PHONY: gdb-server gdb                          # debug client

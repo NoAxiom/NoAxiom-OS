@@ -4,7 +4,7 @@
 
 ### Quick Start
 
-Just run `make all`, and see the output in [`./output/`](./output/)
+Just run `make all`, and it will generate `kernel_rv` and `kernel_la` automatically.
 
 ```shell
 make all
