@@ -104,15 +104,21 @@ asm-user:
 
 asm-all: asm asm-user
 
-backup:
+$(RAW_FS_IMG):
+	@echo -e $(NORMAL)"Building FS Image..."$(RESET)
+	cd $(TEST_DIR) && make all
+
+backup: $(RAW_FS_IMG)
 	@cp $(RAW_FS_IMG) $(FS_IMG)
 
 _run: backup build
 	make run
-	
+
+LOG_SAVE_PATH := log/$(shell date +%m_%d-%H_%M).log
 run:
 	@cp $(KERNEL_BIN) kernel-qemu
-	$(QEMU) $(QFLAGS) | tee log/$(shell date +%m.%d-%H:%M).log
+	$(QEMU) $(QFLAGS) | tee $(LOG_SAVE_PATH)
+	@echo -e $(NORMAL)"Log saved to: $(LOG_SAVE_PATH)"$(RESET)
 
 gdb-server: build-kernel
 	$(QEMU) $(QFLAGS) -s -S
