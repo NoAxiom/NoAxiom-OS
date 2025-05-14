@@ -9,8 +9,8 @@ use crate::{
     fs::{fdtable::RLimit, manager::FS_MANAGER, path::Path, pipe::PipeFile, vfs::root_dentry},
     include::{
         fs::{
-            FcntlArgFlags, FcntlFlags, FileFlags, InodeMode, Iovec, Kstat, MountFlags, RenameFlags,
-            SeekFrom, Statfs, Statx, Whence,
+            FcntlArgFlags, FcntlFlags, FileFlags, InodeMode, IoctlCmd, Iovec, Kstat, MountFlags,
+            RenameFlags, RtcIoctlCmd, SeekFrom, Statfs, Statx, TtyIoctlCmd, Whence,
         },
         resource::Resource,
         result::Errno,
@@ -387,11 +387,16 @@ impl Syscall<'_> {
     /// Get file io control
     pub fn sys_ioctl(&self, fd: usize, request: usize, arg: usize) -> SyscallResult {
         let fd_table = self.task.fd_table();
-        fd_table.get(fd).ok_or(Errno::EBADF)?;
-
+        let file = fd_table.get(fd).ok_or(Errno::EBADF)?;
+        drop(fd_table);
         let arg_ptr = UserPtr::<u8>::new(arg);
-        use crate::include::fs::TtyIoctlCmd::{self, *};
-        let cmd = TtyIoctlCmd::from_repr(request).unwrap();
+        let cmd = if let Some(cmd) = TtyIoctlCmd::from_repr(request) {
+            IoctlCmd::Tty(cmd)
+        } else if let Some(cmd) = RtcIoctlCmd::from_repr(request) {
+            IoctlCmd::Rtc(cmd)
+        } else {
+            return Err(Errno::EINVAL);
+        };
         trace!(
             "[sys_ioctl]: fd: {}, request: {:#x}, argp: {:#x}, cmd: {:?}",
             fd,
@@ -400,12 +405,22 @@ impl Syscall<'_> {
             cmd
         );
         match cmd {
-            TCGETS => {}
-            TCSETS => {}
-            TIOCGPGRP => arg_ptr.write(INIT_PROCESS_ID as u8),
-            TIOCSPGRP => {}
-            TIOCGWINSZ => arg_ptr.write(0),
-            _ => return Err(Errno::EINVAL),
+            IoctlCmd::Tty(x) => match x {
+                TtyIoctlCmd::TCGETS => {}
+                TtyIoctlCmd::TCSETS => {}
+                TtyIoctlCmd::TIOCGPGRP => arg_ptr.write(INIT_PROCESS_ID as u8),
+                TtyIoctlCmd::TIOCSPGRP => {}
+                TtyIoctlCmd::TIOCGWINSZ => arg_ptr.write(0),
+                _ => {
+                    error!("[sys_ioctl] request {} is not supported", request);
+                    return Err(Errno::EINVAL);
+                }
+            },
+            IoctlCmd::Rtc(x) => match x {
+                RtcIoctlCmd::RTCRDTIME => {
+                    return file.ioctl(request, arg);
+                }
+            },
         }
         Ok(0)
     }
