@@ -106,10 +106,18 @@ impl Syscall<'_> {
             path = format!("{ROOT_NAME}/busybox");
             args.push(format!("busybox"));
             args.push(format!("sh"));
-        } else if path.ends_with("ls") || path.ends_with("sleep") {
-            info!("[execve] executing ls or sleep, path: {:?}", path);
+        } else if path.ends_with("ls") {
+            info!("[execve] executing ls, path: {:?}", path);
             path = format!("busybox");
             args.push(format!("busybox"));
+            args.push(format!("sh"));
+            args.push(format!("ls"));
+        } else if path.ends_with("sleep") {
+            info!("[execve] executing sleep, path: {:?}", path);
+            path = format!("busybox");
+            args.push(format!("busybox"));
+            args.push(format!("sh"));
+            args.push(format!("sleep"));
         }
 
         let file_path = Path::from_string(path, self.task)?;

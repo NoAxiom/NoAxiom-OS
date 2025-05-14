@@ -103,7 +103,7 @@ asm-all: asm asm-user
 
 $(RAW_FS_IMG):
 	@echo -e $(NORMAL)"Building FS Image..."$(RESET)
-	cd $(TEST_DIR) && make all
+	cd $(TEST_DIR) && make
 
 backup: $(RAW_FS_IMG)
 	@echo -e $(NORMAL)"Backing up FS Image..."$(RESET)
