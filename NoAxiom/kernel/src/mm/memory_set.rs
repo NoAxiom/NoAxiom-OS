@@ -616,7 +616,7 @@ impl MemorySet {
         let old_flags = pte.flags();
         let new_flags = flags_switch_to_rw(&old_flags);
         if frame_refcount(old_ppn) == 1 {
-            debug!("[realloc_cow] refcount is 1, set flags to RW: {new_flags:?}");
+            trace!("[realloc_cow] refcount is 1, set flags to RW: {new_flags:?}");
             self.page_table().set_flags(vpn, new_flags);
         } else {
             let frame = frame_alloc();
@@ -647,12 +647,10 @@ impl MemorySet {
             }
             self.page_table()
                 .remap_cow(vpn, new_ppn, old_ppn, new_flags);
-            debug!(
-                "[realloc_cow] done, refcount: old: [{:#x}: {:#x}], new: [{:#x}: {:#x}], flag: {:?}",
+            trace!(
+                "[realloc_cow] done, old: {:#x}, new: {:#x}, flag: {:?}",
                 old_ppn.raw(),
-                frame_refcount(old_ppn),
                 new_ppn.raw(),
-                frame_refcount(new_ppn),
                 new_flags,
             );
         }

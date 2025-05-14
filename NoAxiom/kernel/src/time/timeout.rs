@@ -84,19 +84,17 @@ impl<T: Future> Future for TimeLimitedFuture<T> {
 /// sleep will suspend the task
 /// if the result is zero, it indicates the task is woken by sleep event
 pub async fn sleep_now(interval: Duration) -> Duration {
-    let expire = get_time_duration() + interval;
-    TimeLimitedFuture::new(suspend_now(current_task().pcb()), Some(interval));
-    let now = get_time_duration();
-    (expire > now)
-        .then_some(expire - now)
-        .unwrap_or(Duration::ZERO)
+    sleep_now_no_int(interval).await
 }
 
 pub async fn sleep_now_no_int(interval: Duration) -> Duration {
     let expire = get_time_duration() + interval;
-    TimeLimitedFuture::new(pending::<()>(), Some(interval));
+    info!("[sleep] expire: {:?} interval: {:?}", expire, interval);
+    TimeLimitedFuture::new(pending::<()>(), Some(interval)).await;
     let now = get_time_duration();
-    (expire > now)
-        .then_some(expire - now)
-        .unwrap_or(Duration::ZERO)
+    if expire > now {
+        expire - now
+    } else {
+        Duration::ZERO
+    }
 }

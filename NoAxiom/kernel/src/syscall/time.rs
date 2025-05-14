@@ -42,6 +42,10 @@ impl Syscall<'_> {
         if !remain.is_null() {
             if remain_time > Duration::ZERO {
                 remain.write(remain_time.into());
+                error!(
+                    "[sys_nanosleep] sleep interrupted, remain time: {:?}",
+                    remain_time
+                );
                 return Err(Errno::EINTR);
             } else {
                 return Ok(0);

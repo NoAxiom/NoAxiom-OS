@@ -37,7 +37,7 @@ pub async fn validate(
     if let Some(pte) = pte {
         let flags = pte.flags();
         if flags.contains(MappingFlags::COW) {
-            debug!("[validate] realloc COW, vpn={:#x}", vpn.raw());
+            trace!("[validate] realloc COW, vpn={:#x}", vpn.raw());
             memory_set.lock().realloc_cow(vpn, pte)?;
             Ok(())
         } else if trap_type.is_some() && matches!(trap_type.unwrap(), TrapType::StorePageFault(_)) {
@@ -101,7 +101,7 @@ impl Task {
         trap_type: Option<TrapType>,
         is_blockon: bool,
     ) -> SysResult<()> {
-        debug!(
+        trace!(
             "[memory_validate] {:x?} at user_pc={:#x}, is_kernel: {}",
             trap_type,
             self.trap_context()[arch::TrapArgs::EPC],
