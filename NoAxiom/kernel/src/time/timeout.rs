@@ -6,13 +6,9 @@ use core::{
     time::Duration,
 };
 
-use crate::{
-    cpu::current_task,
-    sched::utils::suspend_now,
-    time::{
-        gettime::get_time_duration,
-        time_manager::{Timer, TIMER_MANAGER},
-    },
+use crate::time::{
+    gettime::get_time_duration,
+    time_manager::{Timer, TIMER_MANAGER},
 };
 
 pub enum TimeLimitedType<T> {

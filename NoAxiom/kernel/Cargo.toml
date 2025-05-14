@@ -6,6 +6,7 @@ version = "0.1.0"
 [features]
 multicore = ["config/multicore"]
 busybox = []
+runtests = []
 qemu = ["platform/qemu"]
 interruptable_async = ["driver/interruptable_async"]
 async = ["driver/async"]

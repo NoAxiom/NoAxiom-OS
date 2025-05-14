@@ -37,8 +37,8 @@ pub async fn init_proc_exit_handler(task: &Arc<Task>) {
             "[exit_handler] init_proc exited successfully, exit_code: {}",
             exit_code
         ),
-        _ => panic!(
-            "[exit_handler] init_proc exited unexpectedly, exit_code: {}",
+        _ => println!(
+            "[kernel] init_proc exited unexpectedly, exit_code: {}",
             exit_code,
         ),
     }
@@ -67,8 +67,7 @@ impl Task {
             );
             let ptr = UserPtr::<usize>::new(tidaddress);
             ptr.write(0);
-            // FIXME: IMPL THIS AFTER FUTEX
-            // task.futex_queue.lock().wake(tidaddress as u32, 1);
+            // self.futex().wake_waiter(tidaddress as u32, 1);
         }
 
         // send SIGCHLD to parent

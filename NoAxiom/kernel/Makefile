@@ -23,6 +23,10 @@ endif
 
 ifeq ($(INIT_PROC),busybox)
 	FEATURES += busybox
+else ifeq ($(INIT_PROC),runtests)
+	FEATURES += runtests
+else
+	$(error "Invalid INIT_PROC value: $(INIT_PROC)")
 endif
 
 ifneq ($(INTERRUPTABLE_ASYNC), )

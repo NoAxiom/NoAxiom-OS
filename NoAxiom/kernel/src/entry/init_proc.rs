@@ -50,6 +50,8 @@ macro_rules! use_app {
 }
 #[cfg(feature = "busybox")]
 use_app!("run_busybox");
+#[cfg(feature = "runtests")]
+use_app!("run_tests");
 
 // #[allow(unused)]
 // pub fn schedule_spawn_with_kernel_app() {
