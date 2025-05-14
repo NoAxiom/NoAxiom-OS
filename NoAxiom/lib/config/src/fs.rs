@@ -33,7 +33,7 @@ pub const ROOT_FAKE_ENTRY: [u8; 32] = {
 pub const PIPE_BUF_SIZE: usize = 4096;
 
 mod lib_def {
-    pub const ROOT_NAME: &str = "/";
+    pub const ROOT_NAME: &str = "";
 }
 
 pub use lib_def::*;

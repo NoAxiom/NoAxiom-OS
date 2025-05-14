@@ -2,6 +2,7 @@ use alloc::vec::Vec;
 use core::time::Duration;
 
 use arch::TrapArgs;
+use config::fs::ROOT_NAME;
 
 use super::{Syscall, SyscallResult};
 use crate::{
@@ -99,18 +100,17 @@ impl Syscall<'_> {
         let mut envs = Vec::new();
 
         // args and envs init
-        use config::fs::ROOT_NAME;
         if path.contains(".sh") {
+            // run .sh script
+            info!("[execve] executing .sh script, path: {:?}", path);
             path = format!("{ROOT_NAME}/busybox");
             args.push(format!("busybox"));
             args.push(format!("sh"));
         } else if path.ends_with("ls") || path.ends_with("sleep") {
-            debug!("executing ls or sleep");
-            path = format!("{ROOT_NAME}/busybox");
+            info!("[execve] executing ls or sleep, path: {:?}", path);
+            path = format!("busybox");
             args.push(format!("busybox"));
         }
-        envs.push(format!("PATH={ROOT_NAME}"));
-        envs.push(format!("LD_LIBRARY_PATH={ROOT_NAME}"));
 
         let file_path = Path::from_string(path, self.task)?;
         // append args and envs from user provided

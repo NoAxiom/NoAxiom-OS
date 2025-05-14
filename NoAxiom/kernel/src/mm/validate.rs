@@ -59,7 +59,7 @@ pub async fn validate(
         let mut ms = memory_set.lock();
         if ms.stack.vpn_range.is_in_range(vpn) {
             let task = current_task();
-            info!(
+            trace!(
                 "[validate] stack, tid: {}, vpn: {:#x?}, epc: {:#x}",
                 task.tid(),
                 vpn.raw(),
@@ -68,7 +68,7 @@ pub async fn validate(
             ms.lazy_alloc_stack(vpn);
             Ok(())
         } else if ms.brk.area.vpn_range.is_in_range(vpn) {
-            info!(
+            trace!(
                 "[validate] brk, tid: {}, vpn: {:x?}, epc: {:#x}",
                 current_task().tid(),
                 vpn.raw(),
@@ -77,8 +77,7 @@ pub async fn validate(
             ms.lazy_alloc_brk(vpn);
             Ok(())
         } else if ms.mmap_manager.is_in_space(vpn) {
-            debug!("brk_info: range: {:?}", ms.brk.area.vpn_range);
-            info!(
+            trace!(
                 "[validate] mmap, tid: {}, vpn: {:x?}, epc: {:#x}",
                 current_task().tid(),
                 vpn.raw(),
