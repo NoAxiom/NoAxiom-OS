@@ -568,6 +568,20 @@ pub enum TtyIoctlCmd {
     TIOCSWINSZ = 0x5414,
 }
 
+#[derive(FromRepr, Debug)]
+#[repr(usize)]
+pub enum RtcIoctlCmd {
+    /// Get the current RTC time at usize.
+    RTCRDTIME = 0xffffffff80247009,
+}
+
+#[derive(Debug)]
+#[repr(usize)]
+pub enum IoctlCmd {
+    Tty(TtyIoctlCmd),
+    Rtc(RtcIoctlCmd),
+}
+
 /// Defined in <asm-generic/termbits.h>
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
