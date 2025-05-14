@@ -7,9 +7,9 @@ export KERNEL := kernel
 export ARCH_NAME ?= riscv64
 export LIB_NAME ?= musl
 export INIT_PROC ?= busybox
+export ON_SCREEN ?= false
 export ROOT := $(shell pwd)
 export LOG ?= DEBUG
-export ELF_PATH ?=   # This is for mk_fs.sh
 export TEST_TYPE ?= custom
 export USER_PROJECT := NoAxiom-OS-User
 export ERROR := "\e[31m"
@@ -23,7 +23,7 @@ export TARGET := riscv64gc-unknown-none-elf
 export OBJDUMP := riscv64-unknown-elf-objdump
 export OBJCOPY := rust-objcopy --binary-architecture=riscv64
 export QEMU := qemu-system-riscv64
-export MULTICORE := 2
+export MULTICORE := 1
 export GDB := riscv64-unknown-elf-gdb
 export SIMPLE_ARCH_NAME := rv
 else ifeq ($(ARCH_NAME),loongarch64) # LoongArch64
@@ -47,10 +47,8 @@ export KERNEL_SYMBOL_TABLE := $(KERNEL_ELF).txt
 # Test and fs image config
 TEST_DIR := $(ROOT)/$(PROJECT)-OS-Test
 RAW_FS_IMG := $(TEST_DIR)/$(TEST_TYPE)/img/$(ARCH_NAME)-$(LIB_NAME).img
-FS_IMG := $(ROOT)/fs.img
-FS_IMG_2 := $(ROOT)/fs-2.img
-CHECK_IMG := $(ROOT)/utils/image.py
-MKFS_SH := $(ROOT)/mk_fs.sh
+FS_IMG_DIR := $(TEST_DIR)/$(TEST_TYPE)/tmp-img
+FS_IMG := $(TEST_DIR)/$(TEST_TYPE)/tmp-img/$(ARCH_NAME)-$(LIB_NAME).fs.img
 
 # Qemu flags config
 QFLAGS := 
@@ -80,8 +78,7 @@ QFLAGS += -rtc base=utc
 # QFLAGS += -device virtio-blk-pci,drive=x1,bus=virtio-mmio-bus.1
 endif
 
-default:
-	make _run -j 2
+default: backup build run
 
 build: build-user build-kernel
 	@mkdir -p $(OUTPUT_DIR)
@@ -109,16 +106,21 @@ $(RAW_FS_IMG):
 	cd $(TEST_DIR) && make all
 
 backup: $(RAW_FS_IMG)
-	@cp $(RAW_FS_IMG) $(FS_IMG)
-
-_run: backup build
-	make run
+	@echo -e $(NORMAL)"Backing up FS Image..."$(RESET)
+	@cd $(TEST_DIR) && make check
 
 LOG_SAVE_PATH := log/$(shell date +%m_%d-%H_%M).log
+RUN_OPTION := 
+ifeq ($(ON_SCREEN),true)
+RUN_OPTION += | tee $(LOG_SAVE_PATH)
+else ifeq ($(ON_SCREEN),false)
+RUN_OPTION += > $(LOG_SAVE_PATH)
+endif
 run:
 	@cp $(KERNEL_BIN) kernel-qemu
-	$(QEMU) $(QFLAGS) | tee $(LOG_SAVE_PATH)
-	@echo -e $(NORMAL)"Log saved to: $(LOG_SAVE_PATH)"$(RESET)
+	@echo -e $(NORMAL)"Qemu launched. Log is saved to: $(LOG_SAVE_PATH)"$(RESET)
+	@$(QEMU) $(QFLAGS) $(RUN_OPTION)
+	@echo -e $(NORMAL)"Qemu exited. Log is saved to: $(LOG_SAVE_PATH)"$(RESET)
 
 gdb-server: build-kernel
 	$(QEMU) $(QFLAGS) -s -S
