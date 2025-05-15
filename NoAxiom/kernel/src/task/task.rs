@@ -35,6 +35,7 @@ use crate::{
             robust_list::RobustList,
             CloneFlags,
         },
+        sched::CpuMask,
     },
     mm::{
         memory_set::{ElfMemoryInfo, MemorySet},
@@ -121,6 +122,7 @@ impl Default for PCB {
 pub struct TCB {
     pub clear_child_tid: Option<usize>, // clear tid address
     pub time_stat: TimeInfo,            // task time
+    pub cpu_mask: CpuMask,              // cpu mask
 }
 
 impl Default for TCB {
@@ -128,6 +130,7 @@ impl Default for TCB {
         Self {
             clear_child_tid: None,
             time_stat: TimeInfo::default(),
+            cpu_mask: CpuMask::new(),
         }
     }
 }
@@ -206,6 +209,12 @@ impl PCB {
     }
     pub fn sig_mask_mut(&mut self) -> &mut SigMask {
         &mut self.pending_sigs.sig_mask
+    }
+}
+
+impl TCB {
+    pub fn set_cpu_mask(&mut self, mask: CpuMask) {
+        self.cpu_mask = mask;
     }
 }
 

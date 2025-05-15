@@ -85,6 +85,16 @@ impl<T> UserPtr<T> {
         self.addr as usize
     }
 
+    pub fn as_ref(&self) -> SysResult<&T> {
+        let value = unsafe { self.ptr().as_ref() };
+        value.ok_or(Errno::EFAULT)
+    }
+
+    pub fn as_ref_mut(&self) -> SysResult<&mut T> {
+        let value = unsafe { self.ptr().as_mut() };
+        value.ok_or(Errno::EFAULT)
+    }
+
     #[inline(always)]
     pub fn read(&self) -> T
     where

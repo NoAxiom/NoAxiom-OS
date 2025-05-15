@@ -8,6 +8,7 @@ pub mod mm;
 pub mod net;
 pub mod others;
 pub mod process;
+pub mod sched;
 pub mod signal;
 pub mod syscall;
 pub mod system;

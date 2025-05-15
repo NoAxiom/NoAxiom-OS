@@ -36,6 +36,7 @@
 #![feature(negative_impls)]
 #![feature(core_intrinsics)]
 #![feature(naked_functions)]
+#![feature(const_ptr_as_ref)]
 #![feature(panic_info_message)]
 #![feature(alloc_error_handler)]
 #![feature(slice_from_ptr_range)]
