@@ -1,4 +1,7 @@
-use alloc::{collections::btree_map::BTreeMap, vec::Vec};
+use alloc::{
+    collections::{btree_map::BTreeMap, vec_deque::VecDeque},
+    vec::Vec,
+};
 use core::{
     future::Future,
     ops::{Deref, DerefMut},
@@ -14,14 +17,15 @@ use super::taskid::TID;
 use crate::{cpu::current_task, mm::user_ptr::UserPtr, syscall::SyscallResult};
 
 /// waiter queue: a map of TID -> Waker
-pub struct WaiterQueue(SyncUnsafeCell<BTreeMap<TID, Waker>>);
+type WaiterQueueInner = VecDeque<Waker>;
+pub struct WaiterQueue(SyncUnsafeCell<WaiterQueueInner>);
 impl WaiterQueue {
     pub fn new() -> Self {
-        Self(SyncUnsafeCell::new(BTreeMap::new()))
+        Self(SyncUnsafeCell::new(VecDeque::new()))
     }
 }
 impl Deref for WaiterQueue {
-    type Target = BTreeMap<TID, Waker>;
+    type Target = WaiterQueueInner;
     fn deref(&self) -> &Self::Target {
         self.0.as_ref()
     }
@@ -55,13 +59,6 @@ impl FutexQueue {
         }
     }
 
-    /// remove a waiter from the queue
-    pub fn remove_waiter(&mut self, pa: PhysAddr, tid: TID) {
-        if let Some(queue) = self.get_waiter_queue(pa) {
-            queue.remove(&tid);
-        }
-    }
-
     /// get the waiter queue from a given uaddr
     pub fn get_waiter_queue(&mut self, pa: PhysAddr) -> Option<&mut WaiterQueue> {
         self.inner.get_mut(&pa)
@@ -71,8 +68,8 @@ impl FutexQueue {
     pub fn wake_waiter(&mut self, pa: PhysAddr, wake_num: u32) -> usize {
         let mut count = 0;
         if let Some(waiters) = self.get_waiter_queue(pa) {
-            while let Some((_tid, waiter)) = waiters.pop_first() {
-                waiter.wake();
+            while let Some(waker) = waiters.pop_front() {
+                waker.wake();
                 count += 1;
                 if count >= wake_num {
                     break;
@@ -102,8 +99,8 @@ impl FutexQueue {
         let mut waiter_vec = Vec::new();
 
         // pop the waiters from old_pa and push them to new_pa
-        while let Some((tid, waker)) = old_waiters.pop_first() {
-            waiter_vec.push((tid, waker));
+        while let Some(waker) = old_waiters.pop_front() {
+            waiter_vec.push(waker);
             rq_count += 1;
             if rq_count == n_rq {
                 break;
@@ -153,8 +150,6 @@ impl Future for FutexFuture {
                 return Poll::Ready(Err(Errno::EAGAIN));
             };
         }
-        // wake success, now remove it
-        futex.remove_waiter(self.pa, task.tid());
         Poll::Ready(Ok(0))
     }
 }

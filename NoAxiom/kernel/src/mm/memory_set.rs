@@ -536,7 +536,7 @@ impl MemorySet {
         new_set.mmap_manager = self.mmap_manager.clone();
         for (vpn, frame_tracker) in self.mmap_manager.frame_trackers.iter() {
             let vpn = vpn.clone();
-            debug!("[clone_cow] mmap vpn {:#x} is mapped as cow", vpn.raw());
+            trace!("[clone_cow] mmap vpn {:#x} is mapped as cow", vpn.raw());
             let old_pte = self.page_table().find_pte(vpn).unwrap();
             let old_flags = old_pte.flags();
             if old_flags.contains(MappingFlags::W) {
