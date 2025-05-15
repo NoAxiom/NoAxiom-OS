@@ -138,10 +138,11 @@ impl Syscall<'_> {
                 // process group
                 let pgid = self.task.get_pgid();
                 for task in PROCESS_GROUP_MANAGER
+                    .lock()
                     .get_group(pgid)
                     .unwrap()
                     .into_iter()
-                    .map(|t| t.upgrade().unwrap())
+                    .map(|t| t.task())
                 {
                     task.recv_siginfo(
                         &mut task.pcb(),
@@ -198,10 +199,11 @@ impl Syscall<'_> {
                 // sig is sent to every process in the process group whose ID is -pid.
                 let pgid = self.task.get_pgid();
                 for task in PROCESS_GROUP_MANAGER
+                    .lock()
                     .get_group(pgid)
                     .unwrap()
                     .into_iter()
-                    .map(|t| t.upgrade().unwrap())
+                    .map(|t| t.task())
                 {
                     if task.tgid() == -pid as usize {
                         task.recv_siginfo(

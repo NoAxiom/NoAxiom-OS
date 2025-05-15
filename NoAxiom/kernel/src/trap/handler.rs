@@ -13,6 +13,7 @@ use crate::{
         sig_num::SigNum,
     },
     task::Task,
+    time::time_slice::set_next_trigger,
 };
 
 /// kernel trap handler
@@ -65,11 +66,11 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
 
     // check if need schedule
     if task.tcb().time_stat.is_timeup() {
-        trace!(
-            "task {} yield by time = {:?}",
-            task.tid(),
-            task.tcb().time_stat,
-        );
+        // warn!(
+        //     "task {} yield by time = {:?}",
+        //     task.tid(),
+        //     task.tcb().time_stat,
+        // );
         yield_now().await;
     }
 
@@ -118,12 +119,13 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
         }
         // interrupt
         TrapType::Timer => {
-            trace!(
-                "[SupervisorTimer] hart: {}, tid: {}",
-                get_hartid(),
-                task.tid(),
-            );
+            // warn!(
+            //     "[SupervisorTimer] hart: {}, tid: {}",
+            //     get_hartid(),
+            //     task.tid(),
+            // );
             task.yield_now().await;
+            set_next_trigger();
         }
         TrapType::SupervisorExternal => {
             trace!(

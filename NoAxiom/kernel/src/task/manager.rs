@@ -7,7 +7,7 @@ use alloc::{
 use ksync::{mutex::SpinLock, Lazy};
 
 use super::{
-    taskid::{PGID, TID},
+    taskid::{PGID, PID, TID},
     Task,
 };
 use crate::config::task::INIT_PROCESS_ID;
@@ -39,56 +39,67 @@ impl TaskManager {
     }
 }
 
-pub struct ProcessGroupManager(SpinLock<BTreeMap<PGID, Vec<Weak<Task>>>>);
+#[derive(Clone)]
+pub struct ProcessTracer {
+    pid: PID,
+    proc: Weak<Task>,
+}
+impl ProcessTracer {
+    pub fn pid(&self) -> PID {
+        self.pid
+    }
+    pub fn task(&self) -> Arc<Task> {
+        self.proc.upgrade().unwrap()
+    }
+    pub fn new(task: &Arc<Task>) -> Self {
+        let pid = task.tgid();
+        Self {
+            pid,
+            proc: Arc::downgrade(task),
+        }
+    }
+}
+
+pub struct ProcessGroupManager(BTreeMap<PGID, Vec<ProcessTracer>>);
 impl ProcessGroupManager {
     pub const fn new() -> Self {
-        Self(SpinLock::new(BTreeMap::new()))
+        Self(BTreeMap::new())
     }
 
-    /// insert a new process group with forced setting pgid
-    pub fn insert_new_group(&self, group_leader: &Arc<Task>) {
-        let pgid = group_leader.tid();
-        group_leader.set_pgid(pgid);
-        debug!("[pgid] insert new process group {}", pgid);
-        let mut group = Vec::new();
-        group.push(Arc::downgrade(group_leader));
-        self.0.lock().insert(pgid, group);
-    }
-
-    pub fn insert_process(&self, pgid: PGID, process: &Arc<Task>) {
-        if !process.is_group_leader() {
-            error!(
-                "[pgid] process {} is not a group leader",
-                process.tid()
-            );
-            return;
-        }
-        process.set_pgid(pgid);
-        debug!(
-            "[pgid] insert process {} to group {}",
-            process.tid(),
-            pgid
-        );
-        let mut inner = self.0.lock();
-        let vec = inner.get_mut(&pgid).unwrap();
-        vec.push(Arc::downgrade(process));
-    }
-
-    /// get all process in one process group
-    pub fn get_group(&self, pgid: PGID) -> Option<Vec<Weak<Task>>> {
-        self.0.lock().get(&pgid).cloned()
+    /// insert a task with provided pgid
+    pub fn insert(&mut self, task: &Arc<Task>) {
+        let pgid = task.get_pgid();
+        self.0
+            .entry(pgid)
+            .or_insert(Vec::new())
+            .push(ProcessTracer::new(task));
     }
 
     /// remove a process from its process group
-    pub fn remove(&self, process: &Arc<Task>) {
+    pub fn remove(&mut self, task: &Arc<Task>) {
+        let pgid = task.get_pgid();
+        let pid = task.tgid();
         self.0
-            .lock()
-            .get_mut(&process.pgid())
+            .get_mut(&pgid)
             .unwrap()
-            .retain(|task| {
-                task.upgrade()
-                    .map_or(false, |task| Arc::ptr_eq(process, &task))
-            })
+            .retain(|task| task.pid() != pid);
+    }
+
+    /// modify the process's pgid into new_pgid
+    pub fn modify_pgid(&mut self, task: &Arc<Task>, new_pgid: PGID) {
+        self.remove(task);
+        task.set_pgid(new_pgid);
+        self.insert(task);
+    }
+
+    /// create a new process group from existed task
+    pub fn create_new_group_by(&mut self, task: &Arc<Task>) {
+        self.modify_pgid(task, task.tid());
+    }
+
+    /// get all process in one process group
+    pub fn get_group(&self, pgid: PGID) -> Option<Vec<ProcessTracer>> {
+        self.0.get(&pgid).cloned()
     }
 }
 
@@ -105,8 +116,9 @@ impl ThreadGroup {
     }
 }
 
-pub static TASK_MANAGER: Lazy<TaskManager> = Lazy::new(TaskManager::new);
-pub static PROCESS_GROUP_MANAGER: Lazy<ProcessGroupManager> = Lazy::new(ProcessGroupManager::new);
+pub static TASK_MANAGER: Lazy<TaskManager> = Lazy::new(|| TaskManager::new());
+pub static PROCESS_GROUP_MANAGER: Lazy<SpinLock<ProcessGroupManager>> =
+    Lazy::new(|| SpinLock::new(ProcessGroupManager::new()));
 
 impl Task {
     pub fn delete_children(&self) {

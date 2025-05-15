@@ -216,12 +216,11 @@ impl Syscall<'_> {
         // If pgid is zero, then the PGID of the process specified by pid is
         // made the same as its process ID.
         if pgid == 0 {
-            PROCESS_GROUP_MANAGER.insert_new_group(&target_task);
+            PROCESS_GROUP_MANAGER
+                .lock()
+                .create_new_group_by(&target_task);
         } else {
-            match PROCESS_GROUP_MANAGER.get_group(pgid) {
-                Some(_) => PROCESS_GROUP_MANAGER.insert_process(pgid, &target_task),
-                None => PROCESS_GROUP_MANAGER.insert_new_group(&target_task),
-            }
+            PROCESS_GROUP_MANAGER.lock().modify_pgid(&target_task, pgid);
         }
         Ok(0)
     }
@@ -323,5 +322,23 @@ impl Syscall<'_> {
             }
             _ => Err(Errno::EINVAL),
         }
+    }
+
+    pub fn sys_setsid(&self) -> SyscallResult {
+        let task = self.task;
+        warn!(
+            "[sys_setsid] tid: {}, pid: {}, pgid: {}, using incorrect implementation",
+            task.tid(),
+            task.pid(),
+            task.get_pgid()
+        );
+        Ok(task.tgid() as isize)
+        // fixme: this impl is incorrect!!!
+        // if task.is_group_leader() && task.tgid() != task.get_pgid() {
+        //     PROCESS_GROUP_MANAGER.lock().modify_pgid(task, task.tid());
+        //     Ok(task.tgid() as isize)
+        // } else {
+        //     Err(Errno::EPERM)
+        // }
     }
 }

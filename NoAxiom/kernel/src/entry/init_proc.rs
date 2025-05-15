@@ -12,7 +12,7 @@ use crate::{
 #[allow(unused)]
 pub fn schedule_spawn_with_path() {
     println!(
-        "[kernel] initproc = {}, path = {}",
+        "[kernel] initproc = {}, path = {}/",
         INIT_PROC_NAME, ROOT_NAME
     );
     spawn_ktask(async move {

@@ -1,7 +1,4 @@
-use alloc::{
-    collections::{btree_map::BTreeMap, vec_deque::VecDeque},
-    vec::Vec,
-};
+use alloc::collections::{btree_map::BTreeMap, vec_deque::VecDeque};
 use core::{
     future::Future,
     ops::{Deref, DerefMut},
@@ -10,29 +7,27 @@ use core::{
 };
 
 use include::errno::Errno;
-use ksync::cell::SyncUnsafeCell;
 use memory::address::PhysAddr;
 
-use super::taskid::TID;
 use crate::{cpu::current_task, mm::user_ptr::UserPtr, syscall::SyscallResult};
 
 /// waiter queue: a map of TID -> Waker
 type WaiterQueueInner = VecDeque<Waker>;
-pub struct WaiterQueue(SyncUnsafeCell<WaiterQueueInner>);
+pub struct WaiterQueue(WaiterQueueInner);
 impl WaiterQueue {
     pub fn new() -> Self {
-        Self(SyncUnsafeCell::new(VecDeque::new()))
+        Self(VecDeque::new())
     }
 }
 impl Deref for WaiterQueue {
     type Target = WaiterQueueInner;
     fn deref(&self) -> &Self::Target {
-        self.0.as_ref()
+        &self.0
     }
 }
 impl DerefMut for WaiterQueue {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        self.0.get_mut()
+        &mut self.0
     }
 }
 
@@ -49,12 +44,12 @@ impl FutexQueue {
     }
 
     /// insert a new waiter into the queue
-    pub fn insert_waiter(&mut self, pa: PhysAddr, tid: TID, waker: Waker) {
+    pub fn insert_waiter(&mut self, pa: PhysAddr, waker: Waker) {
         if let Some(waiters) = self.inner.get_mut(&pa) {
-            waiters.insert(tid, waker);
+            waiters.push_back(waker);
         } else {
             let mut waiters = WaiterQueue::new();
-            waiters.insert(tid, waker);
+            waiters.push_back(waker);
             self.inner.insert(pa, waiters);
         }
     }
@@ -96,11 +91,11 @@ impl FutexQueue {
             return 0;
         }
         let mut rq_count = 0;
-        let mut waiter_vec = Vec::new();
+        let mut waiter_vec = VecDeque::new();
 
         // pop the waiters from old_pa and push them to new_pa
         while let Some(waker) = old_waiters.pop_front() {
-            waiter_vec.push(waker);
+            waiter_vec.push_back(waker);
             rq_count += 1;
             if rq_count == n_rq {
                 break;
@@ -110,8 +105,8 @@ impl FutexQueue {
         // now we have the waiters in waiter_vec, we need to insert them into new_pa
         self.inner
             .entry(new_pa)
-            .or_insert_with(WaiterQueue::new)
-            .extend(waiter_vec);
+            .or_insert(WaiterQueue::new())
+            .append(&mut waiter_vec);
 
         rq_count as usize + wake_count
     }
@@ -139,11 +134,16 @@ impl Future for FutexFuture {
     type Output = SyscallResult;
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let task = current_task();
-        let mut futex = task.futex();
         if !self.is_in {
+            let mut futex = task.futex();
             if UserPtr::from(self.uaddr as *const u32).atomic_load_acquire() == self.val {
                 self.is_in = true;
-                futex.insert_waiter(self.pa, task.tid(), cx.waker().clone());
+                futex.insert_waiter(self.pa, cx.waker().clone());
+                debug!(
+                    "[futex] task {} yield with value = {}",
+                    current_task().tid(),
+                    self.val
+                );
                 return Poll::Pending;
             } else {
                 // failed to lock, remove the waker

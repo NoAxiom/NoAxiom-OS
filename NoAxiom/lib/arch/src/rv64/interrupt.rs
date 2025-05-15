@@ -67,6 +67,14 @@ pub fn enable_stimer_interrupt() {
     }
 }
 
+/// set supervisor timer int enabled
+#[inline(always)]
+pub fn disable_stimer_interrupt() {
+    unsafe {
+        riscv::register::sie::clear_stimer();
+    }
+}
+
 /// permit supervisor user memory access
 #[inline(always)]
 pub fn enable_user_memory_access() {

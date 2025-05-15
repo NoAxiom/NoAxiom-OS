@@ -5,7 +5,7 @@ use alloc::{
     sync::{Arc, Weak},
     vec::Vec,
 };
-use core::{marker::PhantomData, ptr::null, task::Waker};
+use core::{marker::PhantomData, ptr::null, sync::atomic::AtomicUsize, task::Waker};
 
 use arch::{Arch, ArchInfo, ArchMemory, ArchTrapContext, TrapContext};
 use config::fs::ROOT_NAME;
@@ -19,7 +19,7 @@ use super::{
     exit::ExitCode,
     manager::ThreadGroup,
     status::TaskStatus,
-    taskid::{TidTracer, PGID, TGID, TID},
+    taskid::{TidTracer, PGID, PID, TGID, TID},
 };
 use crate::{
     config::task::INIT_PROCESS_ID,
@@ -63,6 +63,11 @@ struct Shared<T>(PhantomData<T>);
 impl<T> Shared<T> {
     pub fn new(data: T) -> SharedMut<T> {
         Arc::new(SpinLock::new(data))
+    }
+}
+impl Shared<usize> {
+    pub fn new_atomic(data: usize) -> Arc<AtomicUsize> {
+        Arc::new(AtomicUsize::new(data))
     }
 }
 
@@ -159,7 +164,7 @@ pub struct Task {
     sa_list: SharedMut<SigActionList>,    // signal action list, saves signal handler
     memory_set: SharedMut<MemorySet>,     // memory set for the task
     thread_group: SharedMut<ThreadGroup>, // thread group
-    pgid: SharedMut<PGID>,                // process group id
+    pgid: Arc<AtomicUsize>,               // process group id
     futex: SharedMut<FutexQueue>,         // futex wait queue
 }
 
@@ -212,12 +217,6 @@ impl PCB {
     }
 }
 
-impl TCB {
-    pub fn set_cpu_mask(&mut self, mask: CpuMask) {
-        self.cpu_mask = mask;
-    }
-}
-
 /// user tasks
 /// - usage: wrap it in Arc<Task>
 impl Task {
@@ -235,15 +234,14 @@ impl Task {
     pub fn tgid(&self) -> TGID {
         self.tgid
     }
-    pub fn pgid(&self) -> SpinLockGuard<PGID> {
-        self.pgid.lock()
+    pub fn pid(&self) -> PID {
+        self.tgid
     }
     pub fn get_pgid(&self) -> PGID {
-        *self.pgid.lock()
+        self.pgid.load(core::sync::atomic::Ordering::SeqCst)
     }
     pub fn set_pgid(&self, pgid: usize) {
-        *self.pgid.lock() = pgid;
-        // self.pgid = SharedMutable::new(pgid);
+        self.pgid.store(pgid, core::sync::atomic::Ordering::SeqCst);
     }
     pub fn set_self_as_tg_leader(self: &Arc<Self>) {
         self.tg_leader.call_once(|| Arc::downgrade(self));
@@ -404,7 +402,7 @@ impl Task {
         let task = Arc::new(Self {
             tid,
             tgid,
-            pgid: Shared::new(tgid),
+            pgid: Shared::new_atomic(tgid),
             pcb: Mutable::new(PCB::default()),
             thread_group: Shared::new(ThreadGroup::new()),
             memory_set: Shared::new(memory_set),
@@ -423,7 +421,7 @@ impl Task {
         task.thread_group().insert(&task);
         task.set_self_as_tg_leader();
         TASK_MANAGER.insert(&task);
-        PROCESS_GROUP_MANAGER.insert_new_group(&task);
+        PROCESS_GROUP_MANAGER.lock().insert(&task);
         info!("[spawn] new task spawn complete, tid {}", task.tid.0);
         task
     }
@@ -590,12 +588,12 @@ impl Task {
             // fork as a new process
             let new_tid = tid_alloc();
             let new_tgid = new_tid.0;
-            let new_pgid = *self.pgid(); // use parent's pgid
+            let new_pgid = self.get_pgid(); // use parent's pgid
             info!("fork new process, tgid: {}", new_tgid);
             let new_process = Arc::new(Self {
                 tid: new_tid,
                 tgid: new_tgid,
-                pgid: Shared::new(new_pgid),
+                pgid: Shared::new_atomic(new_pgid),
                 thread_group: Shared::new(ThreadGroup::new()),
                 pcb: Mutable::new(PCB {
                     parent: Some(Arc::downgrade(self)),
@@ -621,7 +619,7 @@ impl Task {
                 .children
                 .push(new_process.clone());
             TASK_MANAGER.insert(&new_process);
-            PROCESS_GROUP_MANAGER.insert_process(new_pgid, &new_process);
+            PROCESS_GROUP_MANAGER.lock().insert(&new_process);
             new_process
         };
         res

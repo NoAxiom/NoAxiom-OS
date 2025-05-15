@@ -123,4 +123,17 @@ impl Syscall<'_> {
         }
         Ok(0)
     }
+
+    pub fn sys_clock_getres(&self, _clockid: usize, res: usize) -> SyscallResult {
+        let res = UserPtr::<TimeSpec>::new(res);
+        if res.is_null() {
+            return Ok(0);
+        }
+        let value = TimeSpec {
+            tv_sec: 0,
+            tv_nsec: 1,
+        };
+        res.write(value);
+        Ok(0)
+    }
 }

@@ -56,18 +56,18 @@ impl Task {
         // thread resources clean up
         self.thread_group().remove(tid);
         TASK_MANAGER.remove(tid);
-        PROCESS_GROUP_MANAGER.remove(self);
+        PROCESS_GROUP_MANAGER.lock().remove(self);
         self.delete_children();
 
         // clear child tid
         if let Some(tidaddress) = self.clear_child_tid() {
-            info!(
-                "[exit_handler] clear child tid {:#x}, (unimpl futex)",
-                tidaddress
-            );
+            info!("[exit_handler] clear child tid {:#x}", tidaddress);
             let ptr = UserPtr::<usize>::new(tidaddress);
             ptr.write(0);
-            // self.futex().wake_waiter(tidaddress as u32, 1);
+            let _ = ptr
+                .translate_pa()
+                .await
+                .map(|pa| self.futex().wake_waiter(pa, 1));
         }
 
         // send SIGCHLD to parent

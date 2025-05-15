@@ -101,14 +101,9 @@ impl<'a> Syscall<'a> {
             SYS_GET_ROBUST_LIST =>      self.sys_get_robust_list(args[0], args[1], args[2]),
             SYS_SET_ROBUST_LIST =>      self.sys_set_robust_list(args[0], args[1]),
             SYS_FUTEX =>                self.sys_futex(args[0] as _, args[1] as _, args[2] as _, args[3] as _, args[4] as _, args[5] as _).await,
-            SYS_SCHED_GETAFFINITY =>    self.sys_sched_getaffinity(args[0], args[1], args[2]),
-            SYS_SCHED_SETAFFINITY =>    self.sys_sched_setaffinity(args[0], args[1], args[2]),
-            SYS_SCHEED_GETSCHEDULER =>  self.sys_sched_getscheduler(args[0]),
-            SYS_SCHED_GETPARAM =>       self.sys_sched_getparam(args[0], args[1]),
-            SYS_SCHED_SETSCHEDULER =>   self.sys_sched_setscheduler(args[0], args[1] as _, args[2]),
+            SYS_SETSID =>               self.sys_setsid(),
             // SYS_TKILL =>                todo!(),
             // SYS_GETRUSAGE =>            todo!(),
-            // SYS_SETSID =>               todo!(),
             // SYS_SYSTEMSHUTDOWN =>       todo!(),
             
             // signal
@@ -131,9 +126,16 @@ impl<'a> Syscall<'a> {
             SYS_SHMAT =>        self.sys_shmat(args[0], args[1], args[2]),
             SYS_SHMDT =>        self.sys_shmdt(args[0]),
             
+            // sched
+            SYS_SCHED_YIELD =>          self.sys_yield().await,
+            SYS_SCHED_GETAFFINITY =>    self.sys_sched_getaffinity(args[0], args[1], args[2]),
+            SYS_SCHED_SETAFFINITY =>    self.sys_sched_setaffinity(args[0], args[1], args[2]),
+            SYS_SCHEED_GETSCHEDULER =>  self.sys_sched_getscheduler(args[0]),
+            SYS_SCHED_GETPARAM =>       self.sys_sched_getparam(args[0], args[1]),
+            SYS_SCHED_SETSCHEDULER =>   self.sys_sched_setscheduler(args[0], args[1] as _, args[2]),
+
             // others
-            SYS_SCHED_YIELD =>      self.sys_yield().await,
-            SYS_GETRANDOM =>        self.sys_getrandom(args[0], args[1], args[2]).await,
+            SYS_GETRANDOM =>    self.sys_getrandom(args[0], args[1], args[2]).await,
 
             // time
             SYS_TIMES =>            self.sys_times(args[0]),
@@ -141,8 +143,8 @@ impl<'a> Syscall<'a> {
             SYS_NANOSLEEP =>        self.sys_nanosleep(args[0], args[1]).await,
             SYS_CLOCK_GETTIME =>    self.sys_clock_gettime(args[0], args[1]),
             SYS_CLOCK_NANOSLEEP =>  self.sys_clock_nanosleep(args[0], args[1], args[2], args[3]).await,
+            SYS_CLOCK_GETRES =>     self.sys_clock_getres(args[0], args[1]),
             // SYS_SETITIMER =>        todo!(),
-            // SYS_CLOCK_GETRES =>     todo!(),
 
             // system
             SYS_SYSINFO =>  Self::empty_syscall("info", 0),

@@ -4,7 +4,8 @@ use ksync::mutex::SpinLock;
 
 pub type TID = usize;
 pub type TGID = TID;
-pub type PGID = usize;
+pub type PID = TGID;
+pub type PGID = TID;
 
 /// Task ID allocator
 struct IndexAllocator {
