@@ -3,6 +3,7 @@ use alloc::sync::Arc;
 
 use super::SyscallResult;
 use crate::{
+    fs::pipe::PipeFile,
     include::{
         net::{AddressFamily, PosixSocketType, SockAddr},
         result::Errno,
@@ -105,5 +106,34 @@ impl Syscall<'_> {
         fd_table.set(new_fd as usize, Arc::new(new_socket_file));
 
         Ok(new_fd as isize)
+    }
+
+    // socketpair now is like pipe
+    pub async fn sys_socketpair(
+        &self,
+        _domain: isize,
+        _type: isize,
+        _protocol: isize,
+        sv: usize,
+    ) -> SyscallResult {
+        let (read_end, write_end) = PipeFile::new_pipe();
+
+        let user_ptr = UserPtr::<i32>::new(sv);
+        let buf_slice = user_ptr.as_slice_mut_checked(2).await?;
+
+        let mut fd_table = self.task.fd_table();
+        let read_fd = fd_table.alloc_fd()?;
+        fd_table.set(read_fd, read_end);
+        buf_slice[0] = read_fd as i32;
+
+        let write_fd = fd_table.alloc_fd()?;
+        fd_table.set(write_fd, write_end);
+        buf_slice[1] = write_fd as i32;
+
+        info!(
+            "[sys_socketpair as sys_pipe2]: read fd {}, write fd {}",
+            read_fd, write_fd
+        );
+        Ok(0)
     }
 }

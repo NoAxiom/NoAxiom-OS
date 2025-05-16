@@ -72,7 +72,7 @@ impl<'a> Syscall<'a> {
             SYS_LISTEN =>       self.sys_listen(args[0], args[1]),
             SYS_ACCEPT =>       self.sys_accept(args[0], args[1], args[2]).await,
             SYS_CONNECT =>      self.sys_connect(args[0], args[1], args[2]).await,
-            // SYS_SOCKETPAIR =>   todo!(),
+            SYS_SOCKETPAIR =>   self.sys_socketpair(args[0] as isize, args[1] as isize, args[2] as isize, args[3]).await,
             // SYS_ACCEPT4 =>      todo!(),
             // SYS_SENDTO =>       todo!(),
             // SYS_RECVFROM =>     todo!(),
