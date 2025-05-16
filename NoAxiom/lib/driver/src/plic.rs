@@ -29,16 +29,13 @@ pub fn init() {
     let plic = PLIC::new(plic_addr, privileges);
     PLIC.call_once(|| plic);
 
-    let priority;
-    #[cfg(feature = "interruptable_async")]
-    {
-        priority = 2;
-    }
-    #[cfg(feature = "async")]
-    {
-        priority = 0;
-    }
-    // ! fixme: now is turn OFF the interrupt
+    let priority = match () {
+        #[cfg(feature = "interruptable_async")]
+        () => 1,
+        #[cfg(feature = "async")]
+        () => 0,
+    };
+
     let irq = 1;
     let plic = PLIC.get().unwrap();
     plic.set_priority(irq, priority);
@@ -64,9 +61,7 @@ pub fn init() {
 pub fn register_to_hart(hart: u32) {
     let plic = PLIC.get().unwrap();
     let irq = 1;
-    plic.set_threshold(hart, Mode::Machine, 1);
-    plic.set_threshold(hart, Mode::Supervisor, 0);
     plic.enable(hart, Mode::Supervisor, irq);
-    plic.complete(hart, Mode::Supervisor, irq);
+    plic.set_threshold(hart, Mode::Supervisor, 0);
     log::info!("Register irq {} to hart {}", irq, hart);
 }

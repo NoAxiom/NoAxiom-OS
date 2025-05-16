@@ -3,6 +3,7 @@
 
 use alloc::sync::Arc;
 
+use arch::ArchInt;
 use devices::{impls::block::BlockDevice, ALL_DEVICES};
 
 mod bus;
@@ -42,12 +43,15 @@ pub fn get_display_dev() -> Arc<&'static devices::impls::DisplayDevice> {
 pub fn handle_irq() {
     #[cfg(feature = "interruptable_async")]
     {
+        use arch::Arch;
+        assert!(!Arch::is_interrupt_enabled());
         let irq = plic::claim();
         assert_eq!(irq, 1); // now we only support blk dev
         get_blk_dev()
             .handle_interrupt()
             .expect("handle interrupt error");
         plic::complete(irq);
+        assert!(!Arch::is_interrupt_enabled());
     }
     #[cfg(feature = "async")]
     {
