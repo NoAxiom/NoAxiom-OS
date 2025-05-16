@@ -41,18 +41,21 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
         let time_in = get_time_us();
         task.tcb_mut().time_stat.record_switch_in();
         current_cpu().set_task(task);
-        Arch::enable_interrupt();
+        fence(Ordering::Acquire);
+        task.restore_cx_int_en();
         // ===== before executing task future =====
 
         let ret = unsafe { Pin::new_unchecked(future).poll(cx) };
 
         // ===== after executing task future =====
+        task.record_cx_int_en();
         Arch::disable_interrupt();
         let time_out = get_time_us();
         task.tcb_mut().time_stat.record_switch_out();
         task.trap_context_mut().freg_mut().yield_task();
         task.sched_entity().update_vruntime(time_out - time_in);
         current_cpu().clear_task();
+        fence(Ordering::Release);
         Arch::enable_interrupt();
         // ===== after executing task future =====
 

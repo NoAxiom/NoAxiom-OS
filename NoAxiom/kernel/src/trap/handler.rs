@@ -61,7 +61,6 @@ fn kernel_trap_handler() {
 #[no_mangle]
 pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
     assert!(!arch::Arch::is_interrupt_enabled());
-    arch::Arch::enable_interrupt();
     trace!("[trap_handler] call trap handler");
 
     // check if need schedule
@@ -81,6 +80,7 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
     match trap_type {
         // syscall
         TrapType::SysCall => {
+            arch::Arch::enable_interrupt();
             cx[TrapArgs::EPC] += 4;
             let result = task.syscall(cx).await;
             trace!("[syscall] done! result {:#x}", result);
@@ -148,4 +148,7 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
             panic!("unsupported trap type: {trap_type:x?}");
         }
     }
+
+    // enable interrupt after handler
+    arch::Arch::enable_interrupt();
 }

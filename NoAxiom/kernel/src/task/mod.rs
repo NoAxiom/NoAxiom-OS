@@ -8,5 +8,6 @@ mod task;
 pub mod task_main;
 pub mod taskid;
 pub mod wait;
+pub mod context;
 
 pub use task::{Task, PCB};

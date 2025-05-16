@@ -7,7 +7,7 @@ use alloc::{
 };
 use core::{marker::PhantomData, ptr::null, sync::atomic::AtomicUsize, task::Waker};
 
-use arch::{Arch, ArchInfo, ArchMemory, ArchTrapContext, TrapContext};
+use arch::{Arch, ArchInfo, ArchInt, ArchMemory, ArchTrapContext, TrapContext};
 use config::fs::ROOT_NAME;
 use ksync::{
     cell::SyncUnsafeCell,
@@ -16,6 +16,7 @@ use ksync::{
 };
 
 use super::{
+    context::TaskContext,
     exit::ExitCode,
     manager::ThreadGroup,
     status::TaskStatus,
@@ -142,10 +143,10 @@ pub struct Task {
     pcb: Mutable<PCB>, // task control block inner, protected by lock
 
     // thread only / once initialization
-    tcb: ThreadOnly<TCB>,             // thread control block
-    trap_cx: ThreadOnly<TrapContext>, // trap context
-    sched_entity: SchedEntity,        // sched entity, shared with scheduler
-    waker: Once<Waker>,               // waker for the task
+    tcb: ThreadOnly<TCB>,        // thread control block
+    cx: ThreadOnly<TaskContext>, // trap context
+    sched_entity: SchedEntity,   // sched entity, shared with scheduler
+    waker: Once<Waker>,          // waker for the task
 
     // immutable
     tid: Immutable<TidTracer>,              // task id, with lifetime holded
@@ -301,11 +302,28 @@ impl Task {
     /// trap context
     #[inline(always)]
     pub fn trap_context(&self) -> &TrapContext {
-        self.trap_cx.as_ref()
+        self.cx.as_ref().cx()
     }
     #[inline(always)]
     pub fn trap_context_mut(&self) -> &mut TrapContext {
-        self.trap_cx.as_ref_mut()
+        self.cx.as_ref().cx_mut()
+    }
+    #[inline(always)]
+    pub fn record_cx_int_en(&self) {
+        let int_en = Arch::is_interrupt_enabled();
+        self.cx.as_ref_mut().int_en = int_en;
+    }
+    #[inline(always)]
+    pub fn restore_cx_int_en(&self) {
+        if self.cx.as_ref().int_en {
+            Arch::enable_interrupt();
+        } else {
+            Arch::disable_interrupt();
+        }
+    }
+    #[inline(always)]
+    pub fn cx_int_en(&self) -> bool {
+        self.cx.as_ref().int_en
     }
 
     /// signal info: sigaction list
@@ -412,7 +430,10 @@ impl Task {
             pcb: Mutable::new(PCB::default()),
             thread_group: Shared::new(ThreadGroup::new()),
             memory_set: Shared::new(memory_set),
-            trap_cx: ThreadOnly::new(TrapContext::app_init_cx(elf_entry, user_sp)),
+            cx: ThreadOnly::new(TaskContext::new(
+                TrapContext::app_init_cx(elf_entry, user_sp),
+                true,
+            )),
             sched_entity: SchedEntity::new_bare(INIT_PROCESS_ID),
             fd_table: Shared::new(FdTable::new()),
             cwd: Shared::new(path),
@@ -579,7 +600,7 @@ impl Task {
                     ..Default::default()
                 }),
                 memory_set,
-                trap_cx: ThreadOnly::new(self.trap_context().clone()),
+                cx: ThreadOnly::new(TaskContext::new(self.trap_context().clone(), true)),
                 sched_entity: self.sched_entity.data_clone(tid_val),
                 fd_table,
                 cwd: self.cwd.clone(),
@@ -611,7 +632,7 @@ impl Task {
                     ..Default::default()
                 }),
                 memory_set,
-                trap_cx: ThreadOnly::new(self.trap_context().clone()),
+                cx: ThreadOnly::new(TaskContext::new(self.trap_context().clone(), true)),
                 sched_entity: self.sched_entity.data_clone(new_tgid),
                 fd_table,
                 cwd: Shared::new(self.cwd().clone()),
