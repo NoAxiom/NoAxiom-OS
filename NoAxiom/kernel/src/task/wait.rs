@@ -25,7 +25,7 @@ pub struct WaitChildFuture<'a> {
 impl<'a> WaitChildFuture<'a> {
     pub fn new(task: &'a Arc<Task>, pid_type: PidSel, wait_option: WaitOption) -> SysResult<Self> {
         let pcb = task.pcb();
-        if pcb.children.is_empty() && pcb.zombie_children.is_empty() {
+        if pcb.children.is_empty() {
             return Err(Errno::ECHILD);
         }
         let target = match pid_type {
@@ -52,14 +52,15 @@ impl Future for WaitChildFuture<'_> {
     fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut pcb = self.task.pcb();
         let res = match &self.target {
-            None => match pcb.zombie_children.pop() {
+            None => match pcb.pop_one_zombie_child() {
                 Some(child) => {
                     // time statistic
+                    let child_tid = child.tid();
                     self.task
                         .tcb_mut()
                         .time_stat
                         .add_child_time(child.tcb().time_stat.child_time());
-                    Poll::Ready(Ok((pcb.exit_code(), child.tid())))
+                    Poll::Ready(Ok((pcb.exit_code(), child_tid)))
                 }
                 None => Poll::Pending,
             },
@@ -67,19 +68,17 @@ impl Future for WaitChildFuture<'_> {
                 let mut ch_pcb = child.pcb();
                 match ch_pcb.status() {
                     TaskStatus::Zombie => {
-                        let target_tid = child.tid();
+                        let child_tid = child.tid();
                         let exit_code = ch_pcb.exit_code();
                         // since we already collected exit info
                         // so just delete it from zombie children
-                        ch_pcb
-                            .zombie_children
-                            .retain(|task| task.tid() != target_tid);
+                        ch_pcb.children.retain(|task| task.tid() != child_tid);
                         // update time statistic
                         self.task
                             .tcb_mut()
                             .time_stat
                             .add_child_time(child.tcb().time_stat.child_time());
-                        Poll::Ready(Ok((exit_code, target_tid)))
+                        Poll::Ready(Ok((exit_code, child_tid)))
                     }
                     _ => Poll::Pending,
                 }

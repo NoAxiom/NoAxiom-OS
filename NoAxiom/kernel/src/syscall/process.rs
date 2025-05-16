@@ -89,6 +89,7 @@ impl Syscall<'_> {
         new_cx[RES] = 0;
         trace!("[sys_fork] new task context: {:?}", new_cx);
         spawn_utask(new_task);
+        TASK_MANAGER.get_init_proc().print_child_tree(0);
         Ok(new_tid as isize)
     }
 

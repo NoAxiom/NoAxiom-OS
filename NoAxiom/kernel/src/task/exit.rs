@@ -80,8 +80,6 @@ impl Task {
                 // del self from parent's children, and wake up suspended parent
                 let mut par_pcb = parent.pcb();
                 pcb.set_status(TaskStatus::Zombie);
-                par_pcb.children.retain(|task| task.tid() != tid);
-                par_pcb.zombie_children.push(self.clone());
 
                 // send SIGCHLD
                 let siginfo = SigInfo::new_detailed(
@@ -102,6 +100,7 @@ impl Task {
             }
         }
         info!("[exit_hander] task {} exited successfully", self.tid());
+        TASK_MANAGER.get_init_proc().print_child_tree(0);
     }
 }
 

@@ -95,9 +95,8 @@ pub struct PCB {
 
     // paternity
     // assertion: only when the task is group leader, it can have children
-    pub children: Vec<Arc<Task>>,        // children tasks
-    pub zombie_children: Vec<Arc<Task>>, // zombie children
-    pub parent: Option<Weak<Task>>,      // parent task, weak ptr
+    pub children: Vec<Arc<Task>>,   // children tasks
+    pub parent: Option<Weak<Task>>, // parent task, weak ptr
 
     // signal structs
     pub pending_sigs: SigPending,        // pending signals
@@ -112,7 +111,6 @@ impl Default for PCB {
     fn default() -> Self {
         Self {
             children: Vec::new(),
-            zombie_children: Vec::new(),
             parent: None,
             status: TaskStatus::Runnable,
             exit_code: ExitCode::default(),
@@ -214,6 +212,18 @@ impl PCB {
     }
     pub fn sig_mask_mut(&mut self) -> &mut SigMask {
         &mut self.pending_sigs.sig_mask
+    }
+
+    /// find zombie children
+    pub fn pop_one_zombie_child(&mut self) -> Option<Arc<Task>> {
+        let mut res = None;
+        for i in 0..self.children.len() {
+            if self.children[i].pcb().status() == TaskStatus::Zombie {
+                res = Some(self.children.remove(i));
+                break;
+            }
+        }
+        res
     }
 }
 
@@ -553,6 +563,18 @@ impl Task {
             tmp
         };
 
+        // CLONE_PARENT (since Linux 2.3.12)
+        //   If CLONE_PARENT is set, then the parent of the new child
+        //   (as returned by getppid(2)) will be the same as that of the
+        //   calling process.
+        // If CLONE_PARENT is not set, then (as with fork(2)) the
+        // child's parent is the calling process.
+        let parent = if flags.contains(CloneFlags::PARENT) {
+            self.pcb.lock().parent.clone()
+        } else {
+            Some(Arc::downgrade(self))
+        };
+
         let res = if flags.contains(CloneFlags::THREAD) {
             // fork as a new thread
             let new_tid = tid_alloc();
@@ -564,7 +586,7 @@ impl Task {
                 pgid: self.pgid.clone(),
                 thread_group: self.thread_group.clone(),
                 pcb: Mutable::new(PCB {
-                    parent: self.pcb.lock().parent.clone(),
+                    parent,
                     ..Default::default()
                 }),
                 memory_set,
@@ -596,7 +618,7 @@ impl Task {
                 pgid: Shared::new_atomic(new_pgid),
                 thread_group: Shared::new(ThreadGroup::new()),
                 pcb: Mutable::new(PCB {
-                    parent: Some(Arc::downgrade(self)),
+                    parent,
                     ..Default::default()
                 }),
                 memory_set,
@@ -614,10 +636,7 @@ impl Task {
             });
             new_process.thread_group().insert(&new_process);
             new_process.set_self_as_tg_leader();
-            self.get_tg_leader()
-                .pcb()
-                .children
-                .push(new_process.clone());
+            self.pcb().children.push(new_process.clone());
             TASK_MANAGER.insert(&new_process);
             PROCESS_GROUP_MANAGER.lock().insert(&new_process);
             new_process
@@ -649,5 +668,26 @@ impl Task {
         self.sa_list().reset();
         self.fd_table().close_on_exec();
         Ok(())
+    }
+
+    /// only for debug, print current child tree
+    pub fn print_child_tree(&self, fmt_offset: usize) {
+        let mut fmt_proc = String::new();
+        for _ in 0..fmt_offset {
+            fmt_proc += "|---";
+        }
+        let mut fmt_thread = String::new();
+        for _ in 0..fmt_offset {
+            fmt_thread += "|   ";
+        }
+        let pcb = self.pcb();
+        debug!("[ch_tree] {fmt_proc}process {}", self.tid());
+        for thread in self.thread_group().0.iter() {
+            let thread = thread.1.upgrade().unwrap();
+            debug!("[ch_tree] {fmt_thread}thread {}", thread.tid());
+        }
+        for child in &pcb.children {
+            child.print_child_tree(fmt_offset + 1);
+        }
     }
 }
