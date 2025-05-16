@@ -32,44 +32,30 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
     type Output = F::Output;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        // ===== interrupt disabled =====
-        let old = Arch::is_interrupt_enabled();
-        Arch::disable_interrupt();
-
         // ===== before executing task future =====
+        assert!(Arch::is_interrupt_enabled());
+        Arch::disable_interrupt();
         let this = unsafe { self.get_unchecked_mut() };
         let task = &this.task;
         let future = &mut this.future;
         let time_in = get_time_us();
         task.tcb_mut().time_stat.record_switch_in();
         current_cpu().set_task(task);
+        Arch::enable_interrupt();
         // ===== before executing task future =====
-
-        // ===== interrupt restore =====
-        if old {
-            Arch::enable_interrupt();
-        }
 
         let ret = unsafe { Pin::new_unchecked(future).poll(cx) };
 
-        // ===== interrupt disabled =====
-        let old = Arch::is_interrupt_enabled();
-        if old {
-            Arch::disable_interrupt();
-        }
-
         // ===== after executing task future =====
+        Arch::disable_interrupt();
         let time_out = get_time_us();
         task.tcb_mut().time_stat.record_switch_out();
         task.trap_context_mut().freg_mut().yield_task();
         task.sched_entity().update_vruntime(time_out - time_in);
         current_cpu().clear_task();
+        Arch::enable_interrupt();
         // ===== after executing task future =====
 
-        // ===== interrupt restore =====
-        if old {
-            Arch::enable_interrupt();
-        }
         ret
     }
 }
@@ -90,35 +76,6 @@ pub async fn task_main(task: Arc<Task>) {
         task.tcb_mut().time_stat.record_trap_out();
 
         // check sigmask and status
-        // unsafe {
-        //     let bottom = 0x120b32630usize;
-        //     let top = 0x120b327a0usize;
-        //     let ptr = bottom as *const u8;
-        //     static mut LAST_HASH: u64 = 0;
-        //     if task
-        //         .memory_set()
-        //         .lock()
-        //         .page_table()
-        //         .find_pte(VirtAddr::from(bottom).floor())
-        //         .is_some()
-        //     {
-        //         let slice = core::slice::from_raw_parts(ptr, top - bottom);
-        //         let mut res: u64 = 0;
-        //         for it in slice {
-        //             res = (res * 20040409 + *it as u64) % 998244353;
-        //         }
-        //         debug!("[test] hash value: {:#x}", res);
-        //         if res != LAST_HASH {
-        //             debug!("[test] hash value changed: {:#x} -> {:#x}", LAST_HASH,
-        // res);             let slice_res: Vec<_> = slice.iter().collect();
-        //             debug!("[test] slice: {:?}", slice_res);
-        //             LAST_HASH = res;
-        //         }
-        //     } else {
-        //         debug!("[test] not allocated");
-        //     }
-        // };
-        fence(Ordering::SeqCst);
         assert!(check_no_lock());
         let mut pcb = task.pcb();
         if let Some(old_mask) = old_mask.take() {
