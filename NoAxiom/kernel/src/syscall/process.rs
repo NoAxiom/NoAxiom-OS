@@ -89,7 +89,7 @@ impl Syscall<'_> {
         new_cx[RES] = 0;
         trace!("[sys_fork] new task context: {:?}", new_cx);
         spawn_utask(new_task);
-        TASK_MANAGER.get_init_proc().print_child_tree(0);
+        TASK_MANAGER.get_init_proc().print_child_tree();
         Ok(new_tid as isize)
     }
 
@@ -103,7 +103,6 @@ impl Syscall<'_> {
 
         // args and envs init
         if path.contains(".sh") {
-            // run .sh script
             info!("[execve] executing .sh script, path: {:?}", path);
             path = format!("{ROOT_NAME}/busybox");
             args.push(format!("busybox"));
@@ -112,14 +111,10 @@ impl Syscall<'_> {
             info!("[execve] executing ls, path: {:?}", path);
             path = format!("busybox");
             args.push(format!("busybox"));
-            args.push(format!("sh"));
-            args.push(format!("ls"));
         } else if path.ends_with("sleep") {
             info!("[execve] executing sleep, path: {:?}", path);
             path = format!("busybox");
             args.push(format!("busybox"));
-            args.push(format!("sh"));
-            args.push(format!("sleep"));
         }
 
         let file_path = Path::from_string(path, self.task)?;

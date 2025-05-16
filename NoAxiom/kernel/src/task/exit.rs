@@ -100,7 +100,7 @@ impl Task {
             }
         }
         info!("[exit_hander] task {} exited successfully", self.tid());
-        TASK_MANAGER.get_init_proc().print_child_tree(0);
+        TASK_MANAGER.get_init_proc().print_child_tree();
     }
 }
 

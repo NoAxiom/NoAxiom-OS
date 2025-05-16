@@ -670,8 +670,7 @@ impl Task {
         Ok(())
     }
 
-    /// only for debug, print current child tree
-    pub fn print_child_tree(&self, fmt_offset: usize) {
+    fn print_child_tree_dfs(&self, fmt_offset: usize) {
         let mut fmt_proc = String::new();
         for _ in 0..fmt_offset {
             fmt_proc += "|---";
@@ -681,13 +680,19 @@ impl Task {
             fmt_thread += "|   ";
         }
         let pcb = self.pcb();
-        debug!("[ch_tree] {fmt_proc}process {}", self.tid());
+        debug!("{fmt_proc}process {}", self.tid());
         for thread in self.thread_group().0.iter() {
             let thread = thread.1.upgrade().unwrap();
-            debug!("[ch_tree] {fmt_thread}thread {}", thread.tid());
+            debug!("{fmt_thread}thread {}", thread.tid());
         }
         for child in &pcb.children {
-            child.print_child_tree(fmt_offset + 1);
+            child.print_child_tree_dfs(fmt_offset + 1);
         }
+    }
+
+    /// only for debug, print current child tree
+    pub fn print_child_tree(&self) {
+        debug!("[child_tree] print the child tree of task {}", self.tid());
+        self.print_child_tree_dfs(0);
     }
 }
