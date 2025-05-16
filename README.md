@@ -18,7 +18,7 @@ If you are not running on Linux, you may use `make docker` to create a virtual m
 
 Run `make env` to automatically set up the environment. It will initialize Rust targets, vendor sources, and Git submodules.
 
-Note: If you want to debug in VSCode, use `make vscode` to quickly generate VSCode settings.
+Note: If you want to debug in vscode, use `make vscode` to quickly generate vscode settings.
 
 Use `make help` and `make info` to get more detailed information.
 
@@ -53,12 +53,12 @@ make TEST_TYPE=official ARCH_NAME=loongarch64 LIB_NAME=musl
 
 ## Thanks
 
-[Pantheon](https://gitee.com/LiLiangF/pantheon_visionfive)
-
-[rCore](https://rcore-os.cn/rCore-Tutorial-Book-v3/index.html)
-
-[DragonOS](https://github.com/DragonOS-Community/DragonOS)
-
-[Titanix](https://gitlab.eduxiji.net/202318123101314/oskernel2023-Titanix)
-
-[Phoenix](https://gitlab.eduxiji.net/educg-group-22026-2376550/T202418123993075-1053)
+| Project                                                      | Referred Function                |
+| ------------------------------------------------------------ | -------------------------------- |
+| [rCore](https://rcore-os.cn/rCore-Tutorial-Book-v3/index.html) | Tutorial                         |
+| [Pantheon](https://gitee.com/LiLiangF/pantheon_visionfive)   | Coroutine, Process, Memory       |
+| [DragonOS](https://github.com/DragonOS-Community/DragonOS)   | Net structure                    |
+| [Phoenix](https://gitlab.eduxiji.net/educg-group-22026-2376550/T202418123993075-1053) | Coroutine, Memory, Signal        |
+| [NPUcore-IMPACT](https://gitlab.eduxiji.net/educg-group-22027-2376549/T202410699992496-1562) | LoongArch support for arch       |
+| [Tornado-OS](https://github.com/HUST-OS/tornado-os)          | Async driver for file system     |
+| [Polyhal](https://github.com/Byte-OS/polyhal)                | Arch layer design for multi-arch |
