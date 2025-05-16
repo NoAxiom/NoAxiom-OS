@@ -3,6 +3,7 @@ use core::task::Waker;
 
 use async_trait::async_trait;
 use smoltcp::wire::IpEndpoint;
+use spin::{Mutex, MutexGuard};
 
 use super::{tcpsocket::TcpSocket, udpsocket::UdpSocket};
 use crate::{
@@ -62,10 +63,12 @@ impl Sock {
     }
 }
 
-/// No lock File struct for managing socket
+/// The file for socket
+/// todo: all the file struct should hold [`async_mutex`] because the I/O is
+/// time-consuming
 pub struct SocketFile {
     meta: FileMeta,
-    sock: Sock,
+    sock: Mutex<Sock>,
     type_: PosixSocketType,
 }
 
@@ -88,7 +91,11 @@ impl SocketFile {
         let meta = FileMeta::new(Arc::new(empty_dentry), Arc::new(empty_inode));
         meta.set_flags(FileFlags::O_RDWR);
 
-        Self { meta, sock, type_ }
+        Self {
+            meta,
+            sock: Mutex::new(sock),
+            type_,
+        }
     }
 
     pub fn new_from_socket(socket: Arc<SocketFile>, sock: Sock) -> Self {
@@ -99,17 +106,13 @@ impl SocketFile {
 
         Self {
             meta,
-            sock,
+            sock: Mutex::new(sock),
             type_: socket.type_,
         }
     }
 
-    pub fn socket(&self) -> &Sock {
-        &self.sock
-    }
-
-    pub fn socket_mut(&mut self) -> &mut Sock {
-        &mut self.sock
+    pub fn socket(&self) -> MutexGuard<'_, Sock> {
+        self.sock.lock()
     }
 }
 
@@ -119,9 +122,9 @@ impl File for SocketFile {
         &self.meta
     }
     async fn base_read(&self, _offset: usize, buf: &mut [u8]) -> SyscallResult {
-        let sock = self.socket();
+        let mut sock = self.socket();
         let res;
-        match sock {
+        match &mut *sock {
             Sock::Tcp(socket) => {
                 res = socket.read(buf).await.0?;
             }
@@ -137,9 +140,9 @@ impl File for SocketFile {
         unreachable!()
     }
     async fn base_write(&self, _offset: usize, buf: &[u8]) -> SyscallResult {
-        let sock = self.socket();
+        let mut sock = self.socket();
         let res;
-        match sock {
+        match &mut *sock {
             Sock::Tcp(socket) => {
                 res = socket.write(buf, None).await?;
             }

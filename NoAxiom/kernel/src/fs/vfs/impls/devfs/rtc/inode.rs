@@ -16,7 +16,7 @@ pub struct RtcInode {
 impl RtcInode {
     pub fn new(superblock: Arc<dyn SuperBlock>) -> Self {
         Self {
-            meta: InodeMeta::new(superblock, InodeMode::FILE, BLOCK_SIZE),
+            meta: InodeMeta::new(superblock, InodeMode::FILE, BLOCK_SIZE, false),
         }
     }
 }

@@ -50,6 +50,7 @@ impl TcpSocket {
             options,
         );
 
+        debug!("[Tcp] new socket: {:?}", new_socket_handle);
         Self {
             meta,
             state: TcpState::Closed,
@@ -228,6 +229,7 @@ impl Socket for TcpSocket {
     ///
     /// return: whether the operation is successful
     async fn connect(&mut self, remote: IpEndpoint) -> SysResult<()> {
+        debug!("[Tcp] connect to {:?}", remote);
         let mut sockets = SOCKET_SET.lock();
         let local_socket = sockets.get_mut::<tcp::Socket>(self.handles[0]);
 

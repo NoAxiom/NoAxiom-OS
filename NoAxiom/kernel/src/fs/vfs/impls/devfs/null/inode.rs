@@ -16,7 +16,7 @@ pub struct NullInode {
 impl NullInode {
     pub fn new(superblock: Arc<dyn SuperBlock>) -> Self {
         Self {
-            meta: InodeMeta::new(superblock, InodeMode::CHAR, BLOCK_SIZE),
+            meta: InodeMeta::new(superblock, InodeMode::CHAR, BLOCK_SIZE, false),
         }
     }
 }

@@ -2,10 +2,11 @@ use alloc::{boxed::Box, sync::Arc};
 
 use async_trait::async_trait;
 use downcast_rs::{impl_downcast, DowncastSync};
-use spin::Mutex;
+use spin::{Mutex, MutexGuard};
 
 use super::superblock::{EmptySuperBlock, SuperBlock};
 use crate::{
+    fs::pagecache::PageCache,
     include::fs::{InodeMode, Stat, Statx, StatxTimestamp},
     syscall::SysResult,
     time::time_spec::TimeSpec,
@@ -20,6 +21,7 @@ fn alloc_id() -> usize {
     *id
 }
 
+#[allow(unused)]
 pub enum InodeState {
     UnInit,
     Normal,
@@ -35,10 +37,22 @@ pub struct InodeMeta {
     pub inode_mode: InodeMode,
     /// The super block of the inode
     pub super_block: Arc<dyn SuperBlock>,
+    /// The page cache of the file, managed by the `Inode`
+    pub page_cache: Option<Mutex<PageCache>>,
 }
 
 impl InodeMeta {
-    pub fn new(super_block: Arc<dyn SuperBlock>, inode_mode: InodeMode, size: usize) -> Self {
+    pub fn new(
+        super_block: Arc<dyn SuperBlock>,
+        inode_mode: InodeMode,
+        size: usize,
+        cached: bool,
+    ) -> Self {
+        let page_cache = if cached {
+            Some(Mutex::new(PageCache::new()))
+        } else {
+            None
+        };
         Self {
             id: alloc_id(),
             inner: Mutex::new(InodeMetaInner {
@@ -54,6 +68,7 @@ impl InodeMeta {
             }),
             inode_mode,
             super_block,
+            page_cache,
         }
     }
 }
@@ -97,6 +112,13 @@ impl dyn Inode {
     }
     pub fn set_size(&self, size: usize) {
         self.meta().inner.lock().size = size;
+    }
+    pub fn page_cache(&self) -> Option<MutexGuard<'_, PageCache>> {
+        if let Some(page_cache) = &self.meta().page_cache {
+            Some(page_cache.lock())
+        } else {
+            None
+        }
     }
     pub fn statx(&self, mask: u32) -> SysResult<Statx> {
         let stat = self.stat()?;
@@ -149,7 +171,7 @@ impl EmptyInode {
         let super_block = Arc::new(EmptySuperBlock::new());
         let inode_mode = InodeMode::empty();
         Self {
-            meta: InodeMeta::new(super_block, inode_mode, 0),
+            meta: InodeMeta::new(super_block, inode_mode, 0, false),
         }
     }
 }

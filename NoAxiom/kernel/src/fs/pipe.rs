@@ -251,7 +251,7 @@ impl PipeInode {
         let parent = root_dentry();
         let super_block = parent.super_block();
         Self {
-            meta: InodeMeta::new(super_block, InodeMode::FIFO, PIPE_BUF_SIZE),
+            meta: InodeMeta::new(super_block, InodeMode::FIFO, PIPE_BUF_SIZE, false),
         }
     }
 }

@@ -40,7 +40,7 @@ impl UdpSocket {
             UDP_CONSTANTS.default_metadata_buf_size,
             options,
         );
-
+        debug!("[Udp] new socket: {:?}", new_socket_handle);
         Self {
             handle: new_socket_handle,
             remote_endpoint: None,

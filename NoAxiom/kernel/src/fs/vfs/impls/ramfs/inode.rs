@@ -16,7 +16,7 @@ pub struct RamFsFileInode {
 impl RamFsFileInode {
     pub fn new(superblock: Arc<dyn SuperBlock>, size: usize) -> Self {
         Self {
-            meta: InodeMeta::new(superblock, InodeMode::FILE, size),
+            meta: InodeMeta::new(superblock, InodeMode::FILE, size, false),
         }
     }
 }
@@ -59,7 +59,7 @@ pub struct RamFsDirInode {
 impl RamFsDirInode {
     pub fn new(superblock: Arc<dyn SuperBlock>, size: usize) -> Self {
         Self {
-            meta: InodeMeta::new(superblock, InodeMode::DIR, size),
+            meta: InodeMeta::new(superblock, InodeMode::DIR, size, false),
         }
     }
 }

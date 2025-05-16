@@ -4,6 +4,7 @@
 pub mod blockcache;
 pub mod fdtable;
 pub mod manager;
+pub mod pagecache;
 pub mod path;
 pub mod pipe;
 pub mod vfs;

@@ -248,7 +248,7 @@ impl MapArea {
 
         loop {
             let mut buf = vec![0u8; len.min(PAGE_SIZE)];
-            file.base_read((start + offset) as usize, &mut buf).await?;
+            file.read_at((start + offset) as usize, &mut buf).await?;
             let data_slice = buf.as_slice();
 
             let src = &data_slice[0..len.min(PAGE_SIZE - page_offset)];

@@ -7,8 +7,9 @@ use core::{
 };
 
 use async_trait::async_trait;
+use config::mm::PAGE_SIZE;
 use downcast_rs::{impl_downcast, DowncastSync};
-use spin::Mutex;
+use spin::{Mutex, MutexGuard};
 
 use super::{
     dentry::{self, Dentry},
@@ -16,12 +17,14 @@ use super::{
 };
 use crate::{
     constant::fs::LEN_BEFORE_NAME,
+    fs::pagecache::{Page, PageCache},
     include::{
         fs::{FileFlags, LinuxDirent64, SeekFrom},
         io::PollEvent,
         result::Errno,
     },
     syscall::{SysResult, SyscallResult},
+    utils::align_offset,
 };
 
 pub struct FileMeta {
@@ -72,17 +75,20 @@ pub trait File: Send + Sync + DowncastSync {
     fn size(&self) -> usize {
         self.meta().inode.size()
     }
+    fn page_cache(&self) -> Option<MutexGuard<'_, PageCache>> {
+        self.meta().inode.page_cache()
+    }
     /// Get the dentry of the file
     fn dentry(&self) -> Arc<dyn Dentry> {
         self.meta().dentry.clone()
     }
     /// Get the meta of the file
     fn meta(&self) -> &FileMeta;
-    /// Read data from file at `offset` to `buf`
+    /// Read data from file at `offset` to `buf`, not for kernel other modules
     async fn base_read(&self, offset: usize, buf: &mut [u8]) -> SyscallResult;
     /// Readlink data from file at `offset` to `buf`
     async fn base_readlink(&self, buf: &mut [u8]) -> SyscallResult;
-    /// Write data to file at `offset` from `buf`
+    /// Write data to file at `offset` from `buf`, not for kernel other modules
     async fn base_write(&self, offset: usize, buf: &[u8]) -> SyscallResult;
     /// Load directory into memory, must be called before read/write explicitly,
     /// only for directories
@@ -143,18 +149,147 @@ impl dyn File {
     pub async fn read_all(&self) -> SysResult<Vec<u8>> {
         let len = self.meta().inode.size();
         let mut buf = vec![0; len];
-        self.base_read(0, &mut buf).await?;
+        self.read_at(0, &mut buf).await?;
         Ok(buf)
     }
+
+    /// **FOR KERNEL!**  
+    /// read the file at `offset` and fill the `buf` as much as possible
+    /// by using the page cache  
+    ///
+    /// if missing, using the `base_read` to fill the
+    /// page cache
+    ///
+    /// return the exact num of bytes read
+    pub async fn read_at(&self, offset: usize, buf: &mut [u8]) -> SyscallResult {
+        let size = self.size();
+        if offset > size {
+            warn!(
+                "[read_at] {} offset {offset} > size {size}",
+                self.meta().dentry.name()
+            );
+            return Ok(0);
+        }
+        let page_cache = self.page_cache();
+        if page_cache.is_none() {
+            return self.base_read(offset, buf).await;
+        }
+        let mut page_cache = page_cache.unwrap();
+
+        let mut current_offset = offset;
+        let mut buf = buf;
+
+        // if the last page is not full,
+        // if the buf is run out
+        loop {
+            let (offset_align, offset_in) = align_offset(current_offset, PAGE_SIZE);
+            if let Some(page) = page_cache.get_page(offset_align) {
+                // maybe it is the las page, the exact len is equal to `size` - `current_offset`
+                // or the rest of the page
+                let page_len = (PAGE_SIZE - offset_in).min(size - current_offset);
+                // maybe the buf is not enough
+                let len = buf.len().min(page_len);
+
+                unsafe {
+                    core::ptr::copy_nonoverlapping(
+                        page.as_mut_bytes_array().as_ptr().add(offset_in),
+                        buf.as_mut_ptr(),
+                        len,
+                    );
+                }
+
+                buf = &mut buf[len..];
+                current_offset += len;
+
+                if buf.is_empty() || current_offset == size {
+                    break;
+                }
+            } else {
+                let new_page = Page::new();
+                // metion that no matter the result of base_read, we can just continue the loop
+                self.base_read(offset_align, new_page.as_mut_bytes_array())
+                    .await?;
+                page_cache.fill_page(offset_align, new_page);
+            }
+        }
+
+        Ok((current_offset - offset) as isize)
+    }
+
     pub async fn read(&self, buf: &mut [u8]) -> SyscallResult {
         let offset = self.meta().pos.load(Ordering::Acquire);
-        let len = self.base_read(offset, buf).await?;
+        let len = self.read_at(offset, buf).await?;
         self.meta().pos.fetch_add(len as usize, Ordering::Release);
         Ok(len)
     }
+
+    /// **FOR KERNEL!**  
+    /// write the `buf` to the file at `offset` as much as possible by using
+    /// the page cache
+    ///
+    /// if missing, using the `base_read` to fill the
+    /// page cache
+    ///
+    /// return the exact num of bytes write
+    pub async fn write_at(&self, offset: usize, buf: &[u8]) -> SyscallResult {
+        let size = self.size();
+        let page_cache = self.page_cache();
+        if page_cache.is_none() {
+            return self.base_write(offset, buf).await;
+        }
+        let mut page_cache = page_cache.unwrap();
+
+        let mut current_offset = offset;
+        let mut buf = buf;
+        let ret = buf.len();
+
+        // if the last page is not full,
+        // if the buf is run out
+        loop {
+            let (offset_align, offset_in) = align_offset(current_offset, PAGE_SIZE);
+            if let Some(page) = page_cache.get_page_mut(offset_align) {
+                // maybe it is the las page, the exact len is equal to `size` - `current_offset`
+                // mention that write can expand the file, so the file size is not useful
+                let page_len = PAGE_SIZE - offset_in;
+                // maybe the buf is not enough
+                let len = buf.len().min(page_len);
+
+                unsafe {
+                    core::ptr::copy_nonoverlapping(
+                        buf.as_ptr(),
+                        page.as_mut_bytes_array().as_mut_ptr().add(offset_in),
+                        len,
+                    );
+                }
+
+                page.mark_dirty();
+
+                buf = &buf[len..];
+                current_offset += len;
+
+                if buf.is_empty() {
+                    break;
+                }
+            } else {
+                let new_page = Page::new();
+                page_cache.fill_page(offset_align, new_page);
+            }
+        }
+
+        if current_offset > size {
+            warn!(
+                "[write_at] {} expand size to {current_offset}",
+                self.meta().dentry.name(),
+            );
+            self.inode().set_size(current_offset);
+        }
+
+        Ok(ret as isize)
+    }
+
     pub async fn write(&self, buf: &[u8]) -> SyscallResult {
         let offset = self.meta().pos.load(Ordering::Acquire);
-        let len = self.base_write(offset, buf).await?;
+        let len = self.write_at(offset, buf).await?;
         self.meta().pos.fetch_add(len as usize, Ordering::Release);
         Ok(len)
     }

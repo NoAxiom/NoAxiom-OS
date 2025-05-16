@@ -8,6 +8,13 @@ pub fn align_up(addr: usize, align: usize) -> usize {
     (addr + align - 1) & !(align - 1)
 }
 
+#[inline(always)]
+pub fn align_offset(offset: usize, align: usize) -> (usize, usize) {
+    let offset_aligned = offset & !(align - 1);
+    let offset_inner = offset - offset_aligned;
+    (offset_aligned, offset_inner)
+}
+
 pub fn get_string_from_ptr(ptr: &UserPtr<u8>) -> String {
     let slice = ptr.clone_as_vec_until(|&c: &u8| c == 0);
     let res = String::from_utf8(Vec::from(slice)).unwrap();

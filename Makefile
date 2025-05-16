@@ -4,13 +4,13 @@
 export PROJECT := NoAxiom
 export MODE := release
 export KERNEL := kernel
+export TEST_TYPE ?= custom
 export ARCH_NAME ?= riscv64
 export LIB_NAME ?= musl
 export INIT_PROC ?= busybox
-export ON_SCREEN ?= false
+export ON_SCREEN ?= true
 export ROOT := $(shell pwd)
 export LOG ?= DEBUG
-export TEST_TYPE ?= custom
 export USER_PROJECT := NoAxiom-OS-User
 export ERROR := "\e[31m"
 export WARN := "\e[33m"

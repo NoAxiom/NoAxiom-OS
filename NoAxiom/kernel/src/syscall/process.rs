@@ -98,6 +98,7 @@ impl Syscall<'_> {
         let mut path = UserPtr::new(path).get_cstr();
         let mut args = Vec::new();
         let mut envs = Vec::new();
+        debug!("[sys_execve] path: {:?}", path);
 
         // args and envs init
         if path.contains(".sh") {

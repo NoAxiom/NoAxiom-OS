@@ -18,7 +18,7 @@ impl MemInfoInode {
         let meminfo = Arc::new(MemInfo::new());
         let file_size = meminfo.serialize().len();
         Self {
-            meta: InodeMeta::new(superblock, InodeMode::FILE, file_size),
+            meta: InodeMeta::new(superblock, InodeMode::FILE, file_size, false),
         }
     }
 }

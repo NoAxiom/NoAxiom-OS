@@ -20,7 +20,12 @@ pub struct Fat32FileInode {
 impl Fat32FileInode {
     pub fn new(superblock: Arc<dyn superblock::SuperBlock>, file: IFatFileFile) -> Self {
         Self {
-            meta: InodeMeta::new(superblock, InodeMode::FILE, file.size().unwrap() as usize),
+            meta: InodeMeta::new(
+                superblock,
+                InodeMode::FILE,
+                file.size().unwrap() as usize,
+                true,
+            ),
             file: Arc::new(Mutex::new(file)),
         }
     }
@@ -68,7 +73,7 @@ pub struct Fat32DirInode {
 impl Fat32DirInode {
     pub fn new(superblock: Arc<dyn superblock::SuperBlock>, file: IFatFileDir) -> Self {
         Self {
-            meta: InodeMeta::new(superblock, InodeMode::DIR, 0),
+            meta: InodeMeta::new(superblock, InodeMode::DIR, 0, false),
             file: Arc::new(Mutex::new(file)),
         }
     }

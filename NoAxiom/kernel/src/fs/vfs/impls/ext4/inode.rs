@@ -1,4 +1,4 @@
-use alloc::{boxed::Box, sync::Arc};
+use alloc::{boxed::Box, rc::Weak, sync::Arc};
 
 use async_trait::async_trait;
 use include::errno::Errno;
@@ -24,7 +24,7 @@ impl Ext4FileInode {
     pub fn new(superblock: Arc<dyn SuperBlock>, inode: IExtInode) -> Self {
         let file_size = inode.inode.size();
         Self {
-            meta: InodeMeta::new(superblock, InodeMode::FILE, file_size as usize),
+            meta: InodeMeta::new(superblock, InodeMode::FILE, file_size as usize, true),
             ino: Arc::new(Mutex::new(inode)),
         }
     }
@@ -89,7 +89,7 @@ pub struct Ext4DirInode {
 impl Ext4DirInode {
     pub fn new(superblock: Arc<dyn SuperBlock>, inode: IExtInode) -> Self {
         Self {
-            meta: InodeMeta::new(superblock, InodeMode::DIR, 0),
+            meta: InodeMeta::new(superblock, InodeMode::DIR, 0, false),
             ino: Arc::new(Mutex::new(inode)),
         }
     }

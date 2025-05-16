@@ -234,7 +234,7 @@ impl Syscall<'_> {
         }
         let user_ptr = UserPtr::<u8>::new(buf);
         let buf_slice = user_ptr.as_slice_mut_checked(len).await?;
-        file.base_read(offset, buf_slice).await
+        file.read_at(offset, buf_slice).await
     }
 
     /// Write data to a file descriptor
@@ -304,7 +304,7 @@ impl Syscall<'_> {
         }
         let user_ptr = UserPtr::<u8>::new(buf);
         let buf_slice = user_ptr.as_slice_mut_checked(len).await?;
-        file.base_write(offset, buf_slice).await
+        file.write_at(offset, buf_slice).await
     }
 
     /// Create a directory
@@ -664,7 +664,7 @@ impl Syscall<'_> {
         let mut buf = vec![0u8; count];
         let read_len = if !offset_ptr.is_null() {
             let offset = offset_ptr.read();
-            let read_len = in_file.base_read(offset, &mut buf).await? as usize;
+            let read_len = in_file.read_at(offset, &mut buf).await? as usize;
             offset_ptr.write(offset + read_len);
             read_len
         } else {
@@ -796,6 +796,7 @@ impl Syscall<'_> {
         drop(fd_table);
         let file_name = file.dentry().path();
         info!("[sys_ftruncate] file_name: {:?}", file_name);
+        file.inode().set_size(length);
         file.inode().truncate(length).await?;
         Ok(0)
     }
@@ -859,7 +860,7 @@ impl Syscall<'_> {
         } else {
             0
         };
-        let in_len = file_in.base_read(in_offset, &mut buf).await?;
+        let in_len = file_in.read_at(in_offset, &mut buf).await?;
         if in_len == 0 {
             return Ok(0);
         }
@@ -874,7 +875,7 @@ impl Syscall<'_> {
         } else {
             0
         };
-        let out_len = file_out.base_write(out_offset, &buf).await? as usize;
+        let out_len = file_out.write_at(out_offset, &buf).await? as usize;
 
         if !off_in.is_null() {
             off_in.write(off_in.read() + in_len as i64);

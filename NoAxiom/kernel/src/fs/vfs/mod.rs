@@ -62,8 +62,8 @@ pub async fn fs_init() {
     // InodeMode::FILE).await; passwd.dentry().open().expect("open /etc/passwd
     // failed");
 
-    let ls = Path::from_or_create(format!("{}/ls", ROOT_NAME), InodeMode::FILE).await;
-    ls.dentry().open().expect("open ls failed");
+    // let ls = Path::from_or_create(format!("{}/ls", ROOT_NAME),
+    // InodeMode::FILE).await; ls.dentry().open().expect("open ls failed");
 }
 
 pub fn root_dentry() -> Arc<dyn basic::dentry::Dentry> {

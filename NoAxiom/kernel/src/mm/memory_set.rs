@@ -276,7 +276,7 @@ impl MemorySet {
             }
         };
         let mut elf_mini_buf = [0u8; 64];
-        elf_file.base_read(0, &mut elf_mini_buf).await?;
+        elf_file.read_at(0, &mut elf_mini_buf).await?;
         let mini_elf = ElfFile::new(&elf_mini_buf).map_err(handler)?;
 
         // check: magic
@@ -291,7 +291,7 @@ impl MemorySet {
         let ph_count = mini_elf.header.pt2.ph_count() as usize;
         let header_buf_len = ph_offset + ph_count * ph_entry_size;
         let mut elf_buf = vec![0u8; header_buf_len];
-        elf_file.base_read(0, elf_buf.as_mut()).await?;
+        elf_file.read_at(0, elf_buf.as_mut()).await?;
         let elf = ElfFile::new(elf_buf.as_slice()).map_err(handler)?;
 
         // construct new memory set to hold elf data
@@ -353,7 +353,7 @@ impl MemorySet {
                         buf.pop();
                     }
                     elf_file
-                        .base_read(ph.offset() as usize, buf.as_mut_slice())
+                        .read_at(ph.offset() as usize, buf.as_mut_slice())
                         .await?;
                     let path = format!(
                         "{ROOT_NAME}/{}",
