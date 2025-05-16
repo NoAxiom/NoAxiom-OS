@@ -162,6 +162,10 @@ impl dyn File {
     ///
     /// return the exact num of bytes read
     pub async fn read_at(&self, offset: usize, buf: &mut [u8]) -> SyscallResult {
+        let page_cache = self.page_cache();
+        if page_cache.is_none() {
+            return self.base_read(offset, buf).await;
+        }
         let size = self.size();
         if offset > size {
             warn!(
@@ -169,10 +173,6 @@ impl dyn File {
                 self.meta().dentry.name()
             );
             return Ok(0);
-        }
-        let page_cache = self.page_cache();
-        if page_cache.is_none() {
-            return self.base_read(offset, buf).await;
         }
         let mut page_cache = page_cache.unwrap();
 
@@ -232,11 +232,11 @@ impl dyn File {
     ///
     /// return the exact num of bytes write
     pub async fn write_at(&self, offset: usize, buf: &[u8]) -> SyscallResult {
-        let size = self.size();
         let page_cache = self.page_cache();
         if page_cache.is_none() {
             return self.base_write(offset, buf).await;
         }
+        let size = self.size();
         let mut page_cache = page_cache.unwrap();
 
         let mut current_offset = offset;
