@@ -189,9 +189,6 @@ impl FdTable {
     }
 
     pub fn close(&mut self, fd: usize) -> SyscallResult {
-        if fd < 3 {
-            return Ok(0);
-        }
         if fd >= self.table.len() {
             return Err(Errno::EBADF);
         }

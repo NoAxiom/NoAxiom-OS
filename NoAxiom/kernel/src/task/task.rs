@@ -23,11 +23,7 @@ use super::{
 };
 use crate::{
     config::task::INIT_PROCESS_ID,
-    constant::fs::{STD_ERR, STD_IN, STD_OUT},
-    fs::{
-        fdtable::{FdTable, FdTableEntry},
-        path::Path,
-    },
+    fs::{fdtable::FdTable, path::Path},
     include::{
         fs::InodeMode,
         process::{
@@ -553,14 +549,7 @@ impl Task {
         let fd_table = if flags.contains(CloneFlags::FILES) {
             self.fd_table.clone()
         } else {
-            trace!("fd table info cloned");
-            let tmp = Shared::new(self.fd_table.lock().clone());
-            let mut guard = tmp.lock();
-            guard.table[STD_IN] = Some(FdTableEntry::std_in());
-            guard.table[STD_OUT] = Some(FdTableEntry::std_out());
-            guard.table[STD_ERR] = Some(FdTableEntry::std_err());
-            drop(guard);
-            tmp
+            Shared::new(self.fd_table.lock().clone())
         };
 
         // CLONE_PARENT (since Linux 2.3.12)
