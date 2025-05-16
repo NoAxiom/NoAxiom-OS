@@ -1,5 +1,6 @@
 use alloc::{collections::BTreeMap, vec::Vec};
 
+use config::mm::SHM_OFFSET;
 use ksync::mutex::SpinLock;
 use lazy_static::lazy_static;
 use memory::address::{PhysAddr, VirtAddr};
@@ -135,7 +136,7 @@ impl ShmInfo {
         Self {
             shm_areas: Vec::new(),
             shm_trackers: BTreeMap::new(),
-            shm_top: 0,
+            shm_top: SHM_OFFSET,
         }
     }
 }

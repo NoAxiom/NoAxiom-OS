@@ -62,7 +62,6 @@ impl Syscall<'_> {
         Ok(0)
     }
 
-    // mprotect 226
     pub fn sys_mprotect(&self, addr: usize, length: usize, prot: usize) -> SyscallResult {
         let root_ppn = Arch::current_root_ppn();
         let page_table = PageTable::from_ppn(root_ppn);
@@ -116,21 +115,24 @@ impl Syscall<'_> {
         Ok(0)
     }
 
+    /// create a shared memory segment with the given key and size
+    /// and return the segment identifier.
     pub fn sys_shmget(&self, key: usize, size: usize, shmflg: usize) -> SyscallResult {
-        info!("create shm");
+        warn!(
+            "[shmget] key: {:#x}, size: {:#x}, shmflg: {:#x}",
+            key, size, shmflg
+        );
         let size = (size + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE;
         assert!(size % PAGE_SIZE == 0);
-        let new_key;
-        if key == IPC_PRIVATE {
-            new_key = create_shm(key, size, shmflg);
-        } else {
-            unimplemented!();
-        }
+        let new_key = match key {
+            IPC_PRIVATE => create_shm(key, size, shmflg),
+            _ => unimplemented!(),
+        };
         Ok(new_key as isize)
     }
 
     pub fn sys_shmctl(&self, key: usize, cmd: usize, _buf: *const u8) -> SyscallResult {
-        info!("remove shm");
+        warn!("[shmctl] remove shm key: {:#x}, cmd: {:#x}", key, cmd);
         if cmd == IPC_RMID {
             remove_shm(key);
         } else {
@@ -140,7 +142,7 @@ impl Syscall<'_> {
     }
 
     pub fn sys_shmat(&self, key: usize, addr: usize, _shmflg: usize) -> SyscallResult {
-        info!("attach shm key {:?} shm address {:#x}", key, addr);
+        warn!("[shmat] attach shm key {:?} shm address {:#x}", key, addr);
         let task = self.task;
         let mut memory_set = task.memory_set().lock();
         let addr = if addr == 0 {
@@ -154,12 +156,11 @@ impl Syscall<'_> {
     }
 
     pub fn sys_shmdt(&self, address: usize) -> SyscallResult {
-        info!("detach shm address {:#x}", address);
+        warn!("[shmdt] detach shm address {:#x}", address);
         let task = self.task;
         let mut memory_set = task.memory_set().lock();
         let nattch = memory_set.detach_shm(address.into());
         drop(memory_set);
-        // detach_shm called when drop SharedMemoryTracker
         Ok(nattch as isize)
     }
 }

@@ -30,10 +30,14 @@ pub const MMAP_MAX_SIZE: usize = 0x1000_0000;
 /// mmap max_end address
 pub const MMAP_MAX_END_ADDR: usize = MMAP_BASE_ADDR + MMAP_MAX_SIZE;
 
+/// user memory end address
 pub const USER_MEMORY_END: usize = 0x20_0000_0000;
 
+/// share memory offset
+pub const SHM_OFFSET: usize = 0;
+
 /// Dynamic linked interpreter address range in user space
-pub const DL_INTERP_OFFSET: usize = USER_MEMORY_END;
+pub const DL_INTERP_OFFSET: usize = USER_MEMORY_END + 0x10_0000_0000;
 
 /// signal trampoline address
 pub const SIG_TRAMPOLINE: usize = USER_MEMORY_END - PAGE_SIZE;

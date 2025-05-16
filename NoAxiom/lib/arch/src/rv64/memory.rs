@@ -67,7 +67,7 @@ impl ArchPageTableEntry for PageTableEntry {
     }
     /// is valid
     fn is_allocated(&self) -> bool {
-        self.ppn() != 0
+        self.0 != 0
     }
 }
 

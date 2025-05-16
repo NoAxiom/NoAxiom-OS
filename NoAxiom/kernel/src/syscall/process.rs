@@ -25,13 +25,13 @@ use crate::{
 
 impl Syscall<'_> {
     /// exit current task by marking it as zombie
-    pub fn sys_exit(&mut self, exit_code: i32) -> SyscallResult {
+    pub fn sys_exit(&self, exit_code: i32) -> SyscallResult {
         self.task.terminate(ExitCode::new(exit_code));
         Ok(0)
     }
 
     /// exit group
-    pub fn sys_exit_group(&mut self, exit_code: i32) -> SyscallResult {
+    pub fn sys_exit_group(&self, exit_code: i32) -> SyscallResult {
         let task = self.task;
         let exit_code = ExitCode::new(exit_code);
         task.terminate_group(exit_code);
@@ -94,7 +94,7 @@ impl Syscall<'_> {
 
     /// execve syscall impl
     /// execute a new program, replacing the current process image
-    pub async fn sys_execve(&mut self, path: usize, argv: usize, envp: usize) -> SyscallResult {
+    pub async fn sys_execve(&self, path: usize, argv: usize, envp: usize) -> SyscallResult {
         let mut path = UserPtr::new(path).get_cstr();
         let mut args = Vec::new();
         let mut envs = Vec::new();

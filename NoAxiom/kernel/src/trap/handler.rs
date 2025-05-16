@@ -66,11 +66,11 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
 
     // check if need schedule
     if task.tcb().time_stat.is_timeup() {
-        // warn!(
-        //     "task {} yield by time = {:?}",
-        //     task.tid(),
-        //     task.tcb().time_stat,
-        // );
+        trace!(
+            "task {} time_stat timeup by time = {:?}",
+            task.tid(),
+            task.tcb().time_stat,
+        );
         yield_now().await;
     }
 
@@ -124,8 +124,8 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
             //     get_hartid(),
             //     task.tid(),
             // );
-            task.yield_now().await;
             set_next_trigger();
+            task.yield_now().await;
         }
         TrapType::SupervisorExternal => {
             trace!(

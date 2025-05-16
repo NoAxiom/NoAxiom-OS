@@ -546,7 +546,6 @@ impl MemorySet {
                     .page_table()
                     .map(vpn, old_pte.ppn().into(), new_flags);
             } else {
-                // fixme: mprotect could cause bugs as well
                 new_set
                     .page_table()
                     .map(vpn, old_pte.ppn().into(), old_flags);
@@ -562,17 +561,24 @@ impl MemorySet {
             new_set.mmap_manager.mmap_top.raw(),
         );
 
-        // shm
+        // shm: map it directly since shared memory needn't extra alloc
         for shm_area in self.shm.shm_areas.iter() {
-            let mut new_area = MapArea::from_another(shm_area);
-            debug!(
+            // we save data slice in shm manager, so the frame map is empty
+            assert!(shm_area.frame_map.is_empty());
+            let new_area = MapArea::from_another(shm_area);
+            info!(
                 "[clone_cow] shm area: {:?} is mapped as cow",
                 shm_area.vpn_range
             );
             for vpn in shm_area.vpn_range {
-                if let Some(frame_tracker) = shm_area.frame_map.get(&vpn) {
-                    remap_cow(self, vpn, &mut new_set, &mut new_area, frame_tracker);
-                }
+                let pte = self.page_table().find_pte(vpn).unwrap();
+                let flag = pte.flags();
+                new_set.page_table().map(vpn, pte.ppn().into(), flag);
+                // trace!(
+                //     "new_set: {:#x} flags: {:?}",
+                //     new_set.page_table().find_pte(vpn).unwrap().ppn(),
+                //     new_set.page_table().find_pte(vpn).unwrap().flags()
+                // );
             }
             new_set.shm.shm_areas.push(new_area);
         }
@@ -581,7 +587,6 @@ impl MemorySet {
             let new_shm_tracker = ShmTracker::new(shm_tracker.key);
             new_set.shm.shm_trackers.insert(*va, new_shm_tracker);
         }
-
         new_set
     }
 
@@ -660,15 +665,15 @@ impl MemorySet {
 
     pub fn attach_shm(&mut self, key: usize, start_va: VirtAddr) {
         let (start_pa, size) = shm_get_address_and_size(key);
-        // println!("attach_shm start_pa {:#x}", start_pa.0);
-        // println!("attach_shm start_va {:#x}", start_va.0);
+        warn!("attach_shm start_pa {:#x}", start_pa.raw());
+        warn!("attach_shm start_va {:#x}", start_va.raw());
         let flags = pte_flags!(V, U, W, R);
         let mut offset = 0;
 
         while offset < size {
-            let va: VirtAddr = (start_va.raw() + offset).into();
-            let pa: PhysAddr = (start_pa.raw() + offset).into();
-            // println!("attach map va:{:x?} to pa{:x?}",va,pa);
+            let va = start_va + offset;
+            let pa = PhysAddr::from(start_pa.raw() + offset);
+            warn!("attach map va:{:x?} to pa{:x?}", va, pa);
             self.page_table().map(va.into(), pa.into(), flags);
             offset += PAGE_SIZE;
         }
@@ -688,15 +693,15 @@ impl MemorySet {
     }
 
     pub fn detach_shm(&mut self, start_va: VirtAddr) -> usize {
-        // println!("detach start_va:{:?}",start_va);
+        warn!("detach start_va:{:?}", start_va);
         let key = self.shm.shm_trackers.get(&start_va).unwrap().key;
         let (_, size) = shm_get_address_and_size(key);
-        // println!("detach size:{:?}",size);
+        warn!("detach size:{:?}", size);
         let mut offset = 0;
         while offset < size {
-            let va: VirtAddr = (start_va.raw() + offset).into();
-            // println!("detach va:{:?}",va);
-            unsafe { &mut (*self.page_table.get()) }.unmap(va.into());
+            let va = start_va + offset;
+            warn!("detach va:{:?}", va);
+            self.page_table().unmap(va.into());
             offset += PAGE_SIZE
         }
         self.shm.shm_trackers.remove(&start_va);
