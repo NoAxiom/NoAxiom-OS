@@ -6,7 +6,10 @@ use config::{
     mm::{DL_INTERP_OFFSET, SIG_TRAMPOLINE, USER_HEAP_SIZE},
 };
 use include::errno::Errno;
-use ksync::{cell::SyncUnsafeCell, mutex::SpinLock};
+use ksync::{
+    cell::SyncUnsafeCell,
+    mutex::{check_no_lock, SpinLock},
+};
 use spin::Once;
 use xmas_elf::ElfFile;
 
@@ -277,6 +280,7 @@ impl MemorySet {
             }
         };
         let mut elf_mini_buf = [0u8; 64];
+        assert!(check_no_lock());
         elf_file.read_at(0, &mut elf_mini_buf).await?;
         let mini_elf = ElfFile::new(&elf_mini_buf).map_err(handler)?;
 

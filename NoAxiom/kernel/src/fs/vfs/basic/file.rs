@@ -9,7 +9,12 @@ use core::{
 use async_trait::async_trait;
 use config::mm::PAGE_SIZE;
 use downcast_rs::{impl_downcast, DowncastSync};
-use spin::{Mutex, MutexGuard};
+use ksync::{
+    async_mutex::AsyncMutexGuard,
+    mutex::{check_no_lock, SpinLock, SpinLockGuard},
+};
+type Mutex<T> = SpinLock<T>;
+type MutexGuard<'a, T> = SpinLockGuard<'a, T>;
 
 use super::{
     dentry::{self, Dentry},
@@ -75,8 +80,8 @@ pub trait File: Send + Sync + DowncastSync {
     fn size(&self) -> usize {
         self.meta().inode.size()
     }
-    fn page_cache(&self) -> Option<MutexGuard<'_, PageCache>> {
-        self.meta().inode.page_cache()
+    async fn page_cache(&self) -> Option<AsyncMutexGuard<'_, PageCache>> {
+        self.meta().inode.page_cache().await
     }
     /// Get the dentry of the file
     fn dentry(&self) -> Arc<dyn Dentry> {
@@ -162,8 +167,10 @@ impl dyn File {
     ///
     /// return the exact num of bytes read
     pub async fn read_at(&self, offset: usize, buf: &mut [u8]) -> SyscallResult {
-        let page_cache = self.page_cache();
+        let page_cache = self.page_cache().await;
         if page_cache.is_none() {
+            drop(page_cache);
+            assert!(check_no_lock());
             return self.base_read(offset, buf).await;
         }
         let size = self.size();
@@ -232,8 +239,10 @@ impl dyn File {
     ///
     /// return the exact num of bytes write
     pub async fn write_at(&self, offset: usize, buf: &[u8]) -> SyscallResult {
-        let page_cache = self.page_cache();
+        let page_cache = self.page_cache().await;
         if page_cache.is_none() {
+            drop(page_cache);
+            assert!(check_no_lock());
             return self.base_write(offset, buf).await;
         }
         let size = self.size();
@@ -296,7 +305,7 @@ impl dyn File {
     pub fn name(&self) -> String {
         self.dentry().name()
     }
-    pub fn flags(&self) -> spin::MutexGuard<'_, FileFlags> {
+    pub fn flags(&self) -> MutexGuard<'_, FileFlags> {
         self.meta().flags.lock()
     }
     pub fn set_flags(&self, flags: FileFlags) {

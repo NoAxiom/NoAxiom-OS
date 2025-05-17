@@ -9,8 +9,10 @@ use core::panic;
 
 use async_trait::async_trait;
 use downcast_rs::DowncastSync;
-use ksync::mutex::check_no_lock;
-use spin::Mutex;
+use ksync::mutex::{check_no_lock, SpinLock, SpinLockGuard};
+
+type Mutex<T> = SpinLock<T>;
+type MutexGuard<'a, T> = SpinLockGuard<'a, T>;
 
 use super::{
     file::File,
@@ -123,7 +125,7 @@ impl dyn Dentry {
     }
 
     /// Get the children of the dentry
-    pub fn children(&self) -> spin::MutexGuard<BTreeMap<String, Arc<dyn Dentry>>> {
+    pub fn children(&self) -> MutexGuard<BTreeMap<String, Arc<dyn Dentry>>> {
         self.meta().children.lock()
     }
 
@@ -280,6 +282,8 @@ impl dyn Dentry {
         path: &Vec<&str>,
         mode: InodeMode,
     ) -> Arc<dyn Dentry> {
+        use arch::ArchInt;
+
         let mut idx = 0;
         let max_idx = path.len() - 1;
         let mut current = self.clone();
@@ -305,10 +309,12 @@ impl dyn Dentry {
             if idx < max_idx {
                 debug!("[find_path_or_create] create dir {}", name);
                 assert!(check_no_lock());
+                assert!(arch::Arch::is_interrupt_enabled());
                 current = current.create(name, InodeMode::DIR).await.unwrap();
             } else {
                 debug!("[find_path_or_create] create file {}", name);
                 assert!(check_no_lock());
+                assert!(arch::Arch::is_interrupt_enabled());
                 current = current.create(name, mode).await.unwrap();
             }
             idx += 1;

@@ -2,7 +2,10 @@ use alloc::{boxed::Box, sync::Arc};
 
 use async_trait::async_trait;
 use downcast_rs::{impl_downcast, DowncastSync};
-use spin::{Mutex, MutexGuard};
+use ksync::{
+    async_mutex::{AsyncMutex, AsyncMutexGuard},
+    mutex::{SpinLock, SpinLockGuard},
+};
 
 use super::superblock::{EmptySuperBlock, SuperBlock};
 use crate::{
@@ -11,6 +14,9 @@ use crate::{
     syscall::SysResult,
     time::time_spec::TimeSpec,
 };
+
+type Mutex<T> = SpinLock<T>;
+type MutexGuard<'a, T> = SpinLockGuard<'a, T>;
 
 lazy_static::lazy_static! {
     static ref INODE_ID: Mutex<usize> = Mutex::new(0);
@@ -38,7 +44,7 @@ pub struct InodeMeta {
     /// The super block of the inode
     pub super_block: Arc<dyn SuperBlock>,
     /// The page cache of the file, managed by the `Inode`
-    pub page_cache: Option<Mutex<PageCache>>,
+    pub page_cache: Option<AsyncMutex<PageCache>>,
 }
 
 impl InodeMeta {
@@ -49,7 +55,7 @@ impl InodeMeta {
         cached: bool,
     ) -> Self {
         let page_cache = if cached {
-            Some(Mutex::new(PageCache::new()))
+            Some(AsyncMutex::new(PageCache::new()))
         } else {
             None
         };
@@ -113,9 +119,9 @@ impl dyn Inode {
     pub fn set_size(&self, size: usize) {
         self.meta().inner.lock().size = size;
     }
-    pub fn page_cache(&self) -> Option<MutexGuard<'_, PageCache>> {
+    pub async fn page_cache(&self) -> Option<AsyncMutexGuard<'_, PageCache>> {
         if let Some(page_cache) = &self.meta().page_cache {
-            Some(page_cache.lock())
+            Some(page_cache.lock().await)
         } else {
             None
         }

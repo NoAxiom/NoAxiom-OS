@@ -3,6 +3,7 @@ use core::task::Waker;
 
 use async_trait::async_trait;
 use ext4_rs::InodeFileType;
+use ksync::mutex::check_no_lock;
 
 use super::{dentry::Ext4Dentry, inode::Ext4FileInode, superblock::Ext4SuperBlock};
 use crate::{
@@ -44,15 +45,19 @@ impl File for Ext4File {
     //  - offset == cursor.offset: normal read
     //  - offset != cursor.offset: seek and read
     async fn base_read(&self, offset: usize, buf: &mut [u8]) -> SyscallResult {
+        assert!(check_no_lock());
         if offset > self.meta.inode.size() {
             return Ok(0);
         }
         let inode = &self.meta.inode;
         let super_block = self.meta.dentry().super_block();
+        trace!("[ext4file] read try to get lock");
         let ext4 = super_block
             .downcast_ref::<Ext4SuperBlock>()
             .unwrap()
-            .get_fs();
+            .get_fs()
+            .await;
+        trace!("[ext4file] read get lock succeed");
 
         match inode.file_type() {
             InodeMode::FILE => {
@@ -74,10 +79,13 @@ impl File for Ext4File {
     async fn base_write(&self, offset: usize, buf: &[u8]) -> SyscallResult {
         let inode = &self.meta.inode;
         let super_block = self.meta.dentry().super_block();
+        trace!("[ext4file] write try to get lock");
         let ext4 = super_block
             .downcast_ref::<Ext4SuperBlock>()
             .unwrap()
-            .get_fs();
+            .get_fs()
+            .await;
+        trace!("[ext4file] write get lock succeed");
         let size = inode.size();
         if offset + buf.len() > size {
             inode.set_size(offset + buf.len());
@@ -153,10 +161,13 @@ impl File for Ext4Dir {
         static mut FIRST: bool = true;
         debug!("[AsyncSmpExt4]Dir {}: load_dir", self.meta.dentry().name());
         let super_block = self.meta.dentry().super_block();
+        debug!("[ext4dir] load try to get lock");
         let ext4 = super_block
             .downcast_ref::<Ext4SuperBlock>()
             .unwrap()
-            .get_fs();
+            .get_fs()
+            .await;
+        debug!("[ext4dir] load get lock succeed");
 
         let entries = ext4.dir_get_entries(self.ino).await;
         for entry in entries {
@@ -194,10 +205,13 @@ impl File for Ext4Dir {
 
     async fn delete_child(&self, name: &str) -> Result<(), Errno> {
         let super_block = self.meta.dentry().super_block();
+        debug!("[ext4dir] delete_child try to get lock");
         let ext4 = super_block
             .downcast_ref::<Ext4SuperBlock>()
             .unwrap()
-            .get_fs();
+            .get_fs()
+            .await;
+        debug!("[ext4dir] delete_child  get lock succeed");
         let mut inode = ext4.get_inode_ref(self.ino).await;
         ext4.dir_remove_entry(&mut inode, &name)
             .await

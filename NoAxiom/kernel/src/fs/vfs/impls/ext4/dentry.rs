@@ -85,10 +85,13 @@ impl Dentry for Ext4Dentry {
         let this_inode_num = downcast_inode.get_inode().lock().inode_num;
         assert!(inode.file_type() == InodeMode::DIR);
         let super_block = self.clone().into_dyn().super_block();
+        trace!("[ext4] try to get lock super block");
         let ext4 = super_block
             .downcast_ref::<Ext4SuperBlock>()
             .unwrap()
-            .get_fs();
+            .get_fs()
+            .await;
+        trace!("[ext4] get lock super block succeed!");
         let self_path = self.clone().into_dyn().path().as_string();
         let child_path = if self_path != "/" {
             format!("{}/{}", self_path, name)
@@ -118,6 +121,8 @@ impl Dentry for Ext4Dentry {
                 .create(this_inode_num, name, 0x8000)
                 .await
                 .map_err(fs_err)?;
+            trace!("[ext4] drop ext4");
+            drop(ext4);
             // let inode_type = new_file_inode.inode.file_type();
             // debug!("new file inode type: {:?}", inode_type);
             let new_inode = Ext4FileInode::new(super_block.clone(), new_file_inode);
@@ -127,6 +132,8 @@ impl Dentry for Ext4Dentry {
             ext4.dir_mk(&child_path).await.map_err(fs_err)?;
             let inode_num = ext4.ext4_dir_open(&child_path).await.map_err(fs_err)?;
             let new_dir_inode = ext4.get_inode_ref(inode_num).await;
+            trace!("[ext4] drop ext4");
+            drop(ext4);
             let new_inode = Ext4DirInode::new(super_block.clone(), new_dir_inode);
             Ok(self.into_dyn().add_child(name, Arc::new(new_inode)))
         } else {

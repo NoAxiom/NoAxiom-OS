@@ -3,7 +3,7 @@ use alloc::{boxed::Box, sync::Arc};
 use async_trait::async_trait;
 use driver::devices::impls::block::BlockDevice;
 use ext4_rs::ext4_defs::ROOT_INODE;
-use spin::Mutex;
+use ksync::async_mutex::AsyncMutex;
 
 use super::{dentry::Ext4Dentry, inode::Ext4DirInode, superblock::Ext4SuperBlock, IExtFs};
 use crate::{
@@ -49,7 +49,7 @@ impl FileSystem for AsyncSmpExt4 {
         let super_block_meta = SuperBlockMeta::new(device.clone(), self.clone());
         let blk = device.unwrap();
         let disk_cursor = DiskCursor::new(blk, 0, 0);
-        let unbooted_fs = Arc::new(Mutex::new(IExtFs::open(Arc::new(disk_cursor)).await));
+        let unbooted_fs = Arc::new(AsyncMutex::new(IExtFs::open(Arc::new(disk_cursor)).await));
         let fs_super_block = Arc::new(Ext4SuperBlock::new(super_block_meta, unbooted_fs));
 
         let root_dentry = Arc::new(Ext4Dentry::new(
@@ -58,7 +58,7 @@ impl FileSystem for AsyncSmpExt4 {
             fs_super_block.clone(),
         ));
 
-        let ext4 = fs_super_block.get_fs();
+        let ext4 = fs_super_block.get_fs().await;
 
         let root_inode = Arc::new(Ext4DirInode::new(
             fs_super_block.clone(),

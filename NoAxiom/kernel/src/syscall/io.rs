@@ -104,7 +104,7 @@ impl Syscall<'_> {
         sigmask_ptr: usize,
     ) -> SyscallResult {
         info!(
-            "[sys_pslect6]: nfds {}, readfds_ptr {:#x}, writefds_ptr {:#x}, exceptfds_ptr {:#x}, timeout_ptr {:#x}, sigmask_ptr {:#x}",
+            "[sys_pselect6]: nfds {}, readfds_ptr {:#x}, writefds_ptr {:#x}, exceptfds_ptr {:#x}, timeout_ptr {:#x}, sigmask_ptr {:#x}",
             nfds, readfds_ptr, writefds_ptr, exceptfds_ptr, timeout_ptr, sigmask_ptr
         );
 

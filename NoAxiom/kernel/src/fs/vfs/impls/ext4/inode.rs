@@ -1,8 +1,8 @@
-use alloc::{boxed::Box, rc::Weak, sync::Arc};
+use alloc::{boxed::Box, sync::Arc};
 
 use async_trait::async_trait;
 use include::errno::Errno;
-use spin::Mutex;
+use ksync::mutex::SpinLock;
 
 use super::{fs_err, superblock::Ext4SuperBlock, IExtInode};
 use crate::{
@@ -17,7 +17,7 @@ use crate::{
 
 pub struct Ext4FileInode {
     meta: InodeMeta,
-    ino: Arc<Mutex<IExtInode>>,
+    ino: Arc<SpinLock<IExtInode>>,
 }
 
 impl Ext4FileInode {
@@ -25,10 +25,10 @@ impl Ext4FileInode {
         let file_size = inode.inode.size();
         Self {
             meta: InodeMeta::new(superblock, InodeMode::FILE, file_size as usize, true),
-            ino: Arc::new(Mutex::new(inode)),
+            ino: Arc::new(SpinLock::new(inode)),
         }
     }
-    pub fn get_inode(&self) -> Arc<Mutex<IExtInode>> {
+    pub fn get_inode(&self) -> Arc<SpinLock<IExtInode>> {
         self.ino.clone()
     }
 }
@@ -68,7 +68,8 @@ impl Inode for Ext4FileInode {
         let ext4 = super_block
             .downcast_ref::<Ext4SuperBlock>()
             .unwrap()
-            .get_fs();
+            .get_fs()
+            .await;
         let mut inode = self.ino.lock();
         debug!(
             "[Ext4FileInode] truncate inode: {}, new_size: {}",
@@ -83,17 +84,17 @@ impl Inode for Ext4FileInode {
 
 pub struct Ext4DirInode {
     meta: InodeMeta,
-    ino: Arc<Mutex<IExtInode>>,
+    ino: Arc<SpinLock<IExtInode>>,
 }
 
 impl Ext4DirInode {
     pub fn new(superblock: Arc<dyn SuperBlock>, inode: IExtInode) -> Self {
         Self {
             meta: InodeMeta::new(superblock, InodeMode::DIR, 0, false),
-            ino: Arc::new(Mutex::new(inode)),
+            ino: Arc::new(SpinLock::new(inode)),
         }
     }
-    pub fn get_inode(&self) -> Arc<Mutex<IExtInode>> {
+    pub fn get_inode(&self) -> Arc<SpinLock<IExtInode>> {
         self.ino.clone()
     }
 }
