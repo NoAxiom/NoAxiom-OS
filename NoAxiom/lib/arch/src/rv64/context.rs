@@ -65,7 +65,6 @@ pub mod reg_id {
 #[derive(Debug, Default, Copy, Clone)]
 pub struct MySstatus(pub usize);
 
-#[allow(unused)]
 impl MySstatus {
     pub fn read() -> Self {
         let val: usize;
@@ -246,6 +245,7 @@ impl ArchTrapContext for TrapContext {
     fn app_init_cx(entry: usize, sp: usize) -> Self {
         let mut sstatus = MySstatus::read();
         sstatus.set_spp(SPP::User);
+        sstatus.set_spie();
         let mut cx = Self {
             x: [0; 32],
             sstatus,

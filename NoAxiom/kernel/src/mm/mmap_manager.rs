@@ -34,7 +34,7 @@ impl MmapPage {
             let buf_slice: &mut [u8] = unsafe {
                 core::slice::from_raw_parts_mut(kernel_vpn.as_va_usize() as *mut u8, PAGE_SIZE)
             };
-            // crate::sched::utils::yield_now().await;
+            warn!("mmap read file, offset: {:#x}", self.offset);
             let res = file.read_at(self.offset, buf_slice).await;
             if let Err(res) = res {
                 error!("ERROR at mmap read file, msg: {:?}", res);

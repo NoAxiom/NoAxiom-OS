@@ -2,7 +2,7 @@
 
 use alloc::sync::Arc;
 
-use arch::{Arch, ArchInt, ArchTrap, TrapArgs, TrapType};
+use arch::{consts::KERNEL_ADDR_OFFSET, Arch, ArchInt, ArchTrap, TrapArgs, TrapType};
 
 use super::{ext_int::ext_int_handler, ipi::ipi_handler};
 use crate::{
@@ -22,6 +22,10 @@ use crate::{
 fn kernel_trap_handler() {
     let trap_type = Arch::read_trap_type(None);
     let epc = Arch::read_epc();
+    assert!(
+        epc & KERNEL_ADDR_OFFSET == 0,
+        "epc {epc:#x?} shouldn't be in kernel space, trap_type: {trap_type:?}",
+    );
     let kernel_panic = |msg: &str| {
         panic!(
             "[kernel trap] msg: {}, trap_type: {:x?}, epc: {:#x} ",
