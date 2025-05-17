@@ -33,6 +33,7 @@ use crate::{
             CloneFlags,
         },
         sched::CpuMask,
+        syscall_id::SyscallID,
     },
     mm::{
         memory_set::{ElfMemoryInfo, MemorySet},
@@ -121,6 +122,7 @@ pub struct TCB {
     pub clear_child_tid: Option<usize>, // clear tid address
     pub time_stat: TimeInfo,            // task time
     pub cpu_mask: CpuMask,              // cpu mask
+    pub current_syscall: SyscallID,     // only for debug, current syscall id
 }
 
 impl Default for TCB {
@@ -129,6 +131,7 @@ impl Default for TCB {
             clear_child_tid: None,
             time_stat: TimeInfo::default(),
             cpu_mask: CpuMask::new(),
+            current_syscall: SyscallID::NO_SYSCALL,
         }
     }
 }

@@ -1,22 +1,17 @@
-use config::cpu::CPU_NUM;
-use ksync::cell::SyncUnsafeCell;
-use lazy_static::lazy_static;
-
-use crate::{cpu::get_hartid, include::syscall_id::SyscallID};
-
-lazy_static! {
-    pub static ref CURRENT_SYSCALL: [SyncUnsafeCell<SyscallID>; CPU_NUM] =
-        array_init::array_init(|_| SyncUnsafeCell::new(SyscallID::NO_SYSCALL));
-}
+use crate::{cpu::current_task, include::syscall_id::SyscallID};
 
 pub fn current_syscall() -> SyscallID {
-    *CURRENT_SYSCALL[get_hartid()].as_ref()
+    current_task()
+        .map(|task| task.tcb().current_syscall)
+        .unwrap_or(SyscallID::NO_SYSCALL)
 }
 
 pub fn update_current_syscall(syscall_id: SyscallID) {
-    *CURRENT_SYSCALL[get_hartid()].as_ref_mut() = syscall_id;
+    let task = current_task().unwrap();
+    task.tcb_mut().current_syscall = syscall_id;
 }
 
 pub fn clear_current_syscall() {
-    *CURRENT_SYSCALL[get_hartid()].as_ref_mut() = SyscallID::NO_SYSCALL;
+    let task = current_task().unwrap();
+    task.tcb_mut().current_syscall = SyscallID::NO_SYSCALL;
 }

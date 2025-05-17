@@ -175,23 +175,23 @@ impl<'a> Syscall<'a> {
         })?;
         #[cfg(feature = "debug_sig")]
         update_current_syscall(id);
-        if id.is_debug_on() {
-            let cx = self.task.trap_context();
-            use arch::TrapArgs::*;
-            info!(
-                "[syscall] id: {:?}, tid: {}, sp: {:#x}, pc: {:#x}, ra: {:#x}, args: {:X?}",
-                id,
-                self.task.tid(),
-                cx[SP],
-                cx[EPC],
-                cx[RA],
-                args
-            );
-        }
+        // if id.is_debug_on() {
+        //     let cx = self.task.trap_context();
+        //     use arch::TrapArgs::*;
+        //     info!(
+        //         "[syscall] id: {:?}, tid: {}, sp: {:#x}, pc: {:#x}, ra: {:#x}, args:
+        // {:X?}",         id,
+        //         self.task.tid(),
+        //         cx[SP],
+        //         cx[EPC],
+        //         cx[RA],
+        //         args
+        //     );
+        // }
         let res = self.syscall_inner(id, args).await;
-        if id.is_debug_on() {
-            info!("[syscall(out)] id: {:?}, res: {:x?}", id, res);
-        }
+        // if id.is_debug_on() {
+        //     info!("[syscall(out)] id: {:?}, res: {:x?}", id, res);
+        // }
         res
     }
     fn empty_syscall(name: &str, res: isize) -> SyscallResult {

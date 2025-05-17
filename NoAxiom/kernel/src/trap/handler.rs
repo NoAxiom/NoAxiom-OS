@@ -76,6 +76,7 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
 
     // def: context, user trap pc, trap type
     let cx = task.trap_context_mut();
+    cx.check();
     assert!(
         cx[TrapArgs::EPC] & KERNEL_ADDR_OFFSET == 0,
         "epc {:#x?} shouldn't be in kernel space, trap_type: {:x?}",
