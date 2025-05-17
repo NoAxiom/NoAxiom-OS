@@ -62,7 +62,7 @@ impl Syscall<'_> {
             ts.addr(),
         );
         use ClockId::*;
-        match clockid {
+        let time = match clockid {
             CLOCK_PROCESS_CPUTIME_ID => {
                 let task = self.task;
                 let mut cpu_time = Duration::ZERO;
@@ -73,29 +73,28 @@ impl Syscall<'_> {
                     }
                 }
                 trace!("[sys_clock_gettime] get process cpu time: {:?}", cpu_time);
-                ts.write(TimeSpec::from(cpu_time)).await?;
-                return Ok(0);
+                cpu_time
             }
             CLOCK_THREAD_CPUTIME_ID => {
                 let cpu_time = self.task.tcb().time_stat.cpu_time();
                 trace!("[sys_clock_gettime] get process cpu time: {:?}", cpu_time);
-                ts.write(TimeSpec::from(cpu_time)).await?;
-                return Ok(0);
+                cpu_time
             }
             _ => match CLOCK_MANAGER.lock().0.get(&clockid) {
                 Some(clock) => {
                     let dev_time = get_time_duration();
                     let clock_time = dev_time + *clock;
                     trace!("[sys_clock_gettime] get time {:?}", clock_time);
-                    ts.write(TimeSpec::from(clock_time)).await?;
-                    return Ok(0);
+                    clock_time
                 }
                 None => {
                     error!("[sys_clock_gettime] Cannot find the clock: {:?}", clockid);
                     return Err(Errno::EINVAL);
                 }
             },
-        }
+        };
+        ts.write(TimeSpec::from(time)).await?;
+        Ok(0)
     }
     pub async fn sys_clock_nanosleep(
         &self,

@@ -1,4 +1,5 @@
 use alloc::{sync::Arc, vec::Vec};
+use ksync::mutex::check_no_lock;
 
 use super::Task;
 use crate::{
@@ -63,6 +64,7 @@ impl Task {
         if let Some(tidaddress) = self.clear_child_tid() {
             info!("[exit_handler] clear child tid {:#x}", tidaddress);
             let ptr = UserPtr::<usize>::new(tidaddress);
+            assert!(check_no_lock());
             let _ = ptr.try_write(0).await;
             let _ = ptr
                 .translate_pa()

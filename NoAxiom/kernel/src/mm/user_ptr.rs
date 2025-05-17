@@ -7,7 +7,12 @@ use ksync::mutex::check_no_lock;
 use memory::address::PhysAddr;
 
 use super::{address::VirtAddr, page_table::PageTable, validate::validate};
-use crate::{cpu::current_task, mm::address::VpnRange, sched::utils::block_on, syscall::SysResult};
+use crate::{
+    cpu::current_task,
+    mm::address::VpnRange,
+    sched::utils::block_on,
+    syscall::{utils::current_syscall, SysResult},
+};
 
 /// the UserPtr is a wrapper for user-space pointer
 /// NOTE THAT: it will NOT validate the pointer
@@ -136,11 +141,23 @@ impl<T> UserPtr<T> {
         unsafe { atomic_load_acquire(self.ptr()) }
     }
 
+    #[allow(unused)]
+    pub fn block_on_read(&self) -> SysResult<T>
+    where
+        T: Copy,
+    {
+        block_on(self.raw_validate())?;
+        Ok(unsafe { *self.ptr() })
+    }
+
+    #[allow(unused)]
     pub fn block_on_write(&self, value: T) -> SysResult<()>
     where
         T: Copy,
     {
-        block_on(self.write(value))
+        block_on(self.raw_validate())?;
+        unsafe { *self.ptr() = value };
+        Ok(())
     }
 
     pub async fn write(&self, value: T) -> SysResult<()> {
@@ -187,15 +204,24 @@ impl<T> UserPtr<T> {
         Ok(unsafe { core::slice::from_raw_parts_mut(slice.as_ptr() as *mut T, len) })
     }
 
+    async fn raw_validate(&self) -> SysResult<()> {
+        self.as_slice_mut_checked(1).await?;
+        Ok(())
+    }
+
     /// validate the user pointer
     /// this will check the page table and allocate valid map areas
     /// or it will return EFAULT
     pub async fn validate(&self) -> SysResult<()> {
         if check_no_lock() {
-            self.as_slice_mut_checked(1).await?;
+            self.raw_validate().await?;
         } else {
-            warn!("[validate] block on addr {:#x}", self.addr());
-            block_on(self.as_slice_mut_checked(1))?;
+            warn!(
+                "[validate] block on addr {:#x} during syscall {:?}",
+                self.addr(),
+                current_syscall()
+            );
+            block_on(self.raw_validate())?;
         }
         Ok(())
     }

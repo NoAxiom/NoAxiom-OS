@@ -3,7 +3,7 @@ use core::mem::size_of;
 
 use arch::{ArchTrapContext, ArchUserFloatContext, TrapArgs};
 use config::mm::SIG_TRAMPOLINE;
-use ksync::mutex::SpinLockGuard;
+use ksync::mutex::{check_no_lock, SpinLockGuard};
 
 use super::task::PCB;
 use crate::{
@@ -38,10 +38,19 @@ impl Task {
             pending.push(si);
         }
         drop(pcb);
+
+        let mut actions = Vec::with_capacity(pending.len());
         let sa_list = self.sa_list();
-        for si in pending {
+        for si in pending.iter() {
             let signum = SigNum::from(si.signo);
             let action = sa_list.get(signum).unwrap().clone();
+            actions.push(action);
+        }
+        drop(sa_list);
+
+        for (i, si) in pending.into_iter().enumerate() {
+            let signum = SigNum::from(si.signo);
+            let action = actions[i];
             info!(
                 "[check_signal] sig {:?}: start to handle, handler: {:?}",
                 signum, action.handler
@@ -86,6 +95,7 @@ impl Task {
                         uc_sig: [0; 16],
                         uc_mcontext: MContext::from_cx(&cx),
                     };
+                    assert!(check_no_lock());
                     ucontext_ptr.write(ucontext).await.unwrap_or_else(|err| {
                         error!("[sigstack] write ucontext failed: {:?}", err);
                     });
@@ -109,7 +119,8 @@ impl Task {
                         siginfo_v.si_code = si.code as i32;
                         new_sp -= size_of::<LinuxSigInfo>();
                         let siginfo_ptr: UserPtr<LinuxSigInfo> = new_sp.into();
-                        siginfo_ptr.block_on_write(siginfo_v).unwrap();
+                        assert!(check_no_lock());
+                        siginfo_ptr.try_write(siginfo_v).await.unwrap();
                         cx[A1] = new_sp;
                     }
 
