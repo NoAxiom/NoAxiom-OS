@@ -16,7 +16,7 @@ use super::{
     map_area::MapArea,
     mmap_manager::MmapManager,
     page_table::{flags_switch_to_rw, PageTable},
-    shm::{shm_get_address_and_size, shm_get_nattch, ShmInfo, ShmTracker},
+    shm::{ShmInfo, ShmTracker},
 };
 use crate::{
     config::mm::{PAGE_SIZE, PAGE_WIDTH, USER_STACK_SIZE},
@@ -29,6 +29,7 @@ use crate::{
         map_area::MapAreaType,
         page_table::flags_switch_to_cow,
         permission::MapType,
+        shm::SHM_MANAGER,
     },
     pte_flags,
     sched::utils::yield_now,
@@ -664,7 +665,7 @@ impl MemorySet {
     }
 
     pub fn attach_shm(&mut self, key: usize, start_va: VirtAddr) {
-        let (start_pa, size) = shm_get_address_and_size(key);
+        let (start_pa, size) = SHM_MANAGER.lock().get_address_and_size(key);
         warn!("attach_shm start_pa {:#x}", start_pa.raw());
         warn!("attach_shm start_va {:#x}", start_va.raw());
         let flags = pte_flags!(V, U, W, R);
@@ -695,7 +696,7 @@ impl MemorySet {
     pub fn detach_shm(&mut self, start_va: VirtAddr) -> usize {
         warn!("detach start_va:{:?}", start_va);
         let key = self.shm.shm_trackers.get(&start_va).unwrap().key;
-        let (_, size) = shm_get_address_and_size(key);
+        let (_, size) = SHM_MANAGER.lock().get_address_and_size(key);
         warn!("detach size:{:?}", size);
         let mut offset = 0;
         while offset < size {
@@ -707,7 +708,7 @@ impl MemorySet {
         self.shm.shm_trackers.remove(&start_va);
         let vpn: VirtPageNum = start_va.into();
         self.shm.shm_areas.retain(|x| x.vpn_range.start() != vpn);
-        shm_get_nattch(key)
+        SHM_MANAGER.lock().get_nattch(key)
     }
 }
 

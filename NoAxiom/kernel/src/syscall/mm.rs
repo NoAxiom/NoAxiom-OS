@@ -9,12 +9,7 @@ use crate::{
         mm::{MmapFlags, MmapProts},
         result::Errno,
     },
-    mm::{
-        address::VirtAddr,
-        page_table::PageTable,
-        permission::MapPermission,
-        shm::{create_shm, remove_shm},
-    },
+    mm::{address::VirtAddr, page_table::PageTable, permission::MapPermission, shm::SHM_MANAGER},
     return_errno,
     syscall::Syscall,
     utils::align_up,
@@ -125,22 +120,24 @@ impl Syscall<'_> {
         let size = (size + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE;
         assert!(size % PAGE_SIZE == 0);
         let new_key = match key {
-            IPC_PRIVATE => create_shm(key, size, shmflg),
+            IPC_PRIVATE => SHM_MANAGER.lock().create(key, size, shmflg),
             _ => unimplemented!(),
         };
         Ok(new_key as isize)
     }
 
+    /// remove the shared memory segment with the given key
     pub fn sys_shmctl(&self, key: usize, cmd: usize, _buf: *const u8) -> SyscallResult {
         warn!("[shmctl] remove shm key: {:#x}, cmd: {:#x}", key, cmd);
         if cmd == IPC_RMID {
-            remove_shm(key);
+            SHM_MANAGER.lock().remove(key);
         } else {
             unimplemented!();
         }
         Ok(0)
     }
 
+    /// attach the shared memory segment with the given key
     pub fn sys_shmat(&self, key: usize, addr: usize, _shmflg: usize) -> SyscallResult {
         warn!("[shmat] attach shm key {:?} shm address {:#x}", key, addr);
         let task = self.task;
@@ -155,6 +152,7 @@ impl Syscall<'_> {
         Ok(addr as isize)
     }
 
+    /// detach the shared memory segment with the given address
     pub fn sys_shmdt(&self, address: usize) -> SyscallResult {
         warn!("[shmdt] detach shm address {:#x}", address);
         let task = self.task;

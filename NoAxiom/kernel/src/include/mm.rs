@@ -60,6 +60,7 @@ bitflags! {
     }
 }
 
+#[allow(unused)]
 pub struct ShmIdDs {
     pub shm_perm: CreateMode, /* Ownership and permissions */
     pub shm_size: usize,      /* Size of segment (bytes) */

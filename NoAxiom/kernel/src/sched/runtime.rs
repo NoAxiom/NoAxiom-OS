@@ -1,3 +1,4 @@
+use arch::{Arch, ArchInt};
 use lazy_static::lazy_static;
 
 use super::{
@@ -21,6 +22,7 @@ lazy_static! {
 pub fn run_tasks() -> ! {
     info!("[kernel] hart {} has been booted", get_hartid());
     loop {
+        assert!(Arch::is_interrupt_enabled());
         timer_handler();
         RUNTIME.run();
     }

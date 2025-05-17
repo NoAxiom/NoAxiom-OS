@@ -27,13 +27,13 @@ pub struct ShmTracker {
 }
 impl ShmTracker {
     pub fn new(key: usize) -> Self {
-        attach_shm(key);
+        SHM_MANAGER.lock().base_attach(key);
         Self { key }
     }
 }
 impl Drop for ShmTracker {
     fn drop(&mut self) {
-        detach_shm(self.key);
+        SHM_MANAGER.lock().base_detach(self.key);
     }
 }
 impl ShmManager {
@@ -70,24 +70,31 @@ impl ShmManager {
         self.shm_areas.insert(key, shm_area);
         key
     }
-    pub fn attach(&mut self, key: usize) {
-        let pid = current_task().unwrap().tid();
+    pub fn base_attach(&mut self, key: usize) {
         let shm_area = &mut self.shm_areas.get_mut(&key).unwrap();
-        shm_area.shmid_ds.shm_atime = get_time();
-        shm_area.shmid_ds.shm_lpid = pid;
         shm_area.shmid_ds.shm_nattch += 1;
     }
-    pub fn detach(&mut self, key: usize) {
-        let pid = current_task().unwrap().tid();
+    pub fn base_detach(&mut self, key: usize) {
         let shm_area = &mut self.shm_areas.get_mut(&key).unwrap();
-        shm_area.shmid_ds.shm_dtime = get_time();
-        shm_area.shmid_ds.shm_lpid = pid;
         shm_area.shmid_ds.shm_nattch -= 1;
     }
+    // pub fn attach(&mut self, key: usize, pid: usize) {
+    //     let shm_area = &mut self.shm_areas.get_mut(&key).unwrap();
+    //     // shm_area.shmid_ds.shm_atime = get_time();
+    //     // shm_area.shmid_ds.shm_lpid = pid;
+    //     shm_area.shmid_ds.shm_nattch += 1;
+    // }
+    // pub fn detach(&mut self, key: usize) {
+    //     let pid = current_task().unwrap().tid();
+    //     let shm_area = &mut self.shm_areas.get_mut(&key).unwrap();
+    //     // shm_area.shmid_ds.shm_dtime = get_time();
+    //     // shm_area.shmid_ds.shm_lpid = pid;
+    //     shm_area.shmid_ds.shm_nattch -= 1;
+    // }
     pub fn remove(&mut self, key: usize) {
         let shm_area = &mut self.shm_areas.get_mut(&key).unwrap();
         if shm_area.shmid_ds.shm_nattch == 0 {
-            info!("shm remove!");
+            info!("shm {key} get removed");
             self.shm_areas.remove(&key);
         };
     }
@@ -103,26 +110,6 @@ impl ShmManager {
         let shm_area = &self.shm_areas.get(&key).unwrap();
         shm_area.shmid_ds.shm_nattch
     }
-}
-
-pub fn create_shm(key: usize, size: usize, perm: usize) -> usize {
-    SHM_MANAGER.lock().create(key, size, perm)
-}
-pub fn attach_shm(key: usize) {
-    SHM_MANAGER.lock().attach(key);
-}
-pub fn detach_shm(key: usize) {
-    SHM_MANAGER.lock().detach(key);
-}
-pub fn remove_shm(key: usize) {
-    SHM_MANAGER.lock().remove(key);
-}
-
-pub fn shm_get_address_and_size(key: usize) -> (PhysAddr, usize) {
-    SHM_MANAGER.lock().get_address_and_size(key)
-}
-pub fn shm_get_nattch(key: usize) -> usize {
-    SHM_MANAGER.lock().get_nattch(key)
 }
 
 pub struct ShmInfo {

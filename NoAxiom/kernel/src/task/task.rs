@@ -704,7 +704,10 @@ impl Task {
     /// warning: this function could cause deadlock if under multicore
     #[allow(unused)]
     pub fn print_child_tree(&self) {
-        debug!("[child_tree] print the child tree of task {}", self.tid());
-        self.print_child_tree_dfs(0);
+        #[cfg(not(feature = "multicore"))]
+        {
+            debug!("[child_tree] print the child tree of task {}", self.tid());
+            self.print_child_tree_dfs(0);
+        }
     }
 }
