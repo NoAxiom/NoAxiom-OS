@@ -44,7 +44,7 @@ pub async fn validate(
             error!(
                 "[validate] store at invalid area, flags: {:?}, tid: {}",
                 flags,
-                current_task().unwrap().tid()
+                current_task().unwrap().tid(),
             );
             Err(Errno::EFAULT)
         } else {

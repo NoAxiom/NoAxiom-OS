@@ -8,10 +8,10 @@ use crate::{
 
 impl Syscall<'_> {
     /// Get system UTS name
-    pub fn sys_uname(buf: usize) -> SyscallResult {
+    pub async fn sys_uname(buf: usize) -> SyscallResult {
         let buf = UserPtr::<Utsname>::new(buf);
         let res = Utsname::get();
-        buf.write(res);
+        buf.write(res).await?;
         Ok(0)
     }
 

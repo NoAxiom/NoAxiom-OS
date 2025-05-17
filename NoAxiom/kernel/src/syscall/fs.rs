@@ -207,7 +207,7 @@ impl Syscall<'_> {
             // todo: check lazy?
             iov_ptr.as_slice_mut_checked(Iovec::size()).await?;
 
-            let iov = iov_ptr.read();
+            let iov = iov_ptr.read().await?;
             let buf_ptr = UserPtr::<u8>::new(iov.iov_base);
             let buf_slice = buf_ptr.as_slice_mut_checked(iov.iov_len).await?;
             read_size += file.read(buf_slice).await?;
@@ -275,7 +275,7 @@ impl Syscall<'_> {
             // todo: check lazy?
             iov_ptr.as_slice_mut_checked(Iovec::size()).await?;
 
-            let iov = iov_ptr.read();
+            let iov = iov_ptr.read().await?;
             // let buf_ptr = UserPtr::<u8>::new(iov.iov_base);
             // let buf_slice = buf_ptr.as_slice_mut_checked(iov.iov_len).await?;
             let buf_slice =
@@ -333,17 +333,17 @@ impl Syscall<'_> {
     }
 
     /// Get file status
-    pub fn sys_fstat(&self, fd: usize, stat_buf: usize) -> SyscallResult {
+    pub async fn sys_fstat(&self, fd: usize, stat_buf: usize) -> SyscallResult {
         trace!("[sys_fstat]: fd: {}, stat_buf: {:#x}", fd, stat_buf);
         let fd_table = self.task.fd_table();
         let file = fd_table.get(fd).ok_or(Errno::EBADF)?;
         let kstat = Kstat::from_stat(file.inode().stat()?);
         let ptr = UserPtr::<Kstat>::new(stat_buf);
-        ptr.write(kstat);
+        ptr.write(kstat).await?;
         Ok(0)
     }
 
-    pub fn sys_statx(
+    pub async fn sys_statx(
         &self,
         dirfd: isize,
         path: usize,
@@ -359,7 +359,7 @@ impl Syscall<'_> {
         );
         let statx = path.dentry().inode()?.statx(mask)?;
         let ptr = UserPtr::<Statx>::new(buf);
-        ptr.write(statx);
+        ptr.write(statx).await?;
         Ok(0)
     }
 
@@ -380,12 +380,12 @@ impl Syscall<'_> {
         );
         let kstat = Kstat::from_stat(path.dentry().inode()?.stat()?);
         let ptr = UserPtr::<Kstat>::new(stat_buf);
-        ptr.write(kstat);
+        ptr.write(kstat).await?;
         Ok(0)
     }
 
     /// Get file io control
-    pub fn sys_ioctl(&self, fd: usize, request: usize, arg: usize) -> SyscallResult {
+    pub async fn sys_ioctl(&self, fd: usize, request: usize, arg: usize) -> SyscallResult {
         let fd_table = self.task.fd_table();
         let file = fd_table.get(fd).ok_or(Errno::EBADF)?;
         drop(fd_table);
@@ -408,9 +408,9 @@ impl Syscall<'_> {
             IoctlCmd::Tty(x) => match x {
                 TtyIoctlCmd::TCGETS => {}
                 TtyIoctlCmd::TCSETS => {}
-                TtyIoctlCmd::TIOCGPGRP => arg_ptr.write(INIT_PROCESS_ID as u8),
+                TtyIoctlCmd::TIOCGPGRP => arg_ptr.write(INIT_PROCESS_ID as u8).await?,
                 TtyIoctlCmd::TIOCSPGRP => {}
-                TtyIoctlCmd::TIOCGWINSZ => arg_ptr.write(0),
+                TtyIoctlCmd::TIOCGWINSZ => arg_ptr.write(0).await?,
                 _ => {
                     error!("[sys_ioctl] request {} is not supported", request);
                     return Err(Errno::EINVAL);
@@ -544,7 +544,7 @@ impl Syscall<'_> {
     }
 
     /// Get and set resource limits
-    pub fn sys_prlimit64(
+    pub async fn sys_prlimit64(
         &self,
         pid: usize,
         resource: u32,
@@ -565,11 +565,13 @@ impl Syscall<'_> {
         let old_limit = UserPtr::<RLimit>::new(old_limit);
 
         if !old_limit.is_null() {
-            old_limit.write(match resource {
-                Resource::NOFILE => fd_table.rlimit().clone(),
-                Resource::STACK => RLimit::default(),
-                _ => todo!(),
-            });
+            old_limit
+                .write(match resource {
+                    Resource::NOFILE => fd_table.rlimit().clone(),
+                    Resource::STACK => RLimit::default(),
+                    _ => todo!(),
+                })
+                .await?;
         }
 
         if !new_limit.is_null() {
@@ -577,10 +579,10 @@ impl Syscall<'_> {
                 "[sys_prlimit64] pid: {}, resource: {:?}, new_limit: {:?}",
                 pid,
                 resource,
-                new_limit.read(),
+                new_limit.read().await?,
             );
             // todo: check before read??
-            *fd_table.rlimit_mut() = new_limit.read();
+            *fd_table.rlimit_mut() = new_limit.read().await?;
         }
         info!(
             "[sys_prlimit64] pid: {}, resource: {:?} new_limit_addr: {:#x}, old_limit_addr: {:#x}",
@@ -663,9 +665,9 @@ impl Syscall<'_> {
         let offset_ptr = UserPtr::<usize>::new(offset);
         let mut buf = vec![0u8; count];
         let read_len = if !offset_ptr.is_null() {
-            let offset = offset_ptr.read();
+            let offset = offset_ptr.read().await?;
             let read_len = in_file.read_at(offset, &mut buf).await? as usize;
-            offset_ptr.write(offset + read_len);
+            offset_ptr.write(offset + read_len).await?;
             read_len
         } else {
             in_file.read(&mut buf).await? as usize
@@ -675,7 +677,7 @@ impl Syscall<'_> {
     }
 
     /// Check if a file exists
-    pub fn sys_faccessat(
+    pub async fn sys_faccessat(
         &self,
         dirfd: isize,
         path: usize,
@@ -691,7 +693,7 @@ impl Syscall<'_> {
     }
 
     /// Modify timestamp of a file
-    pub fn sys_utimensat(
+    pub async fn sys_utimensat(
         &self,
         dirfd: isize,
         path: usize,
@@ -721,7 +723,7 @@ impl Syscall<'_> {
         if !times_ptr.is_null() {
             for i in 0..2 {
                 let times_ptr = UserPtr::<TimeSpec>::new(times + i * TimeSpec::size());
-                let time_spec = times_ptr.read();
+                let time_spec = times_ptr.read().await?;
                 match time_spec.tv_nsec {
                     UTIME_NOW => {}
                     UTIME_OMIT => {
@@ -802,12 +804,12 @@ impl Syscall<'_> {
     }
 
     /// get fs status
-    pub fn sys_statfs(&self, path: usize, buf: usize) -> SyscallResult {
+    pub async fn sys_statfs(&self, path: usize, buf: usize) -> SyscallResult {
         let path = get_string_from_ptr(&UserPtr::<u8>::new(path as usize));
         info!("[sys_statfs] path: {}, buf: {:#x}", path, buf);
         let statfs = Statfs::new();
         let ptr = UserPtr::<Statfs>::new(buf);
-        ptr.write(statfs);
+        ptr.write(statfs).await?;
         Ok(0)
     }
 
@@ -852,7 +854,7 @@ impl Syscall<'_> {
 
         let mut buf = vec![0; len];
         let in_offset = if !off_in.is_null() {
-            let off_in = off_in.read();
+            let off_in = off_in.read().await?;
             if off_in < 0 {
                 return Err(Errno::EINVAL);
             }
@@ -867,7 +869,7 @@ impl Syscall<'_> {
 
         buf.truncate(in_len as usize);
         let out_offset = if !off_out.is_null() {
-            let off_out = off_out.read();
+            let off_out = off_out.read().await?;
             if off_out < 0 {
                 return Err(Errno::EINVAL);
             }
@@ -878,10 +880,14 @@ impl Syscall<'_> {
         let out_len = file_out.write_at(out_offset, &buf).await? as usize;
 
         if !off_in.is_null() {
-            off_in.write(off_in.read() + in_len as i64);
+            off_in
+                .write(off_in.read().await? + in_len as i64)
+                .await?;
         }
         if !off_out.is_null() {
-            off_out.write(off_out.read() + out_len as i64);
+            off_out
+                .write(off_out.read().await? + out_len as i64)
+                .await?;
         }
 
         Ok(out_len as isize)

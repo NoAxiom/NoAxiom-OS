@@ -16,19 +16,19 @@ use crate::{
 };
 
 impl Syscall<'_> {
-    pub fn sys_times(&self, tms: usize) -> SyscallResult {
+    pub async fn sys_times(&self, tms: usize) -> SyscallResult {
         let tms = UserPtr::<TMS>::new(tms);
         let res = self.task.tcb().time_stat.into_tms();
-        tms.write(res);
+        tms.write(res).await?;
         Ok(0)
     }
-    pub fn sys_gettimeofday(tv: usize) -> SyscallResult {
+    pub async fn sys_gettimeofday(tv: usize) -> SyscallResult {
         if tv == 0 {
             return Ok(get_time_ms() as isize);
         }
         let buf = UserPtr::<TimeVal>::new(tv);
         let timeval = get_timeval();
-        buf.write(timeval);
+        buf.write(timeval).await?;
         Ok(0)
     }
     pub async fn sys_nanosleep(&self, buf: usize, remain: usize) -> SyscallResult {
@@ -37,11 +37,11 @@ impl Syscall<'_> {
         if ts.is_null() {
             return Err(Errno::EINVAL);
         }
-        let time_spec = ts.read();
+        let time_spec = ts.read().await?;
         let remain_time = sleep_now(time_spec.into()).await;
         if !remain.is_null() {
             if remain_time > Duration::ZERO {
-                remain.write(remain_time.into());
+                remain.write(remain_time.into()).await?;
                 error!(
                     "[sys_nanosleep] sleep interrupted, remain time: {:?}",
                     remain_time
@@ -53,7 +53,7 @@ impl Syscall<'_> {
         }
         Ok(0)
     }
-    pub fn sys_clock_gettime(&self, clockid: usize, tp: usize) -> SyscallResult {
+    pub async fn sys_clock_gettime(&self, clockid: usize, tp: usize) -> SyscallResult {
         let ts = UserPtr::<TimeSpec>::from(tp);
         let clockid = ClockId::from_repr(clockid).ok_or(Errno::EINVAL)?;
         info!(
@@ -73,13 +73,13 @@ impl Syscall<'_> {
                     }
                 }
                 trace!("[sys_clock_gettime] get process cpu time: {:?}", cpu_time);
-                ts.write(TimeSpec::from(cpu_time));
+                ts.write(TimeSpec::from(cpu_time)).await?;
                 return Ok(0);
             }
             CLOCK_THREAD_CPUTIME_ID => {
                 let cpu_time = self.task.tcb().time_stat.cpu_time();
                 trace!("[sys_clock_gettime] get process cpu time: {:?}", cpu_time);
-                ts.write(TimeSpec::from(cpu_time));
+                ts.write(TimeSpec::from(cpu_time)).await?;
                 return Ok(0);
             }
             _ => match CLOCK_MANAGER.lock().0.get(&clockid) {
@@ -87,7 +87,7 @@ impl Syscall<'_> {
                     let dev_time = get_time_duration();
                     let clock_time = dev_time + *clock;
                     trace!("[sys_clock_gettime] get time {:?}", clock_time);
-                    ts.write(TimeSpec::from(clock_time));
+                    ts.write(TimeSpec::from(clock_time)).await?;
                     return Ok(0);
                 }
                 None => {
@@ -107,7 +107,7 @@ impl Syscall<'_> {
         pub const TIMER_ABSTIME: usize = 1;
         let request = UserPtr::<TimeSpec>::new(request);
         let remain = UserPtr::<TimeSpec>::new(remain);
-        let request = Duration::from(request.read());
+        let request = Duration::from(request.read().await?);
         let current = get_time_duration();
         let remain_time = if flags == TIMER_ABSTIME {
             if request < current {
@@ -119,12 +119,12 @@ impl Syscall<'_> {
             sleep_now(request).await
         };
         if !remain.is_null() {
-            remain.write(remain_time.into());
+            remain.write(remain_time.into()).await?;
         }
         Ok(0)
     }
 
-    pub fn sys_clock_getres(&self, _clockid: usize, res: usize) -> SyscallResult {
+    pub async fn sys_clock_getres(&self, _clockid: usize, res: usize) -> SyscallResult {
         let res = UserPtr::<TimeSpec>::new(res);
         if res.is_null() {
             return Ok(0);
@@ -133,7 +133,7 @@ impl Syscall<'_> {
             tv_sec: 0,
             tv_nsec: 1,
         };
-        res.write(value);
+        res.write(value).await?;
         Ok(0)
     }
 }

@@ -28,9 +28,10 @@ impl Syscall<'_> {
         sigmask_ptr: usize,
     ) -> SyscallResult {
         let sigmask = UserPtr::<SigSet>::new(sigmask_ptr);
-        let sigmask = sigmask.get_ref();
+        let sigmask = sigmask.get_ref().await?;
         let timeout = UserPtr::<TimeSpec>::new(timeout_ptr)
             .get_ref()
+            .await?
             .map(|x| Duration::from(*x));
 
         info!(
@@ -44,7 +45,7 @@ impl Syscall<'_> {
         for i in 0..nfds {
             let fd_ptr = fds_ptr + i * core::mem::size_of::<PollFd>();
             let fd_ptr = UserPtr::<PollFd>::new(fd_ptr);
-            let poll_fd = fd_ptr.read();
+            let poll_fd = fd_ptr.read().await?; // fixme: move this out from lock
             trace!("[sys_ppoll]: before poll: poll_fd {:#x?}", poll_fd);
             let file = fd_table.get(poll_fd.fd as usize).ok_or(Errno::EBADF)?;
             let events = poll_fd.events;
@@ -82,8 +83,11 @@ impl Syscall<'_> {
         for (id, result) in res {
             let mut poll_fd = fds[id].1;
             poll_fd.revents |= result;
-            fds[id].0.write(poll_fd);
-            trace!("[sys_ppoll]: after poll: poll_fd {:#x?}", fds[id].0.read());
+            fds[id].0.try_write(poll_fd).await?;
+            trace!(
+                "[sys_ppoll]: after poll: poll_fd {:#x?}",
+                fds[id].0.try_read().await?
+            );
         }
 
         let mut pcb = self.task.pcb();
@@ -115,15 +119,16 @@ impl Syscall<'_> {
 
         let timeout = UserPtr::<TimeSpec>::new(timeout_ptr)
             .get_ref()
+            .await?
             .map(|x| Duration::from(*x));
         let read_fds = UserPtr::<FdSet>::new(readfds_ptr);
-        let mut read_fds = read_fds.get_ref_mut();
+        let mut read_fds = read_fds.get_ref_mut().await?;
         let write_fds = UserPtr::<FdSet>::new(writefds_ptr);
-        let mut write_fds = write_fds.get_ref_mut();
+        let mut write_fds = write_fds.get_ref_mut().await?;
         let except_fds = UserPtr::<FdSet>::new(exceptfds_ptr);
-        let mut except_fds = except_fds.get_ref_mut();
+        let mut except_fds = except_fds.get_ref_mut().await?;
         let sigmask = UserPtr::<SigSet>::new(sigmask_ptr);
-        let sigmask = sigmask.get_ref();
+        let sigmask = sigmask.get_ref().await?;
 
         info!(
             "[sys_pselect6]: read_fds {:?}, write_fds {:?}, except_fds {:?}, timeout:{:?}, sigmask:{:?}",
