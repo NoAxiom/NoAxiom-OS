@@ -34,6 +34,15 @@ impl Syscall<'_> {
             .await?
             .map(|x| Duration::from(*x));
 
+        let mut poll_fds = Vec::new();
+        let mut fd_ptrs = Vec::new();
+        for i in 0..nfds {
+            let fd_ptr = fds_ptr + i * core::mem::size_of::<PollFd>();
+            let fd_ptr = UserPtr::<PollFd>::new(fd_ptr);
+            fd_ptrs.push(fd_ptr);
+            poll_fds.push(fd_ptr.read().await?)
+        }
+
         info!(
             "[sys_ppoll]: fds_ptr {:#x}, nfds {}, timeout:{:?}, sigmask:{:?}",
             fds_ptr, nfds, timeout, sigmask
@@ -43,14 +52,12 @@ impl Syscall<'_> {
         let mut poll_items = Vec::new();
         let mut fds = Vec::new();
         for i in 0..nfds {
-            let fd_ptr = fds_ptr + i * core::mem::size_of::<PollFd>();
-            let fd_ptr = UserPtr::<PollFd>::new(fd_ptr);
-            let poll_fd = fd_ptr.read().await?; // fixme: move this out from lock
+            let poll_fd = poll_fds[i];
             trace!("[sys_ppoll]: before poll: poll_fd {:#x?}", poll_fd);
             let file = fd_table.get(poll_fd.fd as usize).ok_or(Errno::EBADF)?;
             let events = poll_fd.events;
             poll_items.push(PpollItem::new(i, events, file));
-            fds.push((fd_ptr, poll_fd));
+            fds.push((fd_ptrs[i], poll_fd));
         }
         drop(fd_table);
 
