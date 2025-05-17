@@ -277,7 +277,7 @@ impl dyn File {
         }
 
         if current_offset > size {
-            warn!(
+            trace!(
                 "[write_at] {} expand size to {current_offset}",
                 self.meta().dentry.name(),
             );

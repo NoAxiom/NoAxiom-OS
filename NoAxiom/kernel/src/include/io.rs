@@ -1,5 +1,7 @@
 use bitflags::bitflags;
 
+use crate::{constant::io::FD_SET_LEN, utils::align_offset};
+
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct PollFd {
@@ -46,5 +48,35 @@ bitflags! {
         const POLLREMOVE = 0x1000;
         /// Linux 扩展。
         const POLLRDHUP = 0x2000;
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+#[repr(C)]
+pub struct FdSet {
+    fd_list: [u64; FD_SET_LEN],
+}
+
+impl FdSet {
+    pub fn clear(&mut self) {
+        for i in 0..FD_SET_LEN {
+            self.fd_list[i] = 0;
+        }
+    }
+
+    /// Add the given file descriptor to the collection. Calculate the index and
+    /// corresponding bit of the file descriptor in the array, and set the bit
+    /// to 1
+    pub fn set(&mut self, fd: usize) {
+        let (idx, bit) = align_offset(fd, core::mem::size_of::<u64>());
+        self.fd_list[idx] |= 1 << bit;
+    }
+
+    /// Check if the given file descriptor is in the collection. Calculate the
+    /// index and corresponding bit of the file descriptor in the array, and
+    /// check if the bit is 1
+    pub fn is_set(&self, fd: usize) -> bool {
+        let (idx, bit) = align_offset(fd, core::mem::size_of::<u64>());
+        self.fd_list[idx] & (1 << bit) != 0
     }
 }

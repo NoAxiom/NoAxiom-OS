@@ -1,18 +1,16 @@
-use alloc::{sync::Arc, vec::Vec};
-use core::{
-    future::Future,
-    pin::Pin,
-    task::{Context, Poll},
-    time::Duration,
-};
+use alloc::vec::Vec;
+use core::time::Duration;
 
 use include::errno::Errno;
 use ksync::mutex::check_no_lock;
 
 use super::{Syscall, SyscallResult};
 use crate::{
-    fs::vfs::basic::file::File,
-    include::io::{PollEvent, PollFd},
+    include::io::{FdSet, PollEvent, PollFd},
+    io::{
+        ppoll::{PpollFuture, PpollItem},
+        pselect::PselectFuture,
+    },
     mm::user_ptr::UserPtr,
     signal::sig_set::SigSet,
     time::{
@@ -20,50 +18,6 @@ use crate::{
         timeout::{TimeLimitedFuture, TimeLimitedType},
     },
 };
-
-struct PpollItem {
-    id: usize,
-    events: PollEvent,
-    file: Arc<dyn File>,
-}
-
-impl PpollItem {
-    fn new(id: usize, events: PollEvent, file: Arc<dyn File>) -> Self {
-        Self { id, events, file }
-    }
-}
-
-struct PpollFuture {
-    fds: Vec<PpollItem>,
-}
-
-impl PpollFuture {
-    fn new(fds: Vec<PpollItem>) -> Self {
-        Self { fds }
-    }
-}
-
-impl Future for PpollFuture {
-    type Output = Vec<(usize, PollEvent)>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut result = Vec::new();
-        for poll_item in &self.fds {
-            let id = poll_item.id;
-            let req = &poll_item.events;
-            let res = poll_item.file.poll(req, cx.waker().clone());
-            if !res.is_empty() {
-                result.push((id, res));
-            }
-        }
-        if result.is_empty() {
-            debug!("[sys_ppoll]: poll result empty");
-            Poll::Pending
-        } else {
-            Poll::Ready(result)
-        }
-    }
-}
 
 impl Syscall<'_> {
     pub async fn sys_ppoll(
@@ -73,19 +27,11 @@ impl Syscall<'_> {
         timeout_ptr: usize,
         sigmask_ptr: usize,
     ) -> SyscallResult {
-        let timeout_ptr = UserPtr::<TimeSpec>::new(timeout_ptr);
-        let timeout = if timeout_ptr.is_null() {
-            None
-        } else {
-            Some(Duration::from(timeout_ptr.read()))
-        };
-
-        let sigmask_ptr = UserPtr::<SigSet>::new(sigmask_ptr);
-        let sigmask = if sigmask_ptr.is_null() {
-            None
-        } else {
-            Some(sigmask_ptr.read())
-        };
+        let sigmask = UserPtr::<SigSet>::new(sigmask_ptr);
+        let sigmask = sigmask.get_ref();
+        let timeout = UserPtr::<TimeSpec>::new(timeout_ptr)
+            .get_ref()
+            .map(|x| Duration::from(*x));
 
         info!(
             "[sys_ppoll]: fds_ptr {:#x}, nfds {}, timeout:{:?}, sigmask:{:?}",
@@ -106,26 +52,25 @@ impl Syscall<'_> {
             fds.push((fd_ptr, poll_fd));
         }
         drop(fd_table);
-        let ppoll_future = PpollFuture::new(poll_items);
 
         let mut pcb = self.task.pcb();
         let old_mask = if let Some(mask) = sigmask {
-            Some(core::mem::replace(pcb.sig_mask_mut(), mask))
+            Some(core::mem::replace(pcb.sig_mask_mut(), *mask))
         } else {
             None
         };
         let sig_mask = pcb.sig_mask();
         pcb.set_wake_signal(!sig_mask);
-
-        // we can't hold pcb lock than call .await, but we should ensure the pcb's
-        // sig_mask not changed
-
-        // todo: hold a resource and can use .await, maybe asyncmutex
-
         drop(pcb);
 
+        // we can't hold pcb lock than call .await, but we should ensure the pcb's
+        // sig_mask will not changed
+
+        // todo: anything held a resource want to use .await, maybe should be locked in
+        // asyncmutex
+
         assert!(check_no_lock());
-        let res = match TimeLimitedFuture::new(ppoll_future, timeout).await {
+        let res = match TimeLimitedFuture::new(PpollFuture::new(poll_items), timeout).await {
             TimeLimitedType::Ok(res) => res,
             TimeLimitedType::TimeOut => {
                 debug!("[sys_ppoll]: timeout");
@@ -147,5 +92,118 @@ impl Syscall<'_> {
             *pcb.sig_mask_mut() = old_mask;
         }
         Ok(res_len as isize)
+    }
+
+    pub async fn sys_pselect6(
+        &self,
+        nfds: usize,
+        readfds_ptr: usize,
+        writefds_ptr: usize,
+        exceptfds_ptr: usize,
+        timeout_ptr: usize,
+        sigmask_ptr: usize,
+    ) -> SyscallResult {
+        info!(
+            "[sys_pslect6]: nfds {}, readfds_ptr {:#x}, writefds_ptr {:#x}, exceptfds_ptr {:#x}, timeout_ptr {:#x}, sigmask_ptr {:#x}",
+            nfds, readfds_ptr, writefds_ptr, exceptfds_ptr, timeout_ptr, sigmask_ptr
+        );
+
+        if (nfds as isize) < 0 {
+            error!("[sys_pselect6]: nfds < 0");
+            return Err(Errno::EINVAL);
+        }
+
+        let timeout = UserPtr::<TimeSpec>::new(timeout_ptr)
+            .get_ref()
+            .map(|x| Duration::from(*x));
+        let read_fds = UserPtr::<FdSet>::new(readfds_ptr);
+        let mut read_fds = read_fds.get_ref_mut();
+        let write_fds = UserPtr::<FdSet>::new(writefds_ptr);
+        let mut write_fds = write_fds.get_ref_mut();
+        let except_fds = UserPtr::<FdSet>::new(exceptfds_ptr);
+        let mut except_fds = except_fds.get_ref_mut();
+        let sigmask = UserPtr::<SigSet>::new(sigmask_ptr);
+        let sigmask = sigmask.get_ref();
+
+        info!(
+            "[sys_pselect6]: read_fds {:?}, write_fds {:?}, except_fds {:?}, timeout:{:?}, sigmask:{:?}",
+            read_fds, write_fds, except_fds, timeout, sigmask
+        );
+
+        // collect all poll items
+        let fd_table = self.task.fd_table();
+        let mut poll_items = Vec::new();
+        for fd in 0..nfds as usize {
+            let mut events = PollEvent::empty();
+            read_fds.as_ref().map(|fds| {
+                if fds.is_set(fd) {
+                    events.insert(PollEvent::POLLIN)
+                }
+            });
+            write_fds.as_ref().map(|fds| {
+                if fds.is_set(fd) {
+                    events.insert(PollEvent::POLLOUT)
+                }
+            });
+            // except_fds.as_ref().map(|fds| {
+            //     if fds.is_set(fd) {
+            //         events.insert(PollEvent::POLLPRI)
+            //     }
+            // });
+            if !events.is_empty() {
+                let file = fd_table.get(fd).ok_or(Errno::EBADF)?;
+                debug!(
+                    "[sys_pselect6] event push fd: {}, file path: {:?}",
+                    fd,
+                    file.dentry().path()
+                );
+                poll_items.push(PpollItem::new(fd, events, file));
+            }
+        }
+        drop(fd_table);
+
+        let mut pcb = self.task.pcb();
+        let old_mask = if let Some(mask) = sigmask {
+            Some(core::mem::replace(pcb.sig_mask_mut(), *mask))
+        } else {
+            None
+        };
+        let sig_mask = pcb.sig_mask();
+        pcb.set_wake_signal(!sig_mask);
+        drop(pcb);
+
+        assert!(check_no_lock());
+        let res = match TimeLimitedFuture::new(PselectFuture::new(poll_items), timeout).await {
+            TimeLimitedType::Ok(res) => Some(res),
+            TimeLimitedType::TimeOut => None,
+        };
+
+        read_fds.as_mut().map(|fds| fds.clear());
+        write_fds.as_mut().map(|fds| fds.clear());
+        except_fds.as_mut().map(|fds| fds.clear());
+
+        let mut pcb = self.task.pcb();
+        assert_eq!(sig_mask, pcb.sig_mask(), "sig_mask not equal");
+        if let Some(old_mask) = old_mask {
+            *pcb.sig_mask_mut() = old_mask;
+        }
+
+        if res.is_none() {
+            return Ok(0);
+        }
+
+        let mut ret = 0;
+        for (fd, events) in res.unwrap() {
+            if events.contains(PollEvent::POLLIN) || events.contains(PollEvent::POLLHUP) {
+                read_fds.as_mut().map(|fds| fds.set(fd));
+                ret += 1;
+            }
+            if events.contains(PollEvent::POLLOUT) {
+                write_fds.as_mut().map(|fds| fds.set(fd));
+                ret += 1;
+            }
+        }
+
+        Ok(ret)
     }
 }

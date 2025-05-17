@@ -64,7 +64,7 @@ impl<'a> Syscall<'a> {
 
             // io
             SYS_PPOLL =>    self.sys_ppoll(args[0], args[1], args[2], args[3]).await,
-            // SYS_PSELECT =>  todo!(),
+            SYS_PSELECT =>  self.sys_pselect6(args[0], args[1], args[2], args[3], args[4], args[5]).await,
 
             // net
             SYS_SOCKET =>       self.sys_socket(args[0], args[1], args[2]),

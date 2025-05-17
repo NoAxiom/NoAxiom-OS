@@ -95,6 +95,14 @@ impl<T> UserPtr<T> {
         value.ok_or(Errno::EFAULT)
     }
 
+    pub fn get_ref(&self) -> Option<&T> {
+        unsafe { self.ptr().as_ref() }
+    }
+
+    pub fn get_ref_mut(&self) -> Option<&mut T> {
+        unsafe { self.ptr().as_mut() }
+    }
+
     #[inline(always)]
     pub fn read(&self) -> T
     where

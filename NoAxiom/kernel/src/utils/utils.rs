@@ -9,6 +9,11 @@ pub fn align_up(addr: usize, align: usize) -> usize {
 }
 
 #[inline(always)]
+pub fn is_aligned(addr: usize, align: usize) -> bool {
+    (addr & (align - 1)) == 0
+}
+
+#[inline(always)]
 pub fn align_offset(offset: usize, align: usize) -> (usize, usize) {
     let offset_aligned = offset & !(align - 1);
     let offset_inner = offset - offset_aligned;

@@ -56,6 +56,7 @@ mod driver;
 mod entry;
 mod fs;
 mod include;
+mod io;
 mod mm;
 mod net;
 mod panic;

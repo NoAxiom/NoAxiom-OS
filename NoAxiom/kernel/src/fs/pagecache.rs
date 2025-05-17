@@ -4,7 +4,7 @@ use config::mm::PAGE_SIZE;
 use hashbrown::HashMap;
 use memory::frame::{frame_alloc, FrameTracker};
 
-use crate::utils::align_up;
+use crate::utils::is_aligned;
 
 /// Inspired by `MSI`
 #[allow(unused)]
@@ -57,7 +57,7 @@ impl PageCache {
     }
 
     pub fn fill_page(&mut self, offset_align: usize, page: Page) {
-        assert_eq!(offset_align, align_up(offset_align, PAGE_SIZE));
+        assert!(is_aligned(offset_align, PAGE_SIZE));
         if let Some(_) = self.inner.get_mut(&offset_align) {
             panic!("page already exists: {:#x}", offset_align);
         } else {
@@ -66,12 +66,12 @@ impl PageCache {
     }
 
     pub fn get_page(&self, offset_align: usize) -> Option<&Page> {
-        assert_eq!(offset_align, align_up(offset_align, PAGE_SIZE));
+        assert!(is_aligned(offset_align, PAGE_SIZE));
         self.inner.get(&offset_align)
     }
 
     pub fn get_page_mut(&mut self, offset_align: usize) -> Option<&mut Page> {
-        assert_eq!(offset_align, align_up(offset_align, PAGE_SIZE));
+        assert!(is_aligned(offset_align, PAGE_SIZE));
         self.inner.get_mut(&offset_align)
     }
 
