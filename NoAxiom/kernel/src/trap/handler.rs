@@ -22,10 +22,6 @@ use crate::{
 fn kernel_trap_handler() {
     let trap_type = Arch::read_trap_type(None);
     let epc = Arch::read_epc();
-    assert!(
-        epc & KERNEL_ADDR_OFFSET == 0,
-        "epc {epc:#x?} shouldn't be in kernel space, trap_type: {trap_type:?}",
-    );
     let kernel_panic = |msg: &str| {
         panic!(
             "[kernel trap] msg: {}, trap_type: {:x?}, epc: {:#x} ",
@@ -80,6 +76,12 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
 
     // def: context, user trap pc, trap type
     let cx = task.trap_context_mut();
+    assert!(
+        cx[TrapArgs::EPC] & KERNEL_ADDR_OFFSET == 0,
+        "epc {:#x?} shouldn't be in kernel space, trap_type: {:x?}",
+        cx[TrapArgs::EPC],
+        trap_type
+    );
 
     // user trap handler vector
     match trap_type {
