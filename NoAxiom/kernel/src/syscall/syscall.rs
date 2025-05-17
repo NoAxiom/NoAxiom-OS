@@ -40,27 +40,27 @@ impl<'a> Syscall<'a> {
             SYS_DUP =>              self.sys_dup(args[0]),
             SYS_DUP3 =>             self.sys_dup3(args[0], args[1]),
             SYS_PIPE2 =>            self.sys_pipe2(args[0], args[1]).await,
-            SYS_FSTAT =>            self.sys_fstat(args[0], args[1]),
+            SYS_FSTAT =>            self.sys_fstat(args[0], args[1]).await,
             SYS_GETDENTS64 =>       self.sys_getdents64(args[0], args[1], args[2]).await,
             SYS_MOUNT =>            self.sys_mount(args[0], args[1], args[2], args[3], args[4]).await,
             SYS_UMOUNT2 =>          self.sys_umount2(args[0], args[1]),
             SYS_LINKAT =>           self.sys_linkat(args[0] as isize,args[1],args[2] as isize,args[3],args[4]),
             SYS_UNLINKAT =>         self.sys_unlinkat(args[0] as isize, args[1], args[2]).await,
-            SYS_PRLIMIT64 =>        self.sys_prlimit64(args[0], args[1] as u32, args[2], args[3]),
+            SYS_PRLIMIT64 =>        self.sys_prlimit64(args[0], args[1] as u32, args[2], args[3]).await,
             SYS_FCNTL =>            self.sys_fcntl(args[0], args[1], args[2]),
             SYS_READLINKAT =>       self.sys_readlinkat(args[0] as isize, args[1], args[2], args[3]).await,
-            SYS_IOCTL =>            self.sys_ioctl(args[0], args[1], args[2]),
+            SYS_IOCTL =>            self.sys_ioctl(args[0], args[1], args[2]).await,
             SYS_NEWFSTATAT =>       self.sys_newfstatat(args[0] as isize, args[1], args[2], args[3]).await,
             SYS_SENDFILE =>         self.sys_sendfile(args[0], args[1], args[2], args[3]).await,
-            SYS_FACCESSAT =>        self.sys_faccessat(args[0] as isize, args[1], args[2], args[3]),
-            SYS_UTIMENSAT =>        self.sys_utimensat(args[0] as isize, args[1], args[2], args[3]),
+            SYS_FACCESSAT =>        self.sys_faccessat(args[0] as isize, args[1], args[2], args[3]).await,
+            SYS_UTIMENSAT =>        self.sys_utimensat(args[0] as isize, args[1], args[2], args[3]).await,
             SYS_LSEEK =>            self.sys_lseek(args[0], args[1] as isize, args[2]),
             SYS_RENAMEAT2 =>        self.sys_renameat2(args[0] as isize, args[1], args[2] as isize, args[3], args[4] as i32).await,
             SYS_COPY_FILE_RANGE =>  unimplemented!("shouldn't run SYS_COPY_FILE_RANGE"),
             SYS_FTRUNCATE64 =>      self.sys_ftruncate(args[0], args[1]).await,
-            SYS_STATFS =>           self.sys_statfs(args[0], args[1]),
+            SYS_STATFS =>           self.sys_statfs(args[0], args[1]).await,
             SYS_SPLICE =>           self.sys_splice(args[0], args[1], args[2], args[3], args[4], args[5]).await,
-            SYS_STATX =>            self.sys_statx(args[0] as isize, args[1], args[2] as u32, args[3] as u32, args[4]),
+            SYS_STATX =>            self.sys_statx(args[0] as isize, args[1], args[2] as u32, args[3] as u32, args[4]).await,
 
             // io
             SYS_PPOLL =>    self.sys_ppoll(args[0], args[1], args[2], args[3]).await,
@@ -68,7 +68,7 @@ impl<'a> Syscall<'a> {
 
             // net
             SYS_SOCKET =>       self.sys_socket(args[0], args[1], args[2]),
-            SYS_BIND =>         self.sys_bind(args[0], args[1], args[2]),
+            SYS_BIND =>         self.sys_bind(args[0], args[1], args[2]).await,
             SYS_LISTEN =>       self.sys_listen(args[0], args[1]),
             SYS_ACCEPT =>       self.sys_accept(args[0], args[1], args[2]).await,
             SYS_CONNECT =>      self.sys_connect(args[0], args[1], args[2]).await,
@@ -89,7 +89,7 @@ impl<'a> Syscall<'a> {
             SYS_GETEGID =>              Self::empty_syscall("getegid", 0),
             SYS_EXIT =>                 self.sys_exit(args[0] as i32),
             SYS_EXIT_GROUP =>           self.sys_exit_group(args[0] as i32),
-            SYS_CLONE =>                self.sys_clone(args[0], args[1], args[2], args[3], args[4]),
+            SYS_CLONE =>                self.sys_clone(args[0], args[1], args[2], args[3], args[4]).await,
             SYS_EXECVE =>               self.sys_execve(args[0], args[1], args[2]).await,
             SYS_WAIT4 =>                self.sys_wait4(args[0] as isize, args[1], args[2]).await,
             SYS_GETTID =>               self.sys_gettid(),
@@ -98,7 +98,7 @@ impl<'a> Syscall<'a> {
             SYS_SET_TID_ADDRESS =>      self.sys_set_tid_address(args[0]),
             SYS_GETPGID =>              self.sys_getpgid(args[0]),
             SYS_SETPGID =>              self.sys_setpgid(args[0], args[1]),
-            SYS_GET_ROBUST_LIST =>      self.sys_get_robust_list(args[0], args[1], args[2]),
+            SYS_GET_ROBUST_LIST =>      self.sys_get_robust_list(args[0], args[1], args[2]).await,
             SYS_SET_ROBUST_LIST =>      self.sys_set_robust_list(args[0], args[1]),
             SYS_FUTEX =>                self.sys_futex(args[0] as _, args[1] as _, args[2] as _, args[3] as _, args[4] as _, args[5] as _).await,
             SYS_SETSID =>               self.sys_setsid(),
@@ -108,10 +108,10 @@ impl<'a> Syscall<'a> {
             
             // signal
             SYS_SIGTIMEDWAIT => Self::empty_syscall("sigtimedwait", 0),
-            SYS_SIGACTION =>    self.sys_sigaction(args[0] as i32, args[1], args[2]),
-            SYS_SIGRETURN =>    self.sys_sigreturn(),
+            SYS_SIGACTION =>    self.sys_sigaction(args[0] as i32, args[1], args[2]).await,
+            SYS_SIGRETURN =>    self.sys_sigreturn().await,
             SYS_KILL =>         self.sys_kill(args[0] as isize, args[1] as i32),
-            SYS_SIGPROCMASK =>  self.sys_sigprocmask(args[0], args[1], args[2], args[3]),
+            SYS_SIGPROCMASK =>  self.sys_sigprocmask(args[0], args[1], args[2], args[3]).await,
             SYS_SIGSUSPEND =>   self.sys_sigsuspend(args[0]).await,
 
             // mm
@@ -128,8 +128,8 @@ impl<'a> Syscall<'a> {
             
             // sched
             SYS_SCHED_YIELD =>          self.sys_yield().await,
-            SYS_SCHED_GETAFFINITY =>    self.sys_sched_getaffinity(args[0], args[1], args[2]),
-            SYS_SCHED_SETAFFINITY =>    self.sys_sched_setaffinity(args[0], args[1], args[2]),
+            SYS_SCHED_GETAFFINITY =>    self.sys_sched_getaffinity(args[0], args[1], args[2]).await,
+            SYS_SCHED_SETAFFINITY =>    self.sys_sched_setaffinity(args[0], args[1], args[2]).await,
             SYS_SCHEED_GETSCHEDULER =>  self.sys_sched_getscheduler(args[0]),
             SYS_SCHED_GETPARAM =>       self.sys_sched_getparam(args[0], args[1]),
             SYS_SCHED_SETSCHEDULER =>   self.sys_sched_setscheduler(args[0], args[1] as _, args[2]),
@@ -138,17 +138,17 @@ impl<'a> Syscall<'a> {
             SYS_GETRANDOM =>    self.sys_getrandom(args[0], args[1], args[2]).await,
 
             // time
-            SYS_TIMES =>            self.sys_times(args[0]),
-            SYS_GETTIMEOFDAY =>     Self::sys_gettimeofday(args[0]),
+            SYS_TIMES =>            self.sys_times(args[0]).await,
+            SYS_GETTIMEOFDAY =>     Self::sys_gettimeofday(args[0]).await,
             SYS_NANOSLEEP =>        self.sys_nanosleep(args[0], args[1]).await,
-            SYS_CLOCK_GETTIME =>    self.sys_clock_gettime(args[0], args[1]),
+            SYS_CLOCK_GETTIME =>    self.sys_clock_gettime(args[0], args[1]).await,
             SYS_CLOCK_NANOSLEEP =>  self.sys_clock_nanosleep(args[0], args[1], args[2], args[3]).await,
-            SYS_CLOCK_GETRES =>     self.sys_clock_getres(args[0], args[1]),
+            SYS_CLOCK_GETRES =>     self.sys_clock_getres(args[0], args[1]).await,
             // SYS_SETITIMER =>        todo!(),
 
             // system
             SYS_SYSINFO =>  Self::empty_syscall("info", 0),
-            SYS_UNAME =>    Self::sys_uname(args[0]),
+            SYS_UNAME =>    Self::sys_uname(args[0]).await,
             SYS_SYSLOG =>   Self::sys_syslog(args[0] as u32, args[1], args[2]).await,
 
             // unsupported

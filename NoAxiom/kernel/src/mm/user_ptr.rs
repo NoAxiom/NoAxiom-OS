@@ -3,10 +3,11 @@ use core::{intrinsics::atomic_load_acquire, marker::PhantomData};
 
 use arch::{Arch, ArchMemory};
 use include::errno::Errno;
+use ksync::mutex::check_no_lock;
 use memory::address::PhysAddr;
 
 use super::{address::VirtAddr, page_table::PageTable, validate::validate};
-use crate::{cpu::current_task, mm::address::VpnRange, syscall::SysResult};
+use crate::{cpu::current_task, mm::address::VpnRange, sched::utils::block_on, syscall::SysResult};
 
 /// the UserPtr is a wrapper for user-space pointer
 /// NOTE THAT: it will NOT validate the pointer
@@ -66,7 +67,7 @@ impl<T> UserPtr<T> {
     }
 
     #[inline(always)]
-    pub fn not_null(&self) -> bool {
+    pub fn is_not_null(&self) -> bool {
         !self.ptr().is_null()
     }
 
@@ -104,23 +105,19 @@ impl<T> UserPtr<T> {
     }
 
     #[inline(always)]
-    pub fn read(&self) -> T
+    pub async fn try_read(&self) -> SysResult<T>
     where
         T: Copy,
     {
-        unsafe { *self.ptr() }
+        if check_no_lock() {
+            self.validate().await?;
+        } else {
+            warn!("block on read addr {:#x}", self.addr());
+            block_on(self.validate())?;
+        }
+        Ok(unsafe { *self.ptr() })
     }
 
-    #[inline(always)]
-    #[allow(unused)]
-    pub fn read_volatile(&self) -> T
-    where
-        T: Copy,
-    {
-        unsafe { self.ptr().read_volatile() }
-    }
-
-    #[inline(always)]
     pub fn atomic_load_acquire(&self) -> T
     where
         T: Copy,
@@ -128,15 +125,22 @@ impl<T> UserPtr<T> {
         unsafe { atomic_load_acquire(self.ptr()) }
     }
 
-    #[inline(always)]
-    pub fn write(&self, value: T) {
-        unsafe { *self.ptr() = value };
+    pub fn block_on_write(&self, value: T) -> SysResult<()>
+    where
+        T: Copy,
+    {
+        block_on(self.try_write(value))
     }
 
-    #[inline(always)]
-    #[allow(unused)]
-    pub fn write_volatile(&self, value: T) {
-        unsafe { self.ptr().write_volatile(value) };
+    pub async fn try_write(&self, value: T) -> SysResult<()> {
+        if check_no_lock() {
+            self.validate().await?;
+        } else {
+            warn!("block on write addr {:#x}", self.addr());
+            block_on(self.validate())?;
+        }
+        unsafe { *self.ptr() = value };
+        Ok(())
     }
 
     /// get user slice until the checker returns true
@@ -209,20 +213,20 @@ impl UserPtr<u8> {
 
 impl UserPtr<UserPtr<u8>> {
     /// get user string vec, end with null
-    pub fn get_string_vec(&self) -> Vec<String> {
+    pub async fn get_string_vec(&self) -> SysResult<Vec<String>> {
         let mut ptr = self.clone();
         let mut res = Vec::new();
-        while !ptr.is_null() && !ptr.read().is_null() {
+        while !ptr.is_null() && !ptr.try_read().await?.is_null() {
             trace!(
                 "ptr_addr: {:#}, value: {:#}",
                 ptr.va_addr().raw(),
-                ptr.read().va_addr().raw()
+                ptr.try_read().await?.va_addr().raw()
             );
-            let data = ptr.read().get_cstr();
+            let data = ptr.try_read().await?.get_cstr();
             res.push(data);
             ptr.inc(1);
         }
-        res
+        Ok(res)
     }
 }
 

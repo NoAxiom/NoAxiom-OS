@@ -16,7 +16,7 @@ impl Syscall<'_> {
         Ok(0)
     }
 
-    pub fn sys_sched_getaffinity(
+    pub async fn sys_sched_getaffinity(
         &self,
         pid: usize,
         cpusetsize: usize,
@@ -27,7 +27,7 @@ impl Syscall<'_> {
             0 => {
                 // get current cpu mask
                 let cpu_mask = self.task.tcb().cpu_mask;
-                mask.write(cpu_mask);
+                mask.try_write(cpu_mask).await?;
                 Ok(0)
             }
             _ => {
@@ -35,7 +35,7 @@ impl Syscall<'_> {
                 if let Some(task) = TASK_MANAGER.get(pid) {
                     let tg = task.thread_group();
                     if let Some(Some(task)) = tg.0.get(&pid).map(|t| t.upgrade()) {
-                        mask.write(task.tcb().cpu_mask);
+                        mask.try_write(task.tcb().cpu_mask).await?;
                         Ok(0)
                     } else {
                         Err(Errno::ESRCH)
@@ -47,13 +47,13 @@ impl Syscall<'_> {
         }
     }
 
-    pub fn sys_sched_setaffinity(
+    pub async fn sys_sched_setaffinity(
         &self,
         pid: usize,
         cpusetsize: usize,
         mask: usize,
     ) -> SyscallResult {
-        let mask = UserPtr::<CpuMask>::new(mask).read();
+        let mask = UserPtr::<CpuMask>::new(mask).try_read().await?;
         match pid {
             0 => {
                 // set current cpu mask

@@ -84,7 +84,9 @@ impl Task {
                         uc_sig: [0; 16],
                         uc_mcontext: MContext::from_cx(&cx),
                     };
-                    ucontext_ptr.write(ucontext);
+                    ucontext_ptr.block_on_write(ucontext).unwrap_or_else(|err| {
+                        error!("[sigstack] write ucontext failed: {:?}", err);
+                    });
                     pcb.ucontext_ptr = new_sp.into();
                     cx[A0] = si.signo as usize;
 
@@ -105,7 +107,7 @@ impl Task {
                         siginfo_v.si_code = si.code as i32;
                         new_sp -= size_of::<LinuxSigInfo>();
                         let siginfo_ptr: UserPtr<LinuxSigInfo> = new_sp.into();
-                        siginfo_ptr.write(siginfo_v);
+                        siginfo_ptr.block_on_write(siginfo_v).unwrap();
                         cx[A1] = new_sp;
                     }
 

@@ -25,7 +25,7 @@ use crate::{
 };
 
 impl Syscall<'_> {
-    pub fn sys_sigaction(&self, signo: Signo, act: usize, old_act: usize) -> SyscallResult {
+    pub async fn sys_sigaction(&self, signo: Signo, act: usize, old_act: usize) -> SyscallResult {
         debug!(
             "[sys_sigaction]: signum {:?}, new act ptr {:#x}, old act ptr {:#x}",
             SigNum::from(signo),
@@ -47,19 +47,19 @@ impl Syscall<'_> {
         if !old_act.is_null() {
             let sa = task.sa_list();
             let old = sa.get(signum).unwrap();
-            old_act.write(old.into_sa());
+            old_act.try_write(old.into_sa()).await?;
         }
 
         // when detect new sig action, register it into pcb
         if !act.is_null() {
-            let sa = act.read();
+            let sa = act.try_read().await?;
             task.sa_list()
                 .set_sigaction(signum as usize, KSigAction::from_sa(sa, signum));
         }
         Ok(0)
     }
 
-    pub fn sys_sigreturn(&self) -> SyscallResult {
+    pub async fn sys_sigreturn(&self) -> SyscallResult {
         use TrapArgs::*;
         info!("[sigreturn] do signal return");
 
@@ -68,7 +68,7 @@ impl Syscall<'_> {
         let mut pcb = task.pcb();
 
         let ucontext_ptr: UserPtr<UContext> = pcb.ucontext_ptr;
-        let ucontext = ucontext_ptr.read();
+        let ucontext = ucontext_ptr.try_read().await?;
         *pcb.sig_mask_mut() = ucontext.uc_sigmask;
         pcb.sig_stack = (ucontext.uc_stack.ss_size != 0).then_some(ucontext.uc_stack);
         cx[EPC] = ucontext.uc_mcontext.epc();
@@ -77,7 +77,7 @@ impl Syscall<'_> {
         Ok(cx[RES] as isize)
     }
 
-    pub fn sys_sigprocmask(
+    pub async fn sys_sigprocmask(
         &self,
         how: usize,
         set: usize,
@@ -97,10 +97,10 @@ impl Syscall<'_> {
         let mut pcb = task.pcb();
 
         if !old_set.is_null() {
-            old_set.write(pcb.sig_mask());
+            old_set.try_write(pcb.sig_mask()).await?;
         }
         if !set.is_null() {
-            let mut set = set.read();
+            let mut set = set.try_read().await?;
             // sigmask shouldn't contain SIGKILL and SIGCONT
             set.remove(SigSet::SIGKILL | SigSet::SIGCONT);
             match how {
@@ -229,7 +229,7 @@ impl Syscall<'_> {
         let mask = UserPtr::<SigSet>::from(mask);
         let task = self.task;
         let mut pcb = task.pcb();
-        let mut mask = mask.read();
+        let mut mask = mask.try_read().await?;
         mask.remove(SigSet::SIGKILL | SigSet::SIGSTOP);
         let old_mask = core::mem::replace(&mut pcb.sig_mask(), mask);
         let invoke_signal = task.sa_list().get_bitmap();

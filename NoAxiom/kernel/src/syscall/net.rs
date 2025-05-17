@@ -38,9 +38,9 @@ impl Syscall<'_> {
         Ok(socket_fd as isize)
     }
 
-    pub fn sys_bind(&self, sockfd: usize, addr: usize, _addr_len: usize) -> SyscallResult {
+    pub async fn sys_bind(&self, sockfd: usize, addr: usize, _addr_len: usize) -> SyscallResult {
         let user_ptr = UserPtr::<SockAddr>::new(addr);
-        let sock_addr = user_ptr.read();
+        let sock_addr = user_ptr.try_read().await?;
 
         let fd_table = self.task.fd_table();
         let socket_file = fd_table
@@ -71,7 +71,7 @@ impl Syscall<'_> {
     pub async fn sys_connect(&self, sockfd: usize, addr: usize, _addrlen: usize) -> SyscallResult {
         debug!("[sys_connect] sockfd: {}, addr: {}", sockfd, addr);
         let user_ptr = UserPtr::<SockAddr>::new(addr);
-        let sock_addr = user_ptr.read();
+        let sock_addr = user_ptr.try_read().await?;
 
         let fd_table = self.task.fd_table();
         let socket_file = fd_table
@@ -97,7 +97,7 @@ impl Syscall<'_> {
 
         let sockaddr = SockAddr::from_endpoint(endpoint);
         let user_ptr = UserPtr::<SockAddr>::new(addr);
-        user_ptr.write(sockaddr);
+        user_ptr.try_write(sockaddr).await?;
 
         let new_socket_file =
             SocketFile::new_from_socket(socket_file.clone(), Sock::Tcp(new_tcp_socket));
