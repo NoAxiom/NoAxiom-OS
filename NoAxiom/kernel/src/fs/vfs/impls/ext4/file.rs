@@ -1,6 +1,7 @@
 use alloc::{boxed::Box, sync::Arc};
 use core::task::Waker;
 
+use arch::{Arch, ArchInt};
 use async_trait::async_trait;
 use ext4_rs::InodeFileType;
 use ksync::mutex::check_no_lock;
@@ -46,6 +47,7 @@ impl File for Ext4File {
     //  - offset != cursor.offset: seek and read
     async fn base_read(&self, offset: usize, buf: &mut [u8]) -> SyscallResult {
         assert!(check_no_lock());
+        assert!(Arch::is_interrupt_enabled());
         if offset > self.meta.inode.size() {
             return Ok(0);
         }
@@ -61,6 +63,8 @@ impl File for Ext4File {
 
         match inode.file_type() {
             InodeMode::FILE => {
+                assert!(check_no_lock());
+                assert!(Arch::is_interrupt_enabled());
                 let x = ext4.read_at(self.ino, offset, buf).await.map_err(fs_err)? as isize;
                 Ok(x)
             }
@@ -77,6 +81,8 @@ impl File for Ext4File {
 
     /// write all the buf content, extend the file if necessary
     async fn base_write(&self, offset: usize, buf: &[u8]) -> SyscallResult {
+        assert!(check_no_lock());
+        assert!(Arch::is_interrupt_enabled());
         let inode = &self.meta.inode;
         let super_block = self.meta.dentry().super_block();
         trace!("[ext4file] write try to get lock");
@@ -92,6 +98,8 @@ impl File for Ext4File {
         }
         match inode.file_type() {
             InodeMode::FILE => {
+                assert!(check_no_lock());
+                assert!(Arch::is_interrupt_enabled());
                 Ok(ext4.write_at(self.ino, offset, buf).await.map_err(fs_err)? as isize)
             }
             InodeMode::DIR => {
