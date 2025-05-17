@@ -1,6 +1,6 @@
 use core::ops::{Index, IndexMut};
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TrapType {
     Breakpoint,
     SysCall,
@@ -39,8 +39,6 @@ pub trait ArchTrap {
     type TrapContext: ArchTrapContext;
     fn trap_init();
     fn trap_restore(_cx: &mut <Self as ArchTrap>::TrapContext);
-    fn set_kernel_trap_entry();
-    fn set_user_trap_entry();
     fn read_epc() -> usize;
     fn read_trap_type(cx: Option<&mut <Self as ArchTrap>::TrapContext>) -> TrapType;
 }

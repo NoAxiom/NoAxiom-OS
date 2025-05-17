@@ -57,6 +57,7 @@
     .globl    __user_trapvec
     .globl    __user_trapret
     .globl    __kernel_trapvec
+    .globl    __trap_entry
     .align    2
 
 # user -> kernel
@@ -135,6 +136,13 @@
     ld        a7, 16*8(sp)
     addi      sp, sp, 17*8
     sret
+
+    __trap_entry:
+    csrr      t0, sstatus
+    srli      t0, t0, 8                # spp bit is 8
+    andi      t0, t0, 0x1              # fetch sp
+    beqz      t0, __user_trapvec       # 0 => user
+    j         __kernel_trapvec
 
     .section  .text.signal
     .globl    user_sigreturn

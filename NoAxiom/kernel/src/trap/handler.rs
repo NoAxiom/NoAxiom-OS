@@ -12,6 +12,7 @@ use crate::{
         sig_info::{SigCode, SigInfo},
         sig_num::SigNum,
     },
+    syscall::utils::current_syscall,
     task::Task,
     time::time_slice::set_next_trigger,
 };
@@ -31,12 +32,13 @@ fn kernel_trap_handler() {
         TrapType::StorePageFault(addr)
         | TrapType::LoadPageFault(addr)
         | TrapType::InstructionPageFault(addr) => {
-            // Arch::enable_interrupt();
             if let Some(task) = current_cpu().task.as_mut() {
                 // fixme: currently this block_on cannot be canceled
-                info!(
-                    "[kernel] block on memory_validate, epc: {:#x}, addr: {:#x}",
-                    epc, addr
+                warn!(
+                    "[kernel] block on memory_validate, epc: {:#x}, addr: {:#x}, syscall: {:?}",
+                    epc,
+                    addr,
+                    current_syscall(),
                 );
                 match block_on(task.memory_validate(addr, Some(trap_type), true)) {
                     Ok(_) => trace!("[memory_validate] success in kernel_trap_handler"),
@@ -45,13 +47,10 @@ fn kernel_trap_handler() {
             } else {
                 kernel_panic("page fault without task running");
             }
-            // Arch::disable_interrupt();
         }
         TrapType::SupervisorExternal => ext_int_handler(),
         TrapType::Timer => {
-            // trace!("[SupervisorTimer] kernel Timer");
-            // fixme: now is just reset timer
-            crate::time::time_slice::set_next_trigger();
+            set_next_trigger();
         }
         TrapType::SupervisorSoft => ipi_handler(),
         TrapType::None => {}
@@ -121,11 +120,11 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
         }
         // interrupt
         TrapType::Timer => {
-            // warn!(
-            //     "[SupervisorTimer] hart: {}, tid: {}",
-            //     get_hartid(),
-            //     task.tid(),
-            // );
+            warn!(
+                "[SupervisorTimer] hart: {}, tid: {}",
+                get_hartid(),
+                task.tid(),
+            );
             set_next_trigger();
             task.yield_now().await;
         }

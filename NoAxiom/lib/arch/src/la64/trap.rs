@@ -136,9 +136,6 @@ impl ArchTrap for LA64 {
     fn read_trap_type(cx: Option<&mut TrapContext>) -> crate::TrapType {
         get_trap_type(cx)
     }
-    fn set_kernel_trap_entry() {
-        set_kernel_trap_entry();
-    }
     fn trap_init() {
         trap_init();
     }
@@ -154,8 +151,5 @@ impl ArchTrap for LA64 {
         cx.freg_mut().mark_save_if_needed();
         disable_interrupt();
         set_kernel_trap_entry();
-    }
-    fn set_user_trap_entry() {
-        set_user_trap_entry();
     }
 }
