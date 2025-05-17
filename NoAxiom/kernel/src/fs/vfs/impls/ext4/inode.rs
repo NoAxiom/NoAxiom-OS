@@ -1,8 +1,12 @@
 use alloc::{boxed::Box, sync::Arc};
 
+use arch::{Arch, ArchInt};
 use async_trait::async_trait;
 use include::errno::Errno;
-use ksync::mutex::SpinLock;
+use ksync::{
+    async_mutex::AsyncMutex,
+    mutex::{check_no_lock, SpinLock},
+};
 
 use super::{fs_err, superblock::Ext4SuperBlock, IExtInode};
 use crate::{
@@ -17,7 +21,7 @@ use crate::{
 
 pub struct Ext4FileInode {
     meta: InodeMeta,
-    ino: Arc<SpinLock<IExtInode>>,
+    ino: Arc<AsyncMutex<IExtInode>>,
 }
 
 impl Ext4FileInode {
@@ -25,10 +29,10 @@ impl Ext4FileInode {
         let file_size = inode.inode.size();
         Self {
             meta: InodeMeta::new(superblock, InodeMode::FILE, file_size as usize, true),
-            ino: Arc::new(SpinLock::new(inode)),
+            ino: Arc::new(AsyncMutex::new(inode)),
         }
     }
-    pub fn get_inode(&self) -> Arc<SpinLock<IExtInode>> {
+    pub fn get_inode(&self) -> Arc<AsyncMutex<IExtInode>> {
         self.ino.clone()
     }
 }
@@ -70,11 +74,13 @@ impl Inode for Ext4FileInode {
             .unwrap()
             .get_fs()
             .await;
-        let mut inode = self.ino.lock();
+        let mut inode = self.ino.lock().await;
         debug!(
             "[Ext4FileInode] truncate inode: {}, new_size: {}",
             inode.inode_num, new
         );
+        assert!(check_no_lock());
+        assert!(Arch::is_interrupt_enabled());
         ext4.truncate_inode(&mut inode, new as u64)
             .await
             .map_err(fs_err)?;

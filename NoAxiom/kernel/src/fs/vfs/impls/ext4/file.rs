@@ -16,6 +16,7 @@ use crate::{
         impls::ext4::{fs_err, inode::Ext4DirInode},
     },
     include::{fs::InodeMode, io::PollEvent, result::Errno},
+    sched::utils::block_on,
     syscall::SyscallResult,
 };
 
@@ -31,7 +32,7 @@ impl Ext4File {
     pub fn new(dentry: Arc<Ext4Dentry>, inode: Arc<Ext4FileInode>) -> Self {
         Self {
             meta: FileMeta::new(dentry.clone(), inode.clone()),
-            ino: inode.get_inode().lock().inode_num,
+            ino: block_on(inode.get_inode().lock()).inode_num,
         }
     }
 }
@@ -176,7 +177,8 @@ impl File for Ext4Dir {
             .get_fs()
             .await;
         debug!("[ext4dir] load get lock succeed");
-
+        assert!(check_no_lock());
+        assert!(Arch::is_interrupt_enabled());
         let entries = ext4.dir_get_entries(self.ino).await;
         for entry in entries {
             let entry_inode = ext4.get_inode_ref(entry.inode).await;
@@ -220,6 +222,8 @@ impl File for Ext4Dir {
             .get_fs()
             .await;
         debug!("[ext4dir] delete_child  get lock succeed");
+        assert!(check_no_lock());
+        assert!(Arch::is_interrupt_enabled());
         let mut inode = ext4.get_inode_ref(self.ino).await;
         ext4.dir_remove_entry(&mut inode, &name)
             .await

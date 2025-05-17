@@ -1,6 +1,8 @@
 use alloc::{boxed::Box, sync::Arc};
 
+use arch::{Arch, ArchInt};
 use async_trait::async_trait;
+use ksync::mutex::check_no_lock;
 
 use super::{
     file::{Ext4Dir, Ext4File},
@@ -77,6 +79,8 @@ impl Dentry for Ext4Dentry {
     and then we open ALL the dentry from root to here
      */
     async fn create(self: Arc<Self>, name: &str, mode: InodeMode) -> SysResult<Arc<dyn Dentry>> {
+        assert!(check_no_lock());
+        assert!(Arch::is_interrupt_enabled());
         let inode = self.inode()?;
         let downcast_inode = inode
             .clone()
@@ -112,6 +116,8 @@ impl Dentry for Ext4Dentry {
         //     trace!("res file type: {:?}", res.inode().unwrap().file_type());
         //     return Ok(res);
         // }
+        assert!(check_no_lock());
+        assert!(Arch::is_interrupt_enabled());
         if mode.contains(InodeMode::FILE) {
             debug!(
                 "create file: {}, parent_inode: {}",
