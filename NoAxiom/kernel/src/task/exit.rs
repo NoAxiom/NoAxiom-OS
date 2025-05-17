@@ -63,9 +63,7 @@ impl Task {
         if let Some(tidaddress) = self.clear_child_tid() {
             info!("[exit_handler] clear child tid {:#x}", tidaddress);
             let ptr = UserPtr::<usize>::new(tidaddress);
-            ptr.try_write(0).await.unwrap_or_else(|err| {
-                error!("[exit_handler] clear child tid failed: {:?}", err);
-            });
+            let _ = ptr.try_write(0).await;
             let _ = ptr
                 .translate_pa()
                 .await

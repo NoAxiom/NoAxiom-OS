@@ -19,7 +19,6 @@ use crate::{
         sig_info::{SigCode, SigInfo},
         sig_num::{SigNum, Signo},
         sig_set::SigSet,
-        sig_stack::UContext,
     },
     task::manager::{PROCESS_GROUP_MANAGER, TASK_MANAGER},
 };
@@ -33,29 +32,28 @@ impl Syscall<'_> {
             old_act,
         );
 
-        let act = UserPtr::<USigAction>::new(act);
-        let old_act = UserPtr::<USigAction>::new(old_act);
-        let task = self.task;
         let signum = SigNum::from(signo);
-
-        // signum out of range
         if signo >= MAX_SIGNUM as i32 || signum == SigNum::SIGKILL || signum == SigNum::SIGSTOP {
+            // signum out of range
             return Err(Errno::EINVAL);
         }
 
-        // when detect old sig action request, write the swapped sigaction into old_act
-        if !old_act.is_null() {
-            let sa = task.sa_list();
-            let old = sa.get(signum).unwrap();
-            old_act.try_write(old.into_sa()).await?;
-        }
+        let act = UserPtr::<USigAction>::new(act);
+        let old_act = UserPtr::<USigAction>::new(old_act);
+        let task = self.task;
+        let act = act.try_read().await?;
 
-        // when detect new sig action, register it into pcb
-        if !act.is_null() {
-            let sa = act.try_read().await?;
-            task.sa_list()
-                .set_sigaction(signum as usize, KSigAction::from_sa(sa, signum));
+        let mut sa = task.sa_list();
+        let old = sa.get(signum).unwrap().into_sa();
+        // when detect new sig action, register it into sigaction list
+        if let Some(act) = act {
+            sa.set_sigaction(signum as usize, KSigAction::from_sa(act, signum));
         }
+        drop(sa);
+
+        // when detect old sig action request, write the swapped sigaction into old_act
+        old_act.try_write(old).await?;
+
         Ok(0)
     }
 
@@ -64,15 +62,16 @@ impl Syscall<'_> {
         info!("[sigreturn] do signal return");
 
         let task = self.task;
+        let ucontext_ptr = task.ucx();
+        let ucontext = ucontext_ptr.read().await?;
         let cx = task.trap_context_mut();
-        let mut pcb = task.pcb();
 
-        let ucontext_ptr: UserPtr<UContext> = pcb.ucontext_ptr;
-        let ucontext = ucontext_ptr.try_read().await?;
+        let mut pcb = task.pcb();
         *pcb.sig_mask_mut() = ucontext.uc_sigmask;
         pcb.sig_stack = (ucontext.uc_stack.ss_size != 0).then_some(ucontext.uc_stack);
         cx[EPC] = ucontext.uc_mcontext.epc();
         *cx.gprs_mut() = ucontext.uc_mcontext.gprs();
+        drop(pcb);
 
         Ok(cx[RES] as isize)
     }
@@ -93,14 +92,12 @@ impl Syscall<'_> {
 
         let task = self.task;
         let set = UserPtr::<SigSet>::new(set);
+        let set_value = set.try_read().await?;
         let old_set = UserPtr::<SigSet>::new(old_set);
-        let mut pcb = task.pcb();
 
-        if !old_set.is_null() {
-            old_set.try_write(pcb.sig_mask()).await?;
-        }
-        if !set.is_null() {
-            let mut set = set.try_read().await?;
+        let mut pcb = task.pcb();
+        let old_sigmask = pcb.sig_mask();
+        if let Some(mut set) = set_value {
             // sigmask shouldn't contain SIGKILL and SIGCONT
             set.remove(SigSet::SIGKILL | SigSet::SIGCONT);
             match how {
@@ -117,6 +114,11 @@ impl Syscall<'_> {
                     return Err(Errno::EINVAL);
                 }
             };
+        }
+        drop(pcb);
+
+        if !old_set.is_null() {
+            old_set.write(old_sigmask).await?;
         }
         Ok(0)
     }
@@ -228,8 +230,8 @@ impl Syscall<'_> {
     pub async fn sys_sigsuspend(&self, mask: usize) -> SyscallResult {
         let mask = UserPtr::<SigSet>::from(mask);
         let task = self.task;
+        let mut mask = mask.read().await?;
         let mut pcb = task.pcb();
-        let mut mask = mask.try_read().await?;
         mask.remove(SigSet::SIGKILL | SigSet::SIGSTOP);
         let old_mask = core::mem::replace(&mut pcb.sig_mask(), mask);
         let invoke_signal = task.sa_list().get_bitmap();

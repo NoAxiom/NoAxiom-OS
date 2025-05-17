@@ -11,7 +11,7 @@ impl Syscall<'_> {
     pub async fn sys_uname(buf: usize) -> SyscallResult {
         let buf = UserPtr::<Utsname>::new(buf);
         let res = Utsname::get();
-        buf.try_write(res).await?;
+        buf.write(res).await?;
         Ok(0)
     }
 

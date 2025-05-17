@@ -77,11 +77,11 @@ impl Syscall<'_> {
         }
         if flags.contains(CloneFlags::PARENT_SETTID) {
             let ptid = UserPtr::<usize>::new(ptid);
-            ptid.try_write(new_tid).await?;
+            ptid.write(new_tid).await?;
         }
         if flags.contains(CloneFlags::CHILD_SETTID) {
             let ctid = UserPtr::<usize>::new(ctid);
-            ctid.try_write(new_tid).await?;
+            ctid.write(new_tid).await?;
         }
         if flags.contains(CloneFlags::CHILD_CLEARTID) {
             new_task.set_clear_tid_address(ctid);
@@ -159,7 +159,7 @@ impl Syscall<'_> {
                 "[sys_wait4]: write exit_code at status_addr = {:#x}",
                 status.va_addr().raw(),
             );
-            status.try_write(ExitCode::new(exit_code).inner()).await?;
+            status.write(ExitCode::new(exit_code).inner()).await?;
             trace!("[sys_wait4]: write exit code {:#x}", exit_code);
         }
         Ok(tid as isize)
@@ -252,8 +252,8 @@ impl Syscall<'_> {
         let robust_list = task.pcb().robust_list;
         let head_ptr = UserPtr::<usize>::new(head_ptr);
         let len_ptr = UserPtr::<usize>::new(len_ptr);
-        head_ptr.try_write(robust_list.head).await?;
-        len_ptr.try_write(robust_list.len).await?;
+        head_ptr.write(robust_list.head).await?;
+        len_ptr.write(robust_list.len).await?;
         Ok(0)
     }
 
@@ -284,7 +284,7 @@ impl Syscall<'_> {
                     0 => None,
                     val2 => {
                         let val2 = UserPtr::<TimeSpec>::new(val2);
-                        let time_spec = val2.try_read().await?;
+                        let time_spec = val2.read().await?;
                         let limit_time = Duration::from(time_spec);
                         info!("[sys_futex]: timeout {:?}", limit_time);
                         Some(limit_time)

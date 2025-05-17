@@ -96,9 +96,8 @@ pub struct PCB {
     pub parent: Option<Weak<Task>>, // parent task, weak ptr
 
     // signal structs
-    pub pending_sigs: SigPending,        // pending signals
-    pub sig_stack: Option<SigAltStack>,  // signal alternate stack
-    pub ucontext_ptr: UserPtr<UContext>, // ucontext pointer
+    pub pending_sigs: SigPending,       // pending signals
+    pub sig_stack: Option<SigAltStack>, // signal alternate stack
 
     // futex & robust list
     pub robust_list: RobustList,
@@ -113,7 +112,6 @@ impl Default for PCB {
             exit_code: ExitCode::default(),
             pending_sigs: SigPending::new(),
             sig_stack: None,
-            ucontext_ptr: UserPtr::new_null(),
             robust_list: RobustList::default(),
         }
     }
@@ -143,10 +141,11 @@ pub struct Task {
     pcb: Mutable<PCB>, // task control block inner, protected by lock
 
     // thread only / once initialization
-    tcb: ThreadOnly<TCB>,        // thread control block
-    cx: ThreadOnly<TaskContext>, // trap context
-    sched_entity: SchedEntity,   // sched entity, shared with scheduler
-    waker: Once<Waker>,          // waker for the task
+    tcb: ThreadOnly<TCB>,               // thread control block
+    cx: ThreadOnly<TaskContext>,        // trap context
+    sched_entity: SchedEntity,          // sched entity, shared with scheduler
+    waker: Once<Waker>,                 // waker for the task
+    ucx: ThreadOnly<UserPtr<UContext>>, // ucontext for the task
 
     // immutable
     tid: Immutable<TidTracer>,              // task id, with lifetime holded
@@ -372,6 +371,14 @@ impl Task {
     pub fn futex(&self) -> SpinLockGuard<FutexQueue> {
         self.futex.lock()
     }
+
+    /// user context
+    pub fn ucx(&self) -> &UserPtr<UContext> {
+        self.ucx.as_ref()
+    }
+    pub fn ucx_mut(&self) -> &mut UserPtr<UContext> {
+        self.ucx.as_ref_mut()
+    }
 }
 
 // process implementation
@@ -444,6 +451,7 @@ impl Task {
                 ..Default::default()
             }),
             futex: Shared::new(FutexQueue::new()),
+            ucx: ThreadOnly::new(UserPtr::new_null()),
         });
         task.thread_group().insert(&task);
         task.set_self_as_tg_leader();
@@ -611,6 +619,7 @@ impl Task {
                     ..Default::default()
                 }),
                 futex: self.futex.clone(),
+                ucx: ThreadOnly::new(UserPtr::new_null()),
             });
             new_thread.set_tg_leader_weakly(self.tg_leader.get().unwrap());
             new_thread.thread_group.lock().insert(&new_thread);
@@ -643,6 +652,7 @@ impl Task {
                     ..Default::default()
                 }),
                 futex: Shared::new(FutexQueue::new()),
+                ucx: ThreadOnly::new(UserPtr::new_null()),
             });
             new_process.thread_group().insert(&new_process);
             new_process.set_self_as_tg_leader();

@@ -136,7 +136,8 @@ impl Future for FutexFuture {
         let task = current_task().unwrap();
         if !self.is_in {
             let mut futex = task.futex();
-            if UserPtr::from(self.uaddr as *const u32).atomic_load_acquire() == self.val {
+            if unsafe { UserPtr::from(self.uaddr as *const u32).atomic_load_acquire() } == self.val
+            {
                 self.is_in = true;
                 futex.insert_waiter(self.pa, cx.waker().clone());
                 debug!(

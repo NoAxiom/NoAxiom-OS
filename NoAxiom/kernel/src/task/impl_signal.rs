@@ -26,7 +26,7 @@ extern "C" {
 }
 
 impl Task {
-    pub fn check_signal(self: &Arc<Self>) -> Option<SigMask> {
+    pub async fn check_signal(self: &Arc<Self>) -> Option<SigMask> {
         let mut pcb = self.pcb();
         if pcb.pending_sigs.is_empty() {
             return None;
@@ -71,6 +71,8 @@ impl Task {
                         }
                         None => cx[SP],
                     };
+                    let uc_stack = pcb.sig_stack.unwrap_or_default();
+                    drop(pcb);
 
                     // write ucontext
                     let mut new_sp = sp - size_of::<UContext>();
@@ -79,15 +81,15 @@ impl Task {
                         uc_flags: 0,
                         uc_link: 0,
                         // fixme: always returns default here
-                        uc_stack: pcb.sig_stack.unwrap_or_default(),
+                        uc_stack,
                         uc_sigmask: old_mask,
                         uc_sig: [0; 16],
                         uc_mcontext: MContext::from_cx(&cx),
                     };
-                    ucontext_ptr.block_on_write(ucontext).unwrap_or_else(|err| {
+                    ucontext_ptr.write(ucontext).await.unwrap_or_else(|err| {
                         error!("[sigstack] write ucontext failed: {:?}", err);
                     });
-                    pcb.ucontext_ptr = new_sp.into();
+                    *self.ucx_mut() = new_sp.into();
                     cx[A0] = si.signo as usize;
 
                     // write sig_info

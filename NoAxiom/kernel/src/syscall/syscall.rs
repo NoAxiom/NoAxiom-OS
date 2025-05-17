@@ -131,7 +131,7 @@ impl<'a> Syscall<'a> {
             SYS_SCHED_GETAFFINITY =>    self.sys_sched_getaffinity(args[0], args[1], args[2]).await,
             SYS_SCHED_SETAFFINITY =>    self.sys_sched_setaffinity(args[0], args[1], args[2]).await,
             SYS_SCHEED_GETSCHEDULER =>  self.sys_sched_getscheduler(args[0]),
-            SYS_SCHED_GETPARAM =>       self.sys_sched_getparam(args[0], args[1]),
+            SYS_SCHED_GETPARAM =>       self.sys_sched_getparam(args[0], args[1]).await,
             SYS_SCHED_SETSCHEDULER =>   self.sys_sched_setscheduler(args[0], args[1] as _, args[2]),
 
             // others

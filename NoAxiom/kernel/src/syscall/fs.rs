@@ -207,7 +207,7 @@ impl Syscall<'_> {
             // todo: check lazy?
             iov_ptr.as_slice_mut_checked(Iovec::size()).await?;
 
-            let iov = iov_ptr.try_read().await?;
+            let iov = iov_ptr.read().await?;
             let buf_ptr = UserPtr::<u8>::new(iov.iov_base);
             let buf_slice = buf_ptr.as_slice_mut_checked(iov.iov_len).await?;
             read_size += file.read(buf_slice).await?;
@@ -275,7 +275,7 @@ impl Syscall<'_> {
             // todo: check lazy?
             iov_ptr.as_slice_mut_checked(Iovec::size()).await?;
 
-            let iov = iov_ptr.try_read().await?;
+            let iov = iov_ptr.read().await?;
             // let buf_ptr = UserPtr::<u8>::new(iov.iov_base);
             // let buf_slice = buf_ptr.as_slice_mut_checked(iov.iov_len).await?;
             let buf_slice =
@@ -339,7 +339,7 @@ impl Syscall<'_> {
         let file = fd_table.get(fd).ok_or(Errno::EBADF)?;
         let kstat = Kstat::from_stat(file.inode().stat()?);
         let ptr = UserPtr::<Kstat>::new(stat_buf);
-        ptr.try_write(kstat).await?;
+        ptr.write(kstat).await?;
         Ok(0)
     }
 
@@ -359,7 +359,7 @@ impl Syscall<'_> {
         );
         let statx = path.dentry().inode()?.statx(mask)?;
         let ptr = UserPtr::<Statx>::new(buf);
-        ptr.try_write(statx).await?;
+        ptr.write(statx).await?;
         Ok(0)
     }
 
@@ -380,7 +380,7 @@ impl Syscall<'_> {
         );
         let kstat = Kstat::from_stat(path.dentry().inode()?.stat()?);
         let ptr = UserPtr::<Kstat>::new(stat_buf);
-        ptr.try_write(kstat).await?;
+        ptr.write(kstat).await?;
         Ok(0)
     }
 
@@ -408,9 +408,9 @@ impl Syscall<'_> {
             IoctlCmd::Tty(x) => match x {
                 TtyIoctlCmd::TCGETS => {}
                 TtyIoctlCmd::TCSETS => {}
-                TtyIoctlCmd::TIOCGPGRP => arg_ptr.try_write(INIT_PROCESS_ID as u8).await?,
+                TtyIoctlCmd::TIOCGPGRP => arg_ptr.write(INIT_PROCESS_ID as u8).await?,
                 TtyIoctlCmd::TIOCSPGRP => {}
-                TtyIoctlCmd::TIOCGWINSZ => arg_ptr.try_write(0).await?,
+                TtyIoctlCmd::TIOCGWINSZ => arg_ptr.write(0).await?,
                 _ => {
                     error!("[sys_ioctl] request {} is not supported", request);
                     return Err(Errno::EINVAL);
@@ -566,7 +566,7 @@ impl Syscall<'_> {
 
         if !old_limit.is_null() {
             old_limit
-                .try_write(match resource {
+                .write(match resource {
                     Resource::NOFILE => fd_table.rlimit().clone(),
                     Resource::STACK => RLimit::default(),
                     _ => todo!(),
@@ -579,10 +579,10 @@ impl Syscall<'_> {
                 "[sys_prlimit64] pid: {}, resource: {:?}, new_limit: {:?}",
                 pid,
                 resource,
-                new_limit.try_read().await?,
+                new_limit.read().await?,
             );
             // todo: check before read??
-            *fd_table.rlimit_mut() = new_limit.try_read().await?;
+            *fd_table.rlimit_mut() = new_limit.read().await?;
         }
         info!(
             "[sys_prlimit64] pid: {}, resource: {:?} new_limit_addr: {:#x}, old_limit_addr: {:#x}",
@@ -665,9 +665,9 @@ impl Syscall<'_> {
         let offset_ptr = UserPtr::<usize>::new(offset);
         let mut buf = vec![0u8; count];
         let read_len = if !offset_ptr.is_null() {
-            let offset = offset_ptr.try_read().await?;
+            let offset = offset_ptr.read().await?;
             let read_len = in_file.read_at(offset, &mut buf).await? as usize;
-            offset_ptr.try_write(offset + read_len).await?;
+            offset_ptr.write(offset + read_len).await?;
             read_len
         } else {
             in_file.read(&mut buf).await? as usize
@@ -723,7 +723,7 @@ impl Syscall<'_> {
         if !times_ptr.is_null() {
             for i in 0..2 {
                 let times_ptr = UserPtr::<TimeSpec>::new(times + i * TimeSpec::size());
-                let time_spec = times_ptr.try_read().await?;
+                let time_spec = times_ptr.read().await?;
                 match time_spec.tv_nsec {
                     UTIME_NOW => {}
                     UTIME_OMIT => {
@@ -809,7 +809,7 @@ impl Syscall<'_> {
         info!("[sys_statfs] path: {}, buf: {:#x}", path, buf);
         let statfs = Statfs::new();
         let ptr = UserPtr::<Statfs>::new(buf);
-        ptr.try_write(statfs).await?;
+        ptr.write(statfs).await?;
         Ok(0)
     }
 
@@ -854,7 +854,7 @@ impl Syscall<'_> {
 
         let mut buf = vec![0; len];
         let in_offset = if !off_in.is_null() {
-            let off_in = off_in.try_read().await?;
+            let off_in = off_in.read().await?;
             if off_in < 0 {
                 return Err(Errno::EINVAL);
             }
@@ -869,7 +869,7 @@ impl Syscall<'_> {
 
         buf.truncate(in_len as usize);
         let out_offset = if !off_out.is_null() {
-            let off_out = off_out.try_read().await?;
+            let off_out = off_out.read().await?;
             if off_out < 0 {
                 return Err(Errno::EINVAL);
             }
@@ -881,12 +881,12 @@ impl Syscall<'_> {
 
         if !off_in.is_null() {
             off_in
-                .try_write(off_in.try_read().await? + in_len as i64)
+                .write(off_in.read().await? + in_len as i64)
                 .await?;
         }
         if !off_out.is_null() {
             off_out
-                .try_write(off_out.try_read().await? + out_len as i64)
+                .write(off_out.read().await? + out_len as i64)
                 .await?;
         }
 

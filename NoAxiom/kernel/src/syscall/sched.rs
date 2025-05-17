@@ -27,7 +27,7 @@ impl Syscall<'_> {
             0 => {
                 // get current cpu mask
                 let cpu_mask = self.task.tcb().cpu_mask;
-                mask.try_write(cpu_mask).await?;
+                mask.write(cpu_mask).await?;
                 Ok(0)
             }
             _ => {
@@ -35,7 +35,7 @@ impl Syscall<'_> {
                 if let Some(task) = TASK_MANAGER.get(pid) {
                     let tg = task.thread_group();
                     if let Some(Some(task)) = tg.0.get(&pid).map(|t| t.upgrade()) {
-                        mask.try_write(task.tcb().cpu_mask).await?;
+                        mask.write(task.tcb().cpu_mask).await?;
                         Ok(0)
                     } else {
                         Err(Errno::ESRCH)
@@ -53,7 +53,7 @@ impl Syscall<'_> {
         cpusetsize: usize,
         mask: usize,
     ) -> SyscallResult {
-        let mask = UserPtr::<CpuMask>::new(mask).try_read().await?;
+        let mask = UserPtr::<CpuMask>::new(mask).read().await?;
         match pid {
             0 => {
                 // set current cpu mask
@@ -89,10 +89,12 @@ impl Syscall<'_> {
         Ok(SCHED_OTHER)
     }
 
-    pub fn sys_sched_getparam(&self, pid: usize, param: usize) -> SyscallResult {
+    pub async fn sys_sched_getparam(&self, pid: usize, param: usize) -> SyscallResult {
         let param = UserPtr::<SchedParam>::new(param);
-        let user_param = param.as_ref_mut()?;
-        user_param.set_priority(1);
+        let user_param = param.get_ref_mut().await?;
+        if let Some(user_param) = user_param {
+            user_param.set_priority(1);
+        }
         Ok(0)
     }
 }

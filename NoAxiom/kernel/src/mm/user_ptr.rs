@@ -86,39 +86,50 @@ impl<T> UserPtr<T> {
         self.addr as usize
     }
 
-    pub fn as_ref(&self) -> SysResult<&T> {
-        let value = unsafe { self.ptr().as_ref() };
-        value.ok_or(Errno::EFAULT)
+    pub async fn get_ref(&self) -> SysResult<Option<&T>> {
+        match unsafe { self.ptr().as_ref() } {
+            Some(ptr) => {
+                self.validate().await?;
+                Ok(Some(ptr))
+            }
+            None => Ok(None),
+        }
     }
 
-    pub fn as_ref_mut(&self) -> SysResult<&mut T> {
-        let value = unsafe { self.ptr().as_mut() };
-        value.ok_or(Errno::EFAULT)
-    }
-
-    pub fn get_ref(&self) -> Option<&T> {
-        unsafe { self.ptr().as_ref() }
-    }
-
-    pub fn get_ref_mut(&self) -> Option<&mut T> {
-        unsafe { self.ptr().as_mut() }
+    pub async fn get_ref_mut(&self) -> SysResult<Option<&mut T>> {
+        match unsafe { self.ptr().as_mut() } {
+            Some(ptr) => {
+                self.validate().await?;
+                Ok(Some(ptr))
+            }
+            None => Ok(None),
+        }
     }
 
     #[inline(always)]
-    pub async fn try_read(&self) -> SysResult<T>
+    pub async fn read(&self) -> SysResult<T>
     where
         T: Copy,
     {
-        if check_no_lock() {
-            self.validate().await?;
-        } else {
-            warn!("block on read addr {:#x}", self.addr());
-            block_on(self.validate())?;
-        }
+        self.validate().await?;
         Ok(unsafe { *self.ptr() })
     }
 
-    pub fn atomic_load_acquire(&self) -> T
+    #[inline(always)]
+    pub async fn try_read(&self) -> SysResult<Option<T>>
+    where
+        T: Copy,
+    {
+        match unsafe { self.ptr().as_ref() } {
+            Some(ptr) => {
+                self.validate().await?;
+                Ok(Some(*ptr))
+            }
+            None => Ok(None),
+        }
+    }
+
+    pub unsafe fn atomic_load_acquire(&self) -> T
     where
         T: Copy,
     {
@@ -129,18 +140,24 @@ impl<T> UserPtr<T> {
     where
         T: Copy,
     {
-        block_on(self.try_write(value))
+        block_on(self.write(value))
     }
 
-    pub async fn try_write(&self, value: T) -> SysResult<()> {
-        if check_no_lock() {
-            self.validate().await?;
-        } else {
-            warn!("block on write addr {:#x}", self.addr());
-            block_on(self.validate())?;
-        }
+    pub async fn write(&self, value: T) -> SysResult<()> {
+        self.validate().await?;
         unsafe { *self.ptr() = value };
         Ok(())
+    }
+
+    pub async fn try_write(&self, value: T) -> SysResult<Option<()>> {
+        match unsafe { self.ptr().as_mut() } {
+            Some(ptr) => {
+                self.validate().await?;
+                *ptr = value;
+                Ok(Some(()))
+            }
+            None => Ok(None),
+        }
     }
 
     /// get user slice until the checker returns true
@@ -174,7 +191,12 @@ impl<T> UserPtr<T> {
     /// this will check the page table and allocate valid map areas
     /// or it will return EFAULT
     pub async fn validate(&self) -> SysResult<()> {
-        self.as_slice_mut_checked(1).await?;
+        if check_no_lock() {
+            self.as_slice_mut_checked(1).await?;
+        } else {
+            warn!("[validate] block on addr {:#x}", self.addr());
+            block_on(self.as_slice_mut_checked(1))?;
+        }
         Ok(())
     }
 
@@ -216,13 +238,13 @@ impl UserPtr<UserPtr<u8>> {
     pub async fn get_string_vec(&self) -> SysResult<Vec<String>> {
         let mut ptr = self.clone();
         let mut res = Vec::new();
-        while !ptr.is_null() && !ptr.try_read().await?.is_null() {
+        while !ptr.is_null() && !ptr.read().await?.is_null() {
             trace!(
                 "ptr_addr: {:#}, value: {:#}",
                 ptr.va_addr().raw(),
-                ptr.try_read().await?.va_addr().raw()
+                ptr.read().await?.va_addr().raw()
             );
-            let data = ptr.try_read().await?.get_cstr();
+            let data = ptr.read().await?.get_cstr();
             res.push(data);
             ptr.inc(1);
         }

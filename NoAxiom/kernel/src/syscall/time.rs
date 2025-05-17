@@ -19,7 +19,7 @@ impl Syscall<'_> {
     pub async fn sys_times(&self, tms: usize) -> SyscallResult {
         let tms = UserPtr::<TMS>::new(tms);
         let res = self.task.tcb().time_stat.into_tms();
-        tms.try_write(res).await?;
+        tms.write(res).await?;
         Ok(0)
     }
     pub async fn sys_gettimeofday(tv: usize) -> SyscallResult {
@@ -28,7 +28,7 @@ impl Syscall<'_> {
         }
         let buf = UserPtr::<TimeVal>::new(tv);
         let timeval = get_timeval();
-        buf.try_write(timeval).await?;
+        buf.write(timeval).await?;
         Ok(0)
     }
     pub async fn sys_nanosleep(&self, buf: usize, remain: usize) -> SyscallResult {
@@ -37,11 +37,11 @@ impl Syscall<'_> {
         if ts.is_null() {
             return Err(Errno::EINVAL);
         }
-        let time_spec = ts.try_read().await?;
+        let time_spec = ts.read().await?;
         let remain_time = sleep_now(time_spec.into()).await;
         if !remain.is_null() {
             if remain_time > Duration::ZERO {
-                remain.try_write(remain_time.into()).await?;
+                remain.write(remain_time.into()).await?;
                 error!(
                     "[sys_nanosleep] sleep interrupted, remain time: {:?}",
                     remain_time
@@ -73,13 +73,13 @@ impl Syscall<'_> {
                     }
                 }
                 trace!("[sys_clock_gettime] get process cpu time: {:?}", cpu_time);
-                ts.try_write(TimeSpec::from(cpu_time)).await?;
+                ts.write(TimeSpec::from(cpu_time)).await?;
                 return Ok(0);
             }
             CLOCK_THREAD_CPUTIME_ID => {
                 let cpu_time = self.task.tcb().time_stat.cpu_time();
                 trace!("[sys_clock_gettime] get process cpu time: {:?}", cpu_time);
-                ts.try_write(TimeSpec::from(cpu_time)).await?;
+                ts.write(TimeSpec::from(cpu_time)).await?;
                 return Ok(0);
             }
             _ => match CLOCK_MANAGER.lock().0.get(&clockid) {
@@ -87,7 +87,7 @@ impl Syscall<'_> {
                     let dev_time = get_time_duration();
                     let clock_time = dev_time + *clock;
                     trace!("[sys_clock_gettime] get time {:?}", clock_time);
-                    ts.try_write(TimeSpec::from(clock_time)).await?;
+                    ts.write(TimeSpec::from(clock_time)).await?;
                     return Ok(0);
                 }
                 None => {
@@ -107,7 +107,7 @@ impl Syscall<'_> {
         pub const TIMER_ABSTIME: usize = 1;
         let request = UserPtr::<TimeSpec>::new(request);
         let remain = UserPtr::<TimeSpec>::new(remain);
-        let request = Duration::from(request.try_read().await?);
+        let request = Duration::from(request.read().await?);
         let current = get_time_duration();
         let remain_time = if flags == TIMER_ABSTIME {
             if request < current {
@@ -119,7 +119,7 @@ impl Syscall<'_> {
             sleep_now(request).await
         };
         if !remain.is_null() {
-            remain.try_write(remain_time.into()).await?;
+            remain.write(remain_time.into()).await?;
         }
         Ok(0)
     }
@@ -133,7 +133,7 @@ impl Syscall<'_> {
             tv_sec: 0,
             tv_nsec: 1,
         };
-        res.try_write(value).await?;
+        res.write(value).await?;
         Ok(0)
     }
 }
