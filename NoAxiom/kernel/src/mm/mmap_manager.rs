@@ -168,7 +168,7 @@ pub async fn lazy_alloc_mmap<'a>(
                 drop(guard);
                 debug!("[lazy_alloc_mmap] suspend_no_int_now");
                 loop {
-                    suspend_no_int_now(current_task().pcb()).await;
+                    suspend_no_int_now(current_task().unwrap().pcb()).await;
                     if memory_set.lock().mmap_manager.mmap_map.get(&vpn).is_some() {
                         break;
                     }

@@ -364,7 +364,7 @@ impl MemorySet {
                     );
                     info!("[load_elf] find interp path: {}", path);
                     assert!(Arch::is_external_interrupt_enabled());
-                    dl_interp = Some(Path::from_string(path, current_task())?);
+                    dl_interp = Some(Path::from_string(path, current_task().unwrap())?);
                 }
                 _ => {}
             }

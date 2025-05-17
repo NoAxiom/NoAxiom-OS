@@ -31,6 +31,7 @@ fn kernel_trap_handler() {
         TrapType::StorePageFault(addr)
         | TrapType::LoadPageFault(addr)
         | TrapType::InstructionPageFault(addr) => {
+            Arch::enable_interrupt();
             if let Some(task) = current_cpu().task.as_mut() {
                 // fixme: currently this block_on cannot be canceled
                 info!(
@@ -44,6 +45,7 @@ fn kernel_trap_handler() {
             } else {
                 kernel_panic("page fault without task running");
             }
+            Arch::disable_interrupt();
         }
         TrapType::SupervisorExternal => ext_int_handler(),
         TrapType::Timer => {

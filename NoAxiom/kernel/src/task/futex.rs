@@ -133,7 +133,7 @@ impl FutexFuture {
 impl Future for FutexFuture {
     type Output = SyscallResult;
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let task = current_task();
+        let task = current_task().unwrap();
         if !self.is_in {
             let mut futex = task.futex();
             if UserPtr::from(self.uaddr as *const u32).atomic_load_acquire() == self.val {
@@ -141,7 +141,7 @@ impl Future for FutexFuture {
                 futex.insert_waiter(self.pa, cx.waker().clone());
                 debug!(
                     "[futex] task {} yield with value = {}",
-                    current_task().tid(),
+                    current_task().unwrap().tid(),
                     self.val
                 );
                 return Poll::Pending;

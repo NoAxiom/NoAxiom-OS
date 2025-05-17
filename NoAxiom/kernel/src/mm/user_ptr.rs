@@ -194,7 +194,7 @@ impl UserPtr<u8> {
     /// convert ptr into an slice
     pub async fn as_slice_mut_checked_raw<'a>(&self, len: usize) -> SysResult<&mut [u8]> {
         let page_table = PageTable::from_ppn(Arch::current_root_ppn());
-        let memory_set = current_task().memory_set();
+        let memory_set = current_task().unwrap().memory_set();
         for vpn in VpnRange::new_from_va(
             VirtAddr::from(self.addr()),
             VirtAddr::from(self.addr() + len),

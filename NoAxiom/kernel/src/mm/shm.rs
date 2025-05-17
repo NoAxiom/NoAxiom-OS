@@ -52,7 +52,7 @@ impl ShmManager {
         } else {
             key
         };
-        let pid = current_task().tid();
+        let pid = current_task().unwrap().tid();
         let perm = CreateMode::from_bits((shmflags & 0o777) as u32).unwrap();
         let shmid_ds = ShmIdDs {
             shm_perm: perm,
@@ -71,14 +71,14 @@ impl ShmManager {
         key
     }
     pub fn attach(&mut self, key: usize) {
-        let pid = current_task().tid();
+        let pid = current_task().unwrap().tid();
         let shm_area = &mut self.shm_areas.get_mut(&key).unwrap();
         shm_area.shmid_ds.shm_atime = get_time();
         shm_area.shmid_ds.shm_lpid = pid;
         shm_area.shmid_ds.shm_nattch += 1;
     }
     pub fn detach(&mut self, key: usize) {
-        let pid = current_task().tid();
+        let pid = current_task().unwrap().tid();
         let shm_area = &mut self.shm_areas.get_mut(&key).unwrap();
         shm_area.shmid_ds.shm_dtime = get_time();
         shm_area.shmid_ds.shm_lpid = pid;

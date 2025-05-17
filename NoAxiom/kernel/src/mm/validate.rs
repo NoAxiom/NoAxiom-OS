@@ -44,7 +44,7 @@ pub async fn validate(
             error!(
                 "[validate] store at invalid area, flags: {:?}, tid: {}",
                 flags,
-                current_task().tid()
+                current_task().unwrap().tid()
             );
             Err(Errno::EFAULT)
         } else {
@@ -58,7 +58,7 @@ pub async fn validate(
     } else {
         let mut ms = memory_set.lock();
         if ms.stack.vpn_range.is_in_range(vpn) {
-            let task = current_task();
+            let task = current_task().unwrap();
             trace!(
                 "[validate] stack, tid: {}, vpn: {:#x?}, epc: {:#x}",
                 task.tid(),
@@ -70,18 +70,18 @@ pub async fn validate(
         } else if ms.brk.area.vpn_range.is_in_range(vpn) {
             trace!(
                 "[validate] brk, tid: {}, vpn: {:x?}, epc: {:#x}",
-                current_task().tid(),
+                current_task().unwrap().tid(),
                 vpn.raw(),
-                current_task().trap_context()[arch::TrapArgs::EPC],
+                current_task().unwrap().trap_context()[arch::TrapArgs::EPC],
             );
             ms.lazy_alloc_brk(vpn);
             Ok(())
         } else if ms.mmap_manager.is_in_space(vpn) {
             trace!(
                 "[validate] mmap, tid: {}, vpn: {:x?}, epc: {:#x}",
-                current_task().tid(),
+                current_task().unwrap().tid(),
                 vpn.raw(),
-                current_task().trap_context()[arch::TrapArgs::EPC],
+                current_task().unwrap().trap_context()[arch::TrapArgs::EPC],
             );
             drop(ms);
             lazy_alloc_mmap(memory_set, vpn).await?;

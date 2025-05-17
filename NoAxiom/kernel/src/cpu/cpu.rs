@@ -32,8 +32,8 @@ impl Cpu {
         kernel_space_activate();
         self.task = None;
     }
-    pub fn current_task(&self) -> &Arc<Task> {
-        &self.task.as_ref().unwrap()
+    pub fn current_task(&self) -> &Option<Arc<Task>> {
+        &self.task
     }
 }
 
@@ -44,6 +44,6 @@ pub fn current_cpu() -> &'static mut Cpu {
     CPUS[get_hartid()].as_ref_mut()
 }
 
-pub fn current_task() -> &'static Arc<Task> {
-    current_cpu().current_task()
+pub fn current_task() -> Option<&'static Arc<Task>> {
+    current_cpu().current_task().as_ref()
 }

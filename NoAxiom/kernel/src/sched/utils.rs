@@ -127,7 +127,7 @@ pub async fn raw_suspend_now() {
 
 #[inline(always)]
 fn current_set_runnable() {
-    current_task().pcb().set_runnable();
+    current_task().unwrap().pcb().set_runnable();
 }
 
 pub async fn suspend_no_int_now(mut pcb: SpinLockGuard<'_, PCB>) {
