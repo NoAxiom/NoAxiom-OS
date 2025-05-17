@@ -292,6 +292,8 @@ pub enum SyscallID {
     // for debug
     #[cfg(feature = "debug_sig")]
     NO_SYSCALL = 0xFFFF,
+    #[cfg(feature = "debug_sig")]
+    NO_TASK = 0xFFFE,
 }
 
 impl SyscallID {

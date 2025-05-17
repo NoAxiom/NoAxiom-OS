@@ -175,6 +175,21 @@ impl<'a> Syscall<'a> {
         })?;
         #[cfg(feature = "debug_sig")]
         update_current_syscall(id);
+
+        // === debug ===
+        static mut CNT: usize = 0;
+        unsafe {
+            CNT += 1;
+            if CNT % 1000 == 0 {
+                warn!(
+                    "[kernel] syscall count: {}, id: {:?}",
+                    CNT,
+                    current_syscall(),
+                );
+            }
+        }
+        // === debug ===
+
         // if id.is_debug_on() {
         //     let cx = self.task.trap_context();
         //     use arch::TrapArgs::*;
