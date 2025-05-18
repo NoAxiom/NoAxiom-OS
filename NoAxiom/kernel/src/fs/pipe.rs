@@ -218,6 +218,7 @@ impl PipeDentry {
         let pipe_dentry = Arc::new(Self {
             meta: DentryMeta::new(Some(parent.clone()), name, super_block),
         });
+        debug!("[PipeDentry] create pipe dentry: {}", pipe_dentry.name());
         parent.add_child_directly(pipe_dentry.clone());
         pipe_dentry
     }
@@ -419,7 +420,7 @@ impl Drop for PipeFile {
         let mut buffer = self.buffer.lock();
         if self.is_read_end() {
             let name = self.meta.dentry().name();
-            debug!("[PipeFile] {} dropped!", name);
+            println!("[PipeFile] {} dropped!", name);
             root_dentry().remove_child(&name);
             buffer.read_end = None;
             for waker in buffer.write_wakers.drain(..) {
@@ -427,7 +428,7 @@ impl Drop for PipeFile {
             }
         } else {
             let name = self.meta.dentry().name();
-            debug!("[PipeFile] {} dropped!", name);
+            println!("[PipeFile] {} dropped!", name);
             root_dentry().remove_child(&name);
             buffer.write_end = None;
             for waker in buffer.read_wakers.drain(..) {

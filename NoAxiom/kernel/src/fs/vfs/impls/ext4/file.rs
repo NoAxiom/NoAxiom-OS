@@ -170,15 +170,16 @@ impl File for Ext4Dir {
         static mut FIRST: bool = true;
         debug!("[AsyncSmpExt4]Dir {}: load_dir", self.meta.dentry().name());
         let super_block = self.meta.dentry().super_block();
-        debug!("[ext4dir] load try to get lock");
+        trace!("[ext4dir] load try to get lock");
         let ext4 = super_block
             .downcast_ref::<Ext4SuperBlock>()
             .unwrap()
             .get_fs()
             .await;
-        debug!("[ext4dir] load get lock succeed");
+        trace!("[ext4dir] load get lock succeed");
         assert!(check_no_lock());
         assert!(Arch::is_interrupt_enabled());
+
         let entries = ext4.dir_get_entries(self.ino).await;
         for entry in entries {
             let entry_inode = ext4.get_inode_ref(entry.inode).await;
