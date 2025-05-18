@@ -15,9 +15,6 @@ pub mod system;
 pub mod time;
 pub mod utils;
 
-#[macro_use]
-pub mod macros;
-
 pub use syscall::Syscall;
 
 pub type SysResult<T> = Result<T, Errno>;
