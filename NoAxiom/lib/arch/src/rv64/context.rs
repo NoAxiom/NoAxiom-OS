@@ -103,6 +103,15 @@ impl MySstatus {
         let v: u8 = unsafe { core::mem::transmute(fs) };
         self.0.set_bits(13..15, v as usize);
     }
+    pub fn fs(&self) -> FS {
+        match self.0.get_bits(13..15) {
+            0 => FS::Off,
+            1 => FS::Initial,
+            2 => FS::Clean,
+            3 => FS::Dirty,
+            _ => unreachable!(),
+        }
+    }
 }
 
 /// Trap Context
@@ -305,9 +314,8 @@ impl ArchUserFloatContext for UserFloatContext {
         unsafe { core::mem::zeroed() }
     }
 
-    fn mark_save_if_needed(&mut self) {
-        let sstatus = sstatus::read();
-        self.need_save |= (sstatus.fs() == FS::Dirty) as u8;
+    fn mark_save_if_needed(&mut self, fs: FS) {
+        self.need_save |= (fs == FS::Dirty) as u8;
     }
 
     fn yield_task(&mut self) {

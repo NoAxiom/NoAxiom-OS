@@ -75,7 +75,8 @@ impl ArchTrap for RV64 {
         cx.sstatus().set_fs(FS::Clean);
         unsafe { __user_trapret(cx) };
         set_kernel_trap_entry();
-        cx.freg_mut().mark_save_if_needed();
+        let fs = cx.sstatus().fs();
+        cx.freg_mut().mark_save_if_needed(fs);
     }
     /// read exception pc
     fn read_epc() -> usize {
