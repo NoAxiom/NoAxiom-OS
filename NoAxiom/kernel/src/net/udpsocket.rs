@@ -8,7 +8,7 @@ use smoltcp::{
 };
 
 use super::{
-    socket::{poll_ifaces, Socket, SocketMetadata},
+    socket::{poll_ifaces, Socket, SocketMeta},
     tcpsocket::TcpSocket,
     PORT_MANAGER, SOCKET_SET,
 };
@@ -25,7 +25,7 @@ use crate::{
 pub struct UdpSocket {
     pub handle: SocketHandle,
     remote_endpoint: Option<IpEndpoint>, // for connect()
-    meta: SocketMetadata,
+    meta: SocketMeta,
 }
 
 impl UdpSocket {
@@ -33,7 +33,7 @@ impl UdpSocket {
         let new_socket = Self::new_socket();
         let new_socket_handle = SOCKET_SET.insert(new_socket);
 
-        let meta = SocketMetadata::new(
+        let meta = SocketMeta::new(
             SocketType::Udp,
             UDP_CONSTANTS.default_rx_buf_size,
             UDP_CONSTANTS.default_tx_buf_size,
@@ -199,5 +199,9 @@ impl Socket for UdpSocket {
             );
             return Some(endpoint);
         }
+    }
+
+    fn meta(&self) -> &SocketMeta {
+        &self.meta
     }
 }

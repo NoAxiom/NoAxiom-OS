@@ -11,7 +11,7 @@ use crate::{
 };
 
 #[derive(Debug, Clone)]
-pub struct SocketMetadata {
+pub struct SocketMeta {
     /// socket的类型
     pub socket_type: SocketType,
     /// 接收缓冲区的大小
@@ -24,7 +24,7 @@ pub struct SocketMetadata {
     pub options: SocketOptions,
 }
 
-impl SocketMetadata {
+impl SocketMeta {
     pub fn new(
         socket_type: SocketType,
         rx_buf_size: usize,
@@ -96,7 +96,15 @@ pub trait Socket: Send + Sync + DowncastSync {
     /// return: whether the operation is successful
     fn shutdown(&mut self, operation: ShutdownType) -> SysResult<()>;
 
+    /// Get the socket's metadata
+    fn meta(&self) -> &SocketMeta;
+
     fn end_point(&self) -> Option<IpEndpoint>;
+
+    fn setsockopt(&self, _level: usize, _optname: usize, _optval: &[u8]) -> SysResult<()> {
+        warn!("setsockopt is not implemented");
+        Ok(())
+    }
 }
 
 impl_downcast!(sync Socket);

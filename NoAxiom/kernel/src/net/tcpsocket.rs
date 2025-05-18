@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use smoltcp::{iface::SocketHandle, socket::tcp, wire::IpEndpoint};
 
 use super::{
-    socket::{poll_ifaces, Socket, SocketMetadata},
+    socket::{poll_ifaces, Socket, SocketMeta},
     NET_DEVICES, PORT_MANAGER, SOCKET_SET,
 };
 use crate::{
@@ -26,14 +26,13 @@ pub enum TcpState {
 }
 
 pub struct TcpSocket {
-    meta: SocketMetadata,
+    meta: SocketMeta,
     state: TcpState,
     /// for different end, the meaning of handles is different
     /// server: the handles is the listen socket handle
     /// client: the FIRST handle is the connect socket handle
     handles: Vec<SocketHandle>,
     local_endpoint: Option<IpEndpoint>,
-    // todo: nonblock?
 }
 
 impl TcpSocket {
@@ -42,7 +41,7 @@ impl TcpSocket {
         let new_socket = Self::new_socket();
         let new_socket_handle = SOCKET_SET.insert(new_socket);
 
-        let meta = SocketMetadata::new(
+        let meta = SocketMeta::new(
             SocketType::Tcp,
             TCP_CONSTANTS.default_rx_buf_size,
             TCP_CONSTANTS.default_tx_buf_size,
@@ -64,7 +63,7 @@ impl TcpSocket {
         options: SocketOptions,
         local_endpoint: Option<IpEndpoint>,
     ) -> Self {
-        let meta = SocketMetadata::new(
+        let meta = SocketMeta::new(
             SocketType::Tcp,
             TCP_CONSTANTS.default_rx_buf_size,
             TCP_CONSTANTS.default_tx_buf_size,
@@ -345,5 +344,9 @@ impl Socket for TcpSocket {
         } else {
             self.local_endpoint
         }
+    }
+
+    fn meta(&self) -> &SocketMeta {
+        &self.meta
     }
 }

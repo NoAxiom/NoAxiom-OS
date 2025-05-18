@@ -2,10 +2,10 @@ use alloc::{boxed::Box, sync::Arc};
 use core::task::Waker;
 
 use async_trait::async_trait;
+use ksync::async_mutex::{AsyncMutex, AsyncMutexGuard};
 use smoltcp::wire::IpEndpoint;
-use spin::{Mutex, MutexGuard};
 
-use super::{tcpsocket::TcpSocket, udpsocket::UdpSocket};
+use super::{socket::SocketMeta, tcpsocket::TcpSocket, udpsocket::UdpSocket};
 use crate::{
     fs::vfs::basic::{
         dentry::EmptyDentry,
@@ -61,6 +61,18 @@ impl Sock {
             _ => Err(Errno::ENOSYS),
         }
     }
+    pub fn setsockopt(&mut self, level: usize, optname: usize, optval: &[u8]) -> SysResult<()> {
+        match self {
+            Sock::Tcp(socket) => socket.setsockopt(level, optname, optval),
+            Sock::Udp(socket) => socket.setsockopt(level, optname, optval), /* _ => Err(Errno::ENOSYS), */
+        }
+    }
+    pub fn meta(&self) -> &SocketMeta {
+        match self {
+            Sock::Tcp(socket) => socket.meta(),
+            Sock::Udp(socket) => socket.meta(),
+        }
+    }
 }
 
 /// The file for socket
@@ -68,7 +80,7 @@ impl Sock {
 /// time-consuming
 pub struct SocketFile {
     meta: FileMeta,
-    sock: Mutex<Sock>,
+    sock: AsyncMutex<Sock>,
     type_: PosixSocketType,
 }
 
@@ -93,7 +105,7 @@ impl SocketFile {
 
         Self {
             meta,
-            sock: Mutex::new(sock),
+            sock: AsyncMutex::new(sock),
             type_,
         }
     }
@@ -106,13 +118,13 @@ impl SocketFile {
 
         Self {
             meta,
-            sock: Mutex::new(sock),
+            sock: AsyncMutex::new(sock),
             type_: socket.type_,
         }
     }
 
-    pub fn socket(&self) -> MutexGuard<'_, Sock> {
-        self.sock.lock()
+    pub async fn socket(&self) -> AsyncMutexGuard<'_, Sock> {
+        self.sock.lock().await
     }
 }
 
@@ -122,7 +134,7 @@ impl File for SocketFile {
         &self.meta
     }
     async fn base_read(&self, _offset: usize, buf: &mut [u8]) -> SyscallResult {
-        let mut sock = self.socket();
+        let mut sock = self.socket().await;
         let res;
         match &mut *sock {
             Sock::Tcp(socket) => {
@@ -140,7 +152,7 @@ impl File for SocketFile {
         unreachable!()
     }
     async fn base_write(&self, _offset: usize, buf: &[u8]) -> SyscallResult {
-        let mut sock = self.socket();
+        let mut sock = self.socket().await;
         let res;
         match &mut *sock {
             Sock::Tcp(socket) => {
