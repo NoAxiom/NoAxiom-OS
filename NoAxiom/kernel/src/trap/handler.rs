@@ -117,7 +117,6 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
                         addr,
                     );
                     task.recv_siginfo(
-                        &mut task.pcb(),
                         SigInfo::new_simple(SigNum::SIGSEGV.into(), SigCode::Kernel),
                         false,
                     );

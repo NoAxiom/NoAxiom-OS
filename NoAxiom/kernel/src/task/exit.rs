@@ -1,4 +1,5 @@
 use alloc::{sync::Arc, vec::Vec};
+
 use ksync::mutex::check_no_lock;
 
 use super::Task;
@@ -73,16 +74,12 @@ impl Task {
         }
 
         // send SIGCHLD to parent
+        let mut pcb = self.pcb();
+        pcb.set_status(TaskStatus::Zombie);
         if self.is_group_leader() {
-            let mut pcb = self.pcb();
             if let Some(process) = pcb.parent.clone() {
                 let parent = process.upgrade().unwrap();
                 trace!("[exit_handler] parent tid: {}", parent.tid());
-
-                // del self from parent's children, and wake up suspended parent
-                let mut par_pcb = parent.pcb();
-                pcb.set_status(TaskStatus::Zombie);
-
                 // send SIGCHLD
                 let siginfo = SigInfo::new_detailed(
                     SigNum::SIGCHLD.into(),
@@ -95,8 +92,7 @@ impl Task {
                         stime: None,
                     }),
                 );
-                parent.recv_siginfo(&mut par_pcb, siginfo, false);
-                drop(par_pcb);
+                parent.recv_siginfo(siginfo, false);
             } else {
                 error!("[exit_handler] parent not found");
             }

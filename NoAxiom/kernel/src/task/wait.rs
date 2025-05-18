@@ -11,8 +11,6 @@ use crate::{
         process::{PidSel, WaitOption},
         result::Errno,
     },
-    sched::utils::{after_suspend, before_suspend},
-    signal::sig_set::SigSet,
     syscall::SysResult,
 };
 
@@ -99,14 +97,14 @@ impl Future for WaitChildFuture<'_> {
                 res
             }
         };
-        match res {
-            Poll::Pending => {
-                before_suspend(pcb, Some(SigSet::SIGCHLD));
-            }
-            Poll::Ready(_) => {
-                after_suspend(Some(pcb));
-            }
-        }
+        // match res {
+        //     Poll::Pending => {
+        //         before_suspend(pcb, Some(SigSet::SIGCHLD));
+        //     }
+        //     Poll::Ready(_) => {
+        //         after_suspend(Some(pcb));
+        //     }
+        // }
         res
     }
 }

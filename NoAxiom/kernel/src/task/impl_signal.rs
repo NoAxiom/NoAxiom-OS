@@ -3,9 +3,8 @@ use core::mem::size_of;
 
 use arch::{ArchTrapContext, ArchUserFloatContext, TrapArgs};
 use config::mm::SIG_TRAMPOLINE;
-use ksync::mutex::{check_no_lock, SpinLockGuard};
+use ksync::mutex::check_no_lock;
 
-use super::task::PCB;
 use crate::{
     mm::user_ptr::UserPtr,
     signal::{
@@ -26,6 +25,10 @@ extern "C" {
 }
 
 impl Task {
+    pub fn peek_has_pending_signal(self: &Arc<Self>) -> bool {
+        let pcb = self.pcb();
+        pcb.pending_sigs.has_expect_signals(!pcb.sig_mask())
+    }
     pub async fn check_signal(self: &Arc<Self>) -> Option<SigMask> {
         let mut pcb = self.pcb();
         if pcb.pending_sigs.is_empty() {
@@ -144,16 +147,11 @@ impl Task {
     }
 
     /// siginfo receiver with thread checked
-    pub fn recv_siginfo(
-        self: &Arc<Self>,
-        pcb: &mut SpinLockGuard<PCB>,
-        si: SigInfo,
-        thread_only: bool,
-    ) {
+    pub fn recv_siginfo(self: &Arc<Self>, si: SigInfo, thread_only: bool) {
         match thread_only {
             true => {
                 // is thread
-                self.recv_siginfo_inner(pcb, si);
+                self.try_recv_siginfo_inner(si, true);
             }
             false => {
                 // is process (send signal to thread group)
@@ -178,33 +176,38 @@ impl Task {
 
                 for task in tg.iter() {
                     let task = task.1.upgrade().unwrap();
-                    if pcb.pending_sigs.sig_mask.contain_signum(si.signo as u32) {
-                        continue;
+                    if task.try_recv_siginfo_inner(si, false) {
+                        flag = true;
+                        break;
                     }
-                    task.recv_siginfo_inner(pcb, si);
-                    flag = true;
-                    break;
                 }
                 if !flag {
                     let task = tg.iter().next().unwrap().1.upgrade().unwrap();
-                    task.recv_siginfo_inner(pcb, si)
+                    task.try_recv_siginfo_inner(si, true);
                 }
             }
         }
     }
 
     /// a raw siginfo receiver without thread checked
-    fn recv_siginfo_inner(self: &Arc<Task>, pcb: &mut SpinLockGuard<PCB>, info: SigInfo) {
+    fn try_recv_siginfo_inner(self: &Arc<Task>, info: SigInfo, forced: bool) -> bool {
+        let mut pcb = self.pcb();
+        if pcb.pending_sigs.sig_mask.contain_signum(info.signo as u32) && !forced {
+            return false;
+        }
         let signum = info.signo as u32;
         pcb.pending_sigs.push(info);
-        trace!(
+        debug!(
             "[recv_siginfo_inner] tid: {}, push signal {} to pending",
             self.tid(),
             signum,
         );
-        if pcb.pending_sigs.should_wake.contain_signum(signum) && pcb.can_wake() {
-            self.wake_unchecked();
-        }
+        self.wake_unchecked();
+        // if pcb.pending_sigs.should_wake.contain_signum(signum) {
+        //     debug!("[recv_siginfo_inner] tid: {}, wake up task", self.tid());
+        //     self.wake_unchecked();
+        // }
+        return true;
     }
 
     /// terminate the process

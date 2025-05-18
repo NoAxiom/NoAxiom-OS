@@ -3,22 +3,19 @@
 //! - use [`block_on`] to block on a future
 //! - use [`suspend_now`] to suspend current task (without immediate wake)
 
-#![allow(unused)]
-
 use alloc::{boxed::Box, sync::Arc, task::Wake};
+use ksync::mutex::check_no_lock;
 use core::{
     future::Future,
     pin::Pin,
     task::{Context, Poll, Waker},
 };
 
-use ksync::mutex::SpinLockGuard;
+use include::errno::Errno;
+use pin_project_lite::pin_project;
 
-use crate::{
-    cpu::current_task,
-    signal::sig_set::SigSet,
-    task::{status::TaskStatus, Task, PCB},
-};
+use crate::{syscall::SysResult, task::Task};
+
 pub struct YieldFuture {
     visited: bool,
 }
@@ -120,47 +117,44 @@ impl Future for SuspendFuture {
     }
 }
 
-#[inline(always)]
-pub async fn raw_suspend_now() {
+/// suspend current task
+/// difference with yield_now: it won't wake the task immediately
+pub async fn suspend_now() {
+    assert!(check_no_lock());
     SuspendFuture::new().await;
 }
 
-#[inline(always)]
-fn current_set_runnable() {
-    current_task().unwrap().pcb().set_runnable();
-}
-
-pub async fn suspend_no_int_now(mut pcb: SpinLockGuard<'_, PCB>) {
-    pcb.set_status(TaskStatus::SuspendNoInt);
-    drop(pcb);
-    SuspendFuture::new().await;
-    current_set_runnable();
-}
-
-pub fn before_suspend(mut pcb: SpinLockGuard<'_, PCB>, sig: Option<SigSet>) {
-    let sigset = (!pcb.sig_mask()) | (sig.unwrap_or_else(|| SigSet::empty()));
-    pcb.set_wake_signal(sigset);
-    pcb.set_suspend();
-    drop(pcb);
-}
-
-pub fn after_suspend(pcb: Option<SpinLockGuard<'_, PCB>>) {
-    match pcb {
-        Some(mut pcb) => pcb.set_runnable(),
-        None => current_set_runnable(),
+pin_project! {
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
+    pub struct IntableFuture<'a, F> {
+        task: &'a Arc<Task>,
+        #[pin]
+        fut: F,
     }
 }
 
-/// suspend current task
-/// difference with yield_now: it won't wake the task immediately
-pub async fn suspend_now(pcb: SpinLockGuard<'_, PCB>) {
-    before_suspend(pcb, None);
-    SuspendFuture::new().await;
-    after_suspend(None);
+impl<F, T> Future for IntableFuture<'_, F>
+where
+    F: Future<Output = T>,
+{
+    type Output = SysResult<T>;
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.project();
+        let task = this.task;
+        match this.fut.poll(cx) {
+            Poll::Ready(res) => Poll::Ready(Ok(res)),
+            Poll::Pending => {
+                // start to handle signal
+                if task.peek_has_pending_signal() {
+                    Poll::Ready(Err(Errno::EINTR))
+                } else {
+                    Poll::Pending
+                }
+            }
+        }
+    }
 }
 
-pub async fn suspend_now_with_sig(pcb: SpinLockGuard<'_, PCB>, sig: SigSet) {
-    before_suspend(pcb, Some(sig));
-    SuspendFuture::new().await;
-    after_suspend(None);
+pub async fn intable<T>(task: &Arc<Task>, fut: impl Future<Output = T>) -> SysResult<T> {
+    IntableFuture { task, fut }.await
 }
