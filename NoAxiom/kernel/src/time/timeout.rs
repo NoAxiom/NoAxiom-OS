@@ -44,6 +44,8 @@ impl<T: Future> TimeLimitedFuture<T> {
     /// `future`: the target future  
     /// `timeout`: the timeout duration, None for infinity
     pub fn new(future: T, timeout: Option<Duration>) -> Self {
+        // minimal timeout: 500us
+        let timeout = timeout.map(|t| t.max(Duration::from_micros(500)));
         Self {
             future: Box::pin(future),
             limit: match timeout {
