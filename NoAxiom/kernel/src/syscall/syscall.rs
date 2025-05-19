@@ -1,6 +1,6 @@
 use alloc::sync::Arc;
 
-use arch::{ArchTrapContext, TrapContext};
+use arch::{ArchTrapContext, TrapArgs, TrapContext};
 
 use super::{utils::clear_current_syscall, SyscallResult};
 use crate::{
@@ -177,7 +177,7 @@ impl<'a> Syscall<'a> {
         if id.is_debug_on() {
             let cx = self.task.trap_context();
             use arch::TrapArgs::*;
-            warn!(
+            info!(
                 "[syscall] id: {:?}, tid: {}, sp: {:#x}, pc: {:#x}, ra: {:#x}, args: {:X?}",
                 id,
                 self.task.tid(),
@@ -191,6 +191,7 @@ impl<'a> Syscall<'a> {
         if id.is_debug_on() {
             info!("[syscall(out)] id: {:?}, res: {:x?}", id, res);
         }
+        clear_current_syscall();
         res
     }
     fn empty_syscall(name: &str, res: isize) -> SyscallResult {
@@ -200,23 +201,29 @@ impl<'a> Syscall<'a> {
 }
 
 impl Task {
-    pub async fn syscall(self: &Arc<Self>, cx: &TrapContext) -> isize {
-        let res = Syscall::new(self)
-            .syscall(cx.get_syscall_id(), cx.get_syscall_args())
-            .await;
-        let ret = match res {
-            Ok(res) => res,
-            Err(errno) => {
-                #[cfg(feature = "debug_sig")]
-                warn!("syscall error: {:?} during {:?}", errno, current_syscall());
-                let errno: isize = errno as isize;
-                match errno > 0 {
-                    true => -errno,
-                    false => errno,
-                }
+    pub async fn syscall(self: &Arc<Self>, cx: &mut TrapContext) -> isize {
+        cx[TrapArgs::EPC] += 4;
+        let res = get_syscall_result(
+            Syscall::new(self)
+                .syscall(cx.get_syscall_id(), cx.get_syscall_args())
+                .await,
+        );
+        cx[TrapArgs::RES] = res as usize;
+        res
+    }
+}
+
+pub fn get_syscall_result(res: SyscallResult) -> isize {
+    match res {
+        Ok(res) => res,
+        Err(errno) => {
+            #[cfg(feature = "debug_sig")]
+            warn!("syscall error: {:?} during {:?}", errno, current_syscall());
+            let errno: isize = errno as isize;
+            match errno > 0 {
+                true => -errno,
+                false => errno,
             }
-        };
-        clear_current_syscall();
-        ret
+        }
     }
 }

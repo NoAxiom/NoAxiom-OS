@@ -197,16 +197,23 @@ impl Task {
         }
         let signum = info.signo as u32;
         pcb.pending_sigs.push(info);
-        debug!(
-            "[recv_siginfo_inner] tid: {}, push signal {} to pending",
+        warn!(
+            "[recv_siginfo_inner] tid: {}, push signal {} to pending during syscall {:?}",
             self.tid(),
             signum,
+            self.tcb().current_syscall,
         );
-        self.wake_unchecked();
-        // if pcb.pending_sigs.should_wake.contain_signum(signum) {
-        //     debug!("[recv_siginfo_inner] tid: {}, wake up task", self.tid());
-        //     self.wake_unchecked();
-        // }
+        if pcb.pending_sigs.should_wake.contain_signum(signum) {
+            warn!("[recv_siginfo_inner] tid: {}, wake up task", self.tid());
+            self.wake_unchecked();
+        } else {
+            warn!(
+                "[recv_siginfo_inner] wake task {} get blocked, signo: {:?}, mask: {:?}",
+                self.tid(),
+                info.signo,
+                pcb.sig_mask()
+            )
+        }
         return true;
     }
 

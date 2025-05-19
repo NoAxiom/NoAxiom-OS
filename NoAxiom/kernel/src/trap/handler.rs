@@ -34,7 +34,7 @@ fn kernel_trap_handler() {
         | TrapType::InstructionPageFault(addr) => {
             if let Some(task) = current_cpu().task.as_mut() {
                 // fixme: currently this block_on cannot be canceled
-                warn!(
+                info!(
                     "[kernel] block on memory_validate, epc: {:#x}, addr: {:#x}, syscall: {:?}",
                     epc,
                     addr,
@@ -89,10 +89,8 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
         // syscall
         TrapType::SysCall => {
             arch::Arch::enable_interrupt();
-            cx[TrapArgs::EPC] += 4;
             let result = task.syscall(cx).await;
             trace!("[syscall] done! result {:#x}", result);
-            task.trap_context_mut()[TrapArgs::RES] = result as usize;
         }
         // page fault: try to handle copy-on-write, or exit the task
         TrapType::LoadPageFault(addr)

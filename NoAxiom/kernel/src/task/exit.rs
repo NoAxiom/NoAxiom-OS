@@ -5,6 +5,7 @@ use ksync::mutex::check_no_lock;
 use super::Task;
 use crate::{
     config::task::INIT_PROCESS_ID,
+    cpu::current_cpu,
     mm::user_ptr::UserPtr,
     signal::{
         sig_detail::{SigChildDetail, SigDetail},
@@ -56,10 +57,10 @@ impl Task {
         }
 
         // thread resources clean up
+        self.delete_children();
         self.thread_group().remove(tid);
         TASK_MANAGER.remove(tid);
         PROCESS_GROUP_MANAGER.lock().remove(self);
-        self.delete_children();
 
         // clear child tid
         if let Some(tidaddress) = self.clear_child_tid() {
@@ -97,14 +98,23 @@ impl Task {
                 error!("[exit_handler] parent not found");
             }
         }
-        info!("[exit_hander] task {} exited successfully", self.tid());
+        warn!("[exit_hander] task {} exited successfully", self.tid());
         TASK_MANAGER.get_init_proc().print_child_tree();
     }
 }
 
 impl Drop for Task {
     fn drop(&mut self) {
-        info!("task {} dropped", self.tid())
+        let parent = self.pcb().parent.as_ref().unwrap().upgrade().unwrap();
+        warn!(
+            "[drop_task] task {} dropped, dropper: {}, parent {}",
+            self.tid(),
+            current_cpu()
+                .task
+                .as_ref()
+                .map_or_else(|| 0, |task| task.tid()),
+            parent.tid(),
+        )
     }
 }
 

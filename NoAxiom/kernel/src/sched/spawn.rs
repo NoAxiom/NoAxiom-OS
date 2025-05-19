@@ -36,6 +36,7 @@ pub fn spawn_raw<F, R>(
 
 /// inner spawn: spawn a new user task
 pub fn spawn_utask(task: Arc<Task>) {
+    warn!("[spawn_utask] new task tid = {}", task.tid());
     spawn_raw(
         UserTaskFuture::new(task.clone(), task_main(task.clone())),
         task.sched_entity_ref_cloned(),

@@ -131,9 +131,12 @@ impl Syscall<'_> {
         if sig == SigNum::INVALID {
             return Err(Errno::EINVAL);
         }
-        debug!(
-            "[sys_kill] signo: {}, pid: {}, sig_name: {:?}",
-            signo, pid, sig
+        warn!(
+            "[sys_kill] from: {}, target: {}, signo: {}, sig_name: {:?}",
+            self.task.tid(),
+            pid,
+            signo,
+            sig
         );
         match pid {
             0 => {
@@ -234,7 +237,8 @@ impl Syscall<'_> {
         if pcb.pending_sigs.has_expect_signals(mask | invoke_signal) {
             return Err(Errno::EINTR);
         } else {
-            pcb.pending_sigs.should_wake = mask | invoke_signal; // todo: impl this
+            pcb.pending_sigs.should_wake = mask | invoke_signal; // todo: impl
+                                                                 // this
         }
         pcb.set_suspend();
         drop(pcb);
