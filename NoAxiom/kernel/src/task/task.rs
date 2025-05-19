@@ -684,7 +684,6 @@ impl Task {
         memory_set.memory_activate();
         self.terminate_threads();
         self.change_memory_set(memory_set);
-        trace!("init usatck");
         let (user_sp, _argc, _argv_base, _envp_base) =
             self.init_user_stack(user_sp, args, envs, &mut auxs);
         *self.trap_context_mut() = TrapContext::app_init_cx(entry_point, user_sp);

@@ -394,7 +394,7 @@ impl MemorySet {
 
         // user stack
         let user_stack_base = elf.end_va + PAGE_SIZE; // stack bottom
-        let user_stack_end = user_stack_base + USER_STACK_SIZE; // stack top
+        let user_stack_top = user_stack_base + USER_STACK_SIZE; // stack top
         let map_area = MapArea::new(
             user_stack_base,
             user_stack_base + USER_STACK_SIZE,
@@ -409,9 +409,10 @@ impl MemorySet {
             user_stack_base.raw(),
             user_stack_base.raw() + USER_STACK_SIZE
         );
+        memory_set.lazy_alloc_stack(VirtPageNum::from(user_stack_top - PAGE_SIZE));
 
         // user heap
-        let user_heap_base = user_stack_end + PAGE_SIZE;
+        let user_heap_base = user_stack_top + PAGE_SIZE;
         memory_set.brk = BrkAreaInfo {
             start: user_heap_base.into(),
             end: user_heap_base.into(),
@@ -458,7 +459,7 @@ impl MemorySet {
         auxs.push(AuxEntry(AT_CLKTCK, Arch::get_freq() as usize));
         auxs.push(AuxEntry(AT_SECURE, 0));
 
-        let user_sp = user_stack_end.into();
+        let user_sp = user_stack_top.into();
         info!(
             "[load_elf] done, entry: {:#x}, sp: {:#x}",
             entry_point, user_sp

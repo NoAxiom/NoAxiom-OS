@@ -127,6 +127,11 @@ impl<T> UserPtr<T> {
             Ok(()) => Ok(unsafe { self.read_unchecked() }),
             Err(trap_type) => match trap_type {
                 TrapType::LoadPageFault(addr) | TrapType::StorePageFault(addr) => {
+                    warn!(
+                        "[write] detect trap at addr {:#x} during syscall {:?}",
+                        self.addr(),
+                        current_syscall()
+                    );
                     let task = current_task().unwrap();
                     if check_no_lock() {
                         task.memory_validate(addr, Some(trap_type), false).await?;
@@ -184,6 +189,11 @@ impl<T> UserPtr<T> {
             }
             Err(trap_type) => match trap_type {
                 TrapType::LoadPageFault(addr) | TrapType::StorePageFault(addr) => {
+                    warn!(
+                        "[write] detect trap at addr {:#x} during syscall {:?}",
+                        self.addr(),
+                        current_syscall()
+                    );
                     let task = current_task().unwrap();
                     if check_no_lock() {
                         task.memory_validate(addr, Some(trap_type), false).await?;
