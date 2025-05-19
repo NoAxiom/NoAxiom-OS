@@ -735,14 +735,13 @@ pub async fn lazy_alloc_mmap<'a>(
         ms.page_table().map(vpn, ppn, pte_flags);
     } else {
         // todo: use suspend
-        warn!("[mm] lazy_alloc_mmap: page already mapped, yield for it");
+        warn!("[lazy_alloc_mmap] page {vpn:x?} already mapped, yield for it");
         while PageTable::from_ppn(Arch::current_root_ppn())
             .find_pte(vpn)
             .is_none()
         {
             yield_now().await;
         }
-        unimplemented!();
     }
     Arch::tlb_flush();
     Ok(())

@@ -25,7 +25,6 @@ fn panic(info: &PanicInfo) -> ! {
             .map_or_else(|| 0, |task| task.tid()),
         get_time_ms(),
     );
-    #[cfg(feature = "debug_sig")]
     println!("[PANIC] during syscall {:?}", current_syscall());
     if let Some(task) = current_cpu().task.as_ref() {
         let cx = task.trap_context();

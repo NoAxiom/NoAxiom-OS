@@ -1,13 +1,18 @@
 use alloc::{collections::btree_map::BTreeMap, sync::Arc};
 
+use arch::ArchPageTableEntry;
+use include::errno::Errno;
+
 use super::{
     address::{VirtAddr, VirtPageNum, VpnRange},
     frame::FrameTracker,
+    page_table::PageTable,
 };
 use crate::{
     config::mm::{MMAP_BASE_ADDR, PAGE_SIZE},
     fs::vfs::basic::file::File,
     include::mm::{MmapFlags, MmapProts},
+    pte_flags,
     syscall::SysResult,
 };
 
@@ -128,6 +133,33 @@ impl MmapManager {
     /// is a va in mmap space
     pub fn is_in_space(&self, vpn: VirtPageNum) -> bool {
         self.mmap_map.contains_key(&vpn)
+    }
+
+    /// mprotect
+    pub fn mprotect(
+        &mut self,
+        vpn: VirtPageNum,
+        add_prot: MmapProts,
+        page_table: &PageTable,
+    ) -> SysResult<()> {
+        let page = self.mmap_map.get_mut(&vpn).ok_or(Errno::ENOMEM)?;
+        let old_prot = page.prot;
+        let new_prot = old_prot | add_prot;
+        if self.frame_trackers.contains_key(&vpn) {
+            if let Some(pte) = page_table.find_pte(vpn) {
+                let flags = pte_flags!(U) | new_prot.into();
+                pte.set_flags(flags);
+            } else {
+                warn!(
+                    "[mprotect] not in table, vpn: {:#x}, old_prot: {:?}, add_prot: {:?}",
+                    vpn.raw(),
+                    old_prot,
+                    add_prot
+                );
+            }
+        }
+        page.prot = new_prot;
+        Ok(())
     }
 }
 
