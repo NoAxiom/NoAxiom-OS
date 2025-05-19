@@ -146,11 +146,10 @@ impl<T> UserPtr<T> {
                     Ok(unsafe { self.read_unchecked() })
                 }
                 _ => {
-                    error!(
+                    panic!(
                         "[user_ptr] trigger unexpected trap in read, trap_type: {:?}",
                         trap_type
                     );
-                    Err(Errno::EFAULT)
                 }
             },
         }
@@ -209,11 +208,10 @@ impl<T> UserPtr<T> {
                     Ok(())
                 }
                 _ => {
-                    error!(
+                    panic!(
                         "[user_ptr] trigger unexpected trap in write, trap_type: {:?}",
                         trap_type
                     );
-                    Err(Errno::EFAULT)
                 }
             },
         }
