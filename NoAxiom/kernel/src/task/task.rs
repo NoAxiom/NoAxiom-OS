@@ -343,7 +343,11 @@ impl Task {
     }
     /// wake self up
     pub fn wake_unchecked(&self) {
-        self.waker.get().unwrap().wake_by_ref();
+        if let Some(waker) = self.waker.get() {
+            waker.wake_by_ref();
+        } else {
+            warn!("[kernel] waker of task {} is None", self.tid());
+        }
     }
 
     /// tcb

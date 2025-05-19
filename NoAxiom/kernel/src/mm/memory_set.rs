@@ -742,6 +742,7 @@ pub async fn lazy_alloc_mmap<'a>(
         {
             yield_now().await;
         }
+        unimplemented!();
     }
     Arch::tlb_flush();
     Ok(())

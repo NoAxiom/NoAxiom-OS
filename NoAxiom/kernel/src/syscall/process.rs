@@ -18,6 +18,10 @@ use crate::{
         spawn::spawn_utask,
         utils::{intable, yield_now},
     },
+    signal::{
+        sig_detail::{SigDetail, SigKillDetail},
+        sig_info::{SigCode, SigInfo},
+    },
     task::{
         exit::ExitCode,
         futex::FutexFuture,
@@ -341,5 +345,24 @@ impl Syscall<'_> {
         // } else {
         //     Err(Errno::EPERM)
         // }
+    }
+
+    pub fn sys_tkill(&self, tid: usize, signal: i32) -> SyscallResult {
+        if signal == 0 {
+            return Ok(0);
+        }
+        trace!("tid : {} signal num : {}", tid, signal);
+        let task = TASK_MANAGER.get(tid).ok_or(Errno::ESRCH)?;
+        let pid = task.tgid() as _;
+        task.recv_siginfo(
+            SigInfo {
+                signo: signal,
+                code: SigCode::User,
+                errno: 0,
+                detail: SigDetail::Kill(SigKillDetail { pid }),
+            },
+            true,
+        );
+        Ok(0)
     }
 }

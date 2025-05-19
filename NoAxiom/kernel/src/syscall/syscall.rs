@@ -102,7 +102,7 @@ impl<'a> Syscall<'a> {
             SYS_SET_ROBUST_LIST =>      self.sys_set_robust_list(args[0], args[1]),
             SYS_FUTEX =>                self.sys_futex(args[0] as _, args[1] as _, args[2] as _, args[3] as _, args[4] as _, args[5] as _).await,
             SYS_SETSID =>               self.sys_setsid(),
-            // SYS_TKILL =>                todo!(),
+            SYS_TKILL =>                self.sys_tkill(args[0], args[1] as i32),
             // SYS_GETRUSAGE =>            todo!(),
             // SYS_SYSTEMSHUTDOWN =>       todo!(),
             
@@ -217,7 +217,6 @@ pub fn get_syscall_result(res: SyscallResult) -> isize {
     match res {
         Ok(res) => res,
         Err(errno) => {
-            #[cfg(feature = "debug_sig")]
             warn!("syscall error: {:?} during {:?}", errno, current_syscall());
             let errno: isize = errno as isize;
             match errno > 0 {

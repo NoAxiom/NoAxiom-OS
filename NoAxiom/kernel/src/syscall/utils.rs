@@ -9,7 +9,6 @@ pub fn current_syscall() -> SyscallID {
 pub fn update_current_syscall(syscall_id: SyscallID) {
     let task = current_task().unwrap();
     task.tcb_mut().current_syscall = syscall_id;
-    assert!(current_syscall() != SyscallID::NO_SYSCALL);
 }
 
 pub fn clear_current_syscall() {
