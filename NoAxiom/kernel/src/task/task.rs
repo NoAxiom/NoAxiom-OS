@@ -52,7 +52,7 @@ use crate::{
         manager::{PROCESS_GROUP_MANAGER, TASK_MANAGER},
         taskid::tid_alloc,
     },
-    time::time_info::TimeInfo,
+    time::{time_info::TimeInfo, timer::ITimerManager},
 };
 
 /// shared between threads
@@ -163,6 +163,7 @@ pub struct Task {
     thread_group: SharedMut<ThreadGroup>, // thread group
     pgid: Arc<AtomicUsize>,               // process group id
     futex: SharedMut<FutexQueue>,         // futex wait queue
+    itimer: SharedMut<ITimerManager>,     // interval timer
 }
 
 impl PCB {
@@ -386,6 +387,11 @@ impl Task {
     pub fn ucx_mut(&self) -> &mut UserPtr<UContext> {
         self.ucx.as_ref_mut()
     }
+
+    /// interval timer manager
+    pub fn itimer(&self) -> SpinLockGuard<ITimerManager> {
+        self.itimer.lock()
+    }
 }
 
 // process implementation
@@ -459,6 +465,7 @@ impl Task {
             }),
             futex: Shared::new(FutexQueue::new()),
             ucx: ThreadOnly::new(UserPtr::new_null()),
+            itimer: Shared::new(ITimerManager::new()),
         });
         task.thread_group().insert(&task);
         task.set_self_as_tg_leader();
@@ -627,6 +634,7 @@ impl Task {
                 }),
                 futex: self.futex.clone(),
                 ucx: ThreadOnly::new(UserPtr::new_null()),
+                itimer: self.itimer.clone(),
             });
             new_thread.set_tg_leader_weakly(self.tg_leader.get().unwrap());
             new_thread.thread_group.lock().insert(&new_thread);
@@ -660,6 +668,7 @@ impl Task {
                 }),
                 futex: Shared::new(FutexQueue::new()),
                 ucx: ThreadOnly::new(UserPtr::new_null()),
+                itimer: Shared::new(ITimerManager::new()),
             });
             new_process.thread_group().insert(&new_process);
             new_process.set_self_as_tg_leader();

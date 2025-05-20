@@ -179,3 +179,13 @@ impl ITimerVal {
         }
     }
 }
+
+/// the size of interval timer is 3
+pub const ITIMER_COUNT: usize = 3;
+
+/// real time timer
+pub const ITIMER_REAL: usize = 0;
+/// virtual time timer
+pub const ITIMER_VIRTUAL: usize = 1;
+/// profiling timer
+pub const ITIMER_PROF: usize = 2;

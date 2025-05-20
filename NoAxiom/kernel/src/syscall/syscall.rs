@@ -141,6 +141,7 @@ impl<'a> Syscall<'a> {
             SYS_CLOCK_NANOSLEEP =>  self.sys_clock_nanosleep(args[0], args[1], args[2], args[3]).await,
             SYS_CLOCK_GETRES =>     self.sys_clock_getres(args[0], args[1]).await,
             SYS_SETITIMER =>        self.sys_setitimer(args[0] as _, args[1] as _, args[2] as _).await,
+            SYS_GETITIMER =>        self.sys_getitimer(args[0] as _, args[1] as _).await,
 
             // system / others
             SYS_SYSINFO =>         Self::empty_syscall("info", 0),
@@ -167,7 +168,7 @@ impl<'a> Syscall<'a> {
     }
     /// syscall implementation with debug info
     pub async fn syscall(&mut self, id: usize, args: [usize; 6]) -> SyscallResult {
-        let id = SyscallID::from_repr(id as usize).ok_or_else(|| {
+        let id = SyscallID::from_repr(id as _).ok_or_else(|| {
             error!("invalid syscall id: {}", id);
             Errno::ENOSYS
         })?;

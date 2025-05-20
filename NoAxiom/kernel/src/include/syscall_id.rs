@@ -1,7 +1,7 @@
 use strum::FromRepr;
 
 #[derive(FromRepr, Clone, Copy, Debug, Eq, PartialEq)]
-#[repr(usize)]
+#[repr(isize)]
 #[allow(non_camel_case_types)]
 pub enum SyscallID {
     // reference: pantheon
@@ -291,9 +291,9 @@ pub enum SyscallID {
 
     // for debug
     #[cfg(feature = "debug_sig")]
-    NO_SYSCALL = 0xFFFF,
+    NO_SYSCALL = -1,
     #[cfg(feature = "debug_sig")]
-    NO_TASK = 0xFFFE,
+    NO_TASK = -2,
 }
 
 impl SyscallID {

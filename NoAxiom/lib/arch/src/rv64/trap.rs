@@ -1,6 +1,6 @@
 use core::{
     arch::{asm, global_asm},
-    cell::SyncUnsafeCell,
+    intrinsics::volatile_load,
 };
 
 use config::cpu::CPU_NUM;
@@ -62,19 +62,17 @@ fn set_ptr_entry() {
 
 #[repr(align(64))]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-struct TrapTypeAligned(TrapType);
-static mut USER_PTR_TRAP_TYPE: [TrapTypeAligned; CPU_NUM] =
-    [TrapTypeAligned(TrapType::None); CPU_NUM];
+struct Wrapper(TrapType);
+static mut USER_PTR_TRAP_TYPE: [Wrapper; CPU_NUM] = [Wrapper(TrapType::None); CPU_NUM];
 
 unsafe fn before_user_ptr() {
     RV64::disable_interrupt();
     set_ptr_entry();
-    USER_PTR_TRAP_TYPE[RV64::get_hartid()] = TrapTypeAligned(TrapType::None);
+    USER_PTR_TRAP_TYPE[RV64::get_hartid()] = Wrapper(TrapType::None);
 }
 
 unsafe fn after_user_ptr() -> UserPtrResult {
-    let slice = USER_PTR_TRAP_TYPE.as_slice();
-    let trap_type = slice.as_ptr().add(RV64::get_hartid()).read().0;
+    let trap_type = volatile_load(&USER_PTR_TRAP_TYPE[RV64::get_hartid()]).0;
     let res = match trap_type {
         TrapType::None => Ok(()),
         _ => Err(trap_type),
@@ -124,7 +122,7 @@ pub unsafe extern "C" fn kernel_user_ptr_handler() {
     let stval = stval::read();
     let sepc = sepc::read();
     sepc::write(sepc + 4); // skip read
-    USER_PTR_TRAP_TYPE[hartid] = TrapTypeAligned(get_trap_type(scause, stval));
+    USER_PTR_TRAP_TYPE[hartid] = Wrapper(get_trap_type(scause, stval));
 }
 
 pub fn trap_init() {

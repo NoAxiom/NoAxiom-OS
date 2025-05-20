@@ -166,7 +166,7 @@ impl Syscall<'_> {
         // wait for child exit
         let (exit_code, tid) =
             intable(self.task, self.task.wait_child(pid_type, wait_option)).await??;
-        if status.is_not_null() {
+        if status.is_non_null() {
             trace!(
                 "[sys_wait4]: write exit_code at status_addr = {:#x}",
                 status.va_addr().raw(),

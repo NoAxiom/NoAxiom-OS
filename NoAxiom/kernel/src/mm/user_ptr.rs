@@ -72,7 +72,7 @@ impl<T> UserPtr<T> {
     }
 
     #[inline(always)]
-    pub fn is_not_null(&self) -> bool {
+    pub fn is_non_null(&self) -> bool {
         !self.ptr().is_null()
     }
 
@@ -123,6 +123,10 @@ impl<T> UserPtr<T> {
     where
         T: Copy,
     {
+        if self.is_null() {
+            warn!("[read] read null pointer");
+            return Err(Errno::EFAULT);
+        }
         match Arch::check_read(self.addr()) {
             Ok(()) => Ok(unsafe { self.read_unchecked() }),
             Err(trap_type) => match trap_type {
@@ -181,6 +185,10 @@ impl<T> UserPtr<T> {
     }
 
     pub async fn write(&self, value: T) -> SysResult<()> {
+        if self.is_null() {
+            warn!("[write] write null pointer");
+            return Err(Errno::EFAULT);
+        }
         match Arch::check_write(self.addr()) {
             Ok(()) => {
                 unsafe { self.write_unchecked(value) };

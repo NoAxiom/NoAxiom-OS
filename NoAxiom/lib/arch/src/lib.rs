@@ -7,6 +7,7 @@
 #![feature(lang_items)]
 #![feature(error_in_core)]
 #![feature(negative_impls)]
+#![feature(core_intrinsics)]
 #![feature(naked_functions)]
 #![feature(sync_unsafe_cell)]
 #![feature(panic_info_message)]
