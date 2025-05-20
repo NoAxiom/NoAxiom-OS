@@ -9,7 +9,11 @@ use crate::{
     fs::path::Path,
     include::{
         futex::{FUTEX_CLOCK_REALTIME, FUTEX_CMD_MASK, FUTEX_REQUEUE, FUTEX_WAIT, FUTEX_WAKE},
-        process::{robust_list::RobustList, CloneFlags, PidSel, WaitOption},
+        process::{
+            robust_list::RobustList,
+            rusage::{Rusage, RUSAGE_SELF},
+            CloneFlags, PidSel, WaitOption,
+        },
         result::Errno,
     },
     mm::user_ptr::UserPtr,
@@ -363,6 +367,31 @@ impl Syscall<'_> {
             },
             true,
         );
+        Ok(0)
+    }
+
+    pub async fn sys_getrusage(&self, who: isize, usage: usize) -> SyscallResult {
+        if who != RUSAGE_SELF {
+            return Err(Errno::EINVAL);
+        }
+        let usage = UserPtr::<Rusage>::from(usage);
+        let mut rusage = Rusage::new();
+        let tgroup = self.task.thread_group();
+        let mut utime = Duration::ZERO;
+        let mut stime = Duration::ZERO;
+        let mut start_time = Duration::ZERO;
+        for (_, thread) in tgroup.0.iter() {
+            if let Some(thread) = thread.upgrade() {
+                utime += thread.tcb().time_stat.utime();
+                stime += thread.tcb().time_stat.stime();
+                if start_time.is_zero() {
+                    start_time = thread.tcb().time_stat.create_time();
+                }
+            };
+        }
+        rusage.ru_stime = stime.into();
+        rusage.ru_utime = utime.into();
+        usage.write(rusage).await?;
         Ok(0)
     }
 }

@@ -6,7 +6,7 @@ use arch::{Arch, ArchInfo};
 
 use crate::{
     cpu::{current_cpu, get_hartid},
-    syscall::utils::current_syscall,
+    syscall::{utils::current_syscall, Syscall},
     time::gettime::get_time_ms,
 };
 
@@ -46,7 +46,5 @@ fn panic(info: &PanicInfo) -> ! {
             info.message().unwrap()
         );
     }
-    println!("[PANIC] press any key to shutdown");
-    while platform::getchar() as i8 == -1 {}
-    platform::shutdown()
+    Syscall::sys_systemshutdown()
 }

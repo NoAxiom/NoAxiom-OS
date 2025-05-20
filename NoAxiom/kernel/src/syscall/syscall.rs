@@ -102,15 +102,14 @@ impl<'a> Syscall<'a> {
             SYS_SET_ROBUST_LIST =>      self.sys_set_robust_list(args[0], args[1]),
             SYS_FUTEX =>                self.sys_futex(args[0] as _, args[1] as _, args[2] as _, args[3] as _, args[4] as _, args[5] as _).await,
             SYS_SETSID =>               self.sys_setsid(),
-            SYS_TKILL =>                self.sys_tkill(args[0], args[1] as i32),
-            // SYS_GETRUSAGE =>            todo!(),
-            // SYS_SYSTEMSHUTDOWN =>       todo!(),
+            SYS_GETRUSAGE =>            self.sys_getrusage(args[0] as _, args[1]).await,
             
             // signal
             SYS_SIGTIMEDWAIT => Self::empty_syscall("sigtimedwait", 0),
             SYS_SIGACTION =>    self.sys_sigaction(args[0] as i32, args[1], args[2]).await,
             SYS_SIGRETURN =>    self.sys_sigreturn().await,
             SYS_KILL =>         self.sys_kill(args[0] as isize, args[1] as i32),
+            SYS_TKILL =>        self.sys_tkill(args[0], args[1] as i32),
             SYS_SIGPROCMASK =>  self.sys_sigprocmask(args[0], args[1], args[2], args[3]).await,
             SYS_SIGSUSPEND =>   self.sys_sigsuspend(args[0]).await,
 
@@ -135,7 +134,8 @@ impl<'a> Syscall<'a> {
             SYS_SCHED_SETSCHEDULER =>   self.sys_sched_setscheduler(args[0], args[1] as _, args[2]),
 
             // others
-            SYS_GETRANDOM =>    self.sys_getrandom(args[0], args[1], args[2]).await,
+            SYS_GETRANDOM =>      self.sys_getrandom(args[0], args[1], args[2]).await,
+            SYS_SYSTEMSHUTDOWN => Self::sys_systemshutdown(),
 
             // time
             SYS_TIMES =>            self.sys_times(args[0]).await,

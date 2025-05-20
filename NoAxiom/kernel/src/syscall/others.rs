@@ -1,5 +1,5 @@
 use super::{Syscall, SyscallResult};
-use crate::{mm::user_ptr::UserPtr, utils::random_fill};
+use crate::{mm::user_ptr::UserPtr, time::gettime::get_time_duration, utils::random_fill};
 
 impl Syscall<'_> {
     /// get a random number
@@ -9,5 +9,15 @@ impl Syscall<'_> {
         let buf_slice = user_ptr.as_slice_mut_checked(buflen).await?;
         random_fill(buf_slice);
         Ok(buflen as isize)
+    }
+
+    /// systemshutdown
+    pub fn sys_systemshutdown() -> ! {
+        println!(
+            "[kernel] press any key to shutdown, system time: {:?}",
+            get_time_duration()
+        );
+        while platform::getchar() as i8 == -1 {}
+        platform::shutdown()
     }
 }
