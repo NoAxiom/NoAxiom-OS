@@ -133,10 +133,6 @@ impl<'a> Syscall<'a> {
             SYS_SCHED_GETPARAM =>       self.sys_sched_getparam(args[0], args[1]).await,
             SYS_SCHED_SETSCHEDULER =>   self.sys_sched_setscheduler(args[0], args[1] as _, args[2]),
 
-            // others
-            SYS_GETRANDOM =>      self.sys_getrandom(args[0], args[1], args[2]).await,
-            SYS_SYSTEMSHUTDOWN => Self::sys_systemshutdown(),
-
             // time
             SYS_TIMES =>            self.sys_times(args[0]).await,
             SYS_GETTIMEOFDAY =>     Self::sys_gettimeofday(args[0]).await,
@@ -144,12 +140,14 @@ impl<'a> Syscall<'a> {
             SYS_CLOCK_GETTIME =>    self.sys_clock_gettime(args[0], args[1]).await,
             SYS_CLOCK_NANOSLEEP =>  self.sys_clock_nanosleep(args[0], args[1], args[2], args[3]).await,
             SYS_CLOCK_GETRES =>     self.sys_clock_getres(args[0], args[1]).await,
-            // SYS_SETITIMER =>        todo!(),
+            SYS_SETITIMER =>        self.sys_setitimer(args[0] as _, args[1] as _, args[2] as _).await,
 
-            // system
-            SYS_SYSINFO =>  Self::empty_syscall("info", 0),
-            SYS_UNAME =>    Self::sys_uname(args[0]).await,
-            SYS_SYSLOG =>   Self::sys_syslog(args[0] as u32, args[1], args[2]).await,
+            // system / others
+            SYS_SYSINFO =>         Self::empty_syscall("info", 0),
+            SYS_UNAME =>           Self::sys_uname(args[0]).await,
+            SYS_SYSLOG =>          Self::sys_syslog(args[0] as u32, args[1], args[2]).await,
+            SYS_SYSTEMSHUTDOWN =>  Self::sys_systemshutdown(),
+            SYS_GETRANDOM =>       self.sys_getrandom(args[0], args[1], args[2]).await,
 
             // unsupported
             _ => {

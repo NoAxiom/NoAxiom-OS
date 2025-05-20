@@ -14,7 +14,7 @@ use crate::{
             rusage::{Rusage, RUSAGE_SELF},
             CloneFlags, PidSel, WaitOption,
         },
-        result::Errno,
+        result::Errno, time::TimeSpec,
     },
     mm::user_ptr::UserPtr,
     return_errno,
@@ -31,7 +31,7 @@ use crate::{
         futex::FutexFuture,
         manager::{PROCESS_GROUP_MANAGER, TASK_MANAGER},
     },
-    time::{time_spec::TimeSpec, timeout::TimeLimitedFuture},
+    time::timeout::TimeLimitedFuture,
 };
 
 impl Syscall<'_> {

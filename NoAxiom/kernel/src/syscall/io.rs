@@ -6,7 +6,10 @@ use ksync::mutex::check_no_lock;
 
 use super::{Syscall, SyscallResult};
 use crate::{
-    include::io::{FdSet, PollEvent, PollFd},
+    include::{
+        io::{FdSet, PollEvent, PollFd},
+        time::TimeSpec,
+    },
     io::{
         ppoll::{PpollFuture, PpollItem},
         pselect::PselectFuture,
@@ -14,10 +17,7 @@ use crate::{
     mm::user_ptr::UserPtr,
     sched::utils::intable,
     signal::sig_set::SigSet,
-    time::{
-        time_spec::TimeSpec,
-        timeout::{TimeLimitedFuture, TimeLimitedType},
-    },
+    time::timeout::{TimeLimitedFuture, TimeLimitedType},
 };
 
 impl Syscall<'_> {

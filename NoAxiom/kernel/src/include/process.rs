@@ -151,7 +151,7 @@ pub mod robust_list {
 }
 
 pub mod rusage {
-    use crate::time::time_val::TimeVal;
+    use crate::include::time::TimeVal;
 
     pub const RUSAGE_SELF: isize = 0;
 

@@ -3,6 +3,7 @@
 use core::time::Duration;
 
 use super::{gettime::get_time_duration, time_slice::TIME_SLICE_DURATION};
+use crate::include::time::TMS;
 
 #[derive(Debug, Clone, Copy)]
 pub struct KernelDuration {
@@ -138,16 +139,4 @@ impl Default for TimeInfo {
     fn default() -> Self {
         Self::new()
     }
-}
-
-#[repr(C)]
-pub struct TMS {
-    /// user time
-    pub tms_utime: usize,
-    /// system time
-    pub tms_stime: usize,
-    /// user time of dead children
-    pub tms_cutime: usize,
-    /// system time of dead children
-    pub tms_cstime: usize,
 }

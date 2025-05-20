@@ -9,5 +9,6 @@ pub mod process;
 pub mod resource;
 pub mod sched;
 pub mod syscall_id;
+pub mod time;
 
 pub use include::errno as result;

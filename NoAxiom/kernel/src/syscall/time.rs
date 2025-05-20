@@ -4,13 +4,11 @@ use include::errno::Errno;
 
 use super::{Syscall, SyscallResult};
 use crate::{
+    include::time::{ITimerVal, TimeSpec, TimeVal, TMS},
     mm::user_ptr::UserPtr,
     time::{
         clock::{ClockId, CLOCK_MANAGER},
         gettime::{get_time_duration, get_time_ms, get_timeval},
-        time_info::TMS,
-        time_spec::TimeSpec,
-        time_val::TimeVal,
         timeout::sleep_now,
     },
 };
@@ -134,5 +132,19 @@ impl Syscall<'_> {
         };
         res.write(value).await?;
         Ok(0)
+    }
+
+    pub async fn sys_setitimer(
+        &self,
+        which: i32,
+        new_value: usize,
+        old_value: usize,
+    ) -> SyscallResult {
+        let new_value = UserPtr::<ITimerVal>::new(new_value);
+        let old_value = UserPtr::<ITimerVal>::new(old_value);
+        if new_value.is_null() {
+            return Err(Errno::EFAULT);
+        }
+        todo!()
     }
 }

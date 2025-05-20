@@ -10,9 +10,11 @@ use ksync::{
 use super::superblock::{EmptySuperBlock, SuperBlock};
 use crate::{
     fs::pagecache::PageCache,
-    include::fs::{InodeMode, Stat, Statx, StatxTimestamp},
+    include::{
+        fs::{InodeMode, Stat, Statx, StatxTimestamp},
+        time::TimeSpec,
+    },
     syscall::SysResult,
-    time::time_spec::TimeSpec,
 };
 
 type Mutex<T> = SpinLock<T>;
