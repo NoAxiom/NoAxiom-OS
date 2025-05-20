@@ -8,13 +8,15 @@ use smoltcp::{
 };
 
 use super::{
+    poll::SocketPollMethod,
     socket::{poll_ifaces, Socket, SocketMeta},
     tcpsocket::TcpSocket,
-    PORT_MANAGER, SOCKET_SET,
+    HANDLE_MAP, SOCKET_SET, UDP_PORT_MANAGER,
 };
 use crate::{
     constant::net::UDP_CONSTANTS,
     include::{
+        io::PollEvent,
         net::{ShutdownType, SocketOptions, SocketType},
         result::Errno,
     },
@@ -58,6 +60,17 @@ impl UdpSocket {
             vec![0; UDP_CONSTANTS.default_tx_buf_size],
         );
         udp::Socket::new(rx_buffer, tx_buffer)
+    }
+
+    pub fn poll(&self) -> PollEvent {
+        let sockets = SOCKET_SET.lock();
+        let socket = sockets.get::<udp::Socket>(self.handle);
+        let handle_map_guard = HANDLE_MAP.read();
+        let shutdown_type = handle_map_guard
+            .get(&self.handle)
+            .unwrap()
+            .get_shutdown_type();
+        return SocketPollMethod::udp_poll(socket, shutdown_type);
     }
 }
 
@@ -134,7 +147,10 @@ impl Socket for UdpSocket {
     }
 
     fn bind(&mut self, local: IpEndpoint) -> SysResult<()> {
-        PORT_MANAGER.bind_port::<udp::Socket<'static>>(local.port)?;
+        debug!("[Udp] bind: {:?}", local);
+        let mut port_manager = UDP_PORT_MANAGER.lock();
+        port_manager.bind_port(local.port)?;
+        drop(port_manager);
 
         let mut sockets = SOCKET_SET.lock();
         let socket = sockets.get_mut::<udp::Socket>(self.handle);
@@ -175,8 +191,6 @@ impl Socket for UdpSocket {
         Err(Errno::ENOSYS)
     }
 
-    /// It is used to send data to a connected socket.
-    ///
     /// return: whether the operation is successful
     fn shutdown(&mut self, _operation: ShutdownType) -> SysResult<()> {
         Err(Errno::ENOSYS)

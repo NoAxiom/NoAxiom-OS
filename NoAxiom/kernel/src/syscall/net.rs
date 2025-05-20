@@ -39,10 +39,12 @@ impl Syscall<'_> {
         let socket_fd = fd_table.alloc_fd()?;
         fd_table.set(socket_fd as usize, Arc::new(socket_file));
 
+        debug!("[sys_socket] socket fd: {}", socket_fd);
         Ok(socket_fd as isize)
     }
 
     pub async fn sys_bind(&self, sockfd: usize, addr: usize, _addr_len: usize) -> SyscallResult {
+        info!("[sys_bind] sockfd: {}, addr: {}", sockfd, addr);
         let user_ptr = UserPtr::<SockAddr>::new(addr);
         let sock_addr = user_ptr.read().await?;
 
@@ -54,7 +56,7 @@ impl Syscall<'_> {
 
         let mut socket = socket_file.socket().await;
         socket.bind(sock_addr)?;
-
+        debug!("[sys_bind] bind ok");
         Ok(0)
     }
 

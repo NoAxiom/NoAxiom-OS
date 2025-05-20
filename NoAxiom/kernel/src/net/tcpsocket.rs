@@ -5,15 +5,18 @@ use async_trait::async_trait;
 use smoltcp::{iface::SocketHandle, socket::tcp, wire::IpEndpoint};
 
 use super::{
+    poll::SocketPollMethod,
     socket::{poll_ifaces, Socket, SocketMeta},
-    NET_DEVICES, PORT_MANAGER, SOCKET_SET,
+    NET_DEVICES, SOCKET_SET, TCP_PORT_MANAGER,
 };
 use crate::{
     constant::net::TCP_CONSTANTS,
     include::{
+        io::PollEvent,
         net::{ShutdownType, SocketOptions, SocketType},
         result::Errno,
     },
+    net::HANDLE_MAP,
     sched::utils::yield_now,
     syscall::SysResult,
 };
@@ -25,6 +28,9 @@ pub enum TcpState {
     // Established,
 }
 
+/// **TCP Socket** struct in kernel
+///
+/// this struct is under the protection of a big lock
 pub struct TcpSocket {
     meta: SocketMeta,
     state: TcpState,
@@ -56,6 +62,10 @@ impl TcpSocket {
             handles: vec![new_socket_handle],
             local_endpoint: None,
         }
+    }
+
+    fn handle(&self) -> &SocketHandle {
+        self.handles.first().unwrap()
     }
 
     fn from_handle(
@@ -101,6 +111,34 @@ impl TcpSocket {
         self.state = TcpState::Listen;
         Ok(())
     }
+
+    pub fn poll(&self) -> PollEvent {
+        if self.state == TcpState::Listen {
+            let sockets = SOCKET_SET.lock();
+            let can_accept = self.handles.iter().any(|handle| {
+                let socket = sockets.get::<tcp::Socket>(*handle);
+                socket.is_active()
+            });
+            drop(sockets);
+
+            if can_accept {
+                return PollEvent::POLLIN | PollEvent::POLLRDNORM;
+            } else {
+                return PollEvent::empty();
+            }
+        }
+
+        assert!(self.handles.len() == 1);
+
+        let sockets = SOCKET_SET.lock();
+        let socket = sockets.get::<tcp::Socket>(self.handles[0]);
+        let handle_map_guard = HANDLE_MAP.read();
+        let shutdown_type = handle_map_guard
+            .get(self.handle())
+            .unwrap()
+            .get_shutdown_type();
+        return SocketPollMethod::tcp_poll(socket, shutdown_type);
+    }
 }
 
 #[async_trait]
@@ -144,6 +182,11 @@ impl Socket for TcpSocket {
                     }
                     Err(tcp::RecvError::Finished) => {
                         // remote write end is closed, we should close the read end
+                        let mut handle_map_guard = HANDLE_MAP.write();
+                        handle_map_guard
+                            .get_mut(self.handle())
+                            .unwrap()
+                            .set_shutdown_type(ShutdownType::RCV_SHUTDOWN);
                         return (Err(Errno::ENOTCONN), None);
                     }
                 }
@@ -188,7 +231,9 @@ impl Socket for TcpSocket {
     }
 
     fn bind(&mut self, local: IpEndpoint) -> SysResult<()> {
-        PORT_MANAGER.bind_port::<tcp::Socket<'static>>(local.port)?;
+        debug!("[Tcp] bind to {:?}", local);
+        let mut port_manager = TCP_PORT_MANAGER.lock();
+        port_manager.bind_port(local.port)?;
         self.local_endpoint = Some(local);
         Ok(())
     }
@@ -198,8 +243,16 @@ impl Socket for TcpSocket {
     ///
     /// return: whether the operation is successful
     fn listen(&mut self, backlog: usize) -> SysResult<()> {
+        const MAX_BACKLOG: usize = 10;
         if self.state == TcpState::Listen {
             return Ok(());
+        }
+
+        let mut backlog = backlog;
+        if backlog > MAX_BACKLOG {
+            warn!("[Tcp] now handles has {}", self.handles.len());
+            warn!("[Tcp] listen backlog is too large, set to {}", MAX_BACKLOG);
+            backlog = MAX_BACKLOG;
         }
 
         let handlen = self.handles.len();
@@ -228,13 +281,15 @@ impl Socket for TcpSocket {
     ///
     /// return: whether the operation is successful
     async fn connect(&mut self, remote: IpEndpoint) -> SysResult<()> {
-        debug!("[Tcp] connect to {:?}", remote);
+        debug!("[Tcp] begin connect to {:?}", remote);
         let mut sockets = SOCKET_SET.lock();
         let local_socket = sockets.get_mut::<tcp::Socket>(self.handles[0]);
 
-        let temp_port = PORT_MANAGER.get_ephemeral_port()?;
+        let mut port_manager = TCP_PORT_MANAGER.lock();
+        let temp_port = port_manager.get_ephemeral_port()?;
         // check whether the port is used, if not, bind it
-        PORT_MANAGER.bind_port::<tcp::Socket<'static>>(temp_port)?;
+        port_manager.bind_port(temp_port)?;
+        drop(port_manager);
 
         let driver_write_guard = NET_DEVICES.write();
         let iface = driver_write_guard.get(&0).unwrap().clone(); // now we only have one net device
@@ -320,8 +375,6 @@ impl Socket for TcpSocket {
         }
     }
 
-    /// It is used to send data to a connected socket.
-    ///
     /// return: whether the operation is successful
     fn shutdown(&mut self, operation: ShutdownType) -> SysResult<()> {
         let mut sockets = SOCKET_SET.lock();
@@ -333,6 +386,11 @@ impl Socket for TcpSocket {
             info!("[TcpSocket::shutdown] socket abort");
             local_socket.abort();
         }
+        let mut handle_map_guard = HANDLE_MAP.write();
+        handle_map_guard
+            .get_mut(self.handle())
+            .unwrap()
+            .set_shutdown_type(operation);
         Ok(())
     }
 

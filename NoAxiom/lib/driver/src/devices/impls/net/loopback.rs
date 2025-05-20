@@ -29,7 +29,7 @@ impl LoopBackDev {
                 }
                 Medium::Ip => Config::new(smoltcp::wire::HardwareAddress::Ip),
             };
-            config.random_seed = "NoAxiom".parse().unwrap();
+            config.random_seed = 73197086;
             let mut iface = Interface::new(
                 config,
                 &mut device,
@@ -77,7 +77,7 @@ impl NetWorkDev for LoopBackDev {
         let mut device_guard = self.dev.lock();
         let device = device_guard.deref_mut();
         let res = iface.poll(Instant::from_millis(get_time_ms() as i64), device, sockets);
-        log::info!("[NetInterface::poll] polled {res}");
+        log::info!("[LoopBackDev::poll] polled {res}");
         if res {
             Ok(())
         } else {
