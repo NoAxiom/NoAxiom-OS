@@ -4,7 +4,10 @@
 use alloc::sync::Arc;
 
 use arch::ArchInt;
-use devices::{impls::block::BlockDevice, ALL_DEVICES};
+use devices::{
+    impls::{block::BlockDevice, net::NetWorkDev},
+    ALL_DEVICES,
+};
 
 mod bus;
 pub mod devices;
@@ -30,7 +33,7 @@ pub fn get_blk_dev() -> Arc<&'static dyn BlockDevice> {
     Arc::new(blk)
 }
 
-pub fn get_net_dev() -> Arc<&'static devices::impls::NetDevice> {
+pub fn get_net_dev() -> Arc<&'static dyn NetWorkDev> {
     let net = ALL_DEVICES.as_ref().get_net_device().unwrap();
     Arc::new(net)
 }

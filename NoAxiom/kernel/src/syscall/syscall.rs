@@ -69,7 +69,7 @@ impl<'a> Syscall<'a> {
             // net
             SYS_SOCKET =>       self.sys_socket(args[0], args[1], args[2]),
             SYS_BIND =>         self.sys_bind(args[0], args[1], args[2]).await,
-            SYS_LISTEN =>       self.sys_listen(args[0], args[1]),
+            SYS_LISTEN =>       self.sys_listen(args[0], args[1]).await,
             SYS_ACCEPT =>       self.sys_accept(args[0], args[1], args[2]).await,
             SYS_CONNECT =>      self.sys_connect(args[0], args[1], args[2]).await,
             SYS_SOCKETPAIR =>   self.sys_socketpair(args[0] as isize, args[1] as isize, args[2] as isize, args[3]).await,
@@ -79,8 +79,8 @@ impl<'a> Syscall<'a> {
             // SYS_SHUTDOWN =>     todo!(),
             // SYS_GETSOCKNAME =>  todo!(),
             // SYS_GETPEERNAME =>  todo!(),
-            // SYS_SETSOCKOPT =>   todo!(),
-            // SYS_GETSOCKOPT =>   todo!(),
+            SYS_SETSOCKOPT =>   self.sys_setsockopt(args[0], args[1], args[2], args[3], args[4]).await,
+            SYS_GETSOCKOPT =>   self.sys_getsockopt(args[0], args[1], args[2], args[3], args[4]).await,
 
             // process
             SYS_GETUID =>               Self::empty_syscall("getuid", 0),

@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use downcast_rs::{impl_downcast, DowncastSync};
 use ksync::{
     async_mutex::{AsyncMutex, AsyncMutexGuard},
-    mutex::{SpinLock, SpinLockGuard},
+    mutex::SpinLock,
 };
 
 use super::superblock::{EmptySuperBlock, SuperBlock};
@@ -18,7 +18,6 @@ use crate::{
 };
 
 type Mutex<T> = SpinLock<T>;
-type MutexGuard<'a, T> = SpinLockGuard<'a, T>;
 
 lazy_static::lazy_static! {
     static ref INODE_ID: Mutex<usize> = Mutex::new(0);

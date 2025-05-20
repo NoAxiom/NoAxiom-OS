@@ -3,9 +3,13 @@ use alloc::sync::Arc;
 
 use super::SyscallResult;
 use crate::{
+    constant::net::SOL_SOCKET,
     fs::pipe::PipeFile,
     include::{
-        net::{AddressFamily, PosixSocketType, SockAddr},
+        net::{
+            AddressFamily, PosixIpProtocol, PosixSocketOption, PosixSocketType,
+            PosixTcpSocketOptions, SockAddr,
+        },
         result::Errno,
     },
     mm::user_ptr::UserPtr,
@@ -35,51 +39,52 @@ impl Syscall<'_> {
         let socket_fd = fd_table.alloc_fd()?;
         fd_table.set(socket_fd as usize, Arc::new(socket_file));
 
+        debug!("[sys_socket] socket fd: {}", socket_fd);
         Ok(socket_fd as isize)
     }
 
     pub async fn sys_bind(&self, sockfd: usize, addr: usize, _addr_len: usize) -> SyscallResult {
+        info!("[sys_bind] sockfd: {}, addr: {}", sockfd, addr);
         let user_ptr = UserPtr::<SockAddr>::new(addr);
         let sock_addr = user_ptr.read().await?;
 
         let fd_table = self.task.fd_table();
         let socket_file = fd_table
             .get_socketfile(sockfd as usize)
-            .ok_or(Errno::ENOTSOCK)?;
+            .ok_or(Errno::EBADF)?;
         drop(fd_table);
 
-        let mut socket = socket_file.socket();
+        let mut socket = socket_file.socket().await;
         socket.bind(sock_addr)?;
-
+        debug!("[sys_bind] bind ok");
         Ok(0)
     }
 
-    pub fn sys_listen(&self, sockfd: usize, backlog: usize) -> SyscallResult {
+    pub async fn sys_listen(&self, sockfd: usize, backlog: usize) -> SyscallResult {
         debug!("[sys_listen] sockfd: {}, backlog: {}", sockfd, backlog);
         let fd_table = self.task.fd_table();
         let socket_file = fd_table
             .get_socketfile(sockfd as usize)
-            .ok_or(Errno::ENOTSOCK)?;
+            .ok_or(Errno::EBADF)?;
         drop(fd_table);
 
-        let mut socket = socket_file.socket();
+        let mut socket = socket_file.socket().await;
         socket.listen(backlog)?;
 
         Ok(0)
     }
 
-    pub async fn sys_connect(&self, sockfd: usize, addr: usize, _addrlen: usize) -> SyscallResult {
+    pub async fn sys_connect(&self, sockfd: usize, addr: usize, addr_len: usize) -> SyscallResult {
         debug!("[sys_connect] sockfd: {}, addr: {}", sockfd, addr);
-        let user_ptr = UserPtr::<SockAddr>::new(addr);
-        let sock_addr = user_ptr.read().await?;
+        let sock_addr = SockAddr::new(addr, addr_len)?;
 
         let fd_table = self.task.fd_table();
         let socket_file = fd_table
             .get_socketfile(sockfd as usize)
-            .ok_or(Errno::ENOTSOCK)?;
+            .ok_or(Errno::EBADF)?;
         drop(fd_table);
 
-        let mut socket = socket_file.socket();
+        let mut socket = socket_file.socket().await;
         socket.connect(sock_addr).await?;
 
         Ok(0)
@@ -89,10 +94,10 @@ impl Syscall<'_> {
         let fd_table = self.task.fd_table();
         let socket_file = fd_table
             .get_socketfile(sockfd as usize)
-            .ok_or(Errno::ENOTSOCK)?;
+            .ok_or(Errno::EBADF)?;
         drop(fd_table);
 
-        let mut socket = socket_file.socket();
+        let mut socket = socket_file.socket().await;
         let (new_tcp_socket, endpoint) = socket.accept().await?;
 
         let sockaddr = SockAddr::from_endpoint(endpoint);
@@ -106,6 +111,101 @@ impl Syscall<'_> {
         fd_table.set(new_fd as usize, Arc::new(new_socket_file));
 
         Ok(new_fd as isize)
+    }
+
+    /// configure socket options
+    pub async fn sys_setsockopt(
+        &self,
+        sockfd: usize,
+        level: usize,
+        optname: usize,
+        optval_ptr: usize,
+        optlen: usize,
+    ) -> SyscallResult {
+        info!(
+            "[sys_setsockopt] sockfd: {:?}, level: {:?}, optname: {:?}, optval_ptr: {:?}, optlen: {:?}",
+            sockfd, level, optname, optval_ptr, optlen
+        );
+
+        let fd_table = self.task.fd_table();
+        let socket_file = fd_table
+            .get_socketfile(sockfd as usize)
+            .ok_or(Errno::EBADF)?;
+        drop(fd_table);
+
+        let mut socket = socket_file.socket().await;
+
+        let user_ptr = UserPtr::<u8>::new(optval_ptr);
+        let buf_slice = user_ptr.as_slice_mut_checked(optlen).await?;
+        socket.setsockopt(level, optname, &buf_slice)?;
+        Ok(0)
+    }
+
+    /// get socket options
+    pub async fn sys_getsockopt(
+        &self,
+        sockfd: usize,
+        level: usize,
+        optname: usize,
+        optval_ptr: usize,
+        optlen: usize,
+    ) -> SyscallResult {
+        info!(
+            "[sys_getsockopt] sockfd: {:?}, level: {:?}, optname: {:?}, optval_ptr: {:?}, optlen: {:?}",
+            sockfd, level, optname, optval_ptr, optlen
+        );
+
+        let optval = UserPtr::<u32>::new(optval_ptr);
+        let optval = optval.get_ref_mut().await?.ok_or(Errno::EFAULT)?;
+        let optlen = UserPtr::<u32>::new(optlen);
+        let optlen = optlen.get_ref_mut().await?.ok_or(Errno::EFAULT)?;
+
+        let fd_table = self.task.fd_table();
+        let socket_file = fd_table
+            .get_socketfile(sockfd as usize)
+            .ok_or(Errno::EBADF)?;
+        drop(fd_table);
+
+        let socket = socket_file.socket().await;
+
+        if level as u8 == SOL_SOCKET {
+            let optname = PosixSocketOption::from_repr(optname as i32).ok_or(Errno::ENOPROTOOPT)?;
+            match optname {
+                PosixSocketOption::SO_SNDBUF => {
+                    *optval = socket.meta().tx_buf_size as u32;
+                    *optlen = core::mem::size_of::<u32>() as u32;
+                    return Ok(0);
+                }
+                PosixSocketOption::SO_RCVBUF => {
+                    *optval = socket.meta().rx_buf_size as u32;
+                    *optlen = core::mem::size_of::<u32>() as u32;
+                    return Ok(0);
+                }
+                _ => {
+                    return Err(Errno::ENOPROTOOPT);
+                }
+            }
+        }
+        drop(socket);
+
+        // To manipulate options at any other level the
+        // protocol number of the appropriate protocol controlling the
+        // option is supplied.  For example, to indicate that an option is
+        // to be interpreted by the TCP protocol, level should be set to the
+        // protocol number of TCP.
+
+        let posix_protocol = PosixIpProtocol::from_repr(level as u16).ok_or(Errno::ENOPROTOOPT)?;
+        if posix_protocol == PosixIpProtocol::TCP {
+            let optname =
+                PosixTcpSocketOptions::from_repr(optname as i32).ok_or(Errno::ENOPROTOOPT)?;
+            match optname {
+                PosixTcpSocketOptions::Congestion => return Ok(0),
+                _ => {
+                    return Err(Errno::ENOPROTOOPT);
+                }
+            }
+        }
+        return Err(Errno::ENOPROTOOPT);
     }
 
     // socketpair now is like pipe

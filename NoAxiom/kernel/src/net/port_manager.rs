@@ -1,12 +1,10 @@
 //! IP layer
-use alloc::sync::Arc;
+use alloc::{boxed::Box, collections::btree_map::BTreeMap};
 use core::task::Waker;
 
 use futures::task::noop_waker;
-use ksync::mutex::SpinLock;
-use smoltcp::socket::AnySocket;
 
-use crate::{constant::net::PORT_MAX, include::result::Errno, syscall::SysResult};
+use crate::{cpu::current_task, include::result::Errno, syscall::SysResult};
 
 pub struct PortItem {
     waker: Waker,
@@ -35,13 +33,13 @@ const EMPTY_PORT_ITEM: Option<PortItem> = None;
 /// `Some(x)` means the port is listened and the waker is used to wake up
 /// the socket
 pub struct PortManager {
-    inner: Arc<SpinLock<[Option<PortItem>; PORT_MAX]>>,
+    inner: Box<BTreeMap<usize, PortItem>>,
 }
 
 impl PortManager {
     pub fn new() -> Self {
         Self {
-            inner: Arc::new(SpinLock::new([EMPTY_PORT_ITEM; PORT_MAX])),
+            inner: Box::new(BTreeMap::new()),
         }
     }
 
@@ -49,13 +47,13 @@ impl PortManager {
     pub fn get_ephemeral_port(&self) -> SysResult<u16> {
         // Ephemeral port range: 49152-65535
         static mut EPHEMERAL_PORT: u16 = 49152;
-        let inner = self.inner.lock();
         for _ in 49152..65535 {
             let test_port = unsafe { EPHEMERAL_PORT };
             unsafe {
                 EPHEMERAL_PORT += 1;
             }
-            if inner[test_port as usize].is_none() {
+            if self.inner.get(&(test_port as usize)).is_none() {
+                debug!("[port_manager] Get ephemeral port {test_port}");
                 return Ok(test_port);
             }
         }
@@ -63,23 +61,20 @@ impl PortManager {
     }
 
     /// Bind a port with a socket
-    pub fn bind_port<S>(&self, port: u16) -> SysResult<()>
-    where
-        S: AnySocket<'static>,
-    {
+    pub fn bind_port(&mut self, port: u16) -> SysResult<()> {
         let port = if port == 0 {
             self.get_ephemeral_port()?
         } else {
             port
         };
-        let mut inner = self.inner.lock();
-        if let Some(_) = &inner[port as usize] {
+        if let Some(_) = &self.inner.get(&(port as usize)) {
             // The port is already listened
+            error!("[port_manager] Port {port} is already listened");
             Err(Errno::EADDRINUSE)
         } else {
-            let current_task = crate::cpu::current_cpu().task.clone().unwrap();
-            let waker = current_task.waker();
-            inner[port as usize] = Some(PortItem::new(waker));
+            // let waker = current_task().unwrap().waker();
+            let waker = noop_waker();
+            self.inner.insert(port as usize, PortItem::new(waker));
             Ok(())
         }
     }

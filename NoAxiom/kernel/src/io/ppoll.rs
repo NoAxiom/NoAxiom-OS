@@ -43,7 +43,7 @@ impl Future for PpollFuture {
             }
         }
         if result.is_empty() {
-            debug!("[sys_ppoll]: poll result empty");
+            debug!("[PpollFuture]: poll result empty, return Pending!");
             Poll::Pending
         } else {
             Poll::Ready(result)

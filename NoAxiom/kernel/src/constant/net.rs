@@ -29,3 +29,5 @@ impl SocketConstants {
 
 pub const TCP_CONSTANTS: SocketConstants = SocketConstants::tcp();
 pub const UDP_CONSTANTS: SocketConstants = SocketConstants::udp();
+
+pub const SOL_SOCKET: u8 = 1;

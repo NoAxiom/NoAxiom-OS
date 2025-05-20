@@ -2,23 +2,31 @@ use alloc::{boxed::Box, sync::Arc};
 use core::task::Waker;
 
 use async_trait::async_trait;
+use ksync::async_mutex::{AsyncMutex, AsyncMutexGuard};
 use smoltcp::wire::IpEndpoint;
-use spin::{Mutex, MutexGuard};
 
-use super::{tcpsocket::TcpSocket, udpsocket::UdpSocket};
+use super::{
+    socket::{poll_ifaces, SocketMeta},
+    tcpsocket::TcpSocket,
+    udpsocket::UdpSocket,
+};
 use crate::{
-    fs::vfs::basic::{
-        dentry::EmptyDentry,
-        file::{File, FileMeta},
-        inode::EmptyInode,
+    fs::vfs::{
+        basic::{
+            dentry::{self, Dentry, DentryMeta, EmptyDentry},
+            file::{File, FileMeta},
+            inode::EmptyInode,
+        },
+        root_dentry,
     },
     include::{
-        fs::FileFlags,
+        fs::{FileFlags, InodeMode},
         io::PollEvent,
         net::{AddressFamily, PosixSocketType, SockAddr, SocketOptions},
         result::Errno,
     },
     net::socket::Socket,
+    sched::utils::block_on,
     syscall::{SysResult, SyscallResult},
     utils::random,
 };
@@ -61,14 +69,61 @@ impl Sock {
             _ => Err(Errno::ENOSYS),
         }
     }
+    pub fn setsockopt(&mut self, level: usize, optname: usize, optval: &[u8]) -> SysResult<()> {
+        match self {
+            Sock::Tcp(socket) => socket.setsockopt(level, optname, optval),
+            Sock::Udp(socket) => socket.setsockopt(level, optname, optval), /* _ => Err(Errno::ENOSYS), */
+        }
+    }
+    pub fn meta(&self) -> &SocketMeta {
+        match self {
+            Sock::Tcp(socket) => socket.meta(),
+            Sock::Udp(socket) => socket.meta(),
+        }
+    }
+}
+
+pub struct SocketDentry {
+    meta: DentryMeta,
+}
+
+impl SocketDentry {
+    /// we mount all the pipes to the root dentry
+    pub fn new(name: &str) -> Arc<Self> {
+        let parent = root_dentry();
+        let super_block = parent.super_block();
+        let pipe_dentry = Arc::new(Self {
+            meta: DentryMeta::new(Some(parent.clone()), name, super_block),
+        });
+        debug!("[SocketDentry] create pipe dentry: {}", pipe_dentry.name());
+        parent.add_child_directly(pipe_dentry.clone());
+        pipe_dentry
+    }
+}
+
+#[async_trait]
+impl Dentry for SocketDentry {
+    fn meta(&self) -> &DentryMeta {
+        &self.meta
+    }
+
+    fn from_name(self: Arc<Self>, _name: &str) -> Arc<dyn Dentry> {
+        unreachable!("socket dentry should not have child");
+    }
+
+    fn open(self: Arc<Self>) -> SysResult<Arc<dyn File>> {
+        unreachable!("socket dentry should not open");
+    }
+
+    async fn create(self: Arc<Self>, _name: &str, _mode: InodeMode) -> SysResult<Arc<dyn Dentry>> {
+        unreachable!("socket dentry should not create child");
+    }
 }
 
 /// The file for socket
-/// todo: all the file struct should hold [`async_mutex`] because the I/O is
-/// time-consuming
 pub struct SocketFile {
     meta: FileMeta,
-    sock: Mutex<Sock>,
+    sock: AsyncMutex<Sock>,
     type_: PosixSocketType,
 }
 
@@ -86,14 +141,14 @@ impl SocketFile {
             AddressFamily::AF_UNIX => todo!("Unsupported address family AF_UNIX"),
         };
 
-        let empty_dentry = EmptyDentry::new(&format!("socket-{}", random()));
+        let dentry = SocketDentry::new(&format!("socket-{}", random()));
         let empty_inode = EmptyInode::new();
-        let meta = FileMeta::new(Arc::new(empty_dentry), Arc::new(empty_inode));
+        let meta = FileMeta::new(dentry, Arc::new(empty_inode));
         meta.set_flags(FileFlags::O_RDWR);
 
         Self {
             meta,
-            sock: Mutex::new(sock),
+            sock: AsyncMutex::new(sock),
             type_,
         }
     }
@@ -106,13 +161,13 @@ impl SocketFile {
 
         Self {
             meta,
-            sock: Mutex::new(sock),
+            sock: AsyncMutex::new(sock),
             type_: socket.type_,
         }
     }
 
-    pub fn socket(&self) -> MutexGuard<'_, Sock> {
-        self.sock.lock()
+    pub async fn socket(&self) -> AsyncMutexGuard<'_, Sock> {
+        self.sock.lock().await
     }
 }
 
@@ -122,7 +177,7 @@ impl File for SocketFile {
         &self.meta
     }
     async fn base_read(&self, _offset: usize, buf: &mut [u8]) -> SyscallResult {
-        let mut sock = self.socket();
+        let mut sock = self.socket().await;
         let res;
         match &mut *sock {
             Sock::Tcp(socket) => {
@@ -140,7 +195,7 @@ impl File for SocketFile {
         unreachable!()
     }
     async fn base_write(&self, _offset: usize, buf: &[u8]) -> SyscallResult {
-        let mut sock = self.socket();
+        let mut sock = self.socket().await;
         let res;
         match &mut *sock {
             Sock::Tcp(socket) => {
@@ -169,7 +224,28 @@ impl File for SocketFile {
         warn!("[Socket::ioctl] not supported now, return 0 instead");
         Ok(0)
     }
-    fn poll(&self, _req: &PollEvent, _waker: Waker) -> PollEvent {
-        unimplemented!("Socket::poll not supported now");
+
+    fn poll(&self, req: &PollEvent, _waker: Waker) -> PollEvent {
+        // todo: when the socket is ready, call the waker
+        let mut sock = block_on(self.socket());
+        poll_ifaces();
+        let poll_res = match &mut *sock {
+            Sock::Tcp(socket) => socket.poll(),
+            Sock::Udp(socket) => socket.poll(),
+        };
+
+        let mut res = PollEvent::empty();
+        if req.contains(PollEvent::POLLIN) && poll_res.contains(PollEvent::POLLIN) {
+            res |= PollEvent::POLLIN;
+        }
+        if req.contains(PollEvent::POLLOUT) && poll_res.contains(PollEvent::POLLOUT) {
+            res |= PollEvent::POLLOUT;
+        }
+        if poll_res.contains(PollEvent::POLLHUP) {
+            warn!("[Socket::poll] PollEvent is hangup");
+            res |= PollEvent::POLLHUP;
+        }
+        debug!("[Socket::poll] the result of PollEvent is {:?}", res);
+        res
     }
 }

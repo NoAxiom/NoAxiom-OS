@@ -308,7 +308,7 @@ impl SyscallID {
             | SyscallID::SYS_WRITEV
             | SyscallID::SYS_READV
             | SyscallID::SYS_PSELECT => false,
-            _ => true,
+            _ => false,
         }
     }
 }
