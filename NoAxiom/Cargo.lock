@@ -569,6 +569,7 @@ dependencies = [
  "num-derive",
  "num-traits",
  "paste",
+ "pin-project-lite",
  "platform",
  "ringbuffer",
  "smoltcp",

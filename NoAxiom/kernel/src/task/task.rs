@@ -198,7 +198,7 @@ impl PCB {
 
     /// suspend task can be woken up
     pub fn can_wake(&self) -> bool {
-        self.is_suspend()
+        true
     }
 
     /// set wake signal

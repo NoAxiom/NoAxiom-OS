@@ -1,9 +1,11 @@
 use alloc::{sync::Arc, vec::Vec};
+
 use ksync::mutex::check_no_lock;
 
 use super::Task;
 use crate::{
     config::task::INIT_PROCESS_ID,
+    cpu::current_cpu,
     mm::user_ptr::UserPtr,
     signal::{
         sig_detail::{SigChildDetail, SigDetail},
@@ -55,10 +57,10 @@ impl Task {
         }
 
         // thread resources clean up
+        self.delete_children();
         self.thread_group().remove(tid);
         TASK_MANAGER.remove(tid);
         PROCESS_GROUP_MANAGER.lock().remove(self);
-        self.delete_children();
 
         // clear child tid
         if let Some(tidaddress) = self.clear_child_tid() {
@@ -73,16 +75,12 @@ impl Task {
         }
 
         // send SIGCHLD to parent
+        let mut pcb = self.pcb();
+        pcb.set_status(TaskStatus::Zombie);
         if self.is_group_leader() {
-            let mut pcb = self.pcb();
             if let Some(process) = pcb.parent.clone() {
                 let parent = process.upgrade().unwrap();
                 trace!("[exit_handler] parent tid: {}", parent.tid());
-
-                // del self from parent's children, and wake up suspended parent
-                let mut par_pcb = parent.pcb();
-                pcb.set_status(TaskStatus::Zombie);
-
                 // send SIGCHLD
                 let siginfo = SigInfo::new_detailed(
                     SigNum::SIGCHLD.into(),
@@ -95,20 +93,28 @@ impl Task {
                         stime: None,
                     }),
                 );
-                parent.recv_siginfo(&mut par_pcb, siginfo, false);
-                drop(par_pcb);
+                parent.recv_siginfo(siginfo, false);
             } else {
                 error!("[exit_handler] parent not found");
             }
         }
-        info!("[exit_hander] task {} exited successfully", self.tid());
+        warn!("[exit_hander] task {} exited successfully", self.tid());
         TASK_MANAGER.get_init_proc().print_child_tree();
     }
 }
 
 impl Drop for Task {
     fn drop(&mut self) {
-        info!("task {} dropped", self.tid())
+        let parent = self.pcb().parent.as_ref().unwrap().upgrade().unwrap();
+        warn!(
+            "[drop_task] task {} dropped, dropper: {}, parent {}",
+            self.tid(),
+            current_cpu()
+                .task
+                .as_ref()
+                .map_or_else(|| 0, |task| task.tid()),
+            parent.tid(),
+        )
     }
 }
 

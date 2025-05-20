@@ -87,10 +87,7 @@ pub async fn task_main(task: Arc<Task>) {
         }
         match pcb.status() {
             TaskStatus::Terminated => break,
-            TaskStatus::Stopped => {
-                warn!("[task_main] task is stopped(1), tid: {}", task.tid());
-                suspend_now(pcb).await;
-            }
+            TaskStatus::Stopped => suspend_now().await,
             _ => drop(pcb),
         }
         assert!(check_no_lock());
@@ -108,10 +105,7 @@ pub async fn task_main(task: Arc<Task>) {
         let pcb = task.pcb();
         match pcb.status() {
             TaskStatus::Terminated => break,
-            TaskStatus::Stopped => {
-                warn!("[task_main] task is stopped(2), tid: {}", task.tid());
-                suspend_now(pcb).await;
-            }
+            TaskStatus::Stopped => suspend_now().await,
             _ => drop(pcb),
         }
         assert!(check_no_lock());
@@ -123,10 +117,7 @@ pub async fn task_main(task: Arc<Task>) {
         let pcb = task.pcb();
         match pcb.status() {
             TaskStatus::Terminated => break,
-            TaskStatus::Stopped => {
-                warn!("[task_main] task is stopped(3), tid: {}", task.tid());
-                suspend_now(pcb).await;
-            }
+            TaskStatus::Stopped => suspend_now().await,
             _ => drop(pcb),
         }
         assert!(check_no_lock());

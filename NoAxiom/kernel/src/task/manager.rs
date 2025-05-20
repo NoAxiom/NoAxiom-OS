@@ -125,17 +125,25 @@ impl Task {
         if self.is_group_leader() {
             // process resources clean up
             let mut pcb = self.pcb();
+            let mut child_tid = Vec::new();
+            let init_proc = TASK_MANAGER.get_init_proc();
+            let mut init_pcb = init_proc.pcb();
             // clear all children
             if !pcb.children.is_empty() {
                 for child in pcb.children.iter() {
                     // let init_proc take over the child
-                    let init_proc = TASK_MANAGER.get_init_proc();
+                    child_tid.push(child.tid());
                     child.pcb().parent = Some(Arc::downgrade(&init_proc));
-                    init_proc.pcb().children.push(child.clone());
+                    init_pcb.children.push(child.clone());
                 }
                 pcb.children.clear();
+                init_proc.wake_unchecked();
             }
-            trace!("[delete_children] task {} delete all children", self.tid());
+            warn!(
+                "[delete_children] task {} delete all children, move {:?} to init_proc",
+                self.tid(),
+                child_tid
+            );
         }
     }
 }

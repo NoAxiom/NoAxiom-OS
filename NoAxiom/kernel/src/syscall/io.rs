@@ -12,6 +12,7 @@ use crate::{
         pselect::PselectFuture,
     },
     mm::user_ptr::UserPtr,
+    sched::utils::intable,
     signal::sig_set::SigSet,
     time::{
         time_spec::TimeSpec,
@@ -78,16 +79,14 @@ impl Syscall<'_> {
         // asyncmutex
 
         assert!(check_no_lock());
-        let res = if let Some(timeout) = timeout {
-            match TimeLimitedFuture::new(PpollFuture::new(poll_items), Some(timeout)).await {
-                TimeLimitedType::Ok(res) => res,
-                TimeLimitedType::TimeOut => {
-                    debug!("[sys_ppoll]: timeout");
-                    return Ok(0);
-                }
+        let fut = TimeLimitedFuture::new(PpollFuture::new(poll_items), timeout);
+        let intable = intable(self.task, fut);
+        let res = match intable.await? {
+            TimeLimitedType::Ok(res) => res,
+            TimeLimitedType::TimeOut => {
+                debug!("[sys_ppoll]: timeout");
+                return Ok(0);
             }
-        } else {
-            PpollFuture::new(poll_items).await
         };
 
         let res_len = res.len();
@@ -189,16 +188,11 @@ impl Syscall<'_> {
         drop(pcb);
 
         assert!(check_no_lock());
-        let res = if let Some(timeout) = timeout {
-            match TimeLimitedFuture::new(PselectFuture::new(poll_items), Some(timeout)).await {
-                TimeLimitedType::Ok(res) => Some(res),
-                TimeLimitedType::TimeOut => {
-                    debug!("[sys_pselect6]: timeout");
-                    None
-                }
-            }
-        } else {
-            Some(PselectFuture::new(poll_items).await)
+        let fut = TimeLimitedFuture::new(PselectFuture::new(poll_items), timeout);
+        let intable = intable(self.task, fut);
+        let res = match intable.await? {
+            TimeLimitedType::Ok(res) => Some(res),
+            TimeLimitedType::TimeOut => None,
         };
 
         read_fds.as_mut().map(|fds| fds.clear());

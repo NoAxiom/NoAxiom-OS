@@ -23,7 +23,7 @@ impl SigPending {
             sig_mask: SigMask::empty(),
             queue: VecDeque::new(),
             pending_set: SigSet::empty(),
-            should_wake: SigSet::empty(),
+            should_wake: SigSet::all(),
         }
     }
 

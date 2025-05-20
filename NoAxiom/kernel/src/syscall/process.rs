@@ -14,7 +14,10 @@ use crate::{
     },
     mm::user_ptr::UserPtr,
     return_errno,
-    sched::{spawn::spawn_utask, utils::yield_now},
+    sched::{
+        spawn::spawn_utask,
+        utils::{intable, yield_now},
+    },
     task::{
         exit::ExitCode,
         futex::FutexFuture,
@@ -153,7 +156,8 @@ impl Syscall<'_> {
         };
 
         // wait for child exit
-        let (exit_code, tid) = self.task.wait_child(pid_type, wait_option).await?;
+        let (exit_code, tid) =
+            intable(self.task, self.task.wait_child(pid_type, wait_option)).await??;
         if status.is_not_null() {
             trace!(
                 "[sys_wait4]: write exit_code at status_addr = {:#x}",

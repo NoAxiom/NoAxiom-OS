@@ -11,8 +11,6 @@ use crate::{
         process::{PidSel, WaitOption},
         result::Errno,
     },
-    sched::utils::{after_suspend, before_suspend},
-    signal::sig_set::SigSet,
     syscall::SysResult,
 };
 
@@ -50,29 +48,34 @@ impl<'a> WaitChildFuture<'a> {
 impl Future for WaitChildFuture<'_> {
     type Output = SysResult<(i32, usize)>;
     fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut pcb = self.task.pcb();
         let res = match &self.target {
-            None => match pcb.pop_one_zombie_child() {
-                Some(child) => {
-                    // time statistic
-                    let child_tid = child.tid();
-                    self.task
-                        .tcb_mut()
-                        .time_stat
-                        .add_child_time(child.tcb().time_stat.child_time());
-                    Poll::Ready(Ok((pcb.exit_code(), child_tid)))
+            None => {
+                let mut pcb = self.task.pcb();
+                match pcb.pop_one_zombie_child() {
+                    Some(child) => {
+                        // time statistic
+                        let child_tid = child.tid();
+                        self.task
+                            .tcb_mut()
+                            .time_stat
+                            .add_child_time(child.tcb().time_stat.child_time());
+                        Poll::Ready(Ok((pcb.exit_code(), child_tid)))
+                    }
+                    None => Poll::Pending,
                 }
-                None => Poll::Pending,
-            },
+            }
             Some(child) => {
-                let mut ch_pcb = child.pcb();
+                let ch_pcb = child.pcb();
                 match ch_pcb.status() {
                     TaskStatus::Zombie => {
                         let child_tid = child.tid();
                         let exit_code = ch_pcb.exit_code();
+                        drop(ch_pcb);
                         // since we already collected exit info
                         // so just delete it from zombie children
-                        ch_pcb.children.retain(|task| task.tid() != child_tid);
+                        let mut pcb = self.task.pcb();
+                        // remove child from parent
+                        pcb.children.retain(|task| task.tid() != child_tid);
                         // update time statistic
                         self.task
                             .tcb_mut()
@@ -99,14 +102,6 @@ impl Future for WaitChildFuture<'_> {
                 res
             }
         };
-        match res {
-            Poll::Pending => {
-                before_suspend(pcb, Some(SigSet::SIGCHLD));
-            }
-            Poll::Ready(_) => {
-                after_suspend(Some(pcb));
-            }
-        }
         res
     }
 }

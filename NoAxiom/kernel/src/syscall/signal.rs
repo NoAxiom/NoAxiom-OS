@@ -12,7 +12,7 @@ use crate::{
     constant::signal::MAX_SIGNUM,
     include::result::Errno,
     mm::user_ptr::UserPtr,
-    sched::utils::raw_suspend_now,
+    sched::utils::suspend_now,
     signal::{
         sig_action::{KSigAction, USigAction},
         sig_detail::{SigDetail, SigKillDetail},
@@ -131,9 +131,12 @@ impl Syscall<'_> {
         if sig == SigNum::INVALID {
             return Err(Errno::EINVAL);
         }
-        debug!(
-            "[sys_kill] signo: {}, pid: {}, sig_name: {:?}",
-            signo, pid, sig
+        warn!(
+            "[sys_kill] from: {}, target: {}, signo: {}, sig_name: {:?}",
+            self.task.tid(),
+            pid,
+            signo,
+            sig
         );
         match pid {
             0 => {
@@ -147,7 +150,6 @@ impl Syscall<'_> {
                     .map(|t| t.task())
                 {
                     task.recv_siginfo(
-                        &mut task.pcb(),
                         SigInfo::new_detailed(
                             signo,
                             SigCode::User,
@@ -163,7 +165,6 @@ impl Syscall<'_> {
                     let task = task.upgrade().unwrap();
                     if task.tgid() != INIT_PROCESS_ID && task.is_group_leader() {
                         task.recv_siginfo(
-                            &mut task.pcb(),
                             SigInfo::new_detailed(
                                 signo,
                                 SigCode::User,
@@ -179,7 +180,6 @@ impl Syscall<'_> {
                 if let Some(task) = TASK_MANAGER.get(pid as usize) {
                     if task.is_group_leader() {
                         task.recv_siginfo(
-                            &mut task.pcb(),
                             SigInfo::new_detailed(
                                 signo,
                                 SigCode::User,
@@ -209,7 +209,6 @@ impl Syscall<'_> {
                 {
                     if task.tgid() == -pid as usize {
                         task.recv_siginfo(
-                            &mut task.pcb(),
                             SigInfo::new_detailed(
                                 signo,
                                 SigCode::User,
@@ -238,11 +237,12 @@ impl Syscall<'_> {
         if pcb.pending_sigs.has_expect_signals(mask | invoke_signal) {
             return Err(Errno::EINTR);
         } else {
-            pcb.pending_sigs.should_wake = mask | invoke_signal;
+            pcb.pending_sigs.should_wake = mask | invoke_signal; // todo: impl
+                                                                 // this
         }
         pcb.set_suspend();
         drop(pcb);
-        raw_suspend_now().await;
+        suspend_now().await;
         let mut pcb = task.pcb();
         pcb.set_runnable();
         *pcb.sig_mask_mut() = old_mask;
