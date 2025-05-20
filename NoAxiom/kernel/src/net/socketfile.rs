@@ -228,13 +228,13 @@ impl File for SocketFile {
     fn poll(&self, req: &PollEvent, _waker: Waker) -> PollEvent {
         // todo: when the socket is ready, call the waker
         let mut sock = block_on(self.socket());
+        poll_ifaces();
         let poll_res = match &mut *sock {
             Sock::Tcp(socket) => socket.poll(),
             Sock::Udp(socket) => socket.poll(),
         };
 
         let mut res = PollEvent::empty();
-        poll_ifaces();
         if req.contains(PollEvent::POLLIN) && poll_res.contains(PollEvent::POLLIN) {
             res |= PollEvent::POLLIN;
         }

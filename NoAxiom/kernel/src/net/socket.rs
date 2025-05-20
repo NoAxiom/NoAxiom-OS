@@ -2,11 +2,12 @@ use alloc::boxed::Box;
 
 use async_trait::async_trait;
 use downcast_rs::{impl_downcast, DowncastSync};
-use smoltcp::wire::IpEndpoint;
+use smoltcp::{socket, wire::IpEndpoint};
 
 use super::{tcpsocket::TcpSocket, NET_DEVICES, SOCKET_SET};
 use crate::{
     include::net::{ShutdownType, SocketOptions, SocketType},
+    net::socket::socket::Socket::{Tcp, Udp},
     syscall::SysResult,
 };
 
@@ -102,7 +103,7 @@ pub trait Socket: Send + Sync + DowncastSync {
     fn end_point(&self) -> Option<IpEndpoint>;
 
     fn setsockopt(&self, _level: usize, _optname: usize, _optval: &[u8]) -> SysResult<()> {
-        warn!("setsockopt is not implemented");
+        // warn!("setsockopt is not implemented");
         Ok(())
     }
 }
@@ -114,5 +115,20 @@ pub fn poll_ifaces() {
     let mut sockets = SOCKET_SET.lock();
     for (_, iface) in devices.iter() {
         iface.poll(&mut sockets).ok();
+    }
+    for (handle, socket) in sockets.iter_mut() {
+        match socket {
+            Tcp(socket) => {
+                debug!(
+                    "[poll_ifaces] poll Tcp socket {}, state: {:?}",
+                    handle,
+                    socket.state()
+                );
+            }
+            Udp(_) => {
+                debug!("[poll_ifaces] poll Udp socket {}", handle);
+            }
+            _ => unreachable!(),
+        }
     }
 }

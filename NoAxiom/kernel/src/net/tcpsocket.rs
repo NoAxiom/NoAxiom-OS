@@ -2,7 +2,11 @@
 use alloc::{boxed::Box, vec::Vec};
 
 use async_trait::async_trait;
-use smoltcp::{iface::SocketHandle, socket::tcp, wire::IpEndpoint};
+use smoltcp::{
+    iface::SocketHandle,
+    socket::tcp,
+    wire::{IpAddress, IpEndpoint},
+};
 
 use super::{
     poll::SocketPollMethod,
@@ -98,17 +102,29 @@ impl TcpSocket {
 
     fn do_listen(&mut self, socket: &mut tcp::Socket<'static>) -> SysResult<()> {
         if socket.is_listening() {
+            debug!("[Tcp::do_listen] socket is already listening");
             return Ok(());
         }
         let local_endpoint = self.local_endpoint.ok_or(Errno::EINVAL)?;
         if local_endpoint.addr.is_unspecified() {
+            debug!(
+                "[Tcp::do_listen] local endpoint: {}:{} is unspecified",
+                local_endpoint.addr, local_endpoint.port
+            );
+            // let end_point = IpEndpoint::new(IpAddress::v4(127, 0, 0, 1),
+            // local_endpoint.port);
+            debug!("[Tcp::do_listen] listening addr: {}", local_endpoint.addr);
+            debug!("[Tcp::do_listen] listening port: {}", local_endpoint.port);
             socket
                 .listen(local_endpoint.port)
                 .map_err(|_| Errno::EINVAL)?;
         } else {
+            debug!("[Tcp::do_listen] listening: {:?}", local_endpoint);
             socket.listen(local_endpoint).map_err(|_| Errno::EINVAL)?;
         }
         self.state = TcpState::Listen;
+        assert!(socket.is_listening());
+        debug!("[Tcp::do_listen] socket state: {:?}", socket.state());
         Ok(())
     }
 
@@ -250,7 +266,6 @@ impl Socket for TcpSocket {
 
         let mut backlog = backlog;
         if backlog > MAX_BACKLOG {
-            warn!("[Tcp] now handles has {}", self.handles.len());
             warn!("[Tcp] listen backlog is too large, set to {}", MAX_BACKLOG);
             backlog = MAX_BACKLOG;
         }
@@ -266,6 +281,7 @@ impl Socket for TcpSocket {
 
         (0..backlog).for_each(|i| {
             let handle = self.handles[i];
+            debug!("[Tcp] new socket {} is begin to listen", handle);
             let socket = sockets.get_mut::<tcp::Socket>(handle);
             self.do_listen(socket).unwrap();
         });
@@ -281,7 +297,10 @@ impl Socket for TcpSocket {
     ///
     /// return: whether the operation is successful
     async fn connect(&mut self, remote: IpEndpoint) -> SysResult<()> {
-        debug!("[Tcp] begin connect to {:?}", remote);
+        debug!("[Tcp] {} begin connect to {:?}", self.handles[0], remote);
+        if remote.addr.is_unspecified() {
+            warn!("[Tcp] remote endpoint is unspecified");
+        }
         let mut sockets = SOCKET_SET.lock();
         let local_socket = sockets.get_mut::<tcp::Socket>(self.handles[0]);
 
@@ -304,6 +323,7 @@ impl Socket for TcpSocket {
 
         drop(sockets);
         drop(iface_inner);
+        drop(driver_write_guard);
         loop {
             poll_ifaces();
             let mut sockets = SOCKET_SET.lock();
@@ -327,12 +347,16 @@ impl Socket for TcpSocket {
                     unreachable!()
                 }
                 tcp::State::SynSent => {
+                    debug!("[Tcp] connect loop: Synsent");
+                    drop(sockets);
                     yield_now().await;
                 }
                 tcp::State::Established => {
+                    debug!("[Tcp] connect loop: Established");
                     return Ok(());
                 }
                 _ => {
+                    error!("[Tcp] connect loop: InvalidState");
                     return Err(Errno::ECONNREFUSED);
                 }
             }

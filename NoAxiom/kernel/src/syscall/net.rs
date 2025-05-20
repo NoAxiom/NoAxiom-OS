@@ -74,10 +74,9 @@ impl Syscall<'_> {
         Ok(0)
     }
 
-    pub async fn sys_connect(&self, sockfd: usize, addr: usize, _addrlen: usize) -> SyscallResult {
+    pub async fn sys_connect(&self, sockfd: usize, addr: usize, addr_len: usize) -> SyscallResult {
         debug!("[sys_connect] sockfd: {}, addr: {}", sockfd, addr);
-        let user_ptr = UserPtr::<SockAddr>::new(addr);
-        let sock_addr = user_ptr.read().await?;
+        let sock_addr = SockAddr::new(addr, addr_len)?;
 
         let fd_table = self.task.fd_table();
         let socket_file = fd_table

@@ -3,6 +3,7 @@ use smoltcp::wire::{IpAddress, IpEndpoint, Ipv4Address, Ipv6Address};
 use strum::FromRepr;
 
 use super::result::Errno;
+use crate::syscall::SysResult;
 
 bitflags! {
     /// @brief 用于指定socket的关闭类型
@@ -166,6 +167,41 @@ pub union SockAddr {
 }
 
 impl SockAddr {
+    pub fn new(addr: usize, addr_len: usize) -> SysResult<Self> {
+        // todo: check addr!
+        let family = AddressFamily::try_from(unsafe { *(addr as *const u16) })?;
+        match family {
+            AddressFamily::AF_INET => {
+                if addr_len < core::mem::size_of::<SockAddrIpv4>() {
+                    error!("[Sockaddr::new] AF_INET addrlen error");
+                    return Err(Errno::EINVAL);
+                }
+                Ok(SockAddr {
+                    addr_ipv4: unsafe { *(addr as *const _) },
+                })
+            }
+            AddressFamily::AF_INET6 => {
+                if addr_len < core::mem::size_of::<SockAddrIpv6>() {
+                    error!("[Sockaddr::new] AF_INET6 addrlen error");
+                    return Err(Errno::EINVAL);
+                }
+                Ok(SockAddr {
+                    addr_ipv6: unsafe { *(addr as *const _) },
+                })
+            }
+            AddressFamily::AF_UNIX => {
+                warn!("[Sockaddr::new] is AF_UNIX!");
+                if addr_len < core::mem::size_of::<SockAddrUnix>() {
+                    error!("[Sockaddr::new] AF_UNIX addrlen error");
+                    return Err(Errno::EINVAL);
+                }
+                Ok(SockAddr {
+                    addr_unix: unsafe { *(addr as *const _) },
+                })
+            }
+        }
+    }
+
     pub fn get_endpoint(&self) -> IpEndpoint {
         unsafe {
             match AddressFamily::try_from(self.family).unwrap() {

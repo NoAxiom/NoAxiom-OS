@@ -78,12 +78,16 @@ impl Syscall<'_> {
         // asyncmutex
 
         assert!(check_no_lock());
-        let res = match TimeLimitedFuture::new(PpollFuture::new(poll_items), timeout).await {
-            TimeLimitedType::Ok(res) => res,
-            TimeLimitedType::TimeOut => {
-                debug!("[sys_ppoll]: timeout");
-                return Ok(0);
+        let res = if let Some(timeout) = timeout {
+            match TimeLimitedFuture::new(PpollFuture::new(poll_items), Some(timeout)).await {
+                TimeLimitedType::Ok(res) => res,
+                TimeLimitedType::TimeOut => {
+                    debug!("[sys_ppoll]: timeout");
+                    return Ok(0);
+                }
             }
+        } else {
+            PpollFuture::new(poll_items).await
         };
 
         let res_len = res.len();
@@ -185,9 +189,16 @@ impl Syscall<'_> {
         drop(pcb);
 
         assert!(check_no_lock());
-        let res = match TimeLimitedFuture::new(PselectFuture::new(poll_items), timeout).await {
-            TimeLimitedType::Ok(res) => Some(res),
-            TimeLimitedType::TimeOut => None,
+        let res = if let Some(timeout) = timeout {
+            match TimeLimitedFuture::new(PselectFuture::new(poll_items), Some(timeout)).await {
+                TimeLimitedType::Ok(res) => Some(res),
+                TimeLimitedType::TimeOut => {
+                    debug!("[sys_pselect6]: timeout");
+                    None
+                }
+            }
+        } else {
+            Some(PselectFuture::new(poll_items).await)
         };
 
         read_fds.as_mut().map(|fds| fds.clear());

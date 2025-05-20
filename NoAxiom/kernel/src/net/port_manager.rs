@@ -53,6 +53,7 @@ impl PortManager {
                 EPHEMERAL_PORT += 1;
             }
             if self.inner.get(&(test_port as usize)).is_none() {
+                debug!("[port_manager] Get ephemeral port {test_port}");
                 return Ok(test_port);
             }
         }
@@ -61,7 +62,6 @@ impl PortManager {
 
     /// Bind a port with a socket
     pub fn bind_port(&mut self, port: u16) -> SysResult<()> {
-        debug!("[port_manager] Bind port {port} for socket");
         let port = if port == 0 {
             self.get_ephemeral_port()?
         } else {
@@ -69,6 +69,7 @@ impl PortManager {
         };
         if let Some(_) = &self.inner.get(&(port as usize)) {
             // The port is already listened
+            error!("[port_manager] Port {port} is already listened");
             Err(Errno::EADDRINUSE)
         } else {
             // let waker = current_task().unwrap().waker();
