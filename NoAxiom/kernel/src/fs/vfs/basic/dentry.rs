@@ -303,7 +303,13 @@ impl dyn Dentry {
                 }
             }
             if let Some(child) = current.clone().get_child(name) {
-                current = child.clone();
+                // unlikely
+                if child.is_negative() {
+                    warn!("[find_path_or_create] {} is negative", child.name());
+                    current = current.create(name, mode).await.unwrap();
+                } else {
+                    current = child.clone();
+                }
                 idx += 1;
                 continue;
             }
