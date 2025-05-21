@@ -1,5 +1,3 @@
-use config::fs::ROOT_NAME;
-
 use crate::{
     fs::path::Path,
     include::fs::InodeMode,
@@ -11,12 +9,9 @@ use crate::{
 /// spawn init process
 #[allow(unused)]
 pub fn schedule_spawn_with_path() {
-    println!(
-        "[kernel] initproc = {}, path = {}/",
-        INIT_PROC_NAME, ROOT_NAME
-    );
+    println!("[kernel] initproc = {}", INIT_PROC_NAME);
     spawn_ktask(async move {
-        let path_str = format!("{}/{}", ROOT_NAME, INIT_PROC_NAME);
+        let path_str = format!("/{}", INIT_PROC_NAME);
         let path = Path::from_or_create(path_str, InodeMode::FILE).await;
         let file = path.dentry().open().unwrap();
         let content = get_file();

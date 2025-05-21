@@ -1,10 +1,7 @@
 use alloc::{string::String, sync::Arc, vec::Vec};
 
 use arch::{Arch, ArchInt, ArchMemory, ArchPageTableEntry, ArchTime, MappingFlags, PageTableEntry};
-use config::{
-    fs::ROOT_NAME,
-    mm::{DL_INTERP_OFFSET, SIG_TRAMPOLINE, USER_HEAP_SIZE},
-};
+use config::mm::{DL_INTERP_OFFSET, SIG_TRAMPOLINE, USER_HEAP_SIZE};
 use include::errno::Errno;
 use ksync::{
     cell::SyncUnsafeCell,
@@ -361,11 +358,10 @@ impl MemorySet {
                         .read_at(ph.offset() as usize, buf.as_mut_slice())
                         .await?;
                     let path = format!(
-                        "{ROOT_NAME}/{}",
+                        "{}",
                         String::from_utf8(buf)
                             .map_err(|_| Errno::ENOEXEC)?
                             .trim_end_matches('\0')
-                            .trim_start_matches('/')
                     );
                     info!("[load_elf] find interp path: {}", path);
                     assert!(Arch::is_external_interrupt_enabled());

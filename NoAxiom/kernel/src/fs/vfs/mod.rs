@@ -1,7 +1,6 @@
 use alloc::sync::Arc;
 
 use basic::dentry::Dentry;
-use config::fs::ROOT_NAME;
 use impls::{
     devfs::filesystem::DevFs, ext4::filesystem::AsyncSmpExt4, proc::filesystem::ProcDevFs,
     rust_fat32::filesystem::AsyncSmpFat32,
@@ -62,7 +61,7 @@ pub async fn fs_init() {
     // InodeMode::FILE).await; passwd.dentry().open().expect("open /etc/passwd
     // failed");
 
-    let ls = Path::from_or_create(format!("{}/ls", ROOT_NAME), InodeMode::FILE).await;
+    let ls = Path::from_or_create(format!("/ls"), InodeMode::FILE).await;
     ls.dentry().open().expect("open ls failed");
 }
 
