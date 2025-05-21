@@ -364,7 +364,7 @@ impl Syscall<'_> {
         task.recv_siginfo(
             SigInfo {
                 signo: signal,
-                code: SigCode::User,
+                code: SigCode::TKill,
                 errno: 0,
                 detail: SigDetail::Kill(SigKillDetail { pid }),
             },

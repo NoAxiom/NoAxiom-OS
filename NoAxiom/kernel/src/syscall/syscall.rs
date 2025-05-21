@@ -190,7 +190,6 @@ impl<'a> Syscall<'a> {
         if id.is_debug_on() {
             info!("[syscall(out)] id: {:?}, res: {:x?}", id, res);
         }
-        clear_current_syscall();
         res
     }
     fn empty_syscall(name: &str, res: isize) -> SyscallResult {
@@ -208,6 +207,7 @@ impl Task {
                 .await,
         );
         cx[TrapArgs::RES] = res as usize;
+        clear_current_syscall();
         res
     }
 }

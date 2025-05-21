@@ -8,21 +8,14 @@ use core::future::Future;
 use async_task::{Builder, WithInfo};
 
 use super::{runtime::RUNTIME, sched_entity::SchedEntity, sched_info::SchedInfo, vsched::Runtime};
-use crate::{
-    cpu::get_hartid,
-    task::{
-        task_main::{task_main, UserTaskFuture},
-        Task,
-    },
+use crate::task::{
+    task_main::{task_main, UserTaskFuture},
+    Task,
 };
 
 /// Add a raw task into task queue
-pub fn spawn_raw<F, R>(
-    future: F,
-    sched_entity: SchedEntity,
-    _hartid: usize,
-    task: Option<&Arc<Task>>,
-) where
+pub fn spawn_raw<F, R>(future: F, sched_entity: SchedEntity, task: Option<&Arc<Task>>)
+where
     F: Future<Output = R> + Send + 'static,
     R: Send + 'static,
 {
@@ -40,7 +33,6 @@ pub fn spawn_utask(task: Arc<Task>) {
     spawn_raw(
         UserTaskFuture::new(task.clone(), task_main(task.clone())),
         task.sched_entity_ref_cloned(),
-        get_hartid(),
         Some(&task),
     );
 }
@@ -51,5 +43,5 @@ where
     F: Future<Output = R> + Send + 'static,
     R: Send + 'static,
 {
-    spawn_raw(future, SchedEntity::new_bare(0), get_hartid(), None);
+    spawn_raw(future, SchedEntity::new_bare(0), None);
 }
