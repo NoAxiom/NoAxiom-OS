@@ -15,8 +15,9 @@ use super::NetWorkDev;
 use crate::devices::impls::device::DevResult;
 
 pub struct LoopBackDev {
-    interface: SpinLock<Interface>,
-    dev: SpinLock<Loopback>,
+    // todo: use one lock
+    pub interface: SpinLock<Interface>,
+    pub dev: SpinLock<Loopback>,
 }
 
 impl LoopBackDev {
@@ -76,8 +77,8 @@ impl NetWorkDev for LoopBackDev {
         let mut device_guard = self.dev.lock();
         let device = device_guard.deref_mut();
         let res = iface.poll(Instant::from_millis(get_time_ms() as i64), device, sockets);
-        log::info!("[LoopBackDev::poll] polled {res}");
         if res {
+            log::info!("[LoopBackDev::poll] polled {res}");
             Ok(())
         } else {
             Err(Errno::EAGAIN)

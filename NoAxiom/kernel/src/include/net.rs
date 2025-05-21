@@ -209,7 +209,9 @@ impl SockAddr {
                     let addr = self.addr_ipv4.sin_addr;
                     let port = self.addr_ipv4.sin_port.to_be();
                     IpEndpoint::new(
-                        IpAddress::Ipv4(Ipv4Address::from_bytes(&addr.to_be_bytes())),
+                        IpAddress::Ipv4(Ipv4Address::from_bytes(
+                            &u32::from_be(addr).to_be_bytes()[..],
+                        )),
                         port,
                     )
                 }

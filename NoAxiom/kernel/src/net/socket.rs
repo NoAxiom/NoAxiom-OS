@@ -116,19 +116,19 @@ pub fn poll_ifaces() {
     for (_, iface) in devices.iter() {
         iface.poll(&mut sockets).ok();
     }
-    for (handle, socket) in sockets.iter_mut() {
-        match socket {
-            Tcp(socket) => {
-                debug!(
-                    "[poll_ifaces] poll Tcp socket {}, state: {:?}",
-                    handle,
-                    socket.state()
-                );
-            }
-            Udp(_) => {
-                debug!("[poll_ifaces] poll Udp socket {}", handle);
-            }
-            _ => unreachable!(),
-        }
-    }
+    // for (handle, socket) in sockets.iter_mut() {
+    //     match socket {
+    //         Tcp(socket) => {
+    //             debug!(
+    //                 "[poll_ifaces] poll Tcp socket {}, state: {:?}",
+    //                 handle,
+    //                 socket.state()
+    //             );
+    //         }
+    //         Udp(_) => {
+    //             debug!("[poll_ifaces] poll Udp socket {}", handle);
+    //         }
+    //         _ => unreachable!(),
+    //     }
+    // }
 }

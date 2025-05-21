@@ -75,9 +75,6 @@ impl Syscall<'_> {
         // we can't hold pcb lock than call .await, but we should ensure the pcb's
         // sig_mask will not changed
 
-        // todo: anything held a resource want to use .await, maybe should be locked in
-        // asyncmutex
-
         assert!(check_no_lock());
         let fut = TimeLimitedFuture::new(PpollFuture::new(poll_items), timeout);
         let intable = intable(self.task, fut);
@@ -206,6 +203,7 @@ impl Syscall<'_> {
         }
 
         if res.is_none() {
+            debug!("[sys_pselect6]: timeout return Ok(0)");
             return Ok(0);
         }
 

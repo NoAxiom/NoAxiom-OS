@@ -95,7 +95,10 @@ impl SocketDentry {
         let pipe_dentry = Arc::new(Self {
             meta: DentryMeta::new(Some(parent.clone()), name, super_block),
         });
-        debug!("[SocketDentry] create pipe dentry: {}", pipe_dentry.name());
+        debug!(
+            "[SocketDentry] create socket dentry: {}",
+            pipe_dentry.name()
+        );
         parent.add_child_directly(pipe_dentry.clone());
         pipe_dentry
     }
@@ -225,12 +228,11 @@ impl File for SocketFile {
         Ok(0)
     }
 
-    fn poll(&self, req: &PollEvent, _waker: Waker) -> PollEvent {
-        // todo: when the socket is ready, call the waker
+    fn poll(&self, req: &PollEvent, waker: Waker) -> PollEvent {
         let mut sock = block_on(self.socket());
         poll_ifaces();
         let poll_res = match &mut *sock {
-            Sock::Tcp(socket) => socket.poll(),
+            Sock::Tcp(socket) => socket.poll(req, waker),
             Sock::Udp(socket) => socket.poll(),
         };
 

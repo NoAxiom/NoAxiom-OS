@@ -1,5 +1,6 @@
 //! Network Layer
 use alloc::{boxed::Box, vec::Vec};
+use core::task::Waker;
 
 use async_trait::async_trait;
 use smoltcp::{
@@ -9,7 +10,6 @@ use smoltcp::{
 };
 
 use super::{
-    poll::SocketPollMethod,
     socket::{poll_ifaces, Socket, SocketMeta},
     NET_DEVICES, SOCKET_SET, TCP_PORT_MANAGER,
 };
@@ -23,6 +23,7 @@ use crate::{
     net::HANDLE_MAP,
     sched::utils::yield_now,
     syscall::SysResult,
+    utils::crossover::intermit,
 };
 
 #[derive(PartialEq)]
@@ -111,13 +112,11 @@ impl TcpSocket {
                 "[Tcp::do_listen] local endpoint: {}:{} is unspecified",
                 local_endpoint.addr, local_endpoint.port
             );
-            // let end_point = IpEndpoint::new(IpAddress::v4(127, 0, 0, 1),
-            // local_endpoint.port);
-            debug!("[Tcp::do_listen] listening addr: {}", local_endpoint.addr);
-            debug!("[Tcp::do_listen] listening port: {}", local_endpoint.port);
-            socket
-                .listen(local_endpoint.port)
-                .map_err(|_| Errno::EINVAL)?;
+            let end_point = IpEndpoint::new(IpAddress::v4(127, 0, 0, 1), local_endpoint.port);
+            // debug!("[Tcp::do_listen] listening addr: {}", local_endpoint.addr);
+            // debug!("[Tcp::do_listen] listening port: {}", local_endpoint.port);
+            debug!("[Tcp::do_listen] listening: {:?}", end_point);
+            socket.listen(end_point).map_err(|_| Errno::EINVAL)?;
         } else {
             debug!("[Tcp::do_listen] listening: {:?}", local_endpoint);
             socket.listen(local_endpoint).map_err(|_| Errno::EINVAL)?;
@@ -128,32 +127,51 @@ impl TcpSocket {
         Ok(())
     }
 
-    pub fn poll(&self) -> PollEvent {
-        if self.state == TcpState::Listen {
-            let sockets = SOCKET_SET.lock();
-            let can_accept = self.handles.iter().any(|handle| {
-                let socket = sockets.get::<tcp::Socket>(*handle);
-                socket.is_active()
-            });
-            drop(sockets);
+    pub fn poll(&self, req: &PollEvent, waker: Waker) -> PollEvent {
+        poll_ifaces();
+        let mut res = PollEvent::empty();
+        let mut sockets = SOCKET_SET.lock();
+        let socket = sockets.get_mut::<tcp::Socket>(self.handles[0]);
 
-            if can_accept {
-                return PollEvent::POLLIN | PollEvent::POLLRDNORM;
+        if req.contains(PollEvent::POLLIN) {
+            debug!("[Tcp] poll: req has POLLIN");
+            if socket.can_recv() {
+                debug!("[Tcp] poll: POLLIN is ready 1");
+                res |= PollEvent::POLLIN | PollEvent::POLLRDNORM;
             } else {
-                return PollEvent::empty();
+                match socket.state() {
+                    tcp::State::CloseWait
+                    | tcp::State::FinWait2
+                    | tcp::State::TimeWait
+                    | tcp::State::SynReceived => {
+                        debug!("[Tcp] poll: POLLIN is ready 2");
+                        res |= PollEvent::POLLIN | PollEvent::POLLRDNORM;
+                    }
+                    tcp::State::Established => {
+                        if self.state == TcpState::Listen {
+                            debug!("[Tcp] poll: POLLIN is ready 3");
+                            res |= PollEvent::POLLIN | PollEvent::POLLRDNORM;
+                        }
+                    }
+                    _ => {
+                        debug!("[Tcp] poll: register recv_waker");
+                        socket.register_recv_waker(&waker);
+                    }
+                }
             }
         }
 
-        assert!(self.handles.len() == 1);
+        if req.contains(PollEvent::POLLOUT) {
+            debug!("[Tcp] poll: req has POLLOUT");
+            if socket.can_send() {
+                debug!("[Tcp] poll: POLLOUT is ready");
+                res |= PollEvent::POLLOUT | PollEvent::POLLWRNORM;
+            } else {
+                socket.register_send_waker(&waker);
+            }
+        }
 
-        let sockets = SOCKET_SET.lock();
-        let socket = sockets.get::<tcp::Socket>(self.handles[0]);
-        let handle_map_guard = HANDLE_MAP.read();
-        let shutdown_type = handle_map_guard
-            .get(self.handle())
-            .unwrap()
-            .get_shutdown_type();
-        return SocketPollMethod::tcp_poll(socket, shutdown_type);
+        res
     }
 }
 
@@ -271,7 +289,7 @@ impl Socket for TcpSocket {
         }
 
         let handlen = self.handles.len();
-        let backlog = handlen.max(backlog);
+        let backlog = handlen;
         let mut sockets = SOCKET_SET.lock();
 
         self.handles.extend((handlen..backlog).map(|_| {
@@ -312,8 +330,8 @@ impl Socket for TcpSocket {
 
         let driver_write_guard = NET_DEVICES.write();
         let iface = driver_write_guard.get(&0).unwrap().clone(); // now we only have one net device
+        drop(driver_write_guard);
         let mut iface_inner = iface.inner_iface().lock();
-
         local_socket
             .connect(iface_inner.context(), remote, temp_port)
             .map_err(|e| match e {
@@ -323,7 +341,7 @@ impl Socket for TcpSocket {
 
         drop(sockets);
         drop(iface_inner);
-        drop(driver_write_guard);
+
         loop {
             poll_ifaces();
             let mut sockets = SOCKET_SET.lock();
@@ -347,7 +365,7 @@ impl Socket for TcpSocket {
                     unreachable!()
                 }
                 tcp::State::SynSent => {
-                    debug!("[Tcp] connect loop: Synsent");
+                    intermit(|| debug!("[Tcp] connect loop: Synsent"));
                     drop(sockets);
                     yield_now().await;
                 }
