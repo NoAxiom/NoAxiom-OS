@@ -15,6 +15,7 @@ use crate::{
         },
         io::PollEvent,
     },
+    sched::utils::yield_now,
     syscall::{SysResult, SyscallResult},
 };
 
@@ -55,13 +56,14 @@ impl File for TtyFile {
         unreachable!("readlink from tty");
     }
     async fn base_read(&self, _offset: usize, buf: &mut [u8]) -> SyscallResult {
-        // todo: use yield_now.await
         let mut c = platform::getchar() as i8;
         loop {
             if c != -1 {
                 break;
+            } else {
+                yield_now().await;
+                c = platform::getchar() as i8;
             }
-            c = platform::getchar() as i8;
         }
         buf[0] = c as u8;
         Ok(1 as isize)

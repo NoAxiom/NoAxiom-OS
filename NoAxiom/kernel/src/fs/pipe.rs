@@ -60,9 +60,8 @@ struct PipeBuffer {
     status: PipeBufferStatus,
     read_wakers: Vec<Waker>,
     write_wakers: Vec<Waker>,
-    /// used to count the number of read and write ends
-    read_end: Option<Weak<PipeFile>>,
-    write_end: Option<Weak<PipeFile>>,
+    read_end: bool,
+    write_end: bool,
 }
 
 impl PipeBuffer {
@@ -74,8 +73,8 @@ impl PipeBuffer {
             status: PipeBufferStatus::Empty,
             read_wakers: Vec::new(),
             write_wakers: Vec::new(),
-            read_end: None,
-            write_end: None,
+            read_end: false,
+            write_end: false,
         }
     }
     fn add_read_event(&mut self, waker: Waker) {
@@ -84,42 +83,18 @@ impl PipeBuffer {
     fn add_write_event(&mut self, waker: Waker) {
         self.write_wakers.push(waker);
     }
-    fn set_read_end(&mut self, read_end: Weak<PipeFile>) {
-        self.read_end = Some(read_end);
-    }
-    fn set_write_end(&mut self, write_end: Weak<PipeFile>) {
-        self.write_end = Some(write_end);
-    }
-    fn has_writend(&self) -> bool {
-        self.write_end.is_some()
-    }
-    fn has_readend(&self) -> bool {
-        self.read_end.is_some()
-    }
-    fn read_available(&self) -> usize {
+    fn read_available(&self) -> bool {
         match self.status {
-            PipeBufferStatus::Empty => 0,
-            PipeBufferStatus::Full => PIPE_BUF_SIZE,
-            PipeBufferStatus::Normal => {
-                if self.head <= self.tail {
-                    self.tail - self.head
-                } else {
-                    PIPE_BUF_SIZE - self.head + self.tail
-                }
-            }
+            PipeBufferStatus::Empty => false,
+            PipeBufferStatus::Full => true,
+            PipeBufferStatus::Normal => true,
         }
     }
-    fn write_available(&self) -> usize {
+    fn write_available(&self) -> bool {
         match self.status {
-            PipeBufferStatus::Empty => PIPE_BUF_SIZE,
-            PipeBufferStatus::Full => 0,
-            PipeBufferStatus::Normal => {
-                if self.head <= self.tail {
-                    PIPE_BUF_SIZE - self.tail + self.head
-                } else {
-                    self.head - self.tail
-                }
-            }
+            PipeBufferStatus::Empty => true,
+            PipeBufferStatus::Full => false,
+            PipeBufferStatus::Normal => true,
         }
     }
     fn notify_read_waker(&mut self) {
@@ -203,6 +178,15 @@ impl PipeBuffer {
             self.status = PipeBufferStatus::Normal;
         }
         res
+    }
+}
+
+impl Drop for PipeBuffer {
+    fn drop(&mut self) {
+        debug!(
+            "[PipeBuffer] dropped!! has_readend: {}, has_writend: {}",
+            self.read_end, self.write_end
+        );
     }
 }
 
@@ -328,10 +312,8 @@ impl PipeFile {
         let name = format!("pipe-{}", random());
         let read_end = Self::new_read_end(buffer.clone(), &name);
         let write_end = Self::new_write_end(buffer.clone(), &name);
-        let read_end_weak = Arc::downgrade(&read_end);
-        let write_end_weak = Arc::downgrade(&write_end);
-        buffer.lock().set_read_end(read_end_weak);
-        buffer.lock().set_write_end(write_end_weak);
+        buffer.lock().read_end = true;
+        buffer.lock().write_end = true;
         (read_end, write_end)
     }
 }
@@ -386,11 +368,11 @@ impl File for PipeFile {
         let mut ret = PollEvent::empty();
         if self.is_read_end() {
             debug!("[PipeFile] poll read end, req: {:?}", req);
-            if !buffer.has_writend() {
+            if !buffer.write_end {
                 debug!("[PipeFile] read end has no write end");
                 ret |= PollEvent::POLLHUP;
             }
-            if req.contains(PollEvent::POLLIN) && buffer.read_available() > 0 {
+            if req.contains(PollEvent::POLLIN) && buffer.read_available() {
                 debug!("[PipeFile] read end has data");
                 ret |= PollEvent::POLLIN;
             } else {
@@ -399,11 +381,11 @@ impl File for PipeFile {
             }
         } else {
             debug!("[PipeFile] poll write end, req: {:?}", req);
-            if !buffer.has_readend() {
+            if !buffer.read_end {
                 debug!("[PipeFile] write end has no read end");
                 ret |= PollEvent::POLLERR;
             }
-            if req.contains(PollEvent::POLLOUT) && buffer.write_available() > 0 {
+            if req.contains(PollEvent::POLLOUT) && buffer.write_available() {
                 debug!("[PipeFile] write end has space");
                 ret |= PollEvent::POLLOUT;
             } else {
@@ -420,17 +402,17 @@ impl Drop for PipeFile {
         let mut buffer = self.buffer.lock();
         if self.is_read_end() {
             let name = self.meta.dentry().name();
-            println!("[PipeFile] {} dropped!", name);
+            warn!("[PipeFile] {} dropped!", name);
             root_dentry().remove_child(&name);
-            buffer.read_end = None;
+            buffer.read_end = false;
             for waker in buffer.write_wakers.drain(..) {
                 waker.wake();
             }
         } else {
             let name = self.meta.dentry().name();
-            println!("[PipeFile] {} dropped!", name);
+            warn!("[PipeFile] {} dropped!", name);
             root_dentry().remove_child(&name);
-            buffer.write_end = None;
+            buffer.write_end = false;
             for waker in buffer.read_wakers.drain(..) {
                 waker.wake();
             }
@@ -455,12 +437,11 @@ impl Future for PipeReadFuture {
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut buffer = self.pipe_buffer.lock();
-        if buffer.has_writend() {
+        if buffer.write_end {
             // only continue if it can be read
-            if buffer.read_available() > 0 {
+            if buffer.read_available() {
                 Poll::Ready(Ok(()))
             } else {
-                // ? will add multiple wakers?
                 buffer.add_read_event(cx.waker().clone());
                 Poll::Pending
             }
@@ -487,10 +468,10 @@ impl Future for PipeWriteFuture {
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut buffer = self.pipe_buffer.lock();
-        if buffer.has_readend() {
+        if buffer.read_end {
             trace!("[PipeWriteFile] has read end");
             // only continue if it can be written
-            if buffer.write_available() > 0 {
+            if buffer.write_available() {
                 trace!("[PipeWriteFile] write available");
                 Poll::Ready(Ok(()))
             } else {
