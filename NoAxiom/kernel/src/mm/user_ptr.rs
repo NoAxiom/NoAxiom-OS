@@ -1,7 +1,7 @@
 use alloc::{string::String, vec::Vec};
 use core::{intrinsics::atomic_load_acquire, marker::PhantomData};
 
-use arch::{Arch, ArchMemory};
+use arch::{Arch, ArchMemory, ArchTrap, TrapType};
 use include::errno::Errno;
 use ksync::mutex::check_no_lock;
 use memory::address::PhysAddr;
@@ -72,7 +72,7 @@ impl<T> UserPtr<T> {
     }
 
     #[inline(always)]
-    pub fn is_not_null(&self) -> bool {
+    pub fn is_non_null(&self) -> bool {
         !self.ptr().is_null()
     }
 
@@ -111,13 +111,52 @@ impl<T> UserPtr<T> {
         }
     }
 
+    pub unsafe fn read_unchecked(&self) -> T
+    where
+        T: Copy,
+    {
+        unsafe { *self.ptr() }
+    }
+
     #[inline(always)]
     pub async fn read(&self) -> SysResult<T>
     where
         T: Copy,
     {
-        self.validate().await?;
-        Ok(unsafe { *self.ptr() })
+        if self.is_null() {
+            warn!("[read] read null pointer");
+            return Err(Errno::EFAULT);
+        }
+        match Arch::check_read(self.addr()) {
+            Ok(()) => Ok(unsafe { self.read_unchecked() }),
+            Err(trap_type) => match trap_type {
+                TrapType::LoadPageFault(addr) | TrapType::StorePageFault(addr) => {
+                    warn!(
+                        "[write] detect trap at addr {:#x} during syscall {:?}",
+                        self.addr(),
+                        current_syscall()
+                    );
+                    let task = current_task().unwrap();
+                    if check_no_lock() {
+                        task.memory_validate(addr, Some(trap_type), false).await?;
+                    } else {
+                        warn!(
+                            "[read] block on addr {:#x} during syscall {:?}",
+                            self.addr(),
+                            current_syscall()
+                        );
+                        block_on(task.memory_validate(addr, Some(trap_type), true))?;
+                    }
+                    Ok(unsafe { self.read_unchecked() })
+                }
+                _ => {
+                    panic!(
+                        "[user_ptr] trigger unexpected trap in read, trap_type: {:?}",
+                        trap_type
+                    );
+                }
+            },
+        }
     }
 
     #[inline(always)]
@@ -125,12 +164,12 @@ impl<T> UserPtr<T> {
     where
         T: Copy,
     {
-        match unsafe { self.ptr().as_ref() } {
-            Some(ptr) => {
-                self.validate().await?;
-                Ok(Some(*ptr))
+        match self.ptr().is_null() {
+            false => {
+                let res = self.read().await?;
+                Ok(Some(res))
             }
-            None => Ok(None),
+            true => Ok(None),
         }
     }
 
@@ -141,39 +180,58 @@ impl<T> UserPtr<T> {
         unsafe { atomic_load_acquire(self.ptr()) }
     }
 
-    #[allow(unused)]
-    pub fn block_on_read(&self) -> SysResult<T>
-    where
-        T: Copy,
-    {
-        block_on(self.raw_validate())?;
-        Ok(unsafe { *self.ptr() })
-    }
-
-    #[allow(unused)]
-    pub fn block_on_write(&self, value: T) -> SysResult<()>
-    where
-        T: Copy,
-    {
-        block_on(self.raw_validate())?;
-        unsafe { *self.ptr() = value };
-        Ok(())
+    pub unsafe fn write_unchecked(&self, value: T) {
+        unsafe { *self.ptr() = value }
     }
 
     pub async fn write(&self, value: T) -> SysResult<()> {
-        self.validate().await?;
-        unsafe { *self.ptr() = value };
-        Ok(())
+        if self.is_null() {
+            warn!("[write] write null pointer");
+            return Err(Errno::EFAULT);
+        }
+        match Arch::check_write(self.addr()) {
+            Ok(()) => {
+                unsafe { self.write_unchecked(value) };
+                Ok(())
+            }
+            Err(trap_type) => match trap_type {
+                TrapType::LoadPageFault(addr) | TrapType::StorePageFault(addr) => {
+                    warn!(
+                        "[write] detect trap at addr {:#x} during syscall {:?}",
+                        self.addr(),
+                        current_syscall()
+                    );
+                    let task = current_task().unwrap();
+                    if check_no_lock() {
+                        task.memory_validate(addr, Some(trap_type), false).await?;
+                    } else {
+                        warn!(
+                            "[write] block on addr {:#x} during syscall {:?}",
+                            self.addr(),
+                            current_syscall()
+                        );
+                        block_on(task.memory_validate(addr, Some(trap_type), true))?;
+                    }
+                    unsafe { self.write_unchecked(value) };
+                    Ok(())
+                }
+                _ => {
+                    panic!(
+                        "[user_ptr] trigger unexpected trap in write, trap_type: {:?}",
+                        trap_type
+                    );
+                }
+            },
+        }
     }
 
     pub async fn try_write(&self, value: T) -> SysResult<Option<()>> {
-        match unsafe { self.ptr().as_mut() } {
-            Some(ptr) => {
-                self.validate().await?;
-                *ptr = value;
+        match self.ptr().is_null() {
+            false => {
+                self.write(value).await?;
                 Ok(Some(()))
             }
-            None => Ok(None),
+            true => Ok(None),
         }
     }
 

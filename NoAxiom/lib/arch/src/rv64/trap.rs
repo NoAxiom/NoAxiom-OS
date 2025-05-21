@@ -1,5 +1,9 @@
-use core::arch::global_asm;
+use core::{
+    arch::{asm, global_asm},
+    intrinsics::volatile_load,
+};
 
+use config::cpu::CPU_NUM;
 use riscv::register::{
     scause::{self, Exception, Interrupt, Scause, Trap},
     sepc,
@@ -14,7 +18,7 @@ use crate::{
         enable_external_interrupt, enable_software_interrupt, enable_stimer_interrupt,
         enable_user_memory_access,
     },
-    ArchTrap, ArchTrapContext, ArchUserFloatContext, TrapType,
+    ArchAsm, ArchInt, ArchTrap, ArchTrapContext, ArchUserFloatContext, TrapType, UserPtrResult,
 };
 
 global_asm!(include_str!("./trap.S"));
@@ -22,6 +26,7 @@ extern "C" {
     fn __user_trapvec();
     fn __user_trapret(cx: *mut TrapContext);
     fn __kernel_trapvec();
+    fn __kernel_user_ptr_vec();
 }
 
 pub fn get_trap_type(scause: Scause, stval: usize) -> TrapType {
@@ -50,6 +55,74 @@ fn set_kernel_trap_entry() {
 }
 fn set_user_trap_entry() {
     set_trap_entry(__user_trapvec as usize);
+}
+fn set_ptr_entry() {
+    set_trap_entry(__kernel_user_ptr_vec as usize);
+}
+
+#[repr(align(64))]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+struct Wrapper(TrapType);
+static mut USER_PTR_TRAP_TYPE: [Wrapper; CPU_NUM] = [Wrapper(TrapType::None); CPU_NUM];
+
+unsafe fn before_user_ptr() {
+    RV64::disable_interrupt();
+    set_ptr_entry();
+    USER_PTR_TRAP_TYPE[RV64::get_hartid()] = Wrapper(TrapType::None);
+}
+
+unsafe fn after_user_ptr() -> UserPtrResult {
+    let trap_type = volatile_load(&USER_PTR_TRAP_TYPE[RV64::get_hartid()]).0;
+    let res = match trap_type {
+        TrapType::None => Ok(()),
+        _ => Err(trap_type),
+    };
+    set_kernel_trap_entry();
+    RV64::enable_interrupt();
+    res
+}
+
+unsafe fn bare_read(ptr: usize) {
+    asm!(
+        ".option push
+        .option norvc
+        lb a0, 0(a0)
+        .option pop",
+        in("a0") ptr,
+    );
+}
+
+unsafe fn check_read(ptr: usize) -> UserPtrResult {
+    before_user_ptr();
+    bare_read(ptr);
+    after_user_ptr()
+}
+
+unsafe fn bare_write(ptr: usize) {
+    asm!(
+        ".option push
+        .option norvc
+        lb t0, 0(a0)
+        sb t0, 0(a0)
+        .option pop",
+        in("a0") ptr,
+    );
+}
+
+unsafe fn check_write(ptr: usize) -> UserPtrResult {
+    before_user_ptr();
+    bare_write(ptr);
+    after_user_ptr()
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn kernel_user_ptr_handler() {
+    let hartid = RV64::get_hartid();
+    let scause = scause::read();
+    let stval = stval::read();
+    let sepc = sepc::read();
+    sepc::write(sepc + 4); // skip read
+    USER_PTR_TRAP_TYPE[hartid] = Wrapper(get_trap_type(scause, stval));
 }
 
 pub fn trap_init() {
@@ -87,5 +160,13 @@ impl ArchTrap for RV64 {
         let scause = scause::read();
         let stval = stval::read();
         get_trap_type(scause, stval)
+    }
+    /// try read user ptr
+    fn check_read(addr: usize) -> UserPtrResult {
+        unsafe { check_read(addr) }
+    }
+    /// try write user ptr
+    fn check_write(addr: usize) -> UserPtrResult {
+        unsafe { check_write(addr) }
     }
 }

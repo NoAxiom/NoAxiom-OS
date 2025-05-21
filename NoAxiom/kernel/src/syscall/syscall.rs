@@ -102,15 +102,14 @@ impl<'a> Syscall<'a> {
             SYS_SET_ROBUST_LIST =>      self.sys_set_robust_list(args[0], args[1]),
             SYS_FUTEX =>                self.sys_futex(args[0] as _, args[1] as _, args[2] as _, args[3] as _, args[4] as _, args[5] as _).await,
             SYS_SETSID =>               self.sys_setsid(),
-            // SYS_TKILL =>                todo!(),
-            // SYS_GETRUSAGE =>            todo!(),
-            // SYS_SYSTEMSHUTDOWN =>       todo!(),
+            SYS_GETRUSAGE =>            self.sys_getrusage(args[0] as _, args[1]).await,
             
             // signal
             SYS_SIGTIMEDWAIT => Self::empty_syscall("sigtimedwait", 0),
             SYS_SIGACTION =>    self.sys_sigaction(args[0] as i32, args[1], args[2]).await,
             SYS_SIGRETURN =>    self.sys_sigreturn().await,
             SYS_KILL =>         self.sys_kill(args[0] as isize, args[1] as i32),
+            SYS_TKILL =>        self.sys_tkill(args[0], args[1] as i32),
             SYS_SIGPROCMASK =>  self.sys_sigprocmask(args[0], args[1], args[2], args[3]).await,
             SYS_SIGSUSPEND =>   self.sys_sigsuspend(args[0]).await,
 
@@ -134,9 +133,6 @@ impl<'a> Syscall<'a> {
             SYS_SCHED_GETPARAM =>       self.sys_sched_getparam(args[0], args[1]).await,
             SYS_SCHED_SETSCHEDULER =>   self.sys_sched_setscheduler(args[0], args[1] as _, args[2]),
 
-            // others
-            SYS_GETRANDOM =>    self.sys_getrandom(args[0], args[1], args[2]).await,
-
             // time
             SYS_TIMES =>            self.sys_times(args[0]).await,
             SYS_GETTIMEOFDAY =>     Self::sys_gettimeofday(args[0]).await,
@@ -144,12 +140,15 @@ impl<'a> Syscall<'a> {
             SYS_CLOCK_GETTIME =>    self.sys_clock_gettime(args[0], args[1]).await,
             SYS_CLOCK_NANOSLEEP =>  self.sys_clock_nanosleep(args[0], args[1], args[2], args[3]).await,
             SYS_CLOCK_GETRES =>     self.sys_clock_getres(args[0], args[1]).await,
-            // SYS_SETITIMER =>        todo!(),
+            SYS_SETITIMER =>        self.sys_setitimer(args[0] as _, args[1] as _, args[2] as _).await,
+            SYS_GETITIMER =>        self.sys_getitimer(args[0] as _, args[1] as _).await,
 
-            // system
-            SYS_SYSINFO =>  Self::empty_syscall("info", 0),
-            SYS_UNAME =>    Self::sys_uname(args[0]).await,
-            SYS_SYSLOG =>   Self::sys_syslog(args[0] as u32, args[1], args[2]).await,
+            // system / others
+            SYS_SYSINFO =>         Self::empty_syscall("info", 0),
+            SYS_UNAME =>           Self::sys_uname(args[0]).await,
+            SYS_SYSLOG =>          Self::sys_syslog(args[0] as u32, args[1], args[2]).await,
+            SYS_SYSTEMSHUTDOWN =>  Self::sys_systemshutdown(),
+            SYS_GETRANDOM =>       self.sys_getrandom(args[0], args[1], args[2]).await,
 
             // unsupported
             _ => {
@@ -169,7 +168,7 @@ impl<'a> Syscall<'a> {
     }
     /// syscall implementation with debug info
     pub async fn syscall(&mut self, id: usize, args: [usize; 6]) -> SyscallResult {
-        let id = SyscallID::from_repr(id as usize).ok_or_else(|| {
+        let id = SyscallID::from_repr(id as _).ok_or_else(|| {
             error!("invalid syscall id: {}", id);
             Errno::ENOSYS
         })?;
@@ -217,7 +216,6 @@ pub fn get_syscall_result(res: SyscallResult) -> isize {
     match res {
         Ok(res) => res,
         Err(errno) => {
-            #[cfg(feature = "debug_sig")]
             warn!("syscall error: {:?} during {:?}", errno, current_syscall());
             let errno: isize = errno as isize;
             match errno > 0 {

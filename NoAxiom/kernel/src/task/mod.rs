@@ -1,3 +1,4 @@
+pub mod context;
 pub mod exit;
 pub mod futex;
 pub mod impl_mm;
@@ -8,6 +9,5 @@ mod task;
 pub mod task_main;
 pub mod taskid;
 pub mod wait;
-pub mod context;
 
-pub use task::{Task, PCB};
+pub use task::Task;

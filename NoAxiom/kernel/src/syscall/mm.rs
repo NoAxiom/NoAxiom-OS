@@ -82,7 +82,7 @@ impl Syscall<'_> {
                 let old_flags = pte.flags();
                 let flags = pte.flags().union(mapping_flags);
                 pte.set_flags(flags);
-                trace!(
+                debug!(
                     "[sys_mprotect] set flags in page table, vpn: {:#x}, flags: {:?} => {:?}, pte_raw: {:?}",
                     vpn.raw(), old_flags, flags, pte.raw_flag()
                 );
@@ -91,19 +91,15 @@ impl Syscall<'_> {
                 let mut memory_set = task.memory_set().lock();
                 let mmap_start = memory_set.mmap_manager.mmap_start;
                 let mmap_top = memory_set.mmap_manager.mmap_top;
-                let mmap_perm = MmapProts::from_bits(prot).unwrap();
+                let mmap_prots = MmapProts::from_bits(prot).unwrap();
                 let va = VirtAddr::from(vpn);
                 if va >= mmap_start && va < mmap_top {
                     memory_set
                         .mmap_manager
-                        .mmap_map
-                        .get_mut(&vpn)
-                        .ok_or(Errno::ENOMEM)?
-                        .prot = mmap_perm;
-                    continue;
+                        .mprotect(vpn, mmap_prots, &page_table)?;
+                } else {
+                    return Err(Errno::EINVAL);
                 }
-                // fixme: we don't actually set flags in mmap's mprotect
-                return_errno!(Errno::EINVAL, "invalid vpn: {:?}", vpn);
             }
         }
         Arch::tlb_flush();

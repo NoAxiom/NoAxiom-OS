@@ -34,11 +34,9 @@ pub struct SigInfo {
     pub code: SigCode,
 
     /// errno value
-    #[allow(unused)]
     pub errno: SigErrno,
 
     /// detailed info
-    #[allow(unused)]
     pub detail: SigDetail,
 }
 

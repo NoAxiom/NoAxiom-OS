@@ -14,10 +14,11 @@ use crate::{
         },
         resource::Resource,
         result::Errno,
+        time::TimeSpec,
     },
     mm::user_ptr::UserPtr,
     task::Task,
-    time::{gettime::get_time_duration, time_spec::TimeSpec},
+    time::gettime::get_time_duration,
     utils::get_string_from_ptr,
 };
 
@@ -880,9 +881,7 @@ impl Syscall<'_> {
         let out_len = file_out.write_at(out_offset, &buf).await? as usize;
 
         if !off_in.is_null() {
-            off_in
-                .write(off_in.read().await? + in_len as i64)
-                .await?;
+            off_in.write(off_in.read().await? + in_len as i64).await?;
         }
         if !off_out.is_null() {
             off_out

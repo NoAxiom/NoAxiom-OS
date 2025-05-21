@@ -34,7 +34,7 @@ fn kernel_trap_handler() {
         | TrapType::InstructionPageFault(addr) => {
             if let Some(task) = current_cpu().task.as_mut() {
                 // fixme: currently this block_on cannot be canceled
-                info!(
+                warn!(
                     "[kernel] block on memory_validate, epc: {:#x}, addr: {:#x}, syscall: {:?}",
                     epc,
                     addr,

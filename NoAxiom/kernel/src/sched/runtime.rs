@@ -5,7 +5,7 @@ use super::{
     simple::{SimpleRuntime, SimpleScheduler},
     vsched::Runtime,
 };
-use crate::{cpu::get_hartid, time::time_manager::timer_handler};
+use crate::{cpu::get_hartid, time::timer::timer_handler};
 
 lazy_static! {
     pub static ref RUNTIME: SimpleRuntime<SimpleScheduler> = SimpleRuntime::new();

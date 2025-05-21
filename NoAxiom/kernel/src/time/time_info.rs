@@ -3,6 +3,7 @@
 use core::time::Duration;
 
 use super::{gettime::get_time_duration, time_slice::TIME_SLICE_DURATION};
+use crate::include::time::TMS;
 
 #[derive(Debug, Clone, Copy)]
 pub struct KernelDuration {
@@ -38,23 +39,25 @@ impl Default for KernelDuration {
 pub struct TimeInfo {
     time: KernelDuration,
     child_time: KernelDuration,
+    create_time: Duration,
     system_time_start: Duration,
     user_time_start: Duration,
     schedule_time_start: Duration,
 }
 
 impl TimeInfo {
-    pub const fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             time: KernelDuration::zero(),
             child_time: KernelDuration::zero(),
+            create_time: get_time_duration(),
             system_time_start: Duration::ZERO,
             user_time_start: Duration::ZERO,
             schedule_time_start: Duration::ZERO,
         }
     }
     #[inline(always)]
-    pub fn time(&self) -> KernelDuration {
+    pub const fn time(&self) -> KernelDuration {
         self.time
     }
     #[inline(always)]
@@ -62,17 +65,22 @@ impl TimeInfo {
         self.time.cpu_time()
     }
     #[inline(always)]
-    pub fn child_time(&self) -> KernelDuration {
+    pub const fn child_time(&self) -> KernelDuration {
         self.child_time
     }
     #[inline(always)]
-    pub fn utime(&self) -> Duration {
+    pub const fn utime(&self) -> Duration {
         self.time.utime
     }
     #[inline(always)]
-    pub fn stime(&self) -> Duration {
+    pub const fn stime(&self) -> Duration {
         self.time.stime
     }
+    #[inline(always)]
+    pub const fn create_time(&self) -> Duration {
+        self.create_time
+    }
+
     pub fn into_tms(self) -> TMS {
         TMS {
             tms_utime: self.time.utime.as_micros() as usize,
@@ -131,16 +139,4 @@ impl Default for TimeInfo {
     fn default() -> Self {
         Self::new()
     }
-}
-
-#[repr(C)]
-pub struct TMS {
-    /// user time
-    pub tms_utime: usize,
-    /// system time
-    pub tms_stime: usize,
-    /// user time of dead children
-    pub tms_cutime: usize,
-    /// system time of dead children
-    pub tms_cstime: usize,
 }

@@ -8,7 +8,7 @@ use core::{
 
 use crate::time::{
     gettime::get_time_duration,
-    time_manager::{Timer, TIMER_MANAGER},
+    timer::{Timer, TIMER_MANAGER},
 };
 
 pub enum TimeLimitedType<T> {

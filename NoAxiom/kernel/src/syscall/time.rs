@@ -1,17 +1,20 @@
+use alloc::{boxed::Box, sync::Arc};
 use core::time::Duration;
 
 use include::errno::Errno;
 
 use super::{Syscall, SyscallResult};
 use crate::{
+    include::time::{
+        ITimerVal, TimeSpec, TimeVal, ITIMER_COUNT, ITIMER_PROF, ITIMER_REAL, ITIMER_VIRTUAL, TMS,
+    },
     mm::user_ptr::UserPtr,
+    return_errno,
     time::{
         clock::{ClockId, CLOCK_MANAGER},
         gettime::{get_time_duration, get_time_ms, get_timeval},
-        time_info::TMS,
-        time_spec::TimeSpec,
-        time_val::TimeVal,
         timeout::sleep_now,
+        timer::{ITimer, ITimerReal, Timer, TIMER_MANAGER},
     },
 };
 
@@ -133,6 +136,59 @@ impl Syscall<'_> {
             tv_nsec: 1,
         };
         res.write(value).await?;
+        Ok(0)
+    }
+
+    /// get interval timer
+    pub async fn sys_getitimer(&self, which: usize, curr_value: usize) -> SyscallResult {
+        let curr_value = UserPtr::<ITimerVal>::new(curr_value);
+        if curr_value.is_null() {
+            return Err(Errno::EFAULT);
+        }
+        if which >= ITIMER_COUNT {
+            return Err(Errno::EINVAL);
+        }
+        let manager = self.task.itimer();
+        let itimer = manager.get(which);
+        let itimer_val = ITimerVal {
+            it_interval: itimer.interval.into(),
+            it_value: itimer.expire.saturating_sub(get_time_duration()).into(),
+        };
+        curr_value.write(itimer_val).await?;
+        Ok(0)
+    }
+
+    /// set interval timer
+    pub async fn sys_setitimer(
+        &self,
+        which: usize,
+        new_value: usize,
+        old_value: usize,
+    ) -> SyscallResult {
+        let new_value = UserPtr::<ITimerVal>::new(new_value);
+        let old_value = UserPtr::<ITimerVal>::new(old_value);
+        let new_value = new_value.read().await?;
+        let mut manager = self.task.itimer();
+        let old_itimer = manager.get(which);
+        match which {
+            ITIMER_REAL => {
+                let old = old_itimer.into_itimer_val();
+                let new_itimer = ITimer::register(&new_value);
+                let timer_id = new_itimer.timer_id;
+                manager.set(which, new_itimer);
+                if !new_itimer.is_disarmed() {
+                    let timer = Timer::new(
+                        new_itimer.expire,
+                        Box::new(ITimerReal::new(self.task, timer_id)),
+                    );
+                    TIMER_MANAGER.add_timer(timer);
+                }
+                old_value.try_write(old).await?;
+            }
+            ITIMER_VIRTUAL => return_errno!(Errno::EINVAL, "ITIMER_VIRTUAL is unimplemented"),
+            ITIMER_PROF => return_errno!(Errno::EINVAL, "ITIMER_PROF is unimplemented"),
+            _ => return Err(Errno::EINVAL),
+        };
         Ok(0)
     }
 }

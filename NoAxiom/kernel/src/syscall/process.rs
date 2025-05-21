@@ -9,8 +9,12 @@ use crate::{
     fs::path::Path,
     include::{
         futex::{FUTEX_CLOCK_REALTIME, FUTEX_CMD_MASK, FUTEX_REQUEUE, FUTEX_WAIT, FUTEX_WAKE},
-        process::{robust_list::RobustList, CloneFlags, PidSel, WaitOption},
-        result::Errno,
+        process::{
+            robust_list::RobustList,
+            rusage::{Rusage, RUSAGE_SELF},
+            CloneFlags, PidSel, WaitOption,
+        },
+        result::Errno, time::TimeSpec,
     },
     mm::user_ptr::UserPtr,
     return_errno,
@@ -18,12 +22,16 @@ use crate::{
         spawn::spawn_utask,
         utils::{intable, yield_now},
     },
+    signal::{
+        sig_detail::{SigDetail, SigKillDetail},
+        sig_info::{SigCode, SigInfo},
+    },
     task::{
         exit::ExitCode,
         futex::FutexFuture,
         manager::{PROCESS_GROUP_MANAGER, TASK_MANAGER},
     },
-    time::{time_spec::TimeSpec, timeout::TimeLimitedFuture},
+    time::timeout::TimeLimitedFuture,
 };
 
 impl Syscall<'_> {
@@ -158,7 +166,7 @@ impl Syscall<'_> {
         // wait for child exit
         let (exit_code, tid) =
             intable(self.task, self.task.wait_child(pid_type, wait_option)).await??;
-        if status.is_not_null() {
+        if status.is_non_null() {
             trace!(
                 "[sys_wait4]: write exit_code at status_addr = {:#x}",
                 status.va_addr().raw(),
@@ -341,5 +349,49 @@ impl Syscall<'_> {
         // } else {
         //     Err(Errno::EPERM)
         // }
+    }
+
+    pub fn sys_tkill(&self, tid: usize, signal: i32) -> SyscallResult {
+        if signal == 0 {
+            return Ok(0);
+        }
+        trace!("tid : {} signal num : {}", tid, signal);
+        let task = TASK_MANAGER.get(tid).ok_or(Errno::ESRCH)?;
+        let pid = task.tgid() as _;
+        task.recv_siginfo(
+            SigInfo {
+                signo: signal,
+                code: SigCode::User,
+                errno: 0,
+                detail: SigDetail::Kill(SigKillDetail { pid }),
+            },
+            true,
+        );
+        Ok(0)
+    }
+
+    pub async fn sys_getrusage(&self, who: isize, usage: usize) -> SyscallResult {
+        if who != RUSAGE_SELF {
+            return Err(Errno::EINVAL);
+        }
+        let usage = UserPtr::<Rusage>::from(usage);
+        let mut rusage = Rusage::new();
+        let tgroup = self.task.thread_group();
+        let mut utime = Duration::ZERO;
+        let mut stime = Duration::ZERO;
+        let mut start_time = Duration::ZERO;
+        for (_, thread) in tgroup.0.iter() {
+            if let Some(thread) = thread.upgrade() {
+                utime += thread.tcb().time_stat.utime();
+                stime += thread.tcb().time_stat.stime();
+                if start_time.is_zero() {
+                    start_time = thread.tcb().time_stat.create_time();
+                }
+            };
+        }
+        rusage.ru_stime = stime.into();
+        rusage.ru_utime = utime.into();
+        usage.write(rusage).await?;
+        Ok(0)
     }
 }

@@ -6,7 +6,7 @@ use arch::{Arch, ArchInfo};
 
 use crate::{
     cpu::{current_cpu, get_hartid},
-    syscall::utils::current_syscall,
+    syscall::{utils::current_syscall, Syscall},
     time::gettime::get_time_ms,
 };
 
@@ -25,7 +25,6 @@ fn panic(info: &PanicInfo) -> ! {
             .map_or_else(|| 0, |task| task.tid()),
         get_time_ms(),
     );
-    #[cfg(feature = "debug_sig")]
     println!("[PANIC] during syscall {:?}", current_syscall());
     if let Some(task) = current_cpu().task.as_ref() {
         let cx = task.trap_context();
@@ -47,7 +46,5 @@ fn panic(info: &PanicInfo) -> ! {
             info.message().unwrap()
         );
     }
-    println!("[PANIC] press any key to shutdown");
-    while platform::getchar() as i8 == -1 {}
-    platform::shutdown()
+    Syscall::sys_systemshutdown()
 }

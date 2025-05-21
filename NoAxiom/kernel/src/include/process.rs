@@ -149,3 +149,57 @@ pub mod robust_list {
         }
     }
 }
+
+pub mod rusage {
+    use crate::include::time::TimeVal;
+
+    pub const RUSAGE_SELF: isize = 0;
+
+    #[derive(Debug, Copy, Clone)]
+    pub struct Rusage {
+        pub ru_utime: TimeVal, // user CPU time used
+        pub ru_stime: TimeVal, // system CPU time used
+        ru_maxrss: isize,      // maximum resident set size
+        ru_ixrss: isize,       // integral shared memory size
+        ru_idrss: isize,       // integral unshared data size
+        ru_isrss: isize,       // integral unshared stack size
+        ru_minflt: isize,      // page reclaims (soft page faults)
+        ru_majflt: isize,      // page faults (hard page faults)
+        ru_nswap: isize,       // swaps
+        ru_inblock: isize,     // block input operations
+        ru_oublock: isize,     // block output operations
+        ru_msgsnd: isize,      // IPC messages sent
+        ru_msgrcv: isize,      // IPC messages received
+        ru_nsignals: isize,    // signals received
+        ru_nvcsw: isize,       // voluntary context switches
+        ru_nivcsw: isize,      // involuntary context switches
+    }
+
+    impl Rusage {
+        pub fn new() -> Self {
+            Self {
+                ru_utime: TimeVal::new(),
+                ru_stime: TimeVal::new(),
+                ru_maxrss: 0,
+                ru_ixrss: 0,
+                ru_idrss: 0,
+                ru_isrss: 0,
+                ru_minflt: 0,
+                ru_majflt: 0,
+                ru_nswap: 0,
+                ru_inblock: 0,
+                ru_oublock: 0,
+                ru_msgsnd: 0,
+                ru_msgrcv: 0,
+                ru_nsignals: 0,
+                ru_nvcsw: 0,
+                ru_nivcsw: 0,
+            }
+        }
+
+        pub fn as_bytes(&self) -> &[u8] {
+            let size = core::mem::size_of::<Self>();
+            unsafe { core::slice::from_raw_parts(self as *const _ as usize as *const u8, size) }
+        }
+    }
+}

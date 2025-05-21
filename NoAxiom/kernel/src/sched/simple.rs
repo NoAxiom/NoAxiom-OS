@@ -16,32 +16,37 @@ type Info = SchedInfo;
 
 #[repr(align(64))]
 pub struct SimpleScheduler {
-    queue: VecDeque<Runnable<Info>>,
+    urgent: VecDeque<Runnable<Info>>,
+    normal: VecDeque<Runnable<Info>>,
 }
 
 impl Scheduler<Info> for SimpleScheduler {
     fn default() -> Self {
         Self {
-            queue: VecDeque::new(),
+            urgent: VecDeque::new(),
+            normal: VecDeque::new(),
         }
     }
     fn push_with_info(&mut self, runnable: Runnable<Info>, info: async_task::ScheduleInfo) {
         match info.woken_while_running {
-            true => self.queue.push_back(runnable),
-            false => self.queue.push_front(runnable),
+            true => self.push_normal(runnable),
+            false => self.push_urgent(runnable),
         }
     }
     fn push_normal(&mut self, runnable: Runnable<Info>) {
-        self.queue.push_back(runnable);
+        self.normal.push_back(runnable);
     }
     fn push_urgent(&mut self, runnable: Runnable<Info>) {
-        self.queue.push_front(runnable);
+        self.urgent.push_back(runnable);
     }
-    fn pop(&mut self, order: ScheduleOrder) -> Option<Runnable<Info>> {
-        match order {
-            ScheduleOrder::NormalFirst => self.queue.pop_back(),
-            ScheduleOrder::UrgentFirst => self.queue.pop_front(),
+    fn pop(&mut self, _: ScheduleOrder) -> Option<Runnable<Info>> {
+        if let Some(runnable) = self.urgent.pop_front() {
+            return Some(runnable);
         }
+        if let Some(runnable) = self.normal.pop_front() {
+            return Some(runnable);
+        }
+        None
     }
 }
 
