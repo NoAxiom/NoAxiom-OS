@@ -125,20 +125,20 @@ impl Syscall<'_> {
 
         let path = if flags.contains(FileFlags::O_CREATE) {
             info!("[sys_openat] O_CREATE");
-            // check if the file already exists
-            let path = get_path_or_create(
+            // check if the file already exists, ignore it currently
+            // if flags.contains(FileFlags::O_EXCL) {
+            //     if get_path(self.task.clone(), filename, fd, "sys_openat").is_ok() {
+            //         return Err(Errno::EEXIST);
+            //     }
+            // }
+            get_path_or_create(
                 self.task.clone(),
                 filename,
                 fd,
                 mode.union(InodeMode::FILE),
                 "sys_openat",
             )
-            .await?;
-            let dentry = path.dentry();
-            if flags.contains(FileFlags::O_EXCL) && !dentry.is_negative() {
-                return Err(Errno::EEXIST);
-            }
-            path
+            .await?
         } else {
             get_path(self.task.clone(), filename, fd, "sys_openat")?
         };
@@ -172,12 +172,12 @@ impl Syscall<'_> {
     ///     - file_remain_size == 0: 0, which means EOF
     /// 3. fd is closed: -1
     pub async fn sys_read(&self, fd: usize, buf: usize, len: usize) -> SyscallResult {
-        trace!("[sys_read] fd: {}, buf: {:?}, len: {}", fd, buf, len);
+        info!("[sys_read] fd: {}, buf: {:?}, len: {}", fd, buf, len);
         let fd_table = self.task.fd_table();
         let file = fd_table.get(fd).ok_or(Errno::EBADF)?;
         drop(fd_table);
-        let file_name = file.dentry().path();
-        trace!("[sys_read] file_name: {:?}", file_name);
+        let file_name = file.dentry().path()?;
+        info!("[sys_read] file_name: {:?}", file_name);
 
         // todo: INTERRUPT_BY_SIGNAL FUTURE
 
@@ -201,6 +201,8 @@ impl Syscall<'_> {
         let fd_table = self.task.fd_table();
         let file = fd_table.get(fd).ok_or(Errno::EBADF)?;
         drop(fd_table);
+        let file_name = file.dentry().path()?;
+        info!("[sys_readv] file_name: {:?}", file_name);
 
         let mut read_size = 0;
         for i in 0..iovcnt {
@@ -230,6 +232,8 @@ impl Syscall<'_> {
         let fd_table = self.task.fd_table();
         let file = fd_table.get(fd).ok_or(Errno::EBADF)?;
         drop(fd_table);
+        let file_name = file.dentry().path()?;
+        info!("[sys_pread64] file_name: {:?}", file_name);
         if !file.meta().readable() {
             return Err(Errno::EINVAL);
         }
@@ -240,12 +244,12 @@ impl Syscall<'_> {
 
     /// Write data to a file descriptor
     pub async fn sys_write(&self, fd: usize, buf: usize, len: usize) -> SyscallResult {
-        trace!("[sys_write] fd: {}, buf: {:?}, len: {}", fd, buf, len);
+        info!("[sys_write] fd: {}, buf: {:?}, len: {}", fd, buf, len);
         let fd_table = self.task.fd_table();
         let file = fd_table.get(fd).ok_or(Errno::EBADF)?;
         drop(fd_table);
-        let file_name = file.dentry().path();
-        trace!("[sys_write] file_name: {:?}", file_name);
+        let file_name = file.dentry().path()?;
+        info!("[sys_write] file_name: {:?}", file_name);
 
         let user_ptr = UserPtr::<u8>::new(buf);
         let buf_slice = user_ptr.as_slice_mut_checked(len).await?;
@@ -260,15 +264,15 @@ impl Syscall<'_> {
     /// Write iovcnt buffers of data described by iov to the file associated
     /// with the file descriptor fd
     pub async fn sys_writev(&self, fd: usize, iovp: usize, iovcnt: usize) -> SyscallResult {
-        trace!(
+        info!(
             "[sys_writev] fd: {}, iovp: {:#x}, iovcnt: {}",
-            fd,
-            iovp,
-            iovcnt
+            fd, iovp, iovcnt
         );
         let fd_table = self.task.fd_table();
         let file = fd_table.get(fd).ok_or(Errno::EBADF)?;
         drop(fd_table);
+        let file_name = file.dentry().path()?;
+        info!("[sys_writev] file_name: {:?}", file_name);
 
         let mut write_size = 0;
         for i in 0..iovcnt {
@@ -300,6 +304,8 @@ impl Syscall<'_> {
         let fd_table = self.task.fd_table();
         let file = fd_table.get(fd).ok_or(Errno::EBADF)?;
         drop(fd_table);
+        let file_name = file.dentry().path()?;
+        info!("[sys_pwrite64] file_name: {:?}", file_name);
         if !file.meta().writable() {
             return Err(Errno::EINVAL);
         }
@@ -338,6 +344,9 @@ impl Syscall<'_> {
         trace!("[sys_fstat]: fd: {}, stat_buf: {:#x}", fd, stat_buf);
         let fd_table = self.task.fd_table();
         let file = fd_table.get(fd).ok_or(Errno::EBADF)?;
+        drop(fd_table);
+        let file_name = file.dentry().path()?;
+        info!("[sys_fstat] file_name: {:?}", file_name);
         let kstat = Kstat::from_stat(file.inode().stat()?);
         let ptr = UserPtr::<Kstat>::new(stat_buf);
         ptr.write(kstat).await?;
@@ -387,9 +396,16 @@ impl Syscall<'_> {
 
     /// Get file io control
     pub async fn sys_ioctl(&self, fd: usize, request: usize, arg: usize) -> SyscallResult {
+        info!(
+            "[sys_ioctl] fd: {}, request: {:#x}, arg: {:#x}",
+            fd, request, arg
+        );
         let fd_table = self.task.fd_table();
         let file = fd_table.get(fd).ok_or(Errno::EBADF)?;
         drop(fd_table);
+        let file_name = file.dentry().path()?;
+        info!("[sys_ioctl] file_name: {:?}", file_name);
+
         let arg_ptr = UserPtr::<u8>::new(arg);
         let cmd = if let Some(cmd) = TtyIoctlCmd::from_repr(request) {
             IoctlCmd::Tty(cmd)
@@ -430,6 +446,8 @@ impl Syscall<'_> {
     pub async fn sys_getdents64(&self, fd: usize, buf: usize, len: usize) -> SyscallResult {
         info!("[sys_getdents64] fd: {}, buf: {:#x}, len: {}", fd, buf, len);
         let file = self.task.fd_table().get(fd).ok_or(Errno::EBADF)?;
+        let file_name = file.dentry().path()?;
+        info!("[sys_getdents64] file_name: {:?}", file_name);
         let user_ptr = UserPtr::<u8>::new(buf);
         let buf_slice = user_ptr.as_slice_mut_checked(len).await?;
         assert!(check_no_lock());
@@ -541,6 +559,7 @@ impl Syscall<'_> {
         let path = get_path(task.clone(), path, dirfd, "sys_unlinkat")?;
         let dentry = path.dentry();
         dentry.unlink().await?;
+        debug!("[sys_unlinkat] unlink ok");
         Ok(0)
     }
 
@@ -602,6 +621,8 @@ impl Syscall<'_> {
         let flags = FileFlags::from_bits_retain(arg as u32);
         let mut fd_table = task.fd_table();
         let file = fd_table.get(fd).ok_or(Errno::EBADF)?;
+        let file_name = file.dentry().path()?;
+        info!("[sys_fcntl] file_name: {:?}", file_name);
         let op = FcntlFlags::from_bits(cmd).unwrap();
 
         info!("[sys_fcntl] fd: {fd}, cmd: {op:?}, arg: {flags:?}");
@@ -758,6 +779,8 @@ impl Syscall<'_> {
         let fd_table = self.task.fd_table();
         let file = fd_table.get(fd).ok_or(Errno::EBADF)?;
         drop(fd_table);
+        let file_name = file.dentry().path()?;
+        info!("[sys_lseek] file_name: {:?}", file_name);
         let whence = Whence::from_repr(whence).ok_or(Errno::EINVAL)?;
 
         match whence {
@@ -797,7 +820,7 @@ impl Syscall<'_> {
         let fd_table = self.task.fd_table();
         let file = fd_table.get(fd).ok_or(Errno::EBADF)?;
         drop(fd_table);
-        let file_name = file.dentry().path();
+        let file_name = file.dentry().path()?;
         info!("[sys_ftruncate] file_name: {:?}", file_name);
         file.inode().set_size(length);
         file.inode().truncate(length).await?;
@@ -832,6 +855,12 @@ impl Syscall<'_> {
         let file_in = fd_table.get(fd_in).ok_or(Errno::EBADF)?;
         let file_out = fd_table.get(fd_out).ok_or(Errno::EBADF)?;
         drop(fd_table);
+        let file_in_name = file_in.dentry().path()?;
+        let file_out_name = file_out.dentry().path()?;
+        info!(
+            "[sys_fcntl] file_in_name: {:?}, file_out_name: {:?}",
+            file_in_name, file_out_name
+        );
         let file_in_type = file_in.inode().file_type();
         let file_out_type = file_out.inode().file_type();
         let off_in = UserPtr::<i64>::new(off_in);
@@ -916,7 +945,7 @@ async fn get_path_or_create(
                 .get(fd as usize)
                 .ok_or(Errno::EBADF)?
                 .dentry()
-                .path();
+                .path()?;
             trace!("[{debug_syscall_name}] cwd: {:?}", cwd);
             Ok(cwd.from_cd_or_create(&path_str, mode).await)
         }
@@ -944,7 +973,7 @@ fn get_path(
                 .get(fd as usize)
                 .ok_or(Errno::EBADF)?
                 .dentry()
-                .path();
+                .path()?;
             trace!("[{debug_syscall_name}] cwd: {:?}", cwd);
             cwd.from_cd(&path_str)
         }
