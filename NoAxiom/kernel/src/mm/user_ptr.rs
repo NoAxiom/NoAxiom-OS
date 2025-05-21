@@ -286,7 +286,25 @@ impl<T> UserPtr<T> {
 
     /// translate current address to physical address
     pub async fn translate_pa(&self) -> SysResult<PhysAddr> {
-        self.validate().await?;
+        if let Err(trap_type) = Arch::check_read(self.addr()) {
+            warn!(
+                "[translate_pa] detect trap at addr {:#x} during syscall {:?}",
+                self.addr(),
+                current_syscall()
+            );
+            let task = current_task().unwrap();
+            if check_no_lock() {
+                task.memory_validate(self.addr(), Some(trap_type), false)
+                    .await?;
+            } else {
+                warn!(
+                    "[translate_pa] block on addr {:#x} during syscall {:?}",
+                    self.addr(),
+                    current_syscall()
+                );
+                block_on(task.memory_validate(self.addr(), Some(trap_type), true))?;
+            }
+        }
         let page_table = PageTable::from_ppn(Arch::current_root_ppn());
         page_table.translate_va(self.va_addr()).ok_or(Errno::EFAULT)
     }

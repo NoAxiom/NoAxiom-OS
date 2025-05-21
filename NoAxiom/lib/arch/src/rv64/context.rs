@@ -314,10 +314,6 @@ impl ArchUserFloatContext for UserFloatContext {
         unsafe { core::mem::zeroed() }
     }
 
-    fn mark_save_if_needed(&mut self, fs: FS) {
-        self.need_save |= (fs == FS::Dirty) as u8;
-    }
-
     fn yield_task(&mut self) {
         self.save();
         self.need_restore = 1;
@@ -416,5 +412,11 @@ impl ArchUserFloatContext for UserFloatContext {
             ", in(reg) self
             );
         }
+    }
+}
+
+impl UserFloatContext {
+    pub(crate) fn mark_save_if_needed(&mut self, fs: FS) {
+        self.need_save |= (fs == FS::Dirty) as u8;
     }
 }

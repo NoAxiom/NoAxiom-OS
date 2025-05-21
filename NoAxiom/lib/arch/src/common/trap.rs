@@ -1,7 +1,5 @@
 use core::ops::{Index, IndexMut};
 
-use riscv::register::sstatus::FS;
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TrapType {
     Breakpoint,
@@ -79,7 +77,6 @@ pub trait ArchUserFloatContext {
     fn new() -> Self;
     fn save(&mut self);
     fn restore(&mut self);
-    fn mark_save_if_needed(&mut self, sstatus: FS);
     fn yield_task(&mut self);
     fn encounter_signal(&mut self) {
         self.save();

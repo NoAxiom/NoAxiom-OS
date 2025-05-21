@@ -1,4 +1,4 @@
-use alloc::{boxed::Box, sync::Arc};
+use alloc::boxed::Box;
 use core::time::Duration;
 
 use include::errno::Errno;
@@ -59,7 +59,7 @@ impl Syscall<'_> {
     pub async fn sys_clock_gettime(&self, clockid: usize, tp: usize) -> SyscallResult {
         let ts = UserPtr::<TimeSpec>::from(tp);
         let clockid = ClockId::from_repr(clockid).ok_or(Errno::EINVAL)?;
-        info!(
+        trace!(
             "[sys_clock_gettime] clock_id: {:?}, ts_addr: {:#x}",
             clockid,
             ts.addr(),

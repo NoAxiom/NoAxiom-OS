@@ -21,10 +21,33 @@
     ld.d      $s\n, $sp, \offset*8
     .endm
 
+    .macro    KERNEL_SAVE_REG
+    addi.d    $sp, $sp, -32*8
+    STORE_X   %1
+    STORE_X   %2
+    .set      n, 4
+    .rept     28
+    STORE_X   %n
+    .set      n, n+1
+    .endr
+    .endm
+
+    .macro    KERNEL_LOAD_REG
+    LOAD_X    %1
+    LOAD_X    %2
+    .set      n, 4
+    .rept     28
+    LOAD_X    %n
+    .set      n, n+1
+    .endr
+    addi.d    $sp, $sp, 32*8
+    .endm
+
     .section  .text.trampoline
     .globl    __user_trapvec
     .globl    __user_trapret
     .globl    __kernel_trapvec
+    .globl    __kernel_user_ptr_vec
     .align    4
 
 # user -> kernel
@@ -99,45 +122,15 @@
 # only need to save caller-saved regs
 # note that we don't save ERA & ECFG or other csrs here
     __kernel_trapvec:
-    addi.d    $sp, $sp, -19*8
-    st.d      $ra, $sp, 1*8
-    st.d      $t0, $sp, 2*8
-    st.d      $t1, $sp, 3*8
-    st.d      $t2, $sp, 4*8
-    st.d      $t3, $sp, 5*8
-    st.d      $t4, $sp, 6*8
-    st.d      $t5, $sp, 7*8
-    st.d      $t6, $sp, 8*8            # diff with rv: t7 & t8 should be saved as well
-    st.d      $a0, $sp, 9*8
-    st.d      $a1, $sp, 10*8
-    st.d      $a2, $sp, 11*8
-    st.d      $a3, $sp, 12*8
-    st.d      $a4, $sp, 13*8
-    st.d      $a5, $sp, 14*8
-    st.d      $a6, $sp, 15*8
-    st.d      $a7, $sp, 16*8
-    st.d      $t7, $sp, 17*8
-    st.d      $t8, $sp, 18*8
+    KERNEL_SAVE_REG
     bl        kernel_trap_handler
-    ld.d      $ra, $sp, 1*8
-    ld.d      $t0, $sp, 2*8
-    ld.d      $t1, $sp, 3*8
-    ld.d      $t2, $sp, 4*8
-    ld.d      $t3, $sp, 5*8
-    ld.d      $t4, $sp, 6*8
-    ld.d      $t5, $sp, 7*8
-    ld.d      $t6, $sp, 8*8
-    ld.d      $a0, $sp, 9*8
-    ld.d      $a1, $sp, 10*8
-    ld.d      $a2, $sp, 11*8
-    ld.d      $a3, $sp, 12*8
-    ld.d      $a4, $sp, 13*8
-    ld.d      $a5, $sp, 14*8
-    ld.d      $a6, $sp, 15*8
-    ld.d      $a7, $sp, 16*8
-    ld.d      $t7, $sp, 17*8
-    ld.d      $t8, $sp, 18*8
-    addi.d    $sp, $sp, 19*8
+    KERNEL_LOAD_REG
+    ertn
+
+    __kernel_user_ptr_vec:
+    KERNEL_SAVE_REG
+    bl        kernel_user_ptr_handler
+    KERNEL_LOAD_REG
     ertn
 
 # float registers store & load macros
