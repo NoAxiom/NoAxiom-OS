@@ -921,7 +921,7 @@ async fn get_path_or_create(
             Ok(cwd.from_cd_or_create(&path_str, mode).await)
         }
     } else {
-        Path::try_from(path_str)
+        Ok(Path::from_or_create(path_str, mode).await)
     }
 }
 
