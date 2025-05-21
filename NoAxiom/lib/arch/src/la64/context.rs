@@ -183,9 +183,6 @@ impl ArchUserFloatContext for UserFloatContext {
         self.need_restore = 0;
         // unsafe { __load_freg(self) };
     }
-    fn mark_save_if_needed(&mut self) {
-        self.need_save = 1;
-    }
     fn yield_task(&mut self) {
         self.save();
         self.need_restore = 1;
@@ -195,6 +192,12 @@ impl ArchUserFloatContext for UserFloatContext {
 impl Default for UserFloatContext {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl UserFloatContext {
+    pub(crate) fn mark_save_if_needed(&mut self) {
+        self.need_save = 1;
     }
 }
 

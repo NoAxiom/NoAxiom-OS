@@ -2,7 +2,6 @@ use alloc::vec::Vec;
 use core::time::Duration;
 
 use arch::TrapArgs;
-use config::fs::ROOT_NAME;
 
 use super::{Syscall, SyscallResult};
 use crate::{
@@ -14,7 +13,8 @@ use crate::{
             rusage::{Rusage, RUSAGE_SELF},
             CloneFlags, PidSel, WaitOption,
         },
-        result::Errno, time::TimeSpec,
+        result::Errno,
+        time::TimeSpec,
     },
     mm::user_ptr::UserPtr,
     return_errno,
@@ -115,7 +115,7 @@ impl Syscall<'_> {
         // args and envs init
         if path.contains(".sh") {
             info!("[execve] executing .sh script, path: {:?}", path);
-            path = format!("{ROOT_NAME}/busybox");
+            path = format!("busybox");
             args.push(format!("busybox"));
             args.push(format!("sh"));
         } else if path.ends_with("ls") {
@@ -302,9 +302,12 @@ impl Syscall<'_> {
                         Some(limit_time)
                     }
                 };
-                let res = TimeLimitedFuture::new(FutexFuture::new(uaddr, pa, val), timeout)
-                    .await
-                    .map_timeout(Err(Errno::ETIMEDOUT))?;
+                let res = intable(
+                    self.task,
+                    TimeLimitedFuture::new(FutexFuture::new(uaddr, pa, val), timeout),
+                )
+                .await?
+                .map_timeout(Err(Errno::ETIMEDOUT))?;
                 Ok(res)
             }
             FUTEX_WAKE => {

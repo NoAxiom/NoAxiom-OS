@@ -46,9 +46,9 @@ export KERNEL_SYMBOL_TABLE := $(KERNEL_ELF).txt
 
 # Test and fs image config
 TEST_DIR := $(ROOT)/$(PROJECT)-OS-Test
-RAW_FS_IMG := $(TEST_DIR)/$(TEST_TYPE)/img/$(ARCH_NAME)-$(LIB_NAME).img
+RAW_FS_IMG := $(TEST_DIR)/$(TEST_TYPE)/img/fs-$(ARCH_NAME).img
 FS_IMG_DIR := $(TEST_DIR)/$(TEST_TYPE)/tmp-img
-FS_IMG := $(TEST_DIR)/$(TEST_TYPE)/tmp-img/$(ARCH_NAME)-$(LIB_NAME).fs.img
+FS_IMG := $(TEST_DIR)/$(TEST_TYPE)/tmp-img/fs-$(ARCH_NAME).fs.img
 
 # Qemu flags config
 QFLAGS := 
@@ -153,7 +153,7 @@ count:
 	@echo "kernel code statistic:"
 	@cd $(PROJECT) && cloc $(KERNEL) lib --exclude-dir=.trash,.trashbin --exclude-ext=md,toml
 
-DOCKER ?= docker.educg.net/cg/os-contest:20250226
+DOCKER ?= docker.educg.net/cg/os-contest:20250516
 docker:
 	docker run --rm -it -v .:/code --entrypoint bash -w /code --privileged $(DOCKER)
 

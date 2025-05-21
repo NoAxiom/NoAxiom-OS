@@ -115,7 +115,7 @@ impl TimerManager {
     }
 
     pub fn add_timer(&self, timer: Timer) {
-        debug!("add new timer, next expiration {:?}", timer.expire);
+        trace!("add new timer, next expiration {:?}", timer.expire);
         self.timers.lock().push(Reverse(timer));
     }
 
@@ -125,7 +125,7 @@ impl TimerManager {
             let current_time = get_time_duration();
             if current_time >= timer.0.expire {
                 trace!("timers len {}", timers.len());
-                info!(
+                trace!(
                     "[Timer Manager] there is a timer expired, current:{:?}, expire:{:?}",
                     current_time, timer.0.expire
                 );

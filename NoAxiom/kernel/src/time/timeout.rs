@@ -87,6 +87,7 @@ pub async fn sleep_now(interval: Duration) -> Duration {
 
 pub async fn sleep_now_no_int(interval: Duration) -> Duration {
     let expire = get_time_duration() + interval;
+    // todo add block sleep if the interval is too short
     info!("[sleep] expire: {:?} interval: {:?}", expire, interval);
     TimeLimitedFuture::new(pending::<()>(), Some(interval)).await;
     let now = get_time_duration();
