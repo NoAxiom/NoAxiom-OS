@@ -67,7 +67,7 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
 /// called by [`UserTaskFuture`]
 pub async fn task_main(task: Arc<Task>) {
     task.set_waker(take_waker().await);
-    let mut old_mask = None;
+    task.check_signal().await;
     assert!(check_no_lock());
     loop {
         // kernel -> user
@@ -80,15 +80,10 @@ pub async fn task_main(task: Arc<Task>) {
 
         // check sigmask and status
         assert!(check_no_lock());
-        let mut pcb = task.pcb();
-        if let Some(old_mask) = old_mask.take() {
-            trace!("clear sigmask {:?}", pcb.pending_sigs.sig_mask);
-            pcb.pending_sigs.sig_mask = old_mask;
-        }
-        match pcb.status() {
+        match task.pcb().status() {
             TaskStatus::Terminated => break,
             TaskStatus::Stopped => suspend_now().await,
-            _ => drop(pcb),
+            _ => {}
         }
         assert!(check_no_lock());
 
@@ -102,23 +97,21 @@ pub async fn task_main(task: Arc<Task>) {
         user_trap_handler(&task, trap_type).await;
 
         // check status
-        let pcb = task.pcb();
-        match pcb.status() {
+        match task.pcb().status() {
             TaskStatus::Terminated => break,
             TaskStatus::Stopped => suspend_now().await,
-            _ => drop(pcb),
+            _ => {}
         }
         assert!(check_no_lock());
 
         // check signal before return to user
         trace!("[task_main] check_signal");
-        old_mask = task.check_signal().await;
+        task.check_signal().await;
         assert!(check_no_lock());
-        let pcb = task.pcb();
-        match pcb.status() {
+        match task.pcb().status() {
             TaskStatus::Terminated => break,
             TaskStatus::Stopped => suspend_now().await,
-            _ => drop(pcb),
+            _ => {}
         }
         assert!(check_no_lock());
     }

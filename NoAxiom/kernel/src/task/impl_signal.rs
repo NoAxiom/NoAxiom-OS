@@ -11,7 +11,6 @@ use crate::{
         sig_action::{SAFlags, SAHandlerType},
         sig_info::SigInfo,
         sig_num::SigNum,
-        sig_set::SigMask,
         sig_stack::{MContext, UContext},
     },
     task::{exit::ExitCode, status::TaskStatus, Task},
@@ -29,12 +28,12 @@ impl Task {
         let pcb = self.pcb();
         pcb.pending_sigs.has_expect_signals(!pcb.sig_mask())
     }
-    pub async fn check_signal(self: &Arc<Self>) -> Option<SigMask> {
+    pub async fn check_signal(self: &Arc<Self>) {
         let mut pcb = self.pcb();
-        if pcb.pending_sigs.is_empty() {
-            return None;
-        }
         let old_mask = pcb.pending_sigs.sig_mask.clone();
+        if !pcb.pending_sigs.has_expect_signals(!old_mask) {
+            return;
+        }
         let mut pending = Vec::new();
         while let Some(si) = pcb.pending_sigs.pop_with_mask(old_mask) {
             trace!("[check_signal] find a signal {}", si.signo);
@@ -131,7 +130,6 @@ impl Task {
                     // flow: kernel (restore) -> handler -> ..
                     // -> user_sigreturn -> (syscall) kernel
                     // fixme: should we update gp & tp?
-                    // fixme: memory mapping is incorrect for no U flag used
                     cx[EPC] = handler;
                     cx[RA] = if action.flags.contains(SAFlags::SA_RESTORER) {
                         action.restorer
@@ -139,11 +137,10 @@ impl Task {
                         SIG_TRAMPOLINE
                     };
                     cx[SP] = new_sp;
-                    return Some(old_mask);
+                    return;
                 }
             }
         }
-        None
     }
 
     /// siginfo receiver with thread checked
