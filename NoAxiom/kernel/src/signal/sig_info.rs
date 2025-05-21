@@ -23,6 +23,8 @@ pub enum SigCode {
     AsyncIO = -4,
     /// sent by queued SIGIO
     SigIO = -5,
+    /// sent by tkill system call
+    TKill = -6,
 }
 
 #[derive(Clone, Copy, Debug)]

@@ -5,9 +5,7 @@ use include::errno::Errno;
 
 use super::{Syscall, SyscallResult};
 use crate::{
-    include::time::{
-        ITimerVal, TimeSpec, TimeVal, ITIMER_COUNT, ITIMER_PROF, ITIMER_REAL, ITIMER_VIRTUAL, TMS,
-    },
+    include::time::{ITimerType, ITimerVal, TimeSpec, TimeVal, ITIMER_COUNT, TMS},
     mm::user_ptr::UserPtr,
     return_errno,
     time::{
@@ -167,11 +165,12 @@ impl Syscall<'_> {
     ) -> SyscallResult {
         let new_value = UserPtr::<ITimerVal>::new(new_value);
         let old_value = UserPtr::<ITimerVal>::new(old_value);
+        let itimer_type = ITimerType::from_repr(which).ok_or(Errno::EINVAL)?;
         let new_value = new_value.read().await?;
         let mut manager = self.task.itimer();
         let old_itimer = manager.get(which);
-        match which {
-            ITIMER_REAL => {
+        match itimer_type {
+            ITimerType::Real => {
                 let old = old_itimer.into_itimer_val();
                 let new_itimer = ITimer::register(&new_value);
                 let timer_id = new_itimer.timer_id;
@@ -185,9 +184,8 @@ impl Syscall<'_> {
                 }
                 old_value.try_write(old).await?;
             }
-            ITIMER_VIRTUAL => return_errno!(Errno::EINVAL, "ITIMER_VIRTUAL is unimplemented"),
-            ITIMER_PROF => return_errno!(Errno::EINVAL, "ITIMER_PROF is unimplemented"),
-            _ => return Err(Errno::EINVAL),
+            ITimerType::Virtual => return_errno!(Errno::EINVAL, "ITIMER_VIRTUAL is unimplemented"),
+            ITimerType::Prof => return_errno!(Errno::EINVAL, "ITIMER_PROF is unimplemented"),
         };
         Ok(0)
     }

@@ -18,7 +18,7 @@ use ksync::{mutex::SpinLock, Lazy};
 
 use super::gettime::get_time_duration;
 use crate::{
-    include::time::{ITimerVal, ITIMER_REAL},
+    include::time::{ITimerType, ITimerVal},
     signal::{
         sig_detail::SigDetail,
         sig_info::{SigCode, SigInfo},
@@ -127,7 +127,8 @@ impl TimerManager {
                 trace!("timers len {}", timers.len());
                 trace!(
                     "[Timer Manager] there is a timer expired, current:{:?}, expire:{:?}",
-                    current_time, timer.0.expire
+                    current_time,
+                    timer.0.expire
                 );
                 let timer = timers.pop().unwrap().0;
                 if let Some(new_timer) = timer.callback() {
@@ -245,7 +246,7 @@ impl TimerEvent for ITimerReal {
     fn callback(self: Box<Self>) -> Option<Timer> {
         if let Some(task) = self.task.upgrade() {
             let mut manager = task.itimer();
-            let real = manager.get_mut(ITIMER_REAL);
+            let real = manager.get_mut(ITimerType::Real as usize);
             if real.timer_id != self.timer_id {
                 // current timer is old
                 return None;

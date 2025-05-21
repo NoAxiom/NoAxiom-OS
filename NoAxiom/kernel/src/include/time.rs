@@ -4,6 +4,7 @@ use core::{
 };
 
 use arch::{Arch, ArchTime};
+use strum::FromRepr;
 
 use crate::constant::time::USEC_PER_SEC;
 
@@ -171,21 +172,16 @@ pub struct ITimerVal {
     pub it_value: TimeVal,
 }
 
-impl ITimerVal {
-    pub fn empty() -> Self {
-        Self {
-            it_interval: TimeVal::zero(),
-            it_value: TimeVal::zero(),
-        }
-    }
-}
-
 /// the size of interval timer is 3
 pub const ITIMER_COUNT: usize = 3;
 
-/// real time timer
-pub const ITIMER_REAL: usize = 0;
-/// virtual time timer
-pub const ITIMER_VIRTUAL: usize = 1;
-/// profiling timer
-pub const ITIMER_PROF: usize = 2;
+#[repr(usize)]
+#[derive(FromRepr)]
+pub enum ITimerType {
+    /// real time timer
+    Real = 0,
+    /// virtual time timer
+    Virtual = 1,
+    /// profiling timer
+    Prof = 2,
+}
