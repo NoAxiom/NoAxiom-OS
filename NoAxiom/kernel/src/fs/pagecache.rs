@@ -7,7 +7,6 @@ use memory::frame::{frame_alloc, FrameTracker};
 use crate::utils::is_aligned;
 
 /// Inspired by `MSI`
-#[allow(unused)]
 enum PageState {
     Modified,
     Shared,
@@ -74,6 +73,8 @@ impl PageCache {
         assert!(is_aligned(offset_align, PAGE_SIZE));
         self.inner.get_mut(&offset_align)
     }
+
+    pub fn sync(&self) {}
 
     // /// Read the `id` page from the page cache, if not exists, allocate a new
     // /// page and use `read_fn` to read the data into the page.

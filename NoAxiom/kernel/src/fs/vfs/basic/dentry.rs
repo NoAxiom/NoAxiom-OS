@@ -20,7 +20,7 @@ use super::{
     superblock::{EmptySuperBlock, SuperBlock},
 };
 use crate::{
-    fs::path::Path,
+    fs::{path::Path, vfs::basic::inode::InodeState},
     include::{
         fs::{InodeMode, RenameFlags},
         result::Errno,
@@ -188,8 +188,9 @@ impl dyn Dentry {
         self.meta().super_block.clone()
     }
 
-    /// Get the path of the dentry
-    pub fn path(self: Arc<Self>) -> Path {
+    /// Get the path of the dentry, panic if the dentry is deleted.
+    /// todo: this function cost a lot, we should add PathCache
+    pub fn path(self: Arc<Self>) -> SysResult<Path> {
         let mut path = self.name();
         let mut current = self.clone();
         while let Some(parent) = current.parent() {
@@ -199,7 +200,8 @@ impl dyn Dentry {
         if path.len() > 1 {
             path.remove(0);
         }
-        Path::try_from(path).unwrap()
+        assert!(path.starts_with('/'));
+        Path::try_from(path)
     }
 
     /// Find the dentry with `name` in the **WHOLE** sub-tree of the dentry.
@@ -337,13 +339,20 @@ impl dyn Dentry {
     pub async fn unlink(self: Arc<Self>) -> SyscallResult {
         let inode = self.inode()?;
         let mut nlink = inode.meta().inner.lock().nlink;
+        debug!(
+            "[Vfs::unlink] nlink: {}, file_type: {:?}",
+            nlink,
+            inode.file_type()
+        );
         nlink -= 1;
         if nlink == 0 {
             let parent = self.parent().unwrap();
             if parent.inode()?.file_type() != InodeMode::DIR {
                 return Err(Errno::ENOTDIR);
             }
-            parent.remove_child(&self.name()).unwrap();
+            self.set_inode_none();
+            inode.set_state(InodeState::Deleted);
+            // parent.remove_child(&self.name()).unwrap();
             parent.open().unwrap().delete_child(&self.name()).await?;
         }
         Ok(0)

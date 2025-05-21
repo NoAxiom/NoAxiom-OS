@@ -96,7 +96,7 @@ impl Dentry for Ext4Dentry {
             .get_fs()
             .await;
         trace!("[ext4] get lock super block succeed!");
-        let self_path = self.clone().into_dyn().path().as_string();
+        let self_path = self.clone().into_dyn().path()?.as_string();
         let child_path = if self_path != "/" {
             format!("{}/{}", self_path, name)
         } else {

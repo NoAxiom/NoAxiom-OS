@@ -28,11 +28,11 @@ fn alloc_id() -> usize {
     *id
 }
 
-#[allow(unused)]
 pub enum InodeState {
     UnInit,
     Normal,
     Dirty,
+    Deleted,
 }
 
 pub struct InodeMeta {
@@ -47,6 +47,8 @@ pub struct InodeMeta {
     /// The page cache of the file, managed by the `Inode`
     pub page_cache: Option<AsyncMutex<PageCache>>,
 }
+
+// todo: Drop for the InodeMeta, sync the page cache according to the state
 
 impl InodeMeta {
     pub fn new(
@@ -163,6 +165,15 @@ impl dyn Inode {
         if let Some(ctime) = ctime {
             inner.ctime_sec = ctime.tv_sec;
             inner.ctime_nsec = ctime.tv_nsec;
+        }
+    }
+    pub fn set_state(&self, state: InodeState) {
+        let mut inner = self.meta().inner.lock();
+        match inner.state {
+            InodeState::Deleted => {}
+            _ => {
+                inner.state = state;
+            }
         }
     }
 }

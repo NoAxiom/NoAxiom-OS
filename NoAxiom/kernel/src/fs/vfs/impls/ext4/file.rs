@@ -216,13 +216,11 @@ impl File for Ext4Dir {
 
     async fn delete_child(&self, name: &str) -> Result<(), Errno> {
         let super_block = self.meta.dentry().super_block();
-        debug!("[ext4dir] delete_child try to get lock");
         let ext4 = super_block
             .downcast_ref::<Ext4SuperBlock>()
             .unwrap()
             .get_fs()
             .await;
-        debug!("[ext4dir] delete_child  get lock succeed");
         assert!(check_no_lock());
         assert!(Arch::is_interrupt_enabled());
         let mut inode = ext4.get_inode_ref(self.ino).await;
