@@ -26,7 +26,7 @@ impl Syscall<'_> {
         match pid {
             0 => {
                 // get current cpu mask
-                let cpu_mask = self.task.tcb().cpu_mask;
+                let cpu_mask = self.task.cpu_mask().clone();
                 mask.write(cpu_mask).await?;
                 Ok(0)
             }
@@ -35,7 +35,7 @@ impl Syscall<'_> {
                 if let Some(task) = TASK_MANAGER.get(pid) {
                     let tg = task.thread_group();
                     if let Some(Some(task)) = tg.0.get(&pid).map(|t| t.upgrade()) {
-                        mask.write(task.tcb().cpu_mask).await?;
+                        mask.write(task.cpu_mask().clone()).await?;
                         Ok(0)
                     } else {
                         Err(Errno::ESRCH)
@@ -57,14 +57,14 @@ impl Syscall<'_> {
         match pid {
             0 => {
                 // set current cpu mask
-                self.task.tcb_mut().cpu_mask = mask;
+                *self.task.cpu_mask_mut() = mask;
             }
             _ => {
                 // set task cpu mask
                 if let Some(task) = TASK_MANAGER.get(pid) {
                     let tg = task.thread_group();
                     if let Some(Some(task)) = tg.0.get(&pid).map(|t| t.upgrade()) {
-                        task.tcb_mut().cpu_mask = mask
+                        *task.cpu_mask_mut() = mask;
                     } else {
                         return Err(Errno::ESRCH);
                     }

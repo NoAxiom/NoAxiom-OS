@@ -119,8 +119,6 @@ impl Default for PCB {
 
 pub struct TCB {
     pub clear_child_tid: Option<usize>, // clear tid address
-    pub time_stat: TimeInfo,            // task time
-    pub cpu_mask: CpuMask,              // cpu mask
     pub current_syscall: SyscallID,     // only for debug, current syscall id
 }
 
@@ -128,8 +126,6 @@ impl Default for TCB {
     fn default() -> Self {
         Self {
             clear_child_tid: None,
-            time_stat: TimeInfo::default(),
-            cpu_mask: CpuMask::new(),
             current_syscall: SyscallID::NO_SYSCALL,
         }
     }
@@ -143,11 +139,11 @@ pub struct Task {
     pcb: Mutable<PCB>, // task control block inner, protected by lock
 
     // thread only / once initialization
-    tcb: ThreadOnly<TCB>,               // thread control block
-    cx: ThreadOnly<TaskContext>,        // trap context
-    sched_entity: SchedEntity,          // sched entity, shared with scheduler
-    waker: Once<Waker>,                 // waker for the task
-    ucx: ThreadOnly<UserPtr<UContext>>, // ucontext for the task
+    tcb: ThreadOnly<TCB>,                  // thread control block
+    cx: ThreadOnly<TaskContext>,           // trap context
+    sched_entity: ThreadOnly<SchedEntity>, // sched entity for the task
+    waker: Once<Waker>,                    // waker for the task
+    ucx: ThreadOnly<UserPtr<UContext>>,    // ucontext for the task
 
     // immutable
     tid: Immutable<TidTracer>,              // task id, with lifetime holded
@@ -358,12 +354,25 @@ impl Task {
         self.tcb.as_ref_mut()
     }
 
-    /// sched entity
-    pub fn sched_entity_ref_cloned(&self) -> SchedEntity {
-        self.sched_entity.ref_clone(self.tid())
+    /// time stat
+    pub fn time_stat(&self) -> &TimeInfo {
+        &self.sched_entity.as_ref_mut().time_stat
     }
-    pub fn sched_entity(&self) -> &SchedEntity {
-        &self.sched_entity
+    pub fn time_stat_mut(&self) -> &mut TimeInfo {
+        &mut self.sched_entity.as_ref_mut().time_stat
+    }
+
+    /// cpu mask
+    pub fn cpu_mask(&self) -> &CpuMask {
+        &self.sched_entity.as_ref_mut().cpu_mask
+    }
+    pub fn cpu_mask_mut(&self) -> &mut CpuMask {
+        &mut self.sched_entity.as_ref_mut().cpu_mask
+    }
+
+    /// sched entity
+    pub fn get_sched_entity(&self) -> *mut SchedEntity {
+        self.sched_entity.get()
     }
 
     /// clear child tid address
@@ -453,7 +462,7 @@ impl Task {
                 TrapContext::app_init_cx(elf_entry, user_sp),
                 true,
             )),
-            sched_entity: SchedEntity::new_bare(INIT_PROCESS_ID),
+            sched_entity: ThreadOnly::new(SchedEntity::default()),
             fd_table: Shared::new(FdTable::new()),
             cwd: Shared::new(path),
             sa_list: Shared::new(SigActionList::new()),
@@ -622,7 +631,7 @@ impl Task {
                 }),
                 memory_set,
                 cx: ThreadOnly::new(TaskContext::new(self.trap_context().clone(), true)),
-                sched_entity: self.sched_entity.data_clone(tid_val),
+                sched_entity: ThreadOnly::new(SchedEntity::default()),
                 fd_table,
                 cwd: self.cwd.clone(),
                 sa_list,
@@ -656,7 +665,7 @@ impl Task {
                 }),
                 memory_set,
                 cx: ThreadOnly::new(TaskContext::new(self.trap_context().clone(), true)),
-                sched_entity: self.sched_entity.data_clone(new_tgid),
+                sched_entity: ThreadOnly::new(SchedEntity::default()),
                 fd_table,
                 cwd: Shared::new(self.cwd().clone()),
                 sa_list,

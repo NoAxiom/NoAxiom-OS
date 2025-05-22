@@ -56,9 +56,8 @@ impl Future for WaitChildFuture<'_> {
                         // time statistic
                         let child_tid = child.tid();
                         self.task
-                            .tcb_mut()
-                            .time_stat
-                            .add_child_time(child.tcb().time_stat.child_time());
+                            .time_stat_mut()
+                            .add_child_time(child.time_stat().child_time());
                         Poll::Ready(Ok((pcb.exit_code(), child_tid)))
                     }
                     None => Poll::Pending,
@@ -78,9 +77,8 @@ impl Future for WaitChildFuture<'_> {
                         pcb.children.retain(|task| task.tid() != child_tid);
                         // update time statistic
                         self.task
-                            .tcb_mut()
-                            .time_stat
-                            .add_child_time(child.tcb().time_stat.child_time());
+                            .time_stat_mut()
+                            .add_child_time(child.time_stat().child_time());
                         Poll::Ready(Ok((exit_code, child_tid)))
                     }
                     _ => Poll::Pending,

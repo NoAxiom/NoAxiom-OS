@@ -19,7 +19,7 @@ use crate::{
 impl Syscall<'_> {
     pub async fn sys_times(&self, tms: usize) -> SyscallResult {
         let tms = UserPtr::<TMS>::new(tms);
-        let res = self.task.tcb().time_stat.into_tms();
+        let res = self.task.time_stat().into_tms();
         tms.write(res).await?;
         Ok(0)
     }
@@ -69,15 +69,14 @@ impl Syscall<'_> {
                 let mut cpu_time = Duration::ZERO;
                 for (_tid, task) in task.thread_group().0.iter() {
                     if let Some(task) = task.upgrade() {
-                        let tcb = task.tcb();
-                        cpu_time += tcb.time_stat.cpu_time();
+                        cpu_time += task.time_stat().cpu_time();
                     }
                 }
                 trace!("[sys_clock_gettime] get process cpu time: {:?}", cpu_time);
                 cpu_time
             }
             CLOCK_THREAD_CPUTIME_ID => {
-                let cpu_time = self.task.tcb().time_stat.cpu_time();
+                let cpu_time = self.task.time_stat().cpu_time();
                 trace!("[sys_clock_gettime] get process cpu time: {:?}", cpu_time);
                 cpu_time
             }

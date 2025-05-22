@@ -8,11 +8,11 @@ use async_task::Runnable;
 use ksync::{cell::SyncUnsafeCell, mutex::SpinLock};
 
 use super::{
-    sched_info::SchedInfo,
+    sched_entity::SchedEntityWrapper,
     vsched::{Runtime, ScheduleOrder, Scheduler},
 };
 
-type Info = SchedInfo;
+type Info = SchedEntityWrapper;
 
 #[repr(align(64))]
 pub struct SimpleScheduler {

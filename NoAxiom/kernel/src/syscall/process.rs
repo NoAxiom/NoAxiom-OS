@@ -385,10 +385,10 @@ impl Syscall<'_> {
         let mut start_time = Duration::ZERO;
         for (_, thread) in tgroup.0.iter() {
             if let Some(thread) = thread.upgrade() {
-                utime += thread.tcb().time_stat.utime();
-                stime += thread.tcb().time_stat.stime();
+                utime += thread.time_stat().utime();
+                stime += thread.time_stat().stime();
                 if start_time.is_zero() {
-                    start_time = thread.tcb().time_stat.create_time();
+                    start_time = thread.time_stat().create_time();
                 }
             };
         }

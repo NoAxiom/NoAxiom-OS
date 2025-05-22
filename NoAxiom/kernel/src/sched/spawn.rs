@@ -7,22 +7,26 @@ use core::future::Future;
 
 use async_task::{Builder, WithInfo};
 
-use super::{runtime::RUNTIME, sched_entity::SchedEntity, sched_info::SchedInfo, vsched::Runtime};
+use super::{runtime::RUNTIME, sched_entity::SchedEntityWrapper, vsched::Runtime};
 use crate::task::{
     task_main::{task_main, UserTaskFuture},
     Task,
 };
 
 /// Add a raw task into task queue
-pub fn spawn_raw<F, R>(future: F, sched_entity: SchedEntity, task: Option<&Arc<Task>>)
+pub fn spawn_raw<F, R>(future: F, task: Option<&Arc<Task>>)
 where
     F: Future<Output = R> + Send + 'static,
     R: Send + 'static,
 {
-    let schedule = WithInfo(move |runnable, info| RUNTIME.schedule(runnable, info));
-    let (runnable, handle) = Builder::new()
-        .metadata(SchedInfo::new(sched_entity, task))
-        .spawn(move |_: &SchedInfo| future, schedule);
+    let metadata = SchedEntityWrapper::from_ptr(
+        task.map(|t| t.get_sched_entity())
+            .unwrap_or_else(|| core::ptr::null_mut()),
+    );
+    let (runnable, handle) = Builder::new().metadata(metadata).spawn(
+        move |_| future,
+        WithInfo(move |runnable, info| RUNTIME.schedule(runnable, info)),
+    );
     runnable.schedule();
     handle.detach();
 }
@@ -32,7 +36,6 @@ pub fn spawn_utask(task: Arc<Task>) {
     warn!("[spawn_utask] new task tid = {}", task.tid());
     spawn_raw(
         UserTaskFuture::new(task.clone(), task_main(task.clone())),
-        task.sched_entity_ref_cloned(),
         Some(&task),
     );
 }
@@ -43,5 +46,5 @@ where
     F: Future<Output = R> + Send + 'static,
     R: Send + 'static,
 {
-    spawn_raw(future, SchedEntity::new_bare(0), None);
+    spawn_raw(future, None);
 }

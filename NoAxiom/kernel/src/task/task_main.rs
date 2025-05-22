@@ -38,8 +38,7 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
         let this = unsafe { self.get_unchecked_mut() };
         let task = &this.task;
         let future = &mut this.future;
-        let time_in = get_time_us();
-        task.tcb_mut().time_stat.record_switch_in();
+        task.time_stat_mut().record_switch_in();
         current_cpu().set_task(task);
         fence(Ordering::AcqRel);
         task.restore_cx_int_en();
@@ -50,10 +49,8 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
         // ===== after executing task future =====
         task.record_cx_int_en();
         Arch::disable_interrupt();
-        let time_out = get_time_us();
-        task.tcb_mut().time_stat.record_switch_out();
+        task.time_stat_mut().record_switch_out();
         task.trap_context_mut().freg_mut().yield_task();
-        task.sched_entity().update_vruntime(time_out - time_in);
         current_cpu().clear_task();
         fence(Ordering::AcqRel);
         Arch::enable_interrupt();
@@ -72,11 +69,11 @@ pub async fn task_main(task: Arc<Task>) {
     loop {
         // kernel -> user
         trace!("[task_main] trap_restore, cx: {:#x?}", task.trap_context());
-        task.tcb_mut().time_stat.record_trap_in();
+        task.time_stat_mut().record_trap_in();
         let cx = task.trap_context_mut();
         Arch::trap_restore(cx); // restore context and return to user mode
         let trap_type = Arch::read_trap_type(Some(cx));
-        task.tcb_mut().time_stat.record_trap_out();
+        task.time_stat_mut().record_trap_out();
 
         // check sigmask and status
         assert!(check_no_lock());
