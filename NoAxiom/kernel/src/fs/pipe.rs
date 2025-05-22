@@ -98,12 +98,12 @@ impl PipeBuffer {
         }
     }
     fn notify_read_waker(&mut self) {
-        if let Some(waker) = self.read_wakers.pop() {
+        while let Some(waker) = self.read_wakers.pop() {
             waker.wake();
         }
     }
     fn notify_write_waker(&mut self) {
-        if let Some(waker) = self.write_wakers.pop() {
+        while let Some(waker) = self.write_wakers.pop() {
             waker.wake();
         }
     }
@@ -476,7 +476,6 @@ impl Future for PipeWriteFuture {
                 Poll::Ready(Ok(()))
             } else {
                 trace!("[PipeWriteFile] write pending, save waker");
-                // ? will add multiple wakers?
                 buffer.add_write_event(cx.waker().clone());
                 Poll::Pending
             }
