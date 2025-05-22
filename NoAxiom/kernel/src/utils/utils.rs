@@ -36,6 +36,15 @@ pub fn random() -> u64 {
     }
 }
 
+pub fn global_alloc() -> u64 {
+    use core::sync::atomic::AtomicU64;
+    static mut ALLOC: AtomicU64 = AtomicU64::new(0);
+    unsafe {
+        ALLOC.fetch_add(1, core::sync::atomic::Ordering::SeqCst);
+        ALLOC.load(core::sync::atomic::Ordering::SeqCst)
+    }
+}
+
 #[inline(always)]
 pub fn random_fill(buf: &mut [u8]) -> usize {
     for i in 0..buf.len() {

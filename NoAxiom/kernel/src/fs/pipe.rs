@@ -42,7 +42,7 @@ use crate::{
         result::Errno,
     },
     syscall::{SysResult, SyscallResult},
-    utils::random,
+    utils::global_alloc,
 };
 
 #[derive(PartialEq)]
@@ -309,7 +309,7 @@ impl PipeFile {
     /// Create a new pipe, return (read end, write end)
     pub fn new_pipe() -> (Arc<Self>, Arc<Self>) {
         let buffer = Arc::new(SpinLock::new(PipeBuffer::new()));
-        let name = format!("pipe-{}", random());
+        let name = format!("pipe-{}", global_alloc());
         let read_end = Self::new_read_end(buffer.clone(), &name);
         let write_end = Self::new_write_end(buffer.clone(), &name);
         buffer.lock().read_end = true;
