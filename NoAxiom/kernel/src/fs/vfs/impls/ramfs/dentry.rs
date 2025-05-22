@@ -31,6 +31,9 @@ impl RamFsDentry {
             meta: DentryMeta::new(parent, name, super_block),
         }
     }
+    fn into_dyn(self: Arc<Self>) -> Arc<dyn Dentry> {
+        self.clone()
+    }
 }
 
 #[async_trait]
@@ -72,14 +75,17 @@ impl Dentry for RamFsDentry {
     /// Just create. Don't like real fs that link to its parent
     async fn create(self: Arc<Self>, name: &str, mode: InodeMode) -> SysResult<Arc<dyn Dentry>> {
         let super_block = self.meta.super_block.clone();
-        let sub_dentry = self.from_name(name);
-        let sub_inode: Arc<dyn Inode> = match mode {
-            InodeMode::DIR => Arc::new(RamFsDirInode::new(super_block, 0)),
-            InodeMode::FILE => Arc::new(RamFsFileInode::new(super_block, 0)),
-            InodeMode::SOCKET => Arc::new(RamFsFileInode::new(super_block, 0)),
-            _ => return Err(Errno::EPERM),
+
+        let sub_inode: Arc<dyn Inode> = if mode.contains(InodeMode::FILE) {
+            Arc::new(RamFsDirInode::new(super_block, 0))
+        } else if mode.contains(InodeMode::DIR) {
+            Arc::new(RamFsFileInode::new(super_block, 0))
+        } else if mode.contains(InodeMode::SOCKET) {
+            Arc::new(RamFsFileInode::new(super_block, 0))
+        } else {
+            unreachable!("create unknown inode type")
         };
-        sub_dentry.set_inode(sub_inode);
-        Ok(sub_dentry)
+
+        Ok(self.into_dyn().add_child(name, sub_inode))
     }
 }
