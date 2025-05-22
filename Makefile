@@ -81,8 +81,7 @@ QFLAGS += -rtc base=utc
 endif
 
 MAKE_OPTION ?= backup build run
-default: config.mk
-	@make $(MAKE_OPTION)
+default: $(MAKE_OPTION)
 
 CONFIG_DIR := ./utils/config
 CONFIG_FILE := $(CONFIG_DIR)/$(CONFIG).mk
