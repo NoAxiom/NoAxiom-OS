@@ -5,7 +5,7 @@
 use alloc::collections::vec_deque::VecDeque;
 
 use async_task::Runnable;
-use ksync::mutex::SpinLock;
+use ksync::{cell::SyncUnsafeCell, mutex::SpinLock};
 
 use super::{
     sched_info::SchedInfo,
@@ -50,20 +50,80 @@ impl Scheduler<Info> for SimpleScheduler {
     }
 }
 
-pub struct SimpleRuntime<T>
-where
-    T: Scheduler<Info>,
-{
-    scheduler: SpinLock<T>,
+struct FifoScheduler {
+    queue: VecDeque<Runnable<Info>>,
 }
 
-impl<T> Runtime<T, Info> for SimpleRuntime<T>
-where
-    T: Scheduler<Info>,
-{
+impl Scheduler<Info> for FifoScheduler {
+    fn default() -> Self {
+        Self {
+            queue: VecDeque::new(),
+        }
+    }
+    fn push_with_info(&mut self, runnable: Runnable<Info>, _: async_task::ScheduleInfo) {
+        self.push_normal(runnable);
+    }
+    fn push_normal(&mut self, runnable: Runnable<Info>) {
+        self.queue.push_back(runnable);
+    }
+    fn push_urgent(&mut self, runnable: Runnable<Info>) {
+        self.queue.push_front(runnable);
+    }
+    fn pop(&mut self, _: ScheduleOrder) -> Option<Runnable<Info>> {
+        self.queue.pop_front()
+    }
+}
+
+type MultiSchedulerInnerImpl = SimpleScheduler;
+pub struct MultiScheduler {
+    current: SyncUnsafeCell<MultiSchedulerInnerImpl>,
+    expire: SyncUnsafeCell<MultiSchedulerInnerImpl>,
+}
+
+impl MultiScheduler {
     fn new() -> Self {
         Self {
-            scheduler: SpinLock::new(T::default()),
+            current: SyncUnsafeCell::new(MultiSchedulerInnerImpl::default()),
+            expire: SyncUnsafeCell::new(MultiSchedulerInnerImpl::default()),
+        }
+    }
+    fn switch_expire(&mut self) {
+        core::mem::swap(&mut self.current, &mut self.expire);
+    }
+}
+
+impl Scheduler<Info> for MultiScheduler {
+    fn default() -> Self {
+        Self::new()
+    }
+    fn push_with_info(&mut self, runnable: Runnable<Info>, info: async_task::ScheduleInfo) {
+        self.expire.as_ref_mut().push_with_info(runnable, info);
+    }
+    fn push_normal(&mut self, runnable: Runnable<Info>) {
+        self.expire.as_ref_mut().push_normal(runnable);
+    }
+    fn push_urgent(&mut self, runnable: Runnable<Info>) {
+        self.expire.as_ref_mut().push_urgent(runnable);
+    }
+    fn pop(&mut self, order: ScheduleOrder) -> Option<Runnable<Info>> {
+        let current = self.current.as_ref_mut();
+        let res = current.pop(order);
+        if let None = res.as_ref() {
+            self.switch_expire();
+        }
+        res
+    }
+}
+
+type SchedulerImpl = MultiScheduler;
+pub struct SimpleRuntime {
+    scheduler: SpinLock<SchedulerImpl>,
+}
+
+impl Runtime<SchedulerImpl, Info> for SimpleRuntime {
+    fn new() -> Self {
+        Self {
+            scheduler: SpinLock::new(SchedulerImpl::default()),
         }
     }
     fn run(&self) {

@@ -2,10 +2,7 @@ use arch::{Arch, ArchInt, ArchMemory};
 use config::task::INIT_PROCESS_ID;
 use lazy_static::lazy_static;
 
-use super::{
-    simple::{SimpleRuntime, SimpleScheduler},
-    vsched::Runtime,
-};
+use super::{simple::SimpleRuntime, vsched::Runtime};
 use crate::{
     cpu::{get_hartid, CPUS},
     task::manager::TASK_MANAGER,
@@ -13,14 +10,8 @@ use crate::{
 };
 
 lazy_static! {
-    pub static ref RUNTIME: SimpleRuntime<SimpleScheduler> = SimpleRuntime::new();
+    pub static ref RUNTIME: SimpleRuntime = SimpleRuntime::new();
 }
-
-// use super::cfs::CfsRuntime;
-// use crate::sched::vsched::Runtime;
-// lazy_static! {
-//     pub(crate) static ref RUNTIME: CfsRuntime = CfsRuntime::new();
-// }
 
 /// run_tasks: only act as a task runner
 #[no_mangle]
