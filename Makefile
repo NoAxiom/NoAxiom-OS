@@ -1,6 +1,7 @@
 # NoAxiom Makefile
 
 # General config
+include config.mk
 export PROJECT := NoAxiom
 export MODE := release
 export KERNEL := kernel
@@ -11,6 +12,7 @@ export INIT_PROC ?= busybox
 export ON_SCREEN ?= false
 export ROOT := $(shell pwd)
 export LOG ?= DEBUG
+export CONFIG ?= default
 export USER_PROJECT := NoAxiom-OS-User
 export ERROR := "\e[31m"
 export WARN := "\e[33m"
@@ -23,7 +25,7 @@ export TARGET := riscv64gc-unknown-none-elf
 export OBJDUMP := riscv64-unknown-elf-objdump
 export OBJCOPY := rust-objcopy --binary-architecture=riscv64
 export QEMU := qemu-system-riscv64
-export MULTICORE := 1
+export MULTICORE ?= 1
 export GDB := riscv64-unknown-elf-gdb
 export SIMPLE_ARCH_NAME := rv
 else ifeq ($(ARCH_NAME),loongarch64) # LoongArch64
@@ -31,7 +33,7 @@ export TARGET := loongarch64-unknown-linux-gnu
 export OBJDUMP := loongarch64-linux-gnu-objdump
 export OBJCOPY := loongarch64-linux-gnu-objcopy
 export QEMU := qemu-system-loongarch64
-export MULTICORE := 1
+export MULTICORE ?= 1
 export GDB := $(TOOLCHAIN_DIR)/loongarch64-linux-gnu-gdb
 export SIMPLE_ARCH_NAME := la
 endif
@@ -78,7 +80,18 @@ QFLAGS += -rtc base=utc
 # QFLAGS += -device virtio-blk-pci,drive=x1,bus=virtio-mmio-bus.1
 endif
 
-default: backup build run
+MAKE_OPTION ?= backup build run
+default: config.mk
+	@make $(MAKE_OPTION)
+
+CONFIG_DIR := ./utils/config
+CONFIG_FILE := $(CONFIG_DIR)/$(CONFIG).mk
+config.mk:
+	@touch ./config.mk
+
+config:
+	@echo "using config: $(CONFIG)"
+	@cp $(CONFIG_DIR)/$(CONFIG).mk $(ROOT)/config.mk
 
 build: build-user build-kernel
 	@mkdir -p $(OUTPUT_DIR)
@@ -142,6 +155,7 @@ clean:
 	@rm -rf $(TEST_DIR)/build
 	@rm -rf $(TEST_DIR)/riscv64
 	@rm -rf $(OUTPUT_DIR)
+	@rm -f $(ROOT)/config.mk
 	@cd $(PROJECT) && cargo clean
 
 vendor:
@@ -164,7 +178,6 @@ info:
 	@echo "INIT_PROC: $(INIT_PROC)"
 	@echo "MODE: $(MODE)"
 	@echo "MULTICORE: $(MULTICORE)"
-	@echo "SBI: $(SBI)"
 	@echo "QEMU: $(QEMU)"
 	@echo "TEST_DIR: $(TEST_DIR)"
 	@echo "FS_IMG: $(FS_IMG)"
@@ -216,10 +229,11 @@ build-all:
 all: clean env build-all
 	@echo "Kernel build finished. See output elf in $(OUTPUT_DIR)"
 
-.PHONY: default all build run clean             # basic make
-.PHONY: gdb-server gdb                          # debug client
-.PHONY: asm asm-user asm-all                    # generate assembly info
-.PHONY: build-user build-kernel                 # for more specific build
-.PHONY: add-target env git-update vendor vscode # environment setup
-.PHONY: info help count                         # information utils
-.PHONY: docker build-all                        # for competition
+.PHONY: default all build run clean      # basic make
+.PHONY: gdb-server gdb                   # debug client
+.PHONY: asm asm-user asm-all             # generate assembly info
+.PHONY: build-user build-kernel          # for more specific build
+.PHONY: add-target env git-update vendor # environment setup
+.PHONY: config vscode                    # config
+.PHONY: info help count                  # information utils
+.PHONY: docker build-all                 # for competition
