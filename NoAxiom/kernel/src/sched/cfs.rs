@@ -1,3 +1,5 @@
+//! this scheduler is currently discarded
+
 #![allow(unused)]
 
 use alloc::collections::{btree_set::BTreeSet, vec_deque::VecDeque};
@@ -119,7 +121,7 @@ where
 
 impl Scheduler<SchedInfo> for CFS<SchedInfo> {
     /// default scheduler for init
-    fn default() -> Self {
+    fn new() -> Self {
         Self {
             normal: BTreeSet::new(),
             urgent: VecDeque::new(),
@@ -281,7 +283,7 @@ impl Runtime<CFS<SchedInfo>, SchedInfo> for CfsRuntime {
     fn new() -> Self {
         Self {
             load_balance_lock: SpinLock::new(()),
-            scheduler: array_init(|_| SpinLock::new(CFS::default())),
+            scheduler: array_init(|_| SpinLock::new(CFS::new())),
         }
     }
 

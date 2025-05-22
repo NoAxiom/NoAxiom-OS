@@ -21,7 +21,7 @@ pub struct SimpleScheduler {
 }
 
 impl Scheduler<Info> for SimpleScheduler {
-    fn default() -> Self {
+    fn new() -> Self {
         Self {
             urgent: VecDeque::new(),
             normal: VecDeque::new(),
@@ -55,7 +55,7 @@ struct FifoScheduler {
 }
 
 impl Scheduler<Info> for FifoScheduler {
-    fn default() -> Self {
+    fn new() -> Self {
         Self {
             queue: VecDeque::new(),
         }
@@ -81,20 +81,17 @@ pub struct MultiScheduler {
 }
 
 impl MultiScheduler {
-    fn new() -> Self {
-        Self {
-            current: SyncUnsafeCell::new(MultiSchedulerInnerImpl::default()),
-            expire: SyncUnsafeCell::new(MultiSchedulerInnerImpl::default()),
-        }
-    }
     fn switch_expire(&mut self) {
         core::mem::swap(&mut self.current, &mut self.expire);
     }
 }
 
 impl Scheduler<Info> for MultiScheduler {
-    fn default() -> Self {
-        Self::new()
+    fn new() -> Self {
+        Self {
+            current: SyncUnsafeCell::new(MultiSchedulerInnerImpl::new()),
+            expire: SyncUnsafeCell::new(MultiSchedulerInnerImpl::new()),
+        }
     }
     fn push_with_info(&mut self, runnable: Runnable<Info>, info: async_task::ScheduleInfo) {
         self.expire.as_ref_mut().push_with_info(runnable, info);
@@ -123,7 +120,7 @@ pub struct SimpleRuntime {
 impl Runtime<SchedulerImpl, Info> for SimpleRuntime {
     fn new() -> Self {
         Self {
-            scheduler: SpinLock::new(SchedulerImpl::default()),
+            scheduler: SpinLock::new(SchedulerImpl::new()),
         }
     }
     fn run(&self) {

@@ -2,15 +2,16 @@ use arch::{Arch, ArchInt, ArchMemory};
 use config::task::INIT_PROCESS_ID;
 use lazy_static::lazy_static;
 
-use super::{simple::SimpleRuntime, vsched::Runtime};
+use super::vsched::Runtime;
 use crate::{
     cpu::{get_hartid, CPUS},
     task::manager::TASK_MANAGER,
     time::{gettime::get_time_duration, timer::timer_handler},
 };
 
+type RuntimeImpl = super::simple::SimpleRuntime;
 lazy_static! {
-    pub static ref RUNTIME: SimpleRuntime = SimpleRuntime::new();
+    pub static ref RUNTIME: RuntimeImpl = RuntimeImpl::new();
 }
 
 /// run_tasks: only act as a task runner

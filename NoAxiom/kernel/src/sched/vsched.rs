@@ -7,7 +7,7 @@ pub enum ScheduleOrder {
 }
 
 pub trait Scheduler<R> {
-    fn default() -> Self;
+    fn new() -> Self;
     fn push_with_info(&mut self, runnable: Runnable<R>, info: ScheduleInfo);
     fn push_normal(&mut self, runnable: Runnable<R>);
     fn push_urgent(&mut self, runnable: Runnable<R>);
