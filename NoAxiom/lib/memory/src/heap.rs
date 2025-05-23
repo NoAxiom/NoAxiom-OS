@@ -1,16 +1,38 @@
 //! The global heap allocator
 
+use core::alloc::GlobalAlloc;
+
 use buddy_system_allocator::LockedHeap;
 use config::mm::KERNEL_HEAP_SIZE;
+use ksync::mutex::{LockAction, NoIrqLockAction};
+
+struct NoIrqHeapAllocator(LockedHeap<32>);
+
+unsafe impl GlobalAlloc for NoIrqHeapAllocator {
+    unsafe fn alloc(&self, layout: core::alloc::Layout) -> *mut u8 {
+        NoIrqLockAction::before_lock();
+        let res = self.0.alloc(layout);
+        NoIrqLockAction::after_lock();
+        res
+    }
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: core::alloc::Layout) {
+        NoIrqLockAction::before_lock();
+        self.0.dealloc(ptr, layout);
+        NoIrqLockAction::after_lock();
+    }
+}
 
 #[global_allocator]
-/// heap allocator instance
-static HEAP_ALLOCATOR: LockedHeap<32> = LockedHeap::empty();
+static HEAP_ALLOCATOR: NoIrqHeapAllocator = NoIrqHeapAllocator(LockedHeap::empty());
 
 #[alloc_error_handler]
 /// panic when heap allocation error occurs
 pub fn handle_alloc_error(layout: core::alloc::Layout) -> ! {
-    debug!("{:?}", HEAP_ALLOCATOR.lock());
+    if let Some(heap) = HEAP_ALLOCATOR.0.try_lock() {
+        error!("{:?}", heap);
+    } else {
+        error!("HEAP_ALLOCATOR is already locked");
+    }
     panic!("Heap allocation error, layout = {:?}", layout);
 }
 
@@ -21,6 +43,7 @@ static mut HEAP_SPACE: [u8; KERNEL_HEAP_SIZE] = [0; KERNEL_HEAP_SIZE];
 pub fn heap_init() {
     unsafe {
         HEAP_ALLOCATOR
+            .0
             .lock()
             .init(HEAP_SPACE.as_ptr() as usize, KERNEL_HEAP_SIZE);
     }
