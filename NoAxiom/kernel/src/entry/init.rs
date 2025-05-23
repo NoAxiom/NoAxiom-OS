@@ -93,9 +93,8 @@ pub extern "C" fn _boot_hart_init(_hartid: usize, dtb: usize) -> ! {
     wake_other_hart(get_hartid());
 
     // print hello message
-    println!("[kernel] Hello, NoAxiom!");
     println!("{}", NOAXIOM_BANNER);
-    println!("=============================================\n");
+    println!("\u{1B}[1;34m=============================================\u{1B}[0m\n");
 
     // start task runner
     run_tasks()
