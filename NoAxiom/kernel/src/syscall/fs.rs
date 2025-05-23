@@ -727,13 +727,17 @@ impl Syscall<'_> {
             "[sys_utimensat] dirfd: {}, times: {:#x}, flags: {:?}",
             dirfd, times, flags
         );
-        let fd_table = self.task.fd_table();
         let path_ptr = UserPtr::<u8>::new(path);
         let times_ptr = UserPtr::<TimeSpec>::new(times);
         let inode = if path_ptr.is_null() {
             match dirfd {
                 AT_FDCWD => return Err(Errno::EINVAL),
-                fd => fd_table.get(fd as usize).ok_or(Errno::EBADF)?.inode(),
+                fd => self
+                    .task
+                    .fd_table()
+                    .get(fd as usize)
+                    .ok_or(Errno::EBADF)?
+                    .inode(),
             }
         } else {
             let path = get_path(self.task.clone(), path, dirfd, "sys_utimensat")?;
