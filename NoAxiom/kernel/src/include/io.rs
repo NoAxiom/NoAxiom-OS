@@ -68,15 +68,19 @@ impl FdSet {
     /// corresponding bit of the file descriptor in the array, and set the bit
     /// to 1
     pub fn set(&mut self, fd: usize) {
-        let (idx, bit) = align_offset(fd, core::mem::size_of::<u64>());
-        self.fd_list[idx] |= 1 << bit;
+        let idx = fd / 64;
+        let bit = fd % 64;
+        let mask = 1 << bit;
+        self.fd_list[idx] |= mask;
     }
 
     /// Check if the given file descriptor is in the collection. Calculate the
     /// index and corresponding bit of the file descriptor in the array, and
     /// check if the bit is 1
     pub fn is_set(&self, fd: usize) -> bool {
-        let (idx, bit) = align_offset(fd, core::mem::size_of::<u64>());
-        self.fd_list[idx] & (1 << bit) != 0
+        let idx = fd / 64;
+        let bit = fd % 64;
+        let mask = 1 << bit;
+        self.fd_list[idx] & mask != 0
     }
 }

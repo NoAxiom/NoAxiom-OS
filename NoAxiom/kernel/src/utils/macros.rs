@@ -52,5 +52,13 @@ macro_rules! time_statistic {
         );
         result
     }};
-
+    () => {{
+        let start = crate::time::gettime::get_time_ms();
+        println!(
+            "[time_statistic] Executed at {}:{} - {}ms",
+            file!(),
+            line!(),
+            start
+        );
+    }};
 }

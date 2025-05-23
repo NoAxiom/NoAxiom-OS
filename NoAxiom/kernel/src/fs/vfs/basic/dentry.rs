@@ -99,6 +99,7 @@ pub trait Dentry: Send + Sync + DowncastSync {
                     self.inode().unwrap().file_type()
                 )
             );
+            return;
         }
         *self.meta().inode.lock() = Some(inode);
     }

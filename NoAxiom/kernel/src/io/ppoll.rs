@@ -38,6 +38,7 @@ impl Future for PpollFuture {
             let id = poll_item.id;
             let req = &poll_item.events;
             let res = poll_item.file.poll(req, cx.waker().clone());
+            debug!("[PpollFuture]: poll item {:#x?}", poll_item.file.name());
             if !res.is_empty() {
                 result.push((id, res));
             }
