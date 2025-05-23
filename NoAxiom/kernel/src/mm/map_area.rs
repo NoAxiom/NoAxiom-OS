@@ -1,6 +1,6 @@
 //! map area
 
-use alloc::{collections::btree_map::BTreeMap, sync::Arc};
+use alloc::collections::btree_map::BTreeMap;
 
 use arch::{Arch, ArchMemory, ArchPageTableEntry};
 
@@ -13,7 +13,6 @@ use super::{
 };
 use crate::{
     config::mm::PAGE_SIZE,
-    fs::vfs::basic::file::File,
     mm::address::{PhysPageNum, StepOne},
     syscall::SysResult,
 };
@@ -46,11 +45,6 @@ pub struct MapArea {
 
     /// area type
     pub area_type: MapAreaType,
-
-    /// file to be mapped
-    pub file: Option<Arc<dyn File>>,
-    // /// file offset
-    // pub file_offset: usize,
 }
 
 impl MapArea {
@@ -61,8 +55,6 @@ impl MapArea {
             map_permission: MapPermission::empty(),
             map_type: MapType::Identical,
             area_type: MapAreaType::None,
-            file: None,
-            // file_offset: 0,
         }
     }
 
@@ -73,8 +65,6 @@ impl MapArea {
         map_type: MapType,
         map_permission: MapPermission,
         map_area_type: MapAreaType,
-        file: Option<Arc<dyn File>>,
-        // file_offset: usize,
     ) -> Self {
         Self {
             vpn_range: VpnRange::new_from_va(start_va, end_va),
@@ -82,8 +72,6 @@ impl MapArea {
             map_permission,
             map_type,
             area_type: map_area_type,
-            file,
-            // file_offset,
         }
     }
 
@@ -95,8 +83,6 @@ impl MapArea {
             map_permission: other.map_permission.clone(),
             map_type: other.map_type.clone(),
             area_type: other.area_type.clone(),
-            file: other.file.clone(),
-            // file_offset: other.file_offset,
         }
     }
 
@@ -236,7 +222,7 @@ impl MapArea {
     pub async fn load_data(
         &mut self,
         page_table: &mut PageTable,
-        data_info: MapAreaLoadDataInfo,
+        data_info: MapAreaLoadDataInfo<'_>,
     ) -> SysResult<()> {
         assert_eq!(self.map_type, MapType::Framed);
         let start = data_info.start;
@@ -244,12 +230,12 @@ impl MapArea {
         let mut page_offset = data_info.offset;
         let mut offset: usize = 0;
         let mut current_vpn = self.vpn_range.start();
-        let file = self.file.as_ref().unwrap();
+        let slice = data_info.slice;
 
         loop {
-            let mut buf = vec![0u8; len.min(PAGE_SIZE)];
-            file.read_at((start + offset) as usize, &mut buf).await?;
-            let data_slice = buf.as_slice();
+            let cur_start = start + offset;
+            let cur_end = start + offset + len.min(PAGE_SIZE);
+            let data_slice = &slice[cur_start..cur_end];
 
             let src = &data_slice[0..len.min(PAGE_SIZE - page_offset)];
             let ppn = PhysPageNum::from(page_table.find_pte(current_vpn).unwrap().ppn());

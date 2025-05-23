@@ -36,3 +36,21 @@ macro_rules! map_permission {
         }
     };
 }
+
+#[macro_export]
+macro_rules! time_statistic {
+    ($func_call:expr) => {{
+        let start = crate::time::gettime::get_time_duration();
+        let result = $func_call;
+        let end = crate::time::gettime::get_time_duration();
+        let duration = end - start;
+        println!(
+            "[time_statistic] Executed at {}:{} - Duration: {:?}",
+            file!(),
+            line!(),
+            duration
+        );
+        result
+    }};
+
+}

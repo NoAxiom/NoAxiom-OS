@@ -3,10 +3,7 @@ use alloc::{string::String, sync::Arc, vec::Vec};
 use arch::{Arch, ArchInt, ArchMemory, ArchPageTableEntry, ArchTime, MappingFlags, PageTableEntry};
 use config::mm::{DL_INTERP_OFFSET, SIG_TRAMPOLINE, USER_HEAP_SIZE};
 use include::errno::Errno;
-use ksync::{
-    cell::SyncUnsafeCell,
-    mutex::{check_no_lock, SpinLock},
-};
+use ksync::{cell::SyncUnsafeCell, mutex::SpinLock};
 use spin::Once;
 use xmas_elf::ElfFile;
 
@@ -34,7 +31,7 @@ use crate::{
     pte_flags,
     sched::utils::yield_now,
     syscall::SysResult,
-    task::impl_signal::user_sigreturn,
+    task::impl_signal::user_sigreturn, time_statistic,
 };
 
 #[allow(unused)]
@@ -84,10 +81,11 @@ pub struct ElfMemoryInfo {
 
 /// used in [`MemorySet::push_area`]
 /// when mapping with data
-pub struct MapAreaLoadDataInfo {
+pub struct MapAreaLoadDataInfo<'a> {
     pub start: usize,
     pub len: usize,
     pub offset: usize,
+    pub slice: &'a [u8],
 }
 
 pub struct BrkAreaInfo {
@@ -169,7 +167,7 @@ impl MemorySet {
     pub async fn push_area(
         &mut self,
         mut map_area: MapArea,
-        data_info: Option<MapAreaLoadDataInfo>,
+        data_info: Option<MapAreaLoadDataInfo<'_>>,
     ) -> SysResult<()> {
         trace!(
             "push_area: [{:#X}, {:#X})",
@@ -211,7 +209,6 @@ impl MemorySet {
                                     MapType::Direct,
                                     $permission,
                                     MapAreaType::KernelSpace,
-                                    None,
                                 ),
                                 None,
                             )
@@ -276,25 +273,19 @@ impl MemorySet {
                 false => Errno::ENOEXEC,
             }
         };
-        let mut elf_mini_buf = [0u8; 64];
-        assert!(check_no_lock());
-        elf_file.read_at(0, &mut elf_mini_buf).await?;
-        let mini_elf = ElfFile::new(&elf_mini_buf).map_err(handler)?;
+        let elf_buf = time_statistic!(elf_file.read_all().await?);
+        let elf = ElfFile::new(elf_buf.as_slice()).map_err(handler)?;
 
         // check: magic
-        let magic = mini_elf.header.pt1.magic;
+        let magic = elf.header.pt1.magic;
         if magic != [0x7f, 0x45, 0x4c, 0x46] {
             handler("invalid magic");
         }
 
         // get the real elf header
-        let ph_entry_size = mini_elf.header.pt2.ph_entry_size() as usize;
-        let ph_offset = mini_elf.header.pt2.ph_offset() as usize;
-        let ph_count = mini_elf.header.pt2.ph_count() as usize;
-        let header_buf_len = ph_offset + ph_count * ph_entry_size;
-        let mut elf_buf = vec![0u8; header_buf_len];
-        elf_file.read_at(0, elf_buf.as_mut()).await?;
-        let elf = ElfFile::new(elf_buf.as_slice()).map_err(handler)?;
+        let ph_entry_size = elf.header.pt2.ph_entry_size() as usize;
+        let ph_offset = elf.header.pt2.ph_offset() as usize;
+        let ph_count = elf.header.pt2.ph_count() as usize;
 
         // construct new memory set to hold elf data
         let mut dl_interp = None;
@@ -319,8 +310,6 @@ impl MemorySet {
                         MapType::Framed,
                         permission,
                         MapAreaType::ElfBinary,
-                        Some(Arc::clone(&elf_file)),
-                        // start_va.offset(),
                     );
                     info!(
                         "[map_elf] [{:#x}, {:#x}], permission: {:?}, ph offset {:#x}, file size {:#x}, mem size {:#x}",
@@ -336,6 +325,7 @@ impl MemorySet {
                             start: ph.offset() as usize,
                             len: ph.file_size() as usize,
                             offset: start_va.offset(),
+                            slice: &elf_buf,
                         }),
                     )
                     .await?;
@@ -397,7 +387,6 @@ impl MemorySet {
             MapType::Framed,
             map_permission!(U, R, W),
             MapAreaType::UserStack,
-            None,
         );
         memory_set.stack = map_area;
         info!(
@@ -418,7 +407,6 @@ impl MemorySet {
                 MapType::Framed,
                 map_permission!(U, R, W),
                 MapAreaType::UserHeap,
-                None,
             ),
         };
         info!(
@@ -689,7 +677,6 @@ impl MemorySet {
             MapType::Framed,
             map_permission!(R, W),
             MapAreaType::Shared,
-            None,
         );
         self.shm.shm_areas.push(vma);
     }
