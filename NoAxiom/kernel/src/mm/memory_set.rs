@@ -31,7 +31,7 @@ use crate::{
     pte_flags,
     sched::utils::yield_now,
     syscall::SysResult,
-    task::impl_signal::user_sigreturn, time_statistic,
+    task::impl_signal::user_sigreturn,
 };
 
 #[allow(unused)]
@@ -164,7 +164,7 @@ impl MemorySet {
 
     /// push a map area into current memory set
     /// load data if provided
-    pub async fn push_area(
+    pub fn push_area(
         &mut self,
         mut map_area: MapArea,
         data_info: Option<MapAreaLoadDataInfo<'_>>,
@@ -186,7 +186,7 @@ impl MemorySet {
             pte.raw_flag(),
         );
         if let Some(data_info) = data_info {
-            map_area.load_data(self.page_table(), data_info).await?;
+            map_area.load_data(self.page_table(), data_info)?;
         }
         self.areas.push(map_area); // bind life cycle
         Ok(())
@@ -201,17 +201,15 @@ impl MemorySet {
             macro_rules! kernel_push_area {
                 ($($start:expr, $end:expr, $permission:expr)*) => {
                     $(
-                        crate::sched::utils::block_on(
-                            memory_set.push_area(
-                                MapArea::new(
-                                    ($start as usize).into(),
-                                    ($end as usize).into(),
-                                    MapType::Direct,
-                                    $permission,
-                                    MapAreaType::KernelSpace,
-                                ),
-                                None,
-                            )
+                        memory_set.push_area(
+                            MapArea::new(
+                                ($start as usize).into(),
+                                ($end as usize).into(),
+                                MapType::Direct,
+                                $permission,
+                                MapAreaType::KernelSpace,
+                            ),
+                            None,
                         ).expect("[init_kernel_space] push area error");
                     )*
                 };
@@ -273,7 +271,7 @@ impl MemorySet {
                 false => Errno::ENOEXEC,
             }
         };
-        let elf_buf = time_statistic!(elf_file.read_all().await?);
+        let elf_buf = elf_file.read_all().await?;
         let elf = ElfFile::new(elf_buf.as_slice()).map_err(handler)?;
 
         // check: magic
@@ -327,8 +325,7 @@ impl MemorySet {
                             offset: start_va.offset(),
                             slice: &elf_buf,
                         }),
-                    )
-                    .await?;
+                    )?;
                 }
                 Interp => {
                     // iozone: /glibc/lib/ld-linux-riscv64-lp64d.so.1

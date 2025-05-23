@@ -219,7 +219,7 @@ impl MapArea {
     // }
 
     /// load data from byte slice
-    pub async fn load_data(
+    pub fn load_data(
         &mut self,
         page_table: &mut PageTable,
         data_info: MapAreaLoadDataInfo<'_>,
