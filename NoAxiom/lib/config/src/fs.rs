@@ -30,6 +30,6 @@ pub const ROOT_FAKE_ENTRY: [u8; 32] = {
     entry
 };
 
-pub const PIPE_BUF_SIZE: usize = 4096;
+pub const PIPE_BUF_SIZE: usize = 5 * PAGE_SIZE;
 
 use crate::mm::PAGE_SIZE;

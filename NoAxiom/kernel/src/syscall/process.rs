@@ -133,7 +133,7 @@ impl Syscall<'_> {
         args.append(&mut UserPtr::<UserPtr<u8>>::new(argv).get_string_vec().await?);
         envs.append(&mut UserPtr::<UserPtr<u8>>::new(envp).get_string_vec().await?);
 
-        println!(
+        info!(
             "[sys_exec] path: {:?}, argv: {:#x}, envp: {:#x}, arg: {:?}, env: {:?}",
             file_path, argv, envp, args, envs,
         );

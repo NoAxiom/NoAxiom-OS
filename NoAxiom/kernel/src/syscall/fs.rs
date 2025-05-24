@@ -17,6 +17,7 @@ use crate::{
         time::TimeSpec,
     },
     mm::user_ptr::UserPtr,
+    sched::utils::intable,
     task::Task,
     time::gettime::get_time_duration,
     utils::get_string_from_ptr,
@@ -179,8 +180,6 @@ impl Syscall<'_> {
         // let file_name = file.dentry().path()?;
         // info!("[sys_read] file_name: {:?}", file_name);
 
-        // todo: INTERRUPT_BY_SIGNAL FUTURE
-
         let user_ptr = UserPtr::<u8>::new(buf);
         let buf_slice = user_ptr.as_slice_mut_checked(len).await?;
 
@@ -188,7 +187,7 @@ impl Syscall<'_> {
             return Err(Errno::EINVAL);
         }
 
-        file.read(buf_slice).await
+        intable(self.task, file.read(buf_slice)).await?
     }
 
     /// Read the file associated with the file descriptor fd to iovcnt buffers
@@ -258,7 +257,7 @@ impl Syscall<'_> {
             return Err(Errno::EINVAL);
         }
 
-        file.write(buf_slice).await
+        intable(self.task, file.write(buf_slice)).await?
     }
 
     /// Write iovcnt buffers of data described by iov to the file associated

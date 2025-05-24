@@ -125,24 +125,30 @@ impl PipeBuffer {
     }
     fn notify_read_waker(&mut self) {
         let mut read_available = self.read_available_len();
+        if read_available == 0 {
+            return;
+        }
         while let Some((len, waker)) = self.read_wakers.pop() {
             if read_available >= len {
                 read_available -= len;
                 waker.wake();
             } else {
-                self.read_wakers.push((len, waker));
+                waker.wake();
                 break;
             }
         }
     }
     fn notify_write_waker(&mut self) {
         let mut write_available = self.write_available_len();
+        if write_available == 0 {
+            return;
+        }
         while let Some((len, waker)) = self.write_wakers.pop() {
             if write_available >= len {
                 write_available -= len;
                 waker.wake();
-            } else {
-                self.write_wakers.push((len, waker));
+            } else if write_available > 0 {
+                waker.wake();
                 break;
             }
         }

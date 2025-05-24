@@ -15,18 +15,10 @@ use crate::{
         time::TimeSpec,
     },
     syscall::SysResult,
+    utils::global_alloc,
 };
 
 type Mutex<T> = SpinLock<T>;
-
-lazy_static::lazy_static! {
-    static ref INODE_ID: Mutex<usize> = Mutex::new(0);
-}
-fn alloc_id() -> usize {
-    let mut id = INODE_ID.lock();
-    *id += 1;
-    *id
-}
 
 pub enum InodeState {
     UnInit,
@@ -63,7 +55,7 @@ impl InodeMeta {
             None
         };
         Self {
-            id: alloc_id(),
+            id: global_alloc() as usize,
             inner: Mutex::new(InodeMetaInner {
                 nlink: 1,
                 size,
