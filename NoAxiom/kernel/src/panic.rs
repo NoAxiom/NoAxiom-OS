@@ -2,7 +2,7 @@
 
 use core::panic::PanicInfo;
 
-use arch::{Arch, ArchInfo};
+use arch::{Arch, ArchInfo, ArchTrap};
 
 use crate::{
     cpu::{current_cpu, get_hartid},
@@ -17,13 +17,14 @@ lazy_static::lazy_static! {
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
     println!(
-        "[PANIC] HART{}, TID{}, PANIC at {}ms",
+        "[PANIC] HART{}, TID{}, PANIC at {}ms, epc={:#x}",
         get_hartid(),
         current_cpu()
             .task
             .as_ref()
             .map_or_else(|| 0, |task| task.tid()),
         get_time_ms(),
+        Arch::read_epc(),
     );
     println!("[PANIC] during syscall {:?}", current_syscall());
     if let Some(task) = current_cpu().task.as_ref() {

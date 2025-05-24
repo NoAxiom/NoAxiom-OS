@@ -1,17 +1,9 @@
 use async_task::{Runnable, ScheduleInfo};
 
-#[derive(Clone, Copy, Debug)]
-pub enum ScheduleOrder {
-    NormalFirst,
-    UrgentFirst,
-}
-
 pub trait Scheduler<R> {
     fn new() -> Self;
-    fn push_with_info(&mut self, runnable: Runnable<R>, info: ScheduleInfo);
-    fn push_normal(&mut self, runnable: Runnable<R>);
-    fn push_urgent(&mut self, runnable: Runnable<R>);
-    fn pop(&mut self, order: ScheduleOrder) -> Option<Runnable<R>>;
+    fn push(&mut self, runnable: Runnable<R>, info: ScheduleInfo);
+    fn pop(&mut self) -> Option<Runnable<R>>;
 }
 
 pub trait Runtime<T, R>

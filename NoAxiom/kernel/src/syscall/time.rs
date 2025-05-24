@@ -8,6 +8,7 @@ use crate::{
     include::time::{ITimerType, ITimerVal, TimeSpec, TimeVal, ITIMER_COUNT, TMS},
     mm::user_ptr::UserPtr,
     return_errno,
+    sched::utils::realtime,
     time::{
         clock::{ClockId, CLOCK_MANAGER},
         gettime::{get_time_duration, get_time_ms, get_timeval},
@@ -39,7 +40,7 @@ impl Syscall<'_> {
             return Err(Errno::EINVAL);
         }
         let time_spec = ts.read().await?;
-        let remain_time = sleep_now(time_spec.into()).await;
+        let remain_time = realtime(self.task, sleep_now(time_spec.into())).await;
         if !remain.is_null() {
             if remain_time > Duration::ZERO {
                 remain.write(remain_time.into()).await?;
@@ -108,15 +109,18 @@ impl Syscall<'_> {
         let remain = UserPtr::<TimeSpec>::new(remain);
         let request = Duration::from(request.read().await?);
         let current = get_time_duration();
-        let remain_time = if flags == TIMER_ABSTIME {
-            if request < current {
-                Duration::ZERO
+        let remain_time = realtime(self.task, async move {
+            if flags == TIMER_ABSTIME {
+                if request < current {
+                    Duration::ZERO
+                } else {
+                    sleep_now(request - current).await
+                }
             } else {
-                sleep_now(request - current).await
+                sleep_now(request).await
             }
-        } else {
-            sleep_now(request).await
-        };
+        })
+        .await;
         if !remain.is_null() {
             remain.write(remain_time.into()).await?;
         }

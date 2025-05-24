@@ -1,13 +1,22 @@
 use crate::{include::sched::CpuMask, time::time_info::TimeInfo};
 
+#[derive(Debug, Clone, Copy)]
+pub enum SchedPrio {
+    RealTime(usize),
+    Normal,
+    IdlePrio,
+}
+
 pub struct SchedEntity {
-    pub time_stat: TimeInfo, // task time
-    pub cpu_mask: CpuMask,   // cpu mask
+    pub sched_prio: SchedPrio, // scheduling priority
+    pub time_stat: TimeInfo,   // task time
+    pub cpu_mask: CpuMask,     // cpu mask
 }
 
 impl Default for SchedEntity {
     fn default() -> Self {
         Self {
+            sched_prio: SchedPrio::Normal,
             time_stat: TimeInfo::default(),
             cpu_mask: CpuMask::new(),
         }
@@ -21,11 +30,12 @@ impl SchedEntityWrapper {
     pub fn from_ptr(ptr: *mut SchedEntity) -> Self {
         Self(ptr)
     }
-    pub fn sched_entity(&self) -> &SchedEntity {
-        unsafe { &*self.0 }
-    }
-    pub fn sched_entity_mut(&mut self) -> &mut SchedEntity {
-        unsafe { &mut *self.0 }
+    pub fn sched_entity(&self) -> Option<&SchedEntity> {
+        if self.0.is_null() {
+            None
+        } else {
+            unsafe { Some(&*self.0) }
+        }
     }
 }
 

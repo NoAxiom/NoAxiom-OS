@@ -8,8 +8,8 @@ use async_task::Runnable;
 use ksync::{cell::SyncUnsafeCell, mutex::SpinLock};
 
 use super::{
-    sched_entity::SchedEntityWrapper,
-    vsched::{Runtime, ScheduleOrder, Scheduler},
+    sched_entity::{SchedEntityWrapper, SchedPrio},
+    vsched::{Runtime, Scheduler},
 };
 
 type Info = SchedEntityWrapper;
@@ -20,6 +20,15 @@ pub struct SimpleScheduler {
     normal: VecDeque<Runnable<Info>>,
 }
 
+impl SimpleScheduler {
+    fn push_normal(&mut self, runnable: Runnable<Info>) {
+        self.normal.push_back(runnable);
+    }
+    fn push_urgent(&mut self, runnable: Runnable<Info>) {
+        self.urgent.push_back(runnable);
+    }
+}
+
 impl Scheduler<Info> for SimpleScheduler {
     fn new() -> Self {
         Self {
@@ -27,19 +36,13 @@ impl Scheduler<Info> for SimpleScheduler {
             normal: VecDeque::new(),
         }
     }
-    fn push_with_info(&mut self, runnable: Runnable<Info>, info: async_task::ScheduleInfo) {
+    fn push(&mut self, runnable: Runnable<Info>, info: async_task::ScheduleInfo) {
         match info.woken_while_running {
             true => self.push_normal(runnable),
             false => self.push_urgent(runnable),
         }
     }
-    fn push_normal(&mut self, runnable: Runnable<Info>) {
-        self.normal.push_back(runnable);
-    }
-    fn push_urgent(&mut self, runnable: Runnable<Info>) {
-        self.urgent.push_back(runnable);
-    }
-    fn pop(&mut self, _: ScheduleOrder) -> Option<Runnable<Info>> {
+    fn pop(&mut self) -> Option<Runnable<Info>> {
         if let Some(runnable) = self.urgent.pop_front() {
             return Some(runnable);
         }
@@ -60,59 +63,108 @@ impl Scheduler<Info> for FifoScheduler {
             queue: VecDeque::new(),
         }
     }
-    fn push_with_info(&mut self, runnable: Runnable<Info>, _: async_task::ScheduleInfo) {
-        self.push_normal(runnable);
-    }
-    fn push_normal(&mut self, runnable: Runnable<Info>) {
+    fn push(&mut self, runnable: Runnable<Info>, _: async_task::ScheduleInfo) {
         self.queue.push_back(runnable);
     }
-    fn push_urgent(&mut self, runnable: Runnable<Info>) {
-        self.queue.push_front(runnable);
-    }
-    fn pop(&mut self, _: ScheduleOrder) -> Option<Runnable<Info>> {
+    fn pop(&mut self) -> Option<Runnable<Info>> {
         self.queue.pop_front()
     }
 }
 
-type MultiSchedulerInnerImpl = SimpleScheduler;
-pub struct MultiScheduler {
+pub struct MultiLevelScheduler {
+    realtime: FifoScheduler,
+    normal: ExpiredScheduler,
+    idle: ExpiredScheduler,
+}
+
+impl Scheduler<Info> for MultiLevelScheduler {
+    fn new() -> Self {
+        Self {
+            realtime: FifoScheduler::new(),
+            normal: ExpiredScheduler::new(),
+            idle: ExpiredScheduler::new(),
+        }
+    }
+    fn push(&mut self, runnable: Runnable<Info>, info: async_task::ScheduleInfo) {
+        let entity = runnable.metadata().sched_entity();
+        if let Some(entity) = entity {
+            match entity.sched_prio {
+                SchedPrio::RealTime(_) => {
+                    // println!(
+                    //     "push realtime runnable, time_stat = {:?}, realtime size = {}",
+                    //     runnable
+                    //         .metadata()
+                    //         .sched_entity()
+                    //         .unwrap()
+                    //         .time_stat
+                    //         .stime(),
+                    //     self.realtime.queue.len(),
+                    // );
+                    self.realtime.push(runnable, info)
+                }
+                SchedPrio::Normal => self.normal.push(runnable, info),
+                SchedPrio::IdlePrio => self.idle.push(runnable, info),
+            }
+        } else {
+            self.normal.push(runnable, info);
+        }
+    }
+    fn pop(&mut self) -> Option<Runnable<Info>> {
+        if let Some(runnable) = self.realtime.pop() {
+            // println!(
+            //     "pop realtime runnable, time_stat = {:?}, realtime size = {}",
+            //     runnable
+            //         .metadata()
+            //         .sched_entity()
+            //         .unwrap()
+            //         .time_stat
+            //         .stime(),
+            //     self.realtime.queue.len(),
+            // );
+            return Some(runnable);
+        }
+        if let Some(runnable) = self.normal.pop() {
+            return Some(runnable);
+        }
+        self.idle.pop()
+    }
+}
+
+type MultiSchedulerInnerImpl = FifoScheduler;
+pub struct ExpiredScheduler {
     current: SyncUnsafeCell<MultiSchedulerInnerImpl>,
     expire: SyncUnsafeCell<MultiSchedulerInnerImpl>,
 }
 
-impl MultiScheduler {
+impl ExpiredScheduler {
     fn switch_expire(&mut self) {
         core::mem::swap(&mut self.current, &mut self.expire);
     }
 }
 
-impl Scheduler<Info> for MultiScheduler {
+impl Scheduler<Info> for ExpiredScheduler {
     fn new() -> Self {
         Self {
             current: SyncUnsafeCell::new(MultiSchedulerInnerImpl::new()),
             expire: SyncUnsafeCell::new(MultiSchedulerInnerImpl::new()),
         }
     }
-    fn push_with_info(&mut self, runnable: Runnable<Info>, info: async_task::ScheduleInfo) {
-        self.expire.as_ref_mut().push_with_info(runnable, info);
+    fn push(&mut self, runnable: Runnable<Info>, info: async_task::ScheduleInfo) {
+        self.expire.as_ref_mut().push(runnable, info);
     }
-    fn push_normal(&mut self, runnable: Runnable<Info>) {
-        self.expire.as_ref_mut().push_normal(runnable);
-    }
-    fn push_urgent(&mut self, runnable: Runnable<Info>) {
-        self.expire.as_ref_mut().push_urgent(runnable);
-    }
-    fn pop(&mut self, order: ScheduleOrder) -> Option<Runnable<Info>> {
+    fn pop(&mut self) -> Option<Runnable<Info>> {
         let current = self.current.as_ref_mut();
-        let res = current.pop(order);
+        let res = current.pop();
         if let None = res.as_ref() {
             self.switch_expire();
+            self.current.as_ref_mut().pop()
+        } else {
+            res
         }
-        res
     }
 }
 
-type SchedulerImpl = MultiScheduler;
+type SchedulerImpl = MultiLevelScheduler;
 pub struct SimpleRuntime {
     scheduler: SpinLock<SchedulerImpl>,
 }
@@ -124,12 +176,12 @@ impl Runtime<SchedulerImpl, Info> for SimpleRuntime {
         }
     }
     fn run(&self) {
-        let runnable = self.scheduler.lock().pop(ScheduleOrder::UrgentFirst);
+        let runnable = self.scheduler.lock().pop();
         if let Some(runnable) = runnable {
             runnable.run();
         }
     }
     fn schedule(&self, runnable: Runnable<Info>, info: async_task::ScheduleInfo) {
-        self.scheduler.lock().push_with_info(runnable, info);
+        self.scheduler.lock().push(runnable, info);
     }
 }

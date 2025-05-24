@@ -38,7 +38,7 @@ use crate::{
         memory_set::{ElfMemoryInfo, MemorySet},
         user_ptr::UserPtr,
     },
-    sched::sched_entity::SchedEntity,
+    sched::sched_entity::{SchedEntity, SchedPrio},
     signal::{
         sig_action::SigActionList,
         sig_pending::SigPending,
@@ -360,6 +360,19 @@ impl Task {
     }
     pub fn time_stat_mut(&self) -> &mut TimeInfo {
         &mut self.sched_entity.as_ref_mut().time_stat
+    }
+
+    /// set prio: normal
+    pub fn set_sched_prio_normal(&self) {
+        self.sched_entity.as_ref_mut().sched_prio = SchedPrio::Normal;
+    }
+    /// set prio: realtime
+    pub fn set_sched_prio_realtime(&self, prio: usize) {
+        self.sched_entity.as_ref_mut().sched_prio = SchedPrio::RealTime(prio);
+    }
+    /// set prio: idle
+    pub fn set_sched_prio_idle(&self) {
+        self.sched_entity.as_ref_mut().sched_prio = SchedPrio::IdlePrio;
     }
 
     /// cpu mask
