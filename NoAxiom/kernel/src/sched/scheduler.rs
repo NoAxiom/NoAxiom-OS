@@ -5,14 +5,14 @@
 use alloc::collections::vec_deque::VecDeque;
 
 use async_task::Runnable;
-use ksync::{cell::SyncUnsafeCell, mutex::SpinLock};
+use ksync::cell::SyncUnsafeCell;
 
 use super::{
     sched_entity::{SchedEntityWrapper, SchedPrio},
-    vsched::{Runtime, Scheduler},
+    vsched::Scheduler,
 };
 
-type Info = SchedEntityWrapper;
+pub(super) type Info = SchedEntityWrapper;
 
 #[repr(align(64))]
 pub struct SimpleScheduler {
@@ -161,27 +161,5 @@ impl Scheduler<Info> for ExpiredScheduler {
         } else {
             res
         }
-    }
-}
-
-type SchedulerImpl = MultiLevelScheduler;
-pub struct SimpleRuntime {
-    scheduler: SpinLock<SchedulerImpl>,
-}
-
-impl Runtime<SchedulerImpl, Info> for SimpleRuntime {
-    fn new() -> Self {
-        Self {
-            scheduler: SpinLock::new(SchedulerImpl::new()),
-        }
-    }
-    fn run(&self) {
-        let runnable = self.scheduler.lock().pop();
-        if let Some(runnable) = runnable {
-            runnable.run();
-        }
-    }
-    fn schedule(&self, runnable: Runnable<Info>, info: async_task::ScheduleInfo) {
-        self.scheduler.lock().push(runnable, info);
     }
 }
