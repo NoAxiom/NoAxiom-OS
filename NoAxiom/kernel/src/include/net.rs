@@ -8,6 +8,7 @@ use crate::syscall::SysResult;
 bitflags! {
     /// @brief 用于指定socket的关闭类型
     /// 参考：https://code.dragonos.org.cn/xref/linux-6.1.9/include/net/sock.h?fi=SHUTDOWN_MASK#1573
+    #[derive(Clone)]
     pub struct ShutdownType: u8 {
         //RCV_SHUTDOWN（值为1）：表示接收方向的关闭。当设置此标志时，表示socket不再接收数据。
         const RCV_SHUTDOWN = 1;
@@ -482,4 +483,33 @@ pub enum PosixTcpSocketOptions {
     INQ = 36,
     /// delay outgoing packets by XX usec
     TxDelay = 37,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[allow(non_camel_case_types)]
+/// used in `sys_setsockopt` and `sys_getsockopt`
+pub enum SocketLevel {
+    /// Dummy protocol for TCP
+    IPPROTO_IP = 0,
+    SOL_SOCKET = 1,
+    IPPROTO_TCP = 6,
+    /// IPv6-in-IPv4 tunnelling
+    IPPROTO_IPV6 = 41,
+}
+
+impl TryFrom<usize> for SocketLevel {
+    type Error = Errno;
+
+    fn try_from(value: usize) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Self::IPPROTO_IP),
+            1 => Ok(Self::SOL_SOCKET),
+            6 => Ok(Self::IPPROTO_TCP),
+            41 => Ok(Self::IPPROTO_IPV6),
+            level => {
+                log::warn!("[SocketLevel] unsupported level: {level}");
+                Err(Self::Error::EINVAL)
+            }
+        }
+    }
 }

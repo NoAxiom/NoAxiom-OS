@@ -77,8 +77,8 @@ impl<'a> Syscall<'a> {
             // SYS_SENDTO =>       todo!(),
             // SYS_RECVFROM =>     todo!(),
             // SYS_SHUTDOWN =>     todo!(),
-            // SYS_GETSOCKNAME =>  todo!(),
-            // SYS_GETPEERNAME =>  todo!(),
+            SYS_GETSOCKNAME =>  self.sys_getsockname(args[0], args[1], args[2]).await,
+            SYS_GETPEERNAME =>  self.sys_getpeername(args[0], args[1], args[2]).await,
             SYS_SETSOCKOPT =>   self.sys_setsockopt(args[0], args[1], args[2], args[3], args[4]).await,
             SYS_GETSOCKOPT =>   self.sys_getsockopt(args[0], args[1], args[2], args[3], args[4]).await,
 

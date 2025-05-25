@@ -28,7 +28,7 @@ use crate::{
     net::socket::Socket,
     sched::utils::block_on,
     syscall::{SysResult, SyscallResult},
-    utils::random,
+    utils::global_alloc,
 };
 
 pub enum Sock {
@@ -79,6 +79,18 @@ impl Sock {
         match self {
             Sock::Tcp(socket) => socket.meta(),
             Sock::Udp(socket) => socket.meta(),
+        }
+    }
+    pub fn local_endpoint(&self) -> Option<IpEndpoint> {
+        match self {
+            Sock::Tcp(socket) => socket.local_endpoint(),
+            Sock::Udp(socket) => socket.local_endpoint(),
+        }
+    }
+    pub fn peer_endpoint(&self) -> Option<IpEndpoint> {
+        match self {
+            Sock::Tcp(socket) => socket.peer_endpoint(),
+            Sock::Udp(socket) => socket.peer_endpoint(),
         }
     }
 }
@@ -144,7 +156,7 @@ impl SocketFile {
             AddressFamily::AF_UNIX => todo!("Unsupported address family AF_UNIX"),
         };
 
-        let dentry = SocketDentry::new(&format!("socket-{}", random()));
+        let dentry = SocketDentry::new(&format!("socket-{}", global_alloc()));
         let empty_inode = EmptyInode::new();
         let meta = FileMeta::new(dentry, Arc::new(empty_inode));
         meta.set_flags(FileFlags::O_RDWR);
@@ -157,9 +169,9 @@ impl SocketFile {
     }
 
     pub fn new_from_socket(socket: Arc<SocketFile>, sock: Sock) -> Self {
-        let empty_dentry = EmptyDentry::new(&format!("socket-{}", random()));
+        let dentry = SocketDentry::new(&format!("socket-{}", global_alloc()));
         let empty_inode = EmptyInode::new();
-        let meta = FileMeta::new(Arc::new(empty_dentry), Arc::new(empty_inode));
+        let meta = FileMeta::new(dentry, Arc::new(empty_inode));
         meta.set_flags(FileFlags::O_RDWR);
 
         Self {
@@ -233,7 +245,7 @@ impl File for SocketFile {
         poll_ifaces();
         let poll_res = match &mut *sock {
             Sock::Tcp(socket) => socket.poll(req, waker),
-            Sock::Udp(socket) => socket.poll(),
+            Sock::Udp(socket) => socket.poll(req, waker),
         };
 
         let mut res = PollEvent::empty();

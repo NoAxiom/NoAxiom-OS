@@ -78,7 +78,7 @@ impl NetWorkDev for LoopBackDev {
         let device = device_guard.deref_mut();
         let res = iface.poll(Instant::from_millis(get_time_ms() as i64), device, sockets);
         if res {
-            log::info!("[LoopBackDev::poll] polled {res}");
+            // log::info!("[LoopBackDev::poll] polled {res}");
             Ok(())
         } else {
             Err(Errno::EAGAIN)

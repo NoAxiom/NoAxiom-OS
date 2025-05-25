@@ -100,7 +100,11 @@ pub trait Socket: Send + Sync + DowncastSync {
     /// Get the socket's metadata
     fn meta(&self) -> &SocketMeta;
 
-    fn end_point(&self) -> Option<IpEndpoint>;
+    /// It is used to get the local endpoint of the socket.
+    fn local_endpoint(&self) -> Option<IpEndpoint>;
+
+    /// It is used to get the remote endpoint of the socket.
+    fn peer_endpoint(&self) -> Option<IpEndpoint>;
 
     fn setsockopt(&self, _level: usize, _optname: usize, _optval: &[u8]) -> SysResult<()> {
         // warn!("setsockopt is not implemented");

@@ -1,4 +1,5 @@
 use alloc::{boxed::Box, vec};
+use core::task::Waker;
 
 use async_trait::async_trait;
 use smoltcp::{
@@ -20,6 +21,7 @@ use crate::{
         net::{ShutdownType, SocketOptions, SocketType},
         result::Errno,
     },
+    net::handle::HandleItem,
     sched::utils::yield_now,
     syscall::SysResult,
 };
@@ -43,6 +45,11 @@ impl UdpSocket {
             options,
         );
         debug!("[Udp] new socket: {:?}", new_socket_handle);
+
+        let mut handle_map_guard = HANDLE_MAP.write();
+        let item = HandleItem::new();
+        handle_map_guard.insert(new_socket_handle, item);
+
         Self {
             handle: new_socket_handle,
             remote_endpoint: None,
@@ -62,15 +69,35 @@ impl UdpSocket {
         udp::Socket::new(rx_buffer, tx_buffer)
     }
 
-    pub fn poll(&self) -> PollEvent {
-        let sockets = SOCKET_SET.lock();
-        let socket = sockets.get::<udp::Socket>(self.handle);
-        let handle_map_guard = HANDLE_MAP.read();
-        let shutdown_type = handle_map_guard
-            .get(&self.handle)
-            .unwrap()
-            .get_shutdown_type();
-        return SocketPollMethod::udp_poll(socket, shutdown_type);
+    pub fn poll(&self, req: &PollEvent, waker: Waker) -> PollEvent {
+        poll_ifaces();
+        let mut res = PollEvent::empty();
+        let mut sockets = SOCKET_SET.lock();
+        let socket = sockets.get_mut::<udp::Socket>(self.handle);
+
+        if req.contains(PollEvent::POLLIN) {
+            debug!("[Udp {}] poll: req has POLLIN", self.handle);
+            if socket.can_recv() {
+                debug!("[Udp {}] poll: POLLIN is ready 1", self.handle);
+                res |= PollEvent::POLLIN | PollEvent::POLLRDNORM;
+            } else {
+                debug!("[Udp {}] poll: register recv_waker", self.handle);
+                socket.register_recv_waker(&waker);
+            }
+        }
+
+        if req.contains(PollEvent::POLLOUT) {
+            debug!("[Udp {}] poll: req has POLLOUT", self.handle);
+            if socket.can_send() {
+                debug!("[Udp {}] poll: POLLOUT is ready", self.handle);
+                res |= PollEvent::POLLOUT | PollEvent::POLLWRNORM;
+            } else {
+                debug!("[Udp {}] poll: register send_waker", self.handle);
+                socket.register_send_waker(&waker);
+            }
+        }
+
+        res
     }
 }
 
@@ -147,16 +174,17 @@ impl Socket for UdpSocket {
     }
 
     fn bind(&mut self, local: IpEndpoint) -> SysResult<()> {
-        debug!("[Udp] bind: {:?}", local);
+        debug!("[Udp {}] bind to: {:?}", self.handle, local);
         let mut port_manager = UDP_PORT_MANAGER.lock();
-        port_manager.bind_port(local.port)?;
+        let port = port_manager.bind_port(local.port)?;
         drop(port_manager);
 
         let mut sockets = SOCKET_SET.lock();
         let socket = sockets.get_mut::<udp::Socket>(self.handle);
 
         if local.addr.is_unspecified() {
-            socket.bind(local.port)
+            debug!("[Udp {}] is_unspecified! bind: port {}", self.handle, port);
+            socket.bind(port)
         } else {
             socket.bind(local)
         }
@@ -196,7 +224,7 @@ impl Socket for UdpSocket {
         Err(Errno::ENOSYS)
     }
 
-    fn end_point(&self) -> Option<IpEndpoint> {
+    fn local_endpoint(&self) -> Option<IpEndpoint> {
         let sockets = SOCKET_SET.lock();
         let socket = sockets.get::<udp::Socket>(self.handle);
         let listen_endpoint = socket.endpoint();
@@ -213,6 +241,10 @@ impl Socket for UdpSocket {
             );
             return Some(endpoint);
         }
+    }
+
+    fn peer_endpoint(&self) -> Option<IpEndpoint> {
+        self.remote_endpoint.clone()
     }
 
     fn meta(&self) -> &SocketMeta {

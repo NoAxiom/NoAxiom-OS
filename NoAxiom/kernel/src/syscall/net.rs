@@ -3,12 +3,11 @@ use alloc::sync::Arc;
 
 use super::SyscallResult;
 use crate::{
-    constant::net::SOL_SOCKET,
     fs::pipe::PipeFile,
     include::{
         net::{
-            AddressFamily, PosixIpProtocol, PosixSocketOption, PosixSocketType,
-            PosixTcpSocketOptions, SockAddr,
+            AddressFamily, PosixSocketOption, PosixSocketType, PosixTcpSocketOptions, SockAddr,
+            SocketLevel,
         },
         result::Errno,
     },
@@ -43,10 +42,9 @@ impl Syscall<'_> {
         Ok(socket_fd as isize)
     }
 
-    pub async fn sys_bind(&self, sockfd: usize, addr: usize, _addr_len: usize) -> SyscallResult {
+    pub async fn sys_bind(&self, sockfd: usize, addr: usize, addr_len: usize) -> SyscallResult {
         info!("[sys_bind] sockfd: {}, addr: {}", sockfd, addr);
-        let user_ptr = UserPtr::<SockAddr>::new(addr);
-        let sock_addr = user_ptr.read().await?;
+        let sock_addr = SockAddr::new(addr, addr_len)?;
 
         let fd_table = self.task.fd_table();
         let socket_file = fd_table
@@ -91,6 +89,7 @@ impl Syscall<'_> {
     }
 
     pub async fn sys_accept(&self, sockfd: usize, addr: usize, _addrlen: usize) -> SyscallResult {
+        info!("[sys_accept] sockfd: {}, addr: {}", sockfd, addr);
         let fd_table = self.task.fd_table();
         let socket_file = fd_table
             .get_socketfile(sockfd as usize)
@@ -102,6 +101,7 @@ impl Syscall<'_> {
 
         let sockaddr = SockAddr::from_endpoint(endpoint);
         let user_ptr = UserPtr::<SockAddr>::new(addr);
+        debug!("[sys_accept] succeed endpoint: {:?}", endpoint);
         user_ptr.write(sockaddr).await?;
 
         let new_socket_file =
@@ -111,6 +111,56 @@ impl Syscall<'_> {
         fd_table.set(new_fd as usize, Arc::new(new_socket_file));
 
         Ok(new_fd as isize)
+    }
+
+    pub async fn sys_getsockname(
+        &self,
+        sockfd: usize,
+        addr: usize,
+        _addrlen: usize,
+    ) -> SyscallResult {
+        info!("[sys_getsockname] sockfd: {}, addr: {}", sockfd, addr);
+        let fd_table = self.task.fd_table();
+        let socket_file = fd_table
+            .get_socketfile(sockfd as usize)
+            .ok_or(Errno::EBADF)?;
+        drop(fd_table);
+
+        let socket = socket_file.socket().await;
+        let local_endpoint = socket.local_endpoint().ok_or(Errno::EINVAL)?;
+        drop(socket);
+
+        let sockaddr = SockAddr::from_endpoint(local_endpoint);
+        let user_ptr = UserPtr::<SockAddr>::new(addr);
+        debug!("[sys_getsockname] local endpoint: {:?}", local_endpoint);
+        user_ptr.write(sockaddr).await?;
+
+        Ok(0)
+    }
+
+    pub async fn sys_getpeername(
+        &self,
+        sockfd: usize,
+        addr: usize,
+        _addrlen: usize,
+    ) -> SyscallResult {
+        info!("[sys_getpeername] sockfd: {}, addr: {}", sockfd, addr);
+        let fd_table = self.task.fd_table();
+        let socket_file = fd_table
+            .get_socketfile(sockfd as usize)
+            .ok_or(Errno::EBADF)?;
+        drop(fd_table);
+
+        let socket = socket_file.socket().await;
+        let remote_endpoint = socket.peer_endpoint().ok_or(Errno::EINVAL)?;
+        drop(socket);
+
+        let sockaddr = SockAddr::from_endpoint(remote_endpoint);
+        let user_ptr = UserPtr::<SockAddr>::new(addr);
+        debug!("[sys_getpeername] remote endpoint: {:?}", remote_endpoint);
+        user_ptr.write(sockaddr).await?;
+
+        Ok(0)
     }
 
     /// configure socket options
@@ -155,57 +205,76 @@ impl Syscall<'_> {
             sockfd, level, optname, optval_ptr, optlen
         );
 
-        let optval = UserPtr::<u32>::new(optval_ptr);
-        let optval = optval.get_ref_mut().await?.ok_or(Errno::EFAULT)?;
-        let optlen = UserPtr::<u32>::new(optlen);
-        let optlen = optlen.get_ref_mut().await?.ok_or(Errno::EFAULT)?;
+        let optvalptr = UserPtr::<u32>::new(optval_ptr);
+        let optval = optvalptr.get_ref_mut().await?.ok_or(Errno::EFAULT)?;
+        let optlenptr = UserPtr::<u32>::new(optlen);
+        let optlen = optlenptr.get_ref_mut().await?.ok_or(Errno::EFAULT)?;
 
-        let fd_table = self.task.fd_table();
-        let socket_file = fd_table
-            .get_socketfile(sockfd as usize)
-            .ok_or(Errno::EBADF)?;
-        drop(fd_table);
-
-        let socket = socket_file.socket().await;
-
-        if level as u8 == SOL_SOCKET {
-            let optname = PosixSocketOption::from_repr(optname as i32).ok_or(Errno::ENOPROTOOPT)?;
-            match optname {
-                PosixSocketOption::SO_SNDBUF => {
-                    *optval = socket.meta().tx_buf_size as u32;
-                    *optlen = core::mem::size_of::<u32>() as u32;
-                    return Ok(0);
-                }
-                PosixSocketOption::SO_RCVBUF => {
-                    *optval = socket.meta().rx_buf_size as u32;
-                    *optlen = core::mem::size_of::<u32>() as u32;
-                    return Ok(0);
-                }
-                _ => {
-                    return Err(Errno::ENOPROTOOPT);
-                }
-            }
-        }
-        drop(socket);
-
-        // To manipulate options at any other level the
-        // protocol number of the appropriate protocol controlling the
-        // option is supplied.  For example, to indicate that an option is
-        // to be interpreted by the TCP protocol, level should be set to the
-        // protocol number of TCP.
-
-        let posix_protocol = PosixIpProtocol::from_repr(level as u16).ok_or(Errno::ENOPROTOOPT)?;
-        if posix_protocol == PosixIpProtocol::TCP {
-            let optname =
-                PosixTcpSocketOptions::from_repr(optname as i32).ok_or(Errno::ENOPROTOOPT)?;
-            match optname {
-                PosixTcpSocketOptions::Congestion => return Ok(0),
-                _ => {
-                    return Err(Errno::ENOPROTOOPT);
+        match SocketLevel::try_from(level)? {
+            SocketLevel::SOL_SOCKET => {
+                const SEND_BUFFER_SIZE: usize = 64 * 1024;
+                const RECV_BUFFER_SIZE: usize = 64 * 1024;
+                match PosixSocketOption::from_repr(optname as i32) {
+                    Some(opt) => match opt {
+                        PosixSocketOption::SO_RCVBUF => {
+                            *optval = RECV_BUFFER_SIZE as u32;
+                            *optlen = core::mem::size_of::<u32>() as u32;
+                        }
+                        PosixSocketOption::SO_SNDBUF => {
+                            *optval = SEND_BUFFER_SIZE as u32;
+                            *optlen = core::mem::size_of::<u32>() as u32;
+                        }
+                        PosixSocketOption::SO_ERROR => {
+                            *optval = 0;
+                            *optlen = core::mem::size_of::<u32>() as u32;
+                        }
+                        opt => {
+                            warn!(
+                                    "[sys_getsockopt] unsupported SOL_SOCKET opt {opt:?} optlen:{optlen}"
+                                )
+                        }
+                    },
+                    None => {
+                        warn!("[sys_getsockopt] unknown SOL_SOCKET opt {optname} optlen:{optlen}")
+                    }
                 }
             }
+            SocketLevel::IPPROTO_IP | SocketLevel::IPPROTO_TCP => {
+                const MAX_SEGMENT_SIZE: usize = 1666;
+                match PosixTcpSocketOptions::from_repr(optname as i32) {
+                    Some(opt) => match opt {
+                        PosixTcpSocketOptions::MaxSegment => {
+                            *optval = MAX_SEGMENT_SIZE as u32;
+                            *optlen = core::mem::size_of::<u32>() as u32;
+                        }
+                        PosixTcpSocketOptions::NoDelay => {
+                            *optval = 0;
+                            *optlen = core::mem::size_of::<u32>() as u32;
+                        }
+                        PosixTcpSocketOptions::Info => {}
+                        PosixTcpSocketOptions::Congestion => {
+                            const CONGESTION: &str = "reno";
+                            const CONGESTION_BYTES: &[u8] = CONGESTION.as_bytes();
+
+                            let optval = UserPtr::<u8>::new(optval_ptr);
+                            let buf_slice = optval.as_slice_mut_checked(CONGESTION.len()).await?;
+                            buf_slice.copy_from_slice(CONGESTION_BYTES);
+                            *optlen = CONGESTION.len() as u32;
+                        }
+                        opt => {
+                            warn!(
+                                "[sys_getsockopt] unsupported IPPROTO_TCP opt {opt:?} optlen:{optlen}"
+                            )
+                        }
+                    },
+                    None => {
+                        warn!("[sys_getsockopt] unknown IPPROTO_TCP opt {optname} optlen:{optlen}")
+                    }
+                };
+            }
+            SocketLevel::IPPROTO_IPV6 => todo!(),
         }
-        return Err(Errno::ENOPROTOOPT);
+        Ok(0)
     }
 
     // socketpair now is like pipe
