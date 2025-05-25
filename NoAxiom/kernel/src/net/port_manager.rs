@@ -61,7 +61,7 @@ impl PortManager {
     }
 
     /// Bind a port with a socket
-    pub fn bind_port(&mut self, port: u16) -> SysResult<()> {
+    pub fn bind_port(&mut self, port: u16) -> SysResult<u16> {
         let port = if port == 0 {
             self.get_ephemeral_port()?
         } else {
@@ -75,7 +75,7 @@ impl PortManager {
             // let waker = current_task().unwrap().waker();
             let waker = noop_waker();
             self.inner.insert(port as usize, PortItem::new(waker));
-            Ok(())
+            Ok(port)
         }
     }
 }
