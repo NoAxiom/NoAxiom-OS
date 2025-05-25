@@ -7,7 +7,7 @@
 // mod cfs;
 pub mod runtime;
 pub mod sched_entity;
-pub mod simple;
+pub mod scheduler;
 pub mod spawn;
 pub mod utils;
 pub mod vsched;

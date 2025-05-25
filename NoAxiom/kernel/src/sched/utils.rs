@@ -4,7 +4,6 @@
 //! - use [`suspend_now`] to suspend current task (without immediate wake)
 
 use alloc::{boxed::Box, sync::Arc, task::Wake};
-use ksync::mutex::check_no_lock;
 use core::{
     future::Future,
     pin::Pin,
@@ -12,9 +11,10 @@ use core::{
 };
 
 use include::errno::Errno;
+use ksync::mutex::check_no_lock;
 use pin_project_lite::pin_project;
 
-use crate::{syscall::SysResult, task::Task};
+use crate::{cpu::current_task, syscall::SysResult, task::Task};
 
 pub struct YieldFuture {
     visited: bool,
@@ -50,7 +50,9 @@ impl Task {
 
 #[inline(always)]
 pub async fn yield_now() {
+    current_task().unwrap().set_sched_prio_idle();
     YieldFuture::new().await;
+    current_task().unwrap().set_sched_prio_normal();
 }
 
 /// future to take the waker of the current task
@@ -157,4 +159,11 @@ where
 
 pub async fn intable<T>(task: &Arc<Task>, fut: impl Future<Output = T>) -> SysResult<T> {
     IntableFuture { task, fut }.await
+}
+
+pub async fn realtime<T>(task: &Arc<Task>, fut: impl Future<Output = T>) -> T {
+    task.set_sched_prio_realtime(0);
+    let res = fut.await;
+    task.set_sched_prio_normal();
+    res
 }
