@@ -5,6 +5,8 @@ use alloc::{
 };
 use core::fmt::Debug;
 
+use ksync::mutex::check_no_lock;
+
 use super::vfs::{basic::dentry::Dentry, root_dentry};
 use crate::{include::fs::InodeMode, syscall::SysResult, task::Task};
 
@@ -18,7 +20,8 @@ impl Path {
     /// Get the path from string with cwd or absolute path
     pub fn from_string(path: String, task: &Arc<Task>) -> SysResult<Self> {
         if !path.starts_with('/') {
-            task.cwd().from_cd(path.as_str())
+            let cwd = task.cwd().clone();
+            cwd.from_cd(path.as_str())
         } else {
             Path::try_from(path)
         }
@@ -96,6 +99,7 @@ impl Path {
     /// Get the path from relative path, the path should exist
     #[inline(always)]
     pub fn from_cd(&self, path: &str) -> SysResult<Self> {
+        assert!(check_no_lock());
         Self::try_from(self.cd(path))
     }
 
