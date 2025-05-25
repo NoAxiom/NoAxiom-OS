@@ -1,29 +1,36 @@
 //! The global heap allocator
 
-use core::alloc::GlobalAlloc;
+use core::{
+    alloc::{GlobalAlloc, Layout},
+    ptr::NonNull,
+};
 
-use buddy_system_allocator::LockedHeap;
+use buddy_system_allocator::Heap;
 use config::mm::KERNEL_HEAP_SIZE;
-use ksync::mutex::{LockAction, NoIrqLockAction};
-
-struct NoIrqHeapAllocator(LockedHeap<32>);
-
-unsafe impl GlobalAlloc for NoIrqHeapAllocator {
-    unsafe fn alloc(&self, layout: core::alloc::Layout) -> *mut u8 {
-        NoIrqLockAction::before_lock();
-        let res = self.0.alloc(layout);
-        NoIrqLockAction::after_lock();
-        res
-    }
-    unsafe fn dealloc(&self, ptr: *mut u8, layout: core::alloc::Layout) {
-        NoIrqLockAction::before_lock();
-        self.0.dealloc(ptr, layout);
-        NoIrqLockAction::after_lock();
-    }
-}
+use ksync::mutex::SpinLock;
 
 #[global_allocator]
-static HEAP_ALLOCATOR: NoIrqHeapAllocator = NoIrqHeapAllocator(LockedHeap::empty());
+static HEAP_ALLOCATOR: HeapAllocator = HeapAllocator::empty();
+
+struct HeapAllocator(SpinLock<Heap<32>>);
+
+impl HeapAllocator {
+    const fn empty() -> Self {
+        Self(SpinLock::new(Heap::empty()))
+    }
+}
+unsafe impl GlobalAlloc for HeapAllocator {
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        self.0
+            .lock()
+            .alloc(layout)
+            .ok()
+            .map_or(0 as *mut u8, |allocation| allocation.as_ptr())
+    }
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        self.0.lock().dealloc(NonNull::new_unchecked(ptr), layout)
+    }
+}
 
 #[alloc_error_handler]
 /// panic when heap allocation error occurs
