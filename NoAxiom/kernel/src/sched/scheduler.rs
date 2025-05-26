@@ -8,11 +8,11 @@ use async_task::Runnable;
 use ksync::cell::SyncUnsafeCell;
 
 use super::{
-    sched_entity::{SchedEntityWrapper, SchedPrio},
+    sched_entity::{SchedMetadata, SchedPrio},
     vsched::Scheduler,
 };
 
-pub(super) type Info = SchedEntityWrapper;
+pub(super) type Info = SchedMetadata;
 
 struct FifoScheduler {
     queue: VecDeque<Runnable<Info>>,
@@ -58,7 +58,7 @@ impl Scheduler<Info> for DualPrioScheduler {
     }
 }
 
-type ExpiredSchedulerInnerImpl = DualPrioScheduler;
+type ExpiredSchedulerInnerImpl = FifoScheduler;
 pub struct ExpiredScheduler {
     current: SyncUnsafeCell<ExpiredSchedulerInnerImpl>,
     expire: SyncUnsafeCell<ExpiredSchedulerInnerImpl>,
@@ -108,22 +108,17 @@ impl Scheduler<Info> for MultiLevelScheduler {
         }
     }
     fn push(&mut self, runnable: Runnable<Info>, info: async_task::ScheduleInfo) {
+        // let tid = runnable.metadata().tid();
+        // if tid == 4 || tid == 6 {
+        //     debug!(
+        //         "[scheduler] push, tid: {}, woken_while_running: {}",
+        //         tid, info.woken_while_running
+        //     );
+        // }
         let entity = runnable.metadata().sched_entity();
         if let Some(entity) = entity {
             match entity.sched_prio {
-                SchedPrio::RealTime(_) => {
-                    // println!(
-                    //     "push realtime runnable, time_stat = {:?}, realtime size = {}",
-                    //     runnable
-                    //         .metadata()
-                    //         .sched_entity()
-                    //         .unwrap()
-                    //         .time_stat
-                    //         .stime(),
-                    //     self.realtime.queue.len(),
-                    // );
-                    self.realtime.push(runnable, info)
-                }
+                SchedPrio::RealTime(_) => self.realtime.push(runnable, info),
                 _ => self.normal.push(runnable, info),
             }
         } else {
@@ -132,16 +127,6 @@ impl Scheduler<Info> for MultiLevelScheduler {
     }
     fn pop(&mut self) -> Option<Runnable<Info>> {
         if let Some(runnable) = self.realtime.pop() {
-            // println!(
-            //     "pop realtime runnable, time_stat = {:?}, realtime size = {}",
-            //     runnable
-            //         .metadata()
-            //         .sched_entity()
-            //         .unwrap()
-            //         .time_stat
-            //         .stime(),
-            //     self.realtime.queue.len(),
-            // );
             return Some(runnable);
         }
         self.normal.pop()

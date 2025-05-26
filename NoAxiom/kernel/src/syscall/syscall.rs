@@ -176,7 +176,7 @@ impl<'a> Syscall<'a> {
         if id.is_debug_on() {
             let cx = self.task.trap_context();
             use arch::TrapArgs::*;
-            info!(
+            warn!(
                 "[syscall] id: {:?}, tid: {}, sp: {:#x}, pc: {:#x}, ra: {:#x}, args: {:X?}",
                 id,
                 self.task.tid(),
@@ -216,7 +216,7 @@ pub fn get_syscall_result(res: SyscallResult) -> isize {
     match res {
         Ok(res) => res,
         Err(errno) => {
-            warn!("syscall error: {:?} during {:?}", errno, current_syscall());
+            trace!("syscall error: {:?} during {:?}", errno, current_syscall());
             let errno: isize = errno as isize;
             match errno > 0 {
                 true => -errno,

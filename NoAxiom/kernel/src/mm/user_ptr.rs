@@ -132,7 +132,7 @@ impl<T> UserPtr<T> {
             Err(trap_type) => match trap_type {
                 TrapType::LoadPageFault(addr) | TrapType::StorePageFault(addr) => {
                     warn!(
-                        "[write] detect trap at addr {:#x} during syscall {:?}",
+                        "[read] detect trap at addr {:#x} during syscall {:?}",
                         self.addr(),
                         current_syscall()
                     );

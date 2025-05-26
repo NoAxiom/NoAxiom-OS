@@ -25,6 +25,7 @@ use crate::{
     signal::{
         sig_detail::{SigDetail, SigKillDetail},
         sig_info::{SigCode, SigInfo},
+        sig_set::SigSet,
     },
     task::{
         exit::ExitCode,
@@ -100,7 +101,7 @@ impl Syscall<'_> {
         new_cx[RES] = 0;
         trace!("[sys_fork] new task context: {:?}", new_cx);
         spawn_utask(new_task);
-        TASK_MANAGER.get_init_proc().print_child_tree();
+        // TASK_MANAGER.get_init_proc().print_child_tree();
         Ok(new_tid as isize)
     }
 
@@ -164,8 +165,12 @@ impl Syscall<'_> {
         };
 
         // wait for child exit
-        let (exit_code, tid) =
-            intable(self.task, self.task.wait_child(pid_type, wait_option)).await??;
+        let (exit_code, tid) = intable(
+            self.task,
+            self.task.wait_child(pid_type, wait_option),
+            Some(SigSet::SIGCHLD),
+        )
+        .await??;
         if status.is_non_null() {
             trace!(
                 "[sys_wait4]: write exit_code at status_addr = {:#x}",
@@ -305,6 +310,7 @@ impl Syscall<'_> {
                 let res = intable(
                     self.task,
                     TimeLimitedFuture::new(FutexFuture::new(uaddr, pa, val), timeout),
+                    None,
                 )
                 .await?
                 .map_timeout(Err(Errno::ETIMEDOUT))?;

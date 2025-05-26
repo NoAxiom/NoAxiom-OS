@@ -14,7 +14,7 @@ use include::errno::Errno;
 use ksync::mutex::check_no_lock;
 use pin_project_lite::pin_project;
 
-use crate::{cpu::current_task, syscall::SysResult, task::Task};
+use crate::{cpu::current_task, signal::sig_set::SigMask, syscall::SysResult, task::Task};
 
 pub struct YieldFuture {
     visited: bool,
@@ -132,6 +132,7 @@ pin_project! {
         task: &'a Arc<Task>,
         #[pin]
         fut: F,
+        mask: Option<SigMask>,
     }
 }
 
@@ -147,7 +148,7 @@ where
             Poll::Ready(res) => Poll::Ready(Ok(res)),
             Poll::Pending => {
                 // start to handle signal
-                if task.peek_has_pending_signal() {
+                if task.peek_has_pending_signal(this.mask) {
                     Poll::Ready(Err(Errno::EINTR))
                 } else {
                     Poll::Pending
@@ -157,8 +158,17 @@ where
     }
 }
 
-pub async fn intable<T>(task: &Arc<Task>, fut: impl Future<Output = T>) -> SysResult<T> {
-    IntableFuture { task, fut }.await
+pub async fn intable<T>(
+    task: &Arc<Task>,
+    fut: impl Future<Output = T>,
+    block_sig: Option<SigMask>,
+) -> SysResult<T> {
+    IntableFuture {
+        task,
+        fut,
+        mask: block_sig,
+    }
+    .await
 }
 
 pub async fn realtime<T>(task: &Arc<Task>, fut: impl Future<Output = T>) -> T {

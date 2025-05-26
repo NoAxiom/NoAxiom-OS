@@ -13,7 +13,6 @@ use crate::{
     cpu::current_cpu,
     sched::utils::{suspend_now, take_waker},
     task::{status::TaskStatus, Task},
-    time::gettime::get_time_us,
     trap::handler::user_trap_handler,
 };
 
@@ -55,7 +54,6 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
         fence(Ordering::AcqRel);
         Arch::enable_interrupt();
         // ===== after executing task future =====
-
         ret
     }
 }
@@ -64,7 +62,6 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
 /// called by [`UserTaskFuture`]
 pub async fn task_main(task: Arc<Task>) {
     task.set_waker(take_waker().await);
-    task.check_signal().await;
     assert!(check_no_lock());
     loop {
         // kernel -> user
@@ -103,7 +100,7 @@ pub async fn task_main(task: Arc<Task>) {
 
         // check signal before return to user
         trace!("[task_main] check_signal");
-        task.check_signal().await;
+        task.check_signal(None).await;
         assert!(check_no_lock());
         match task.pcb().status() {
             TaskStatus::Terminated => break,

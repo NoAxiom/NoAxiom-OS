@@ -7,7 +7,7 @@ use core::future::Future;
 
 use async_task::{Builder, WithInfo};
 
-use super::{runtime::RUNTIME, sched_entity::SchedEntityWrapper, vsched::Runtime};
+use super::{runtime::RUNTIME, sched_entity::SchedMetadata, vsched::Runtime};
 use crate::task::{
     task_main::{task_main, UserTaskFuture},
     Task,
@@ -19,10 +19,9 @@ where
     F: Future<Output = R> + Send + 'static,
     R: Send + 'static,
 {
-    let metadata = SchedEntityWrapper::from_ptr(
-        task.map(|t| t.get_sched_entity())
-            .unwrap_or_else(|| core::ptr::null_mut()),
-    );
+    let metadata = task
+        .map(|task| SchedMetadata::from_task(task))
+        .unwrap_or_else(SchedMetadata::default);
     let (runnable, handle) = Builder::new().metadata(metadata).spawn(
         move |_| future,
         WithInfo(move |runnable, info| RUNTIME.schedule(runnable, info)),

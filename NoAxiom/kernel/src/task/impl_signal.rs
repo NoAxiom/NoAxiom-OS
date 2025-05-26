@@ -11,6 +11,7 @@ use crate::{
         sig_action::{SAFlags, SAHandlerType},
         sig_info::SigInfo,
         sig_num::SigNum,
+        sig_set::SigMask,
         sig_stack::{MContext, UContext},
     },
     task::{exit::ExitCode, status::TaskStatus, Task},
@@ -24,13 +25,23 @@ extern "C" {
 }
 
 impl Task {
-    pub fn peek_has_pending_signal(self: &Arc<Self>) -> bool {
+    pub fn peek_has_pending_signal(self: &Arc<Self>, mask: &Option<SigMask>) -> bool {
         let pcb = self.pcb();
-        pcb.pending_sigs.has_expect_signals(!pcb.sig_mask())
+        let pcb_mask = pcb.sig_mask();
+        let mask = match mask {
+            Some(m) => pcb_mask | *m,
+            None => pcb_mask,
+        };
+        pcb.pending_sigs.has_expect_signals(!mask)
     }
-    pub async fn check_signal(self: &Arc<Self>) {
+    pub async fn check_signal(self: &Arc<Self>, tmp_mask: Option<SigMask>) {
         let mut pcb = self.pcb();
-        let old_mask = pcb.pending_sigs.sig_mask.clone();
+        let old_mask = tmp_mask.unwrap_or(pcb.pending_sigs.sig_mask.clone());
+        debug!(
+            "[check_signal] tid: {}, check pending signals, old_mask: {:?}",
+            self.tid(),
+            old_mask
+        );
         if !pcb.pending_sigs.has_expect_signals(!old_mask) {
             return;
         }
@@ -49,6 +60,16 @@ impl Task {
             actions.push(action);
         }
         drop(sa_list);
+
+        debug!(
+            "[check_signal] pending signals: {}",
+            pending
+                .iter()
+                .enumerate()
+                .map(|(i, si)| format!("{:?}: {:?}", actions[i].handler, SigNum::from(si.signo)))
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
 
         for (i, si) in pending.into_iter().enumerate() {
             let signum = SigNum::from(si.signo);
@@ -137,6 +158,8 @@ impl Task {
                         SIG_TRAMPOLINE
                     };
                     cx[SP] = new_sp;
+
+                    // fixme: this return could cause signal missing
                     return;
                 }
             }

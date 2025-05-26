@@ -726,6 +726,7 @@ impl Task {
         Ok(())
     }
 
+    #[allow(unused)]
     fn print_child_tree_dfs(&self, fmt_offset: usize) {
         let mut fmt_proc = String::new();
         for _ in 0..fmt_offset {
@@ -749,5 +750,7 @@ impl Task {
     /// only for debug, print current child tree
     /// warning: this function could cause deadlock if under multicore
     #[allow(unused)]
-    pub fn print_child_tree(&self) {}
+    pub fn print_child_tree(&self) {
+        self.print_child_tree_dfs(0);
+    }
 }

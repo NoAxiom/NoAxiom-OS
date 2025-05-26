@@ -187,7 +187,7 @@ impl Syscall<'_> {
             return Err(Errno::EINVAL);
         }
 
-        intable(self.task, file.read(buf_slice)).await?
+        intable(self.task, file.read(buf_slice), None).await?
     }
 
     /// Read the file associated with the file descriptor fd to iovcnt buffers
@@ -257,7 +257,7 @@ impl Syscall<'_> {
             return Err(Errno::EINVAL);
         }
 
-        intable(self.task, file.write(buf_slice)).await?
+        intable(self.task, file.write(buf_slice), None).await?
     }
 
     /// Write iovcnt buffers of data described by iov to the file associated

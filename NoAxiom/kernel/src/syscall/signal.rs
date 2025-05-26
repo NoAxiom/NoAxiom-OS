@@ -94,6 +94,12 @@ impl Syscall<'_> {
         let set = UserPtr::<SigSet>::new(set);
         let set_value = set.try_read().await?;
         let old_set = UserPtr::<SigSet>::new(old_set);
+        debug!(
+            "[sys_sigprocmask] tid: {}, how: {}, set: {:?}",
+            task.tid(),
+            how,
+            set_value,
+        );
 
         let mut pcb = task.pcb();
         let old_sigmask = pcb.sig_mask();
@@ -101,25 +107,14 @@ impl Syscall<'_> {
             // sigmask shouldn't contain SIGKILL and SIGCONT
             set.remove(SigSet::SIGKILL | SigSet::SIGCONT);
             match how {
-                SIGBLOCK => {
-                    *pcb.sig_mask_mut() |= set;
-                }
-                SIGUNBLOCK => {
-                    pcb.sig_mask_mut().remove(set);
-                }
-                SIGSETMASK => {
-                    *pcb.sig_mask_mut() = set;
-                }
-                _ => {
-                    return Err(Errno::EINVAL);
-                }
+                SIGBLOCK => *pcb.sig_mask_mut() |= set,
+                SIGUNBLOCK => *pcb.sig_mask_mut() &= !set,
+                SIGSETMASK => *pcb.sig_mask_mut() = set,
+                _ => return Err(Errno::EINVAL),
             };
         }
         drop(pcb);
-
-        if !old_set.is_null() {
-            old_set.write(old_sigmask).await?;
-        }
+        old_set.try_write(old_sigmask).await?;
         Ok(0)
     }
 
@@ -230,22 +225,36 @@ impl Syscall<'_> {
         let mask = UserPtr::<SigSet>::from(mask);
         let task = self.task;
         let mut mask = mask.read().await?;
-        let mut pcb = task.pcb();
         mask.remove(SigSet::SIGKILL | SigSet::SIGSTOP);
-        let old_mask = core::mem::replace(&mut pcb.sig_mask(), mask);
         let invoke_signal = task.sa_list().get_bitmap();
-        if pcb.pending_sigs.has_expect_signals(mask | invoke_signal) {
+        debug!(
+            "[sys_sigsuspend] tid: {}, new_mask: {:?}, invoke_signal: {:?}",
+            task.tid(),
+            mask,
+            invoke_signal
+        );
+        let mut pcb = task.pcb();
+        let old_mask = core::mem::replace(&mut pcb.sig_mask(), mask);
+        let expect = mask | invoke_signal;
+        if pcb.pending_sigs.has_expect_signals(expect) {
             return Err(Errno::EINTR);
         } else {
-            pcb.pending_sigs.should_wake = mask | invoke_signal; // todo: impl
-                                                                 // this
+            *pcb.sig_mask_mut() = !expect;
+            pcb.pending_sigs.should_wake = expect;
         }
         pcb.set_suspend();
+        debug!(
+            "[sys_sigsuspend] tid: {}, suspend with mask: {:?}, old mask: {:?}, invoke_signal: {:?}",
+            task.tid(),
+            pcb.sig_mask(),
+            old_mask,
+            invoke_signal,
+        );
         drop(pcb);
         suspend_now().await;
         let mut pcb = task.pcb();
         pcb.set_runnable();
-        *pcb.sig_mask_mut() = old_mask;
+        // *pcb.sig_mask_mut() = old_mask;
         Err(Errno::EINTR)
     }
 }

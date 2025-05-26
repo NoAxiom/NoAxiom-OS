@@ -1,4 +1,6 @@
-use crate::{include::sched::CpuMask, time::time_info::TimeInfo};
+use alloc::sync::Arc;
+
+use crate::{include::sched::CpuMask, task::Task, time::time_info::TimeInfo};
 
 #[derive(Debug, Clone, Copy)]
 pub enum SchedPrio {
@@ -24,26 +26,38 @@ impl Default for SchedEntity {
 }
 
 #[derive(Clone, Copy)]
-pub struct SchedEntityWrapper(*mut SchedEntity);
+pub struct SchedMetadata {
+    ptr: *mut SchedEntity,
+    tid: usize,
+}
 
-impl SchedEntityWrapper {
-    pub fn from_ptr(ptr: *mut SchedEntity) -> Self {
-        Self(ptr)
+impl SchedMetadata {
+    pub fn from_task(task: &Arc<Task>) -> Self {
+        Self {
+            ptr: task.get_sched_entity(),
+            tid: task.tid(),
+        }
     }
     pub fn sched_entity(&self) -> Option<&SchedEntity> {
-        if self.0.is_null() {
+        if self.ptr.is_null() {
             None
         } else {
-            unsafe { Some(&*self.0) }
+            unsafe { Some(&*self.ptr) }
+        }
+    }
+    pub fn tid(&self) -> usize {
+        self.tid
+    }
+}
+
+impl Default for SchedMetadata {
+    fn default() -> Self {
+        Self {
+            ptr: core::ptr::null_mut(),
+            tid: 0,
         }
     }
 }
 
-impl Default for SchedEntityWrapper {
-    fn default() -> Self {
-        Self(core::ptr::null_mut())
-    }
-}
-
-unsafe impl Sync for SchedEntityWrapper {}
-unsafe impl Send for SchedEntityWrapper {}
+unsafe impl Sync for SchedMetadata {}
+unsafe impl Send for SchedMetadata {}
