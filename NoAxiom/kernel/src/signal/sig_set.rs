@@ -98,4 +98,14 @@ impl SigSet {
         let signum = signum - 1;
         self.contains(SigSet::from_bits_truncate(1 << signum))
     }
+    pub fn from_signum(signum: u32) -> Self {
+        let signum = signum - 1;
+        if signum >= MAX_SIGNUM {
+            panic!(
+                "[Kernel] invalid signum when create SigSet from signum {}",
+                signum
+            );
+        }
+        SigSet::from_bits_truncate(1 << signum)
+    }
 }

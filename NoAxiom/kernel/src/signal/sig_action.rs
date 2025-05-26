@@ -17,7 +17,7 @@ pub enum SAHandlerType {
 }
 
 impl SAHandlerType {
-    pub fn new_default(sig: SigNum) -> Self {
+    pub const fn new_default(sig: SigNum) -> Self {
         match sig {
             SigNum::SIGCHLD | SigNum::SIGURG | SigNum::SIGWINCH => Self::Ignore,
             SigNum::SIGSTOP | SigNum::SIGTSTP | SigNum::SIGTTIN | SigNum::SIGTTOU => Self::Stop,
@@ -62,7 +62,7 @@ pub struct USigAction {
     pub mask: SigMask,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct KSigAction {
     pub handler: SAHandlerType,
     pub mask: SigMask,
@@ -71,7 +71,7 @@ pub struct KSigAction {
 }
 
 impl KSigAction {
-    pub fn new_default(sig: SigNum) -> Self {
+    pub const fn new_default(sig: SigNum) -> Self {
         Self {
             handler: SAHandlerType::new_default(sig),
             mask: SigMask::empty(),
@@ -130,6 +130,12 @@ impl SigActionList {
     }
     pub fn set_sigaction(&mut self, signum: usize, action: KSigAction) {
         self.actions[signum] = action;
+        debug!(
+            "[SigActionList] set_sigaction: signum {:?}, action: {:?}, cur_bitmap: {:?}",
+            SigNum::from(signum),
+            action,
+            self.get_bitmap()
+        );
     }
     pub fn get(&self, signum: SigNum) -> Option<&KSigAction> {
         self.actions.get(signum as usize)
@@ -138,7 +144,7 @@ impl SigActionList {
         let mut res = SigSet::empty();
         for (i, sa) in self.actions.iter().enumerate() {
             if let SAHandlerType::User { handler: _ } = sa.handler {
-                res |= SigSet::from_bits_truncate(1 << i);
+                res |= SigSet::from_signum(i as u32);
             }
         }
         res
