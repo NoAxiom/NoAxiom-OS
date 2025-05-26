@@ -258,6 +258,7 @@ impl ArchTrapContext for TrapContext {
         let mut sstatus = MySstatus::read();
         sstatus.set_spp(SPP::User);
         sstatus.set_spie();
+        sstatus.set_sie(false);
         let mut cx = Self {
             x: [0; 32],
             sstatus,

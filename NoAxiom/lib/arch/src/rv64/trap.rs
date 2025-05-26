@@ -142,7 +142,6 @@ impl ArchTrap for RV64 {
     }
     /// restore trap context, with freg handled as well
     fn trap_restore(cx: &mut TrapContext) {
-        enable_interrupt();
         disable_interrupt();
         set_user_trap_entry();
         cx.freg_mut().restore();

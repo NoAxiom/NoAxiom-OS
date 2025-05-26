@@ -222,6 +222,7 @@ impl ArchTrapContext for TrapContext {
         cx.set_prmd();
         cx[EPC] = entry;
         cx[SP] = sp;
+        // fixme: should disable interrupt
         cx
     }
 
