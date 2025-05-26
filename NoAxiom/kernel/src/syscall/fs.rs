@@ -645,12 +645,12 @@ impl Syscall<'_> {
                 Ok(file_flag.bits() as isize)
             }
             FcntlFlags::F_DUPFD => {
-                let new_fd = fd_table.alloc_fd_after(fd)?;
+                let new_fd = fd_table.alloc_fd_after(arg)?;
                 assert!(new_fd > fd);
                 fd_table.copyfrom(fd, new_fd)
             }
             FcntlFlags::F_DUPFD_CLOEXEC => {
-                let new_fd = fd_table.alloc_fd_after(fd)?;
+                let new_fd = fd_table.alloc_fd_after(arg)?;
                 assert!(new_fd > fd);
                 fd_table.set_fdflag(new_fd, FcntlArgFlags::FD_CLOEXEC);
                 fd_table.copyfrom(fd, new_fd)
