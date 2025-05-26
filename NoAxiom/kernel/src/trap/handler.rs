@@ -87,7 +87,7 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
     match trap_type {
         // syscall
         TrapType::SysCall => {
-            arch::Arch::enable_interrupt();
+            Arch::enable_interrupt();
             let result = task.syscall(cx).await;
             trace!("[syscall] done! result {:#x}", result);
         }
@@ -154,5 +154,5 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
     }
 
     // enable interrupt after handler
-    arch::Arch::enable_interrupt();
+    Arch::enable_interrupt();
 }

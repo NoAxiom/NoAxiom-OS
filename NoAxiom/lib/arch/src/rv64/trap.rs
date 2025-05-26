@@ -12,7 +12,7 @@ use riscv::register::{
     stvec::{self, TrapMode},
 };
 
-use super::{context::TrapContext, interrupt::disable_interrupt, RV64};
+use super::{context::TrapContext, interrupt::{disable_interrupt, enable_interrupt}, RV64};
 use crate::{
     rv64::interrupt::{
         enable_external_interrupt, enable_software_interrupt, enable_stimer_interrupt,
@@ -142,6 +142,7 @@ impl ArchTrap for RV64 {
     }
     /// restore trap context, with freg handled as well
     fn trap_restore(cx: &mut TrapContext) {
+        enable_interrupt();
         disable_interrupt();
         set_user_trap_entry();
         cx.freg_mut().restore();

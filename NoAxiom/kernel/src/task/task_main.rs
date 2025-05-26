@@ -89,6 +89,7 @@ pub async fn task_main(task: Arc<Task>) {
         assert!(!Arch::is_interrupt_enabled());
         assert!(check_no_lock());
         user_trap_handler(&task, trap_type).await;
+        assert!(Arch::is_interrupt_enabled());
 
         // check status
         match task.pcb().status() {
