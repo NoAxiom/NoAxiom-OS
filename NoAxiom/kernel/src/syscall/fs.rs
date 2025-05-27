@@ -335,6 +335,9 @@ impl Syscall<'_> {
     pub fn sys_close(&self, fd: usize) -> SyscallResult {
         info!("[sys_close] fd: {}", fd);
         let mut fd_table = self.task.fd_table();
+        if let Some(file) = fd_table.get(fd) {
+            debug!("[sys_close] closing file: {:?}", file.name());
+        }
         fd_table.close(fd)
     }
 

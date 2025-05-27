@@ -8,7 +8,7 @@ use smoltcp::iface::SocketHandle;
 use socket_set::SocketSet;
 
 mod handle;
-mod poll;
+// mod poll;
 mod port_manager;
 mod socket;
 mod socket_set;
@@ -36,7 +36,7 @@ pub mod test {
     use ksync::mutex::SpinLock;
     use smoltcp::{iface::SocketSet, socket::tcp, time::Instant};
 
-    use crate::time::gettime::get_time_ms;
+    use crate::{time::gettime::get_time_ms, utils::crossover::intermit};
 
     /// 元数据的缓冲区的大小
     pub const DEFAULT_METADATA_BUF_SIZE: usize = 1024;
@@ -58,30 +58,45 @@ pub mod test {
 
         let server_socket = create_new_socket();
         let server_handle = sockets.lock().add(server_socket);
+        let server_socket_2 = create_new_socket();
+        let server_handle_2 = sockets.lock().add(server_socket_2);
         let client_socket = create_new_socket();
         let client_handle = sockets.lock().add(client_socket);
+        let client_socket_2 = create_new_socket();
+        let client_handle_2 = sockets.lock().add(client_socket_2);
+
+        {
+            let mut sockets_guard = sockets.lock();
+            let server = sockets_guard.get_mut::<tcp::Socket>(server_handle_2);
+            server.listen(80).unwrap();
+            drop(sockets_guard);
+        }
 
         {
             let mut sockets_guard = sockets.lock();
             let server = sockets_guard.get_mut::<tcp::Socket>(server_handle);
-            let local_endpoint =
-                smoltcp::wire::IpEndpoint::new(smoltcp::wire::IpAddress::v4(127, 0, 0, 1), 80);
-            server.listen(local_endpoint).unwrap();
+            server.listen(80).unwrap();
             drop(sockets_guard);
         }
 
         {
             let mut sockets_guard = sockets.lock();
             let client = sockets_guard.get_mut::<tcp::Socket>(client_handle);
-            let temp_port = 999;
             let remote_endpoint =
                 smoltcp::wire::IpEndpoint::new(smoltcp::wire::IpAddress::v4(127, 0, 0, 1), 80);
             client
-                .connect(
-                    loopback.interface.lock().context(),
-                    remote_endpoint,
-                    temp_port,
-                )
+                .connect(loopback.interface.lock().context(), remote_endpoint, 233)
+                .unwrap();
+            drop(sockets_guard);
+        }
+
+        {
+            let mut sockets_guard = sockets.lock();
+            let client = sockets_guard.get_mut::<tcp::Socket>(client_handle_2);
+            let remote_endpoint =
+                smoltcp::wire::IpEndpoint::new(smoltcp::wire::IpAddress::v4(127, 0, 0, 1), 80);
+            client
+                .connect(loopback.interface.lock().context(), remote_endpoint, 234)
                 .unwrap();
             drop(sockets_guard);
         }
@@ -96,9 +111,13 @@ pub mod test {
                 &mut sockets_guard,
             );
             let server = sockets_guard.get::<tcp::Socket>(server_handle);
+            let server_2 = sockets_guard.get::<tcp::Socket>(server_handle_2);
             let client = sockets_guard.get::<tcp::Socket>(client_handle);
-            debug!("server state: {:?}", server.state());
-            debug!("client state: {:?}", client.state());
+            let client_2 = sockets_guard.get::<tcp::Socket>(client_handle_2);
+            intermit(|| debug!("server   state: {:?}", server.state()));
+            intermit(|| debug!("server_2 state: {:?}", server_2.state()));
+            intermit(|| debug!("client   state: {:?}", client.state()));
+            intermit(|| debug!("client_2 state: {:?}", client_2.state()));
         }
     }
 }

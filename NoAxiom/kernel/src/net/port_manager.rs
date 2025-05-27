@@ -60,7 +60,26 @@ impl PortManager {
         Err(Errno::EADDRINUSE)
     }
 
-    /// Bind a port with a socket
+    /// Bind a port with a socket, error if the port is already listened or run
+    /// out of ephemeral ports
+    pub fn bind_port_volatile(&mut self, port: u16) -> SysResult<u16> {
+        let port = if port == 0 {
+            self.get_ephemeral_port()?
+        } else {
+            port
+        };
+        if let Some(_) = &self.inner.get(&(port as usize)) {
+            Ok(port)
+        } else {
+            // let waker = current_task().unwrap().waker();
+            let waker = noop_waker();
+            self.inner.insert(port as usize, PortItem::new(waker));
+            Ok(port)
+        }
+    }
+
+    /// Bind a port with a socket, if the port is listened, it will just return
+    /// the port, error only when run out of ephemeral ports
     pub fn bind_port(&mut self, port: u16) -> SysResult<u16> {
         let port = if port == 0 {
             self.get_ephemeral_port()?
@@ -68,10 +87,6 @@ impl PortManager {
             port
         };
         if let Some(_) = &self.inner.get(&(port as usize)) {
-            // ! FIXME: HERE we just don't care the initial port owner, which can cause many
-            // ! lose
-            return Ok(port);
-            // The port is already listened
             error!("[port_manager] Port {port} is already listened");
             Err(Errno::EADDRINUSE)
         } else {
@@ -79,6 +94,14 @@ impl PortManager {
             let waker = noop_waker();
             self.inner.insert(port as usize, PortItem::new(waker));
             Ok(port)
+        }
+    }
+
+    pub fn unbind_port(&mut self, port: u16) {
+        if let Some(_) = self.inner.remove(&(port as usize)) {
+            debug!("[port_manager] Unbind port {port}");
+        } else {
+            warn!("[port_manager] Port {port} is not listened");
         }
     }
 }

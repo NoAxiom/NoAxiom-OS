@@ -191,7 +191,7 @@ impl Socket for UdpSocket {
     fn bind(&mut self, local: IpEndpoint) -> SysResult<()> {
         debug!("[Udp {}] bind to: {:?}", self.handle, local);
         let mut port_manager = UDP_PORT_MANAGER.lock();
-        let port = port_manager.bind_port(local.port)?;
+        let port = port_manager.bind_port_volatile(local.port)?;
         drop(port_manager);
 
         let mut sockets = SOCKET_SET.lock();
@@ -241,7 +241,7 @@ impl Socket for UdpSocket {
         if local.port == 0 {
             let mut port_manager = UDP_PORT_MANAGER.lock();
             let temp_port = port_manager.get_ephemeral_port()?;
-            port_manager.bind_port(temp_port)?;
+            port_manager.bind_port_volatile(temp_port)?;
             drop(port_manager);
 
             warn!(
@@ -292,5 +292,23 @@ impl Socket for UdpSocket {
 
     fn meta(&self) -> &SocketMeta {
         &self.meta
+    }
+}
+
+impl Drop for UdpSocket {
+    fn drop(&mut self) {
+        warn!(
+            "[Udp {}] drop socket, remote: {:?}",
+            self.handle, self.remote_endpoint
+        );
+        // poll_ifaces();
+        // let mut sockets = SOCKET_SET.lock();
+        // let handle = self.handle;
+        // let socket = sockets.get_mut::<udp::Socket>(handle);
+        // if socket.is_open() {
+        //     socket.close();
+        // }
+        // sockets.remove(handle);
+        // poll_ifaces();
     }
 }

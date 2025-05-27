@@ -16,13 +16,13 @@ use crate::{
         net::{ShutdownType, SocketOptions, SocketType},
         result::Errno,
     },
-    net::{handle::HandleItem, HANDLE_MAP},
+    net::{handle::HandleItem, port_manager, HANDLE_MAP},
     sched::utils::yield_now,
     syscall::SysResult,
     utils::crossover::intermit,
 };
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 pub enum TcpState {
     Closed,
     Listen,
@@ -148,8 +148,20 @@ impl TcpSocket {
         poll_ifaces();
         let mut res = PollEvent::empty();
         let mut sockets = SOCKET_SET.lock();
+        for (handle, s) in sockets.iter() {
+            match s {
+                smoltcp::socket::Socket::Tcp(tcp) => {
+                    debug!(
+                        "[Tcp {}] poll: socket handle {}, state {:?}",
+                        self.handles[0],
+                        handle,
+                        tcp.state()
+                    );
+                }
+                _ => {}
+            }
+        }
         let socket = sockets.get_mut::<tcp::Socket>(self.handles[0]);
-
         if req.contains(PollEvent::POLLIN) {
             debug!("[Tcp {}] poll: req has POLLIN", self.handles[0]);
             if socket.can_recv() {
@@ -169,12 +181,18 @@ impl TcpSocket {
                             debug!("[Tcp {}] poll: POLLIN is ready 3", self.handles[0]);
                             res |= PollEvent::POLLIN | PollEvent::POLLRDNORM;
                         } else {
-                            debug!("[Tcp {}] poll: register recv_waker", self.handles[0]);
+                            debug!(
+                                "[Tcp {}] self state: {:?}, Established poll: register recv_waker",
+                                self.handles[0], self.state
+                            );
                             socket.register_recv_waker(&waker);
                         }
                     }
-                    _ => {
-                        debug!("[Tcp {}] poll: register recv_waker", self.handles[0]);
+                    state => {
+                        debug!(
+                            "[Tcp {}] {:?} poll: register recv_waker",
+                            self.handles[0], state
+                        );
                         socket.register_recv_waker(&waker);
                     }
                 }
@@ -404,7 +422,7 @@ impl Socket for TcpSocket {
 
         let mut port_manager = TCP_PORT_MANAGER.lock();
         let temp_port = port_manager.get_ephemeral_port()?;
-        port_manager.bind_port(temp_port)?;
+        port_manager.bind_port_volatile(temp_port)?;
         drop(port_manager);
 
         let driver_write_guard = NET_DEVICES.write();
@@ -551,5 +569,39 @@ impl Socket for TcpSocket {
 
     fn meta(&self) -> &SocketMeta {
         &self.meta
+    }
+}
+
+impl Drop for TcpSocket {
+    fn drop(&mut self) {
+        warn!(
+            "[Tcp {}] drop socket, local: {:?}",
+            self.handles[0], self.local_endpoint
+        );
+
+        if let Some(local) = self.local_endpoint {
+            let mut port_manager = TCP_PORT_MANAGER.lock();
+            port_manager.unbind_port(local.port);
+            drop(port_manager);
+        }
+
+        poll_ifaces();
+        let mut sockets = SOCKET_SET.lock();
+        let handle = self.handles[0];
+        let socket = sockets.get_mut::<tcp::Socket>(handle);
+        if socket.is_open() {
+            socket.close();
+            warn!("[Tcp {}] socket is closed", handle);
+        }
+        warn!(
+            "[Tcp {}] after state is {:?}",
+            self.handles[0],
+            socket.state()
+        );
+        sockets.remove(handle);
+        drop(sockets);
+        poll_ifaces();
+
+        // todo: handle map
     }
 }

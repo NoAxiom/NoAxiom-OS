@@ -97,7 +97,12 @@ impl Sock {
     pub async fn write(&mut self, buf: &[u8], remote: Option<IpEndpoint>) -> SysResult<usize> {
         match self {
             Sock::Tcp(socket) => socket.write(buf, remote).await,
-            Sock::Udp(socket) => socket.write(buf, remote).await,
+            Sock::Udp(socket) => {
+                if let Some(r) = remote {
+                    socket.connect(r).await?;
+                }
+                socket.write(buf, remote).await
+            }
         }
     }
 }
