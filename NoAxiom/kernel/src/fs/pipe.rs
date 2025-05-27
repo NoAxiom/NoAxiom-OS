@@ -24,6 +24,7 @@ use core::{
 
 use async_trait::async_trait;
 use ksync::mutex::SpinLock;
+use memory::frame::{frame_alloc, FrameTracker};
 
 use super::vfs::{
     basic::{
@@ -54,7 +55,7 @@ enum PipeBufferStatus {
 
 /// Ring buffer that max size is PIPE_BUF_SIZE
 struct PipeBuffer {
-    data: [u8; PIPE_BUF_SIZE],
+    data: FrameTracker,
     head: usize,
     tail: usize,
     status: PipeBufferStatus,
@@ -67,7 +68,7 @@ struct PipeBuffer {
 impl PipeBuffer {
     fn new() -> Self {
         Self {
-            data: [0; PIPE_BUF_SIZE],
+            data: frame_alloc(),
             head: 0,
             tail: 0,
             status: PipeBufferStatus::Empty,
@@ -158,22 +159,23 @@ impl PipeBuffer {
     fn read(&mut self, buf: &mut [u8]) -> usize {
         trace!("[PipeBuffer] read buf");
         let len = buf.len();
+        let data = self.data.ppn().get_bytes_array();
         let res = match self.status {
             PipeBufferStatus::Empty => 0,
             _ => {
                 if self.head < self.tail {
                     let res = core::cmp::min(len, self.tail - self.head);
-                    buf[..res].copy_from_slice(&self.data[self.head..self.head + res]);
+                    buf[..res].copy_from_slice(&data[self.head..self.head + res]);
                     res
                 } else {
                     // maybe full
                     let res = core::cmp::min(len, PIPE_BUF_SIZE - self.head + self.tail);
                     if res <= PIPE_BUF_SIZE - self.head {
-                        buf[..res].copy_from_slice(&self.data[self.head..self.head + res]);
+                        buf[..res].copy_from_slice(&data[self.head..self.head + res]);
                     } else {
-                        buf[..PIPE_BUF_SIZE - self.head].copy_from_slice(&self.data[self.head..]);
+                        buf[..PIPE_BUF_SIZE - self.head].copy_from_slice(&data[self.head..]);
                         buf[PIPE_BUF_SIZE - self.head..res]
-                            .copy_from_slice(&self.data[..self.head + res - PIPE_BUF_SIZE]);
+                            .copy_from_slice(&data[..self.head + res - PIPE_BUF_SIZE]);
                     }
                     res
                 }
@@ -194,6 +196,7 @@ impl PipeBuffer {
             alloc::string::String::from_utf8_lossy(buf)
         );
         let len = buf.len();
+        let data = self.data.ppn().get_bytes_array();
         let res = match self.status {
             PipeBufferStatus::Full => 0,
             _ => {
@@ -202,17 +205,17 @@ impl PipeBuffer {
                     trace!("[PipeBuffer] write maybe empty");
                     let res = core::cmp::min(len, self.head + PIPE_BUF_SIZE - self.tail);
                     if res <= PIPE_BUF_SIZE - self.tail {
-                        self.data[self.tail..self.tail + res].copy_from_slice(&buf[..res]);
+                        data[self.tail..self.tail + res].copy_from_slice(&buf[..res]);
                     } else {
-                        self.data[self.tail..].copy_from_slice(&buf[..PIPE_BUF_SIZE - self.tail]);
-                        self.data[..self.tail + res - PIPE_BUF_SIZE]
+                        data[self.tail..].copy_from_slice(&buf[..PIPE_BUF_SIZE - self.tail]);
+                        data[..self.tail + res - PIPE_BUF_SIZE]
                             .copy_from_slice(&buf[PIPE_BUF_SIZE - self.tail..res]);
                     }
                     res
                 } else {
                     debug!("[PipeBuffer] write normal");
                     let res = core::cmp::min(len, self.head - self.tail);
-                    self.data[self.tail..self.tail + res].copy_from_slice(&buf[..res]);
+                    data[self.tail..self.tail + res].copy_from_slice(&buf[..res]);
                     res
                 }
             }
