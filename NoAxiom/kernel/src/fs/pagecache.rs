@@ -1,4 +1,4 @@
-use core::panic;
+use core::{panic, sync::atomic::AtomicUsize};
 
 use config::mm::PAGE_SIZE;
 use hashbrown::HashMap;
@@ -13,6 +13,8 @@ enum PageState {
     Invalid,
 }
 
+pub static mut FRAME_ALLOCS: AtomicUsize = AtomicUsize::new(0);
+
 pub struct Page {
     data: FrameTracker,
     state: PageState,
@@ -20,6 +22,7 @@ pub struct Page {
 
 impl Page {
     pub fn new() -> Self {
+        unsafe { FRAME_ALLOCS.fetch_add(1, core::sync::atomic::Ordering::SeqCst) };
         Self {
             data: frame_alloc(),
             state: PageState::Invalid,
@@ -39,6 +42,12 @@ impl Page {
             }
             _ => {}
         }
+    }
+}
+
+impl Drop for Page {
+    fn drop(&mut self) {
+        unsafe { FRAME_ALLOCS.fetch_sub(1, core::sync::atomic::Ordering::SeqCst) };
     }
 }
 
