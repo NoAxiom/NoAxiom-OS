@@ -231,7 +231,7 @@ impl SockAddr {
                 addr_ipv4: SockAddrIpv4 {
                     sin_family: AddressFamily::AF_INET as u16,
                     sin_port: endpoint.port.to_be(),
-                    sin_addr: u32::from_be_bytes(v4.0),
+                    sin_addr: u32::from_be_bytes(v4.0).to_be(),
                     sin_zero: [0; 8],
                 },
             },

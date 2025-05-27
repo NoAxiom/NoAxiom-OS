@@ -4,9 +4,11 @@ use arch::{ArchTrapContext, TrapArgs, TrapContext};
 
 use super::{utils::clear_current_syscall, SyscallResult};
 use crate::{
+    fs::pagecache::FRAME_ALLOCS,
     include::{result::Errno, syscall_id::SyscallID},
     syscall::utils::{current_syscall, update_current_syscall},
     task::Task,
+    utils::crossover::intermit,
 };
 
 /// system call tracer for a task
@@ -74,9 +76,9 @@ impl<'a> Syscall<'a> {
             SYS_CONNECT =>      self.sys_connect(args[0], args[1], args[2]).await,
             SYS_SOCKETPAIR =>   self.sys_socketpair(args[0] as isize, args[1] as isize, args[2] as isize, args[3]).await,
             // SYS_ACCEPT4 =>      todo!(),
-            // SYS_SENDTO =>       todo!(),
-            // SYS_RECVFROM =>     todo!(),
-            // SYS_SHUTDOWN =>     todo!(),
+            SYS_SENDTO =>       self.sys_sendto(args[0], args[1], args[2], args[3] as u32, args[4], args[5]).await,
+            SYS_RECVFROM =>     self.sys_recvfrom(args[0], args[1], args[2], args[3] as u32, args[4], args[5]).await,
+            SYS_SHUTDOWN =>     todo!(),
             SYS_GETSOCKNAME =>  self.sys_getsockname(args[0], args[1], args[2]).await,
             SYS_GETPEERNAME =>  self.sys_getpeername(args[0], args[1], args[2]).await,
             SYS_SETSOCKOPT =>   self.sys_setsockopt(args[0], args[1], args[2], args[3], args[4]).await,
@@ -190,6 +192,12 @@ impl<'a> Syscall<'a> {
         if id.is_debug_on() {
             info!("[syscall(out)] id: {:?}, res: {:x?}", id, res);
         }
+        // intermit(|| unsafe {
+        //     println!(
+        //         "[PageCache] holds frames: {}",
+        //         FRAME_ALLOCS.load(core::sync::atomic::Ordering::SeqCst)
+        //     )
+        // });
         res
     }
     fn empty_syscall(name: &str, res: isize) -> SyscallResult {

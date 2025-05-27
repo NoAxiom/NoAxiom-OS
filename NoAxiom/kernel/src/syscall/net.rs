@@ -277,6 +277,83 @@ impl Syscall<'_> {
         Ok(0)
     }
 
+    /// receive data from a socket
+    pub async fn sys_recvfrom(
+        &self,
+        sockfd: usize,
+        buf: usize,
+        len: usize,
+        _flags: u32,
+        addr: usize,
+        addr_len: usize,
+    ) -> SyscallResult {
+        info!(
+            "[sys_recvfrom] sockfd: {}, buf: {}, flags: ignored, addr: {}, addr_len: {}",
+            sockfd, buf, addr, addr_len
+        );
+
+        let fd_table = self.task.fd_table();
+        let socket_file = fd_table
+            .get_socketfile(sockfd as usize)
+            .ok_or(Errno::EBADF)?;
+        drop(fd_table);
+
+        let mut socket = socket_file.socket().await;
+        let buf_ptr = UserPtr::<u8>::new(buf);
+        let buf_slice = buf_ptr.as_slice_mut_checked(len).await?;
+        let (n, endpoint) = socket.read(buf_slice).await;
+        drop(socket);
+
+        let n = n?;
+
+        let sockaddr = SockAddr::from_endpoint(endpoint.unwrap());
+        let user_ptr = UserPtr::<SockAddr>::new(addr);
+        if user_ptr.is_non_null() {
+            debug!("[sys_recvfrom] remote endpoint: {:?}", endpoint);
+            user_ptr.write(sockaddr).await?;
+        } else {
+            warn!(
+                "[sys_recvfrom] addr pointer is null, not writing remote endpoint: {:?}",
+                endpoint
+            );
+        }
+        Ok(n as isize)
+    }
+
+    pub async fn sys_sendto(
+        &self,
+        sockfd: usize,
+        buf: usize,
+        len: usize,
+        _flags: u32,
+        addr: usize,
+        addr_len: usize,
+    ) -> SyscallResult {
+        info!(
+            "[sys_sendto] sockfd: {}, buf: {}, flags: ignored, addr: {}, addr_len: {}",
+            sockfd, buf, addr, addr_len
+        );
+
+        let fd_table = self.task.fd_table();
+        let socket_file = fd_table
+            .get_socketfile(sockfd as usize)
+            .ok_or(Errno::EBADF)?;
+        drop(fd_table);
+
+        let mut socket = socket_file.socket().await;
+        let buf_ptr = UserPtr::<u8>::new(buf);
+        let buf_slice = buf_ptr.as_slice_mut_checked(len).await?;
+        let remote_endpoint = if addr == 0 {
+            None
+        } else {
+            Some(SockAddr::new(addr, addr_len)?.get_endpoint())
+        };
+        let n = socket.write(buf_slice, remote_endpoint).await?;
+        drop(socket);
+
+        Ok(n as isize)
+    }
+
     // socketpair now is like pipe
     pub async fn sys_socketpair(
         &self,

@@ -13,7 +13,7 @@ use super::{
 use crate::{
     fs::vfs::{
         basic::{
-            dentry::{self, Dentry, DentryMeta, EmptyDentry},
+            dentry::{Dentry, DentryMeta},
             file::{File, FileMeta},
             inode::EmptyInode,
         },
@@ -41,31 +41,26 @@ impl Sock {
     pub fn bind(&mut self, addr: SockAddr) -> SysResult<()> {
         let endpoint = addr.get_endpoint();
         match self {
-            Sock::Tcp(socket) => socket.bind(endpoint).map_err(|_| Errno::EINVAL),
-            Sock::Udp(socket) => socket.bind(endpoint).map_err(|_| Errno::EINVAL),
-            // Sock::Unix(unix_sock) => unix_sock.bind().map_err(|_| Errno::EINVAL),
+            Sock::Tcp(socket) => socket.bind(endpoint),
+            Sock::Udp(socket) => socket.bind(endpoint),
         }
     }
     pub fn listen(&mut self, backlog: usize) -> SysResult<()> {
         match self {
-            Sock::Tcp(socket) => socket.listen(backlog).map_err(|_| Errno::EINVAL),
+            Sock::Tcp(socket) => socket.listen(backlog),
             _ => Err(Errno::ENOSYS),
         }
     }
     pub async fn connect(&mut self, addr: SockAddr) -> SysResult<()> {
         let endpoint = addr.get_endpoint();
         match self {
-            Sock::Tcp(socket) => socket.connect(endpoint).await.map_err(|_| Errno::EINVAL),
-            Sock::Udp(socket) => socket.connect(endpoint).await.map_err(|_| Errno::EINVAL),
-            // _ => Err(Errno::ENOSYS),
+            Sock::Tcp(socket) => socket.connect(endpoint).await,
+            Sock::Udp(socket) => socket.connect(endpoint).await,
         }
     }
     pub async fn accept(&mut self) -> SysResult<(TcpSocket, IpEndpoint)> {
         match self {
-            Sock::Tcp(socket) => {
-                let (new_socket, endpoint) = socket.accept().await.map_err(|_| Errno::EINVAL)?;
-                Ok((new_socket, endpoint))
-            }
+            Sock::Tcp(socket) => socket.accept().await,
             _ => Err(Errno::ENOSYS),
         }
     }
@@ -91,6 +86,18 @@ impl Sock {
         match self {
             Sock::Tcp(socket) => socket.peer_endpoint(),
             Sock::Udp(socket) => socket.peer_endpoint(),
+        }
+    }
+    pub async fn read(&mut self, buf: &mut [u8]) -> (SysResult<usize>, Option<IpEndpoint>) {
+        match self {
+            Sock::Tcp(socket) => socket.read(buf).await,
+            Sock::Udp(socket) => socket.read(buf).await,
+        }
+    }
+    pub async fn write(&mut self, buf: &[u8], remote: Option<IpEndpoint>) -> SysResult<usize> {
+        match self {
+            Sock::Tcp(socket) => socket.write(buf, remote).await,
+            Sock::Udp(socket) => socket.write(buf, remote).await,
         }
     }
 }

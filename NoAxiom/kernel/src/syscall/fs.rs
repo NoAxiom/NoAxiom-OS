@@ -825,9 +825,14 @@ impl Syscall<'_> {
         drop(fd_table);
         // let file_name = file.dentry().path()?;
         // info!("[sys_ftruncate] file_name: {:?}", file_name);
-        file.inode().set_size(length);
-        file.inode().truncate(length).await?;
-        Ok(0)
+        if file.size() < length {
+            file.write_at(length, &[0u8; 1]).await?;
+            Ok(0)
+        } else {
+            file.inode().set_size(length);
+            file.inode().truncate(length).await?;
+            Ok(0)
+        }
     }
 
     /// get fs status

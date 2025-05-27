@@ -7,7 +7,6 @@ use smoltcp::{socket, wire::IpEndpoint};
 use super::{tcpsocket::TcpSocket, NET_DEVICES, SOCKET_SET};
 use crate::{
     include::net::{ShutdownType, SocketOptions, SocketType},
-    net::socket::socket::Socket::{Tcp, Udp},
     syscall::SysResult,
 };
 

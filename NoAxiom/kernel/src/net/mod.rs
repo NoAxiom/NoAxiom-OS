@@ -28,12 +28,13 @@ lazy_static::lazy_static! {
     };
 }
 
+#[allow(dead_code)]
 pub mod test {
     use core::ops::DerefMut;
 
     use driver::devices::impls::net::loopback::LoopBackDev;
     use ksync::mutex::SpinLock;
-    use smoltcp::{iface::SocketSet, phy::Loopback, socket::tcp, time::Instant};
+    use smoltcp::{iface::SocketSet, socket::tcp, time::Instant};
 
     use crate::time::gettime::get_time_ms;
 

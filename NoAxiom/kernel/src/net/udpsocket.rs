@@ -9,7 +9,6 @@ use smoltcp::{
 };
 
 use super::{
-    poll::SocketPollMethod,
     socket::{poll_ifaces, Socket, SocketMeta},
     tcpsocket::TcpSocket,
     HANDLE_MAP, SOCKET_SET, UDP_PORT_MANAGER,
@@ -112,6 +111,10 @@ impl Socket for UdpSocket {
     /// from which data was read).
     /// - Failure: Error code
     async fn read(&self, buf: &mut [u8]) -> (SysResult<usize>, Option<IpEndpoint>) {
+        debug!(
+            "[Udp {}] read, remote: {:?}",
+            self.handle, self.remote_endpoint
+        );
         loop {
             poll_ifaces();
             let mut sockets = SOCKET_SET.lock();
@@ -123,11 +126,8 @@ impl Socket for UdpSocket {
                     poll_ifaces();
                     return (Ok(size), Some(metadata.endpoint));
                 }
-            } else {
-                yield_now().await;
-                // 如果socket没有连接，则忙等
-                // return (Err(SystemError::ENOTCONN), Endpoint::Ip(None));
             }
+
             drop(sockets);
             yield_now().await;
         }
@@ -150,6 +150,15 @@ impl Socket for UdpSocket {
                 return Err(Errno::ENOTCONN);
             }
         };
+        debug!("[Udp {}] write to: {:?}", self.handle, remote_endpoint);
+
+        if remote_endpoint.addr.is_unspecified() {
+            error!(
+                "[Udp {}] write error: remote endpoint is unspecified",
+                self.handle
+            );
+            return Err(Errno::EINVAL);
+        }
 
         let mut sockets = SOCKET_SET.lock();
         let socket = sockets.get_mut::<udp::Socket>(self.handle);
@@ -158,17 +167,23 @@ impl Socket for UdpSocket {
             // debug!("udp write: can send");
             match socket.send_slice(buf, *remote_endpoint) {
                 Ok(()) => {
-                    // debug!("udp write: send ok");
                     drop(sockets);
                     poll_ifaces();
                     Ok(buf.len())
                 }
-                Err(_) => {
-                    // debug!("udp write: send err");
+                Err(e) => {
+                    error!(
+                        "[Udp {}] send error : {:?}, local: {:?}, remote: {:?}",
+                        self.handle,
+                        e,
+                        socket.endpoint(),
+                        remote_endpoint
+                    );
                     Err(Errno::ENOBUFS)
                 }
             }
         } else {
+            error!("[Udp {}] send error 2: no buffer", self.handle);
             Err(Errno::ENOBUFS)
         }
     }
@@ -210,6 +225,34 @@ impl Socket for UdpSocket {
     ///
     /// return: whether the operation is successful
     async fn connect(&mut self, remote: IpEndpoint) -> SysResult<()> {
+        assert!(
+            !remote.addr.is_unspecified(),
+            "[Udp {}] remote endpoint is unspecified",
+            self.handle
+        );
+        assert_ne!(remote.port, 0, "[Udp {}] remote port is 0", self.handle);
+
+        let mut sockets = SOCKET_SET.lock();
+        let socket = sockets.get_mut::<udp::Socket>(self.handle);
+        let local = socket.endpoint();
+
+        debug!("[Udp {}] {:?} connect to: {:?}", self.handle, local, remote);
+
+        if local.port == 0 {
+            let mut port_manager = UDP_PORT_MANAGER.lock();
+            let temp_port = port_manager.get_ephemeral_port()?;
+            port_manager.bind_port(temp_port)?;
+            drop(port_manager);
+
+            warn!(
+                "[Udp {}] local port is 0, binding to random port {}",
+                self.handle, temp_port
+            );
+
+            socket.bind(temp_port).map_err(|_| Errno::EINVAL)?;
+        }
+        drop(sockets);
+        poll_ifaces(); // fixme: maybe can in the `if` block
         self.remote_endpoint = Some(remote);
         Ok(())
     }

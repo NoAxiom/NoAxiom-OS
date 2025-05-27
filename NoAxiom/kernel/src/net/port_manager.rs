@@ -4,7 +4,7 @@ use core::task::Waker;
 
 use futures::task::noop_waker;
 
-use crate::{cpu::current_task, include::result::Errno, syscall::SysResult};
+use crate::{include::result::Errno, syscall::SysResult};
 
 pub struct PortItem {
     waker: Waker,
@@ -68,6 +68,9 @@ impl PortManager {
             port
         };
         if let Some(_) = &self.inner.get(&(port as usize)) {
+            // ! FIXME: HERE we just don't care the initial port owner, which can cause many
+            // ! lose
+            return Ok(port);
             // The port is already listened
             error!("[port_manager] Port {port} is already listened");
             Err(Errno::EADDRINUSE)

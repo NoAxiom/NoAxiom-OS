@@ -3,11 +3,7 @@ use alloc::{boxed::Box, vec::Vec};
 use core::task::Waker;
 
 use async_trait::async_trait;
-use smoltcp::{
-    iface::SocketHandle,
-    socket::tcp,
-    wire::{IpAddress, IpEndpoint},
-};
+use smoltcp::{iface::SocketHandle, socket::tcp, wire::IpEndpoint};
 
 use super::{
     socket::{poll_ifaces, Socket, SocketMeta},
@@ -60,7 +56,7 @@ impl TcpSocket {
             options,
         );
 
-        debug!("[tcp] new socket: {}", new_socket_handle);
+        debug!("[Tcp] new socket: {}", new_socket_handle);
 
         let mut handle_map_guard = HANDLE_MAP.write();
         let item = HandleItem::new();
@@ -172,6 +168,9 @@ impl TcpSocket {
                         if self.state == TcpState::Listen {
                             debug!("[Tcp {}] poll: POLLIN is ready 3", self.handles[0]);
                             res |= PollEvent::POLLIN | PollEvent::POLLRDNORM;
+                        } else {
+                            debug!("[Tcp {}] poll: register recv_waker", self.handles[0]);
+                            socket.register_recv_waker(&waker);
                         }
                     }
                     _ => {
@@ -244,13 +243,13 @@ impl Socket for TcpSocket {
                             drop(sockets);
                             poll_ifaces();
                             debug!(
-                                "[tcp {}] read receive: {:?}",
+                                "[Tcp {}] read receive: {:?}",
                                 self.handles[0],
                                 alloc::string::String::from_utf8_lossy(buf)
                             );
                             return (Ok(size), Some(remote_endpoint.unwrap()));
                         } else {
-                            debug!("[tcp {}] read receive: 0, yield!", self.handles[0]);
+                            debug!("[Tcp {}] read receive: 0, yield!", self.handles[0]);
                         }
                     }
                     Err(tcp::RecvError::InvalidState) => {
@@ -264,7 +263,7 @@ impl Socket for TcpSocket {
                             .get_mut(self.handle())
                             .unwrap()
                             .set_shutdown_type(ShutdownType::RCV_SHUTDOWN);
-                        debug!("[tcp {}] read receive: Finished", self.handles[0]);
+                        debug!("[Tcp {}] read receive: Finished", self.handles[0]);
                         return (Err(Errno::ENOTCONN), None);
                     }
                 }
@@ -284,7 +283,7 @@ impl Socket for TcpSocket {
     ///
     /// return: the length of the data written
     async fn write(&self, buf: &[u8], _to: Option<IpEndpoint>) -> SysResult<usize> {
-        debug!("[tcp {}] write: {}", self.handles[0], self.handles[0]);
+        debug!("[Tcp {}] write: {}", self.handles[0], self.handles[0]);
         if HANDLE_MAP
             .read()
             .get(&self.handles[0])
@@ -292,7 +291,7 @@ impl Socket for TcpSocket {
             .get_shutdown_type()
             .contains(ShutdownType::RCV_SHUTDOWN)
         {
-            warn!("[tcp {}] write: socket is closed", self.handles[0]);
+            warn!("[Tcp {}] write: socket is closed", self.handles[0]);
             return Err(Errno::ENOTCONN);
         }
         let mut sockets = SOCKET_SET.lock();
@@ -305,10 +304,11 @@ impl Socket for TcpSocket {
                         drop(sockets);
                         poll_ifaces();
                         debug!(
-                            "[tcp {}] write send: {:?}",
+                            "[Tcp {}] write send: {:?}",
                             self.handles[0],
                             alloc::string::String::from_utf8_lossy(buf)
                         );
+                        yield_now().await; // fixme: yield to let other task to run!
                         Ok(size)
                     }
                     Err(e) => {
@@ -318,19 +318,19 @@ impl Socket for TcpSocket {
                 }
             } else {
                 error!(
-                    "[tcp {}] write: No buffer space available.",
+                    "[Tcp {}] write: No buffer space available.",
                     self.handles[0]
                 );
                 Err(Errno::ENOBUFS)
             }
         } else {
-            error!("[tcp {}] write: socket is closed", self.handles[0]);
+            error!("[Tcp {}] write: socket is closed", self.handles[0]);
             Err(Errno::ENOTCONN)
         }
     }
 
     fn bind(&mut self, local: IpEndpoint) -> SysResult<()> {
-        debug!("[tcp {}] bind to {:?}", self.handles[0], local);
+        debug!("[Tcp {}] bind to {:?}", self.handles[0], local);
         let mut port_manager = TCP_PORT_MANAGER.lock();
         port_manager.bind_port(local.port)?;
         self.local_endpoint = Some(local);
@@ -342,10 +342,10 @@ impl Socket for TcpSocket {
     ///
     /// return: whether the operation is successful
     fn listen(&mut self, _backlog: usize) -> SysResult<()> {
-        const MAX_BACKLOG: usize = 10;
+        // const MAX_BACKLOG: usize = 10;
         if self.state == TcpState::Listen {
             debug!(
-                "[tcp {}] listen: socket is already listening",
+                "[Tcp {}] listen: socket is already listening",
                 self.handles[0]
             );
             return Ok(());
@@ -353,7 +353,7 @@ impl Socket for TcpSocket {
 
         // let mut backlog = backlog;
         // if backlog > MAX_BACKLOG {
-        //     warn!("[tcp {}] listen backlog is too large, set to {}", MAX_BACKLOG);
+        //     warn!("[Tcp {}] listen backlog is too large, set to {}", MAX_BACKLOG);
         //     backlog = MAX_BACKLOG;
         // }
 
@@ -373,7 +373,7 @@ impl Socket for TcpSocket {
         (0..handlen).for_each(|i| {
             let handle = self.handles[i];
             debug!(
-                "[tcp {}] new socket {} is begin to listen",
+                "[Tcp {}] new socket {} is begin to listen",
                 self.handles[0], handle
             );
             let socket = sockets.get_mut::<tcp::Socket>(handle);
@@ -391,16 +391,19 @@ impl Socket for TcpSocket {
     ///
     /// return: whether the operation is successful
     async fn connect(&mut self, remote: IpEndpoint) -> SysResult<()> {
-        debug!("[tcp {}] begin connect to {:?}", self.handles[0], remote);
-        if remote.addr.is_unspecified() {
-            warn!("[tcp {}] remote endpoint is unspecified", self.handles[0]);
-        }
+        debug!("[Tcp {}] begin connect to {:?}", self.handles[0], remote);
+        assert!(
+            !remote.addr.is_unspecified(),
+            "[Tcp {}] remote endpoint is unspecified",
+            self.handles[0]
+        );
+        assert_ne!(remote.port, 0, "[Tcp {}] remote port is 0", self.handles[0]);
+
         let mut sockets = SOCKET_SET.lock();
         let local_socket = sockets.get_mut::<tcp::Socket>(self.handles[0]);
 
         let mut port_manager = TCP_PORT_MANAGER.lock();
         let temp_port = port_manager.get_ephemeral_port()?;
-        // check whether the port is used, if not, bind it
         port_manager.bind_port(temp_port)?;
         drop(port_manager);
 
@@ -441,16 +444,16 @@ impl Socket for TcpSocket {
                     unreachable!()
                 }
                 tcp::State::SynSent => {
-                    intermit(|| debug!("[tcp {}] connect loop: Synsent", self.handles[0]));
+                    intermit(|| debug!("[Tcp {}] connect loop: Synsent", self.handles[0]));
                     drop(sockets);
                     yield_now().await;
                 }
                 tcp::State::Established => {
-                    debug!("[tcp {}] connect loop: Established", self.handles[0]);
+                    debug!("[Tcp {}] connect loop: Established", self.handles[0]);
                     return Ok(());
                 }
                 _ => {
-                    error!("[tcp {}] connect loop: InvalidState", self.handles[0]);
+                    error!("[Tcp {}] connect loop: InvalidState", self.handles[0]);
                     return Err(Errno::ECONNREFUSED);
                 }
             }
@@ -459,7 +462,7 @@ impl Socket for TcpSocket {
 
     /// It is used to accept a new incoming connection.
     async fn accept(&mut self) -> SysResult<(TcpSocket, IpEndpoint)> {
-        debug!("[tcp {}] accept", self.handles[0]);
+        debug!("[Tcp {}] accept", self.handles[0]);
         if self.state != TcpState::Listen {
             return Err(Errno::EINVAL);
         }
