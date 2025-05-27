@@ -4,3 +4,6 @@
 [submodule "NoAxiom-OS-User"]
 	path = NoAxiom-OS-User
 	url = https://github.com/NoAxiom/NoAxiom-OS-User.git
+[submodule "NoAxiom-OS-Document"]
+	path = NoAxiom-OS-Document
+	url = https://github.com/NoAxiom/NoAxiom-OS-Document.git
