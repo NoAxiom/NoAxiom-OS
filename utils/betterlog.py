@@ -188,7 +188,7 @@ if __name__ == "__main__":
     output_file_path = args.output_file
 
     try:
-        with open(input_file_path, 'r', encoding='utf-8') as f:
+        with open(input_file_path, 'r', encoding='utf-8', errors='replace') as f:
             log_content_for_script = f.read()
         
         print(f"正在处理日志文件: {input_file_path}...")
