@@ -347,10 +347,10 @@ impl Socket for TcpSocket {
         }
     }
 
-    fn bind(&mut self, local: IpEndpoint) -> SysResult<()> {
+    fn bind(&mut self, local: IpEndpoint, fd: usize) -> SysResult<()> {
         debug!("[Tcp {}] bind to {:?}", self.handles[0], local);
         let mut port_manager = TCP_PORT_MANAGER.lock();
-        port_manager.bind_port(local.port)?;
+        port_manager.bind_port_with_fd(local.port, fd)?;
         self.local_endpoint = Some(local);
         Ok(())
     }
@@ -422,7 +422,7 @@ impl Socket for TcpSocket {
 
         let mut port_manager = TCP_PORT_MANAGER.lock();
         let temp_port = port_manager.get_ephemeral_port()?;
-        port_manager.bind_port_volatile(temp_port)?;
+        port_manager.bind_port(temp_port)?;
         drop(port_manager);
 
         let driver_write_guard = NET_DEVICES.write();

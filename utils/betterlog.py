@@ -102,7 +102,7 @@ def analyze_log_tid_blocks_final(log_content):
             level_val = parsed_line.get("level", "").upper() 
             time_val = parsed_line.get("time") 
             
-            new_metadata_replacement = f"[{level_val} at {time_val}ms] "
+            new_metadata_replacement = f"[{level_val:>{5}} at {time_val}ms] "
             
             if original_metadata_tag:
                 display_line_content = original_full_line_stripped.replace(

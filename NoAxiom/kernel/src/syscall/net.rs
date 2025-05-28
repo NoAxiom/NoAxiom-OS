@@ -53,9 +53,28 @@ impl Syscall<'_> {
         drop(fd_table);
 
         let mut socket = socket_file.socket().await;
-        socket.bind(sock_addr)?;
-        debug!("[sys_bind] bind ok");
-        Ok(0)
+        let res = socket.bind(sock_addr, sockfd);
+        match res {
+            // !fixme: now we SPECIALLY handle EADDRINUSE, to handle the case that multiple sockets
+            // !use the same port
+            Err(Errno::EADDRINUSE) => {
+                warn!("[sys_bind] address already in use, so we copy from the old socket file");
+                // get the old socket file
+                let old_fd = crate::net::get_old_socket_fd(sock_addr.get_endpoint().port);
+
+                // copy the old socket file to the current one, and the current one will be
+                // dropped
+                let mut fd_table = self.task.fd_table();
+                fd_table.copyfrom(old_fd, sockfd)?;
+                drop(fd_table);
+                Ok(0)
+            }
+            r => {
+                r.unwrap();
+                debug!("[sys_bind] bind ok");
+                Ok(0)
+            }
+        }
     }
 
     pub async fn sys_listen(&self, sockfd: usize, backlog: usize) -> SyscallResult {

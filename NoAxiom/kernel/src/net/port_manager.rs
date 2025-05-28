@@ -1,30 +1,16 @@
-//! IP layer
 use alloc::{boxed::Box, collections::btree_map::BTreeMap};
-use core::task::Waker;
-
-use futures::task::noop_waker;
 
 use crate::{include::result::Errno, syscall::SysResult};
 
 pub struct PortItem {
-    waker: Waker,
+    pub fd: usize,
 }
 
 impl PortItem {
-    pub fn new(waker: Waker) -> Self {
-        Self { waker }
+    pub fn new(fd: usize) -> Self {
+        Self { fd }
     }
 }
-
-impl Default for PortItem {
-    fn default() -> Self {
-        Self {
-            waker: noop_waker(),
-        }
-    }
-}
-
-const EMPTY_PORT_ITEM: Option<PortItem> = None;
 
 /// A table to record the listening endpoint of each port
 /// for both TCP/UDP
@@ -33,7 +19,7 @@ const EMPTY_PORT_ITEM: Option<PortItem> = None;
 /// `Some(x)` means the port is listened and the waker is used to wake up
 /// the socket
 pub struct PortManager {
-    inner: Box<BTreeMap<usize, PortItem>>,
+    pub inner: Box<BTreeMap<u16, PortItem>>,
 }
 
 impl PortManager {
@@ -52,7 +38,7 @@ impl PortManager {
             unsafe {
                 EPHEMERAL_PORT += 1;
             }
-            if self.inner.get(&(test_port as usize)).is_none() {
+            if self.inner.get(&test_port).is_none() {
                 debug!("[port_manager] Get ephemeral port {test_port}");
                 return Ok(test_port);
             }
@@ -60,45 +46,38 @@ impl PortManager {
         Err(Errno::EADDRINUSE)
     }
 
-    /// Bind a port with a socket, error if the port is already listened or run
-    /// out of ephemeral ports
-    pub fn bind_port_volatile(&mut self, port: u16) -> SysResult<u16> {
-        let port = if port == 0 {
-            self.get_ephemeral_port()?
-        } else {
-            port
-        };
-        if let Some(_) = &self.inner.get(&(port as usize)) {
-            Ok(port)
+    /// Bind a port with **SPECIFIC** port and fd
+    pub fn bind_port_with_fd(&mut self, port: u16, fd: usize) -> SysResult<u16> {
+        assert!(port < 49152, "Port number must be set");
+        if let Some(_) = &self.inner.get(&port) {
+            error!("[port_manager] Port {port} is already listened (with fd {fd})");
+            Err(Errno::EADDRINUSE)
         } else {
             // let waker = current_task().unwrap().waker();
-            let waker = noop_waker();
-            self.inner.insert(port as usize, PortItem::new(waker));
+            self.inner.insert(port, PortItem::new(fd));
             Ok(port)
         }
     }
 
-    /// Bind a port with a socket, if the port is listened, it will just return
-    /// the port, error only when run out of ephemeral ports
+    /// Bind a port with a **RANDOM** port
     pub fn bind_port(&mut self, port: u16) -> SysResult<u16> {
-        let port = if port == 0 {
-            self.get_ephemeral_port()?
-        } else {
-            port
-        };
-        if let Some(_) = &self.inner.get(&(port as usize)) {
+        // port is u16 which is less than 65536
+        assert!(
+            49152 <= port,
+            "Port number must be range from 49152 to 65535"
+        );
+        if let Some(_) = &self.inner.get(&port) {
             error!("[port_manager] Port {port} is already listened");
             Err(Errno::EADDRINUSE)
         } else {
             // let waker = current_task().unwrap().waker();
-            let waker = noop_waker();
-            self.inner.insert(port as usize, PortItem::new(waker));
+            self.inner.insert(port, PortItem::new(usize::MAX));
             Ok(port)
         }
     }
 
     pub fn unbind_port(&mut self, port: u16) {
-        if let Some(_) = self.inner.remove(&(port as usize)) {
+        if let Some(_) = self.inner.remove(&port) {
             debug!("[port_manager] Unbind port {port}");
         } else {
             warn!("[port_manager] Port {port} is not listened");

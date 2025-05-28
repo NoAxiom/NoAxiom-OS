@@ -69,7 +69,7 @@ pub trait Socket: Send + Sync + DowncastSync {
     /// address and port number on the local machine.
     ///
     /// return: whether the operation is successful
-    fn bind(&mut self, local: IpEndpoint) -> SysResult<()>;
+    fn bind(&mut self, local: IpEndpoint, fd: usize) -> SysResult<()>;
 
     /// `backlog` is the maximum length to which the queue of pending
     /// connections

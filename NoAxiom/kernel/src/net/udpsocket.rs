@@ -77,7 +77,7 @@ impl UdpSocket {
         if req.contains(PollEvent::POLLIN) {
             debug!("[Udp {}] poll: req has POLLIN", self.handle);
             if socket.can_recv() {
-                debug!("[Udp {}] poll: POLLIN is ready 1", self.handle);
+                debug!("[Udp {}] poll: POLLIN is ready", self.handle);
                 res |= PollEvent::POLLIN | PollEvent::POLLRDNORM;
             } else {
                 debug!("[Udp {}] poll: register recv_waker", self.handle);
@@ -112,8 +112,10 @@ impl Socket for UdpSocket {
     /// - Failure: Error code
     async fn read(&self, buf: &mut [u8]) -> (SysResult<usize>, Option<IpEndpoint>) {
         debug!(
-            "[Udp {}] read, remote: {:?}",
-            self.handle, self.remote_endpoint
+            "[Udp {}] read, local: {:?}, remote: {:?}",
+            self.handle,
+            self.local_endpoint(),
+            self.remote_endpoint
         );
         loop {
             poll_ifaces();
@@ -124,11 +126,17 @@ impl Socket for UdpSocket {
                 if let Ok((size, metadata)) = socket.recv_slice(buf) {
                     drop(sockets);
                     poll_ifaces();
+                    debug!(
+                        "[Udp {}] read receive: {:?}",
+                        self.handle,
+                        alloc::string::String::from_utf8_lossy(buf)
+                    );
                     return (Ok(size), Some(metadata.endpoint));
                 }
             }
 
             drop(sockets);
+            debug!("[Udp {}] read: no data, yield", self.handle);
             yield_now().await;
         }
     }
@@ -169,6 +177,11 @@ impl Socket for UdpSocket {
                 Ok(()) => {
                     drop(sockets);
                     poll_ifaces();
+                    debug!(
+                        "[Udp {}] write send: {:?}",
+                        self.handle,
+                        alloc::string::String::from_utf8_lossy(buf)
+                    );
                     Ok(buf.len())
                 }
                 Err(e) => {
@@ -188,10 +201,10 @@ impl Socket for UdpSocket {
         }
     }
 
-    fn bind(&mut self, local: IpEndpoint) -> SysResult<()> {
+    fn bind(&mut self, local: IpEndpoint, fd: usize) -> SysResult<()> {
         debug!("[Udp {}] bind to: {:?}", self.handle, local);
         let mut port_manager = UDP_PORT_MANAGER.lock();
-        let port = port_manager.bind_port_volatile(local.port)?;
+        let port = port_manager.bind_port_with_fd(local.port, fd)?;
         drop(port_manager);
 
         let mut sockets = SOCKET_SET.lock();
@@ -231,6 +244,7 @@ impl Socket for UdpSocket {
             self.handle
         );
         assert_ne!(remote.port, 0, "[Udp {}] remote port is 0", self.handle);
+        self.remote_endpoint = Some(remote);
 
         let mut sockets = SOCKET_SET.lock();
         let socket = sockets.get_mut::<udp::Socket>(self.handle);
@@ -241,7 +255,7 @@ impl Socket for UdpSocket {
         if local.port == 0 {
             let mut port_manager = UDP_PORT_MANAGER.lock();
             let temp_port = port_manager.get_ephemeral_port()?;
-            port_manager.bind_port_volatile(temp_port)?;
+            port_manager.bind_port(temp_port)?;
             drop(port_manager);
 
             warn!(
@@ -253,7 +267,6 @@ impl Socket for UdpSocket {
         }
         drop(sockets);
         poll_ifaces(); // fixme: maybe can in the `if` block
-        self.remote_endpoint = Some(remote);
         Ok(())
     }
 
@@ -271,15 +284,20 @@ impl Socket for UdpSocket {
         let sockets = SOCKET_SET.lock();
         let socket = sockets.get::<udp::Socket>(self.handle);
         let listen_endpoint = socket.endpoint();
+        drop(sockets);
 
         if listen_endpoint.port == 0 {
+            warn!(
+                "[Udp {}] local port is 0, it means the socket is not bound",
+                self.handle
+            );
             None
         } else {
             // support ipv4 only
             // TODO: support ipv6
             let endpoint = IpEndpoint::new(
                 // if listen_endpoint.addr is None, it means "listen to all addresses"
-                listen_endpoint.addr.unwrap_or(IpAddress::v4(0, 0, 0, 0)),
+                listen_endpoint.addr.unwrap_or(IpAddress::v4(127, 0, 0, 1)),
                 listen_endpoint.port,
             );
             return Some(endpoint);
@@ -301,14 +319,23 @@ impl Drop for UdpSocket {
             "[Udp {}] drop socket, remote: {:?}",
             self.handle, self.remote_endpoint
         );
-        // poll_ifaces();
-        // let mut sockets = SOCKET_SET.lock();
-        // let handle = self.handle;
-        // let socket = sockets.get_mut::<udp::Socket>(handle);
-        // if socket.is_open() {
-        //     socket.close();
-        // }
-        // sockets.remove(handle);
-        // poll_ifaces();
+
+        if let Some(local) = self.local_endpoint() {
+            let mut port_manager = UDP_PORT_MANAGER.lock();
+            port_manager.unbind_port(local.port);
+            drop(port_manager);
+        }
+
+        poll_ifaces();
+        let mut sockets = SOCKET_SET.lock();
+        let handle = self.handle;
+        let socket = sockets.get_mut::<udp::Socket>(handle);
+        if socket.is_open() {
+            socket.close();
+            warn!("[Udp {}] socket is closed", handle);
+        }
+        sockets.remove(handle);
+        drop(sockets);
+        poll_ifaces();
     }
 }

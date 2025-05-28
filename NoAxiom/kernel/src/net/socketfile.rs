@@ -38,11 +38,11 @@ pub enum Sock {
 }
 
 impl Sock {
-    pub fn bind(&mut self, addr: SockAddr) -> SysResult<()> {
+    pub fn bind(&mut self, addr: SockAddr, fd: usize) -> SysResult<()> {
         let endpoint = addr.get_endpoint();
         match self {
-            Sock::Tcp(socket) => socket.bind(endpoint),
-            Sock::Udp(socket) => socket.bind(endpoint),
+            Sock::Tcp(socket) => socket.bind(endpoint, fd),
+            Sock::Udp(socket) => socket.bind(endpoint, fd),
         }
     }
     pub fn listen(&mut self, backlog: usize) -> SysResult<()> {
@@ -254,24 +254,22 @@ impl File for SocketFile {
 
     fn poll(&self, req: &PollEvent, waker: Waker) -> PollEvent {
         let mut sock = block_on(self.socket());
-        poll_ifaces();
         let poll_res = match &mut *sock {
             Sock::Tcp(socket) => socket.poll(req, waker),
             Sock::Udp(socket) => socket.poll(req, waker),
         };
 
         let mut res = PollEvent::empty();
-        if req.contains(PollEvent::POLLIN) && poll_res.contains(PollEvent::POLLIN) {
+        if poll_res.contains(PollEvent::POLLIN) {
             res |= PollEvent::POLLIN;
         }
-        if req.contains(PollEvent::POLLOUT) && poll_res.contains(PollEvent::POLLOUT) {
+        if poll_res.contains(PollEvent::POLLOUT) {
             res |= PollEvent::POLLOUT;
         }
         if poll_res.contains(PollEvent::POLLHUP) {
             warn!("[Socket::poll] PollEvent is hangup");
             res |= PollEvent::POLLHUP;
         }
-        debug!("[Socket::poll] the result of PollEvent is {:?}", res);
         res
     }
 }

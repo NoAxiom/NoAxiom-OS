@@ -192,6 +192,7 @@ impl<'a> Syscall<'a> {
         if id.is_debug_on() {
             info!("[syscall(out)] id: {:?}, res: {:x?}", id, res);
         }
+        // crate::utils::loghook::log_hook();
         // intermit(|| unsafe {
         //     println!(
         //         "[PageCache] holds frames: {}",
