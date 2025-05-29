@@ -5,11 +5,7 @@ use async_trait::async_trait;
 use ksync::async_mutex::{AsyncMutex, AsyncMutexGuard};
 use smoltcp::wire::IpEndpoint;
 
-use super::{
-    socket::{poll_ifaces, SocketMeta},
-    tcpsocket::TcpSocket,
-    udpsocket::UdpSocket,
-};
+use super::{socket::SocketMeta, tcpsocket::TcpSocket, udpsocket::UdpSocket};
 use crate::{
     fs::vfs::{
         basic::{

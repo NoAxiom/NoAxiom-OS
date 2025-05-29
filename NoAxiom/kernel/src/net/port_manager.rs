@@ -1,5 +1,7 @@
 use alloc::{boxed::Box, collections::btree_map::BTreeMap};
 
+use smoltcp::wire::{IpEndpoint, IpListenEndpoint};
+
 use crate::{include::result::Errno, syscall::SysResult};
 
 pub struct PortItem {
@@ -48,9 +50,8 @@ impl PortManager {
 
     /// Bind a port with **SPECIFIC** port and fd
     pub fn bind_port_with_fd(&mut self, port: u16, fd: usize) -> SysResult<u16> {
-        assert!(port < 49152, "Port number must be set");
         if let Some(_) = &self.inner.get(&port) {
-            error!("[port_manager] Port {port} is already listened (with fd {fd})");
+            warn!("[port_manager] Port {port} is already listened (with fd {fd})");
             Err(Errno::EADDRINUSE)
         } else {
             // let waker = current_task().unwrap().waker();
@@ -81,6 +82,20 @@ impl PortManager {
             debug!("[port_manager] Unbind port {port}");
         } else {
             warn!("[port_manager] Port {port} is not listened");
+        }
+    }
+
+    pub fn resolve_port(&self, endpoint: &IpEndpoint) -> SysResult<u16> {
+        if endpoint.addr.is_unspecified() {
+            let port = if endpoint.port == 0 {
+                self.get_ephemeral_port()?
+            } else {
+                endpoint.port
+            };
+            Ok(port)
+        } else {
+            assert_ne!(endpoint.port, 0);
+            Ok(endpoint.port)
         }
     }
 }

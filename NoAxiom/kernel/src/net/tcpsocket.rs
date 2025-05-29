@@ -16,7 +16,7 @@ use crate::{
         net::{ShutdownType, SocketOptions, SocketType},
         result::Errno,
     },
-    net::{handle::HandleItem, port_manager, HANDLE_MAP},
+    net::{handle::HandleItem, HANDLE_MAP},
     sched::utils::yield_now,
     syscall::SysResult,
     utils::crossover::intermit,
@@ -116,10 +116,6 @@ impl TcpSocket {
                 "[Tcp::do_listen {}] local endpoint: {}:{} is unspecified",
                 self.handles[0], local_endpoint.addr, local_endpoint.port
             );
-            // let end_point = IpEndpoint::new(IpAddress::v4(127, 0, 0, 1),
-            // local_endpoint.port); debug!("[Tcp::do_listen] listening addr:
-            // {}", local_endpoint.addr); debug!("[Tcp::do_listen] listening
-            // port: {}", local_endpoint.port);
             debug!(
                 "[Tcp::do_listen {}] listening: {:?}",
                 self.handles[0], local_endpoint.port
@@ -263,7 +259,7 @@ impl Socket for TcpSocket {
                             debug!(
                                 "[Tcp {}] read receive: {:?}",
                                 self.handles[0],
-                                alloc::string::String::from_utf8_lossy(buf)
+                                alloc::string::String::from_utf8_lossy(&buf[..10.min(buf.len())])
                             );
                             return (Ok(size), Some(remote_endpoint.unwrap()));
                         } else {
@@ -324,9 +320,9 @@ impl Socket for TcpSocket {
                         debug!(
                             "[Tcp {}] write send: {:?}",
                             self.handles[0],
-                            alloc::string::String::from_utf8_lossy(buf)
+                            alloc::string::String::from_utf8_lossy(&buf[..10.min(buf.len())])
                         );
-                        yield_now().await; // fixme: yield to let other task to run!
+                        yield_now().await; // fixme: yield to let other task to run! why?? amazing?!
                         Ok(size)
                     }
                     Err(e) => {
@@ -350,8 +346,10 @@ impl Socket for TcpSocket {
     fn bind(&mut self, local: IpEndpoint, fd: usize) -> SysResult<()> {
         debug!("[Tcp {}] bind to {:?}", self.handles[0], local);
         let mut port_manager = TCP_PORT_MANAGER.lock();
-        port_manager.bind_port_with_fd(local.port, fd)?;
-        self.local_endpoint = Some(local);
+        let port = port_manager.resolve_port(&local)?;
+        port_manager.bind_port_with_fd(port, fd).unwrap();
+        self.local_endpoint = Some(IpEndpoint::new(local.addr, port));
+        self.state = TcpState::Closed;
         Ok(())
     }
 
@@ -369,24 +367,8 @@ impl Socket for TcpSocket {
             return Ok(());
         }
 
-        // let mut backlog = backlog;
-        // if backlog > MAX_BACKLOG {
-        //     warn!("[Tcp {}] listen backlog is too large, set to {}", MAX_BACKLOG);
-        //     backlog = MAX_BACKLOG;
-        // }
-
         let handlen = self.handles.len();
-        // let backlog = handlen.max(backlog);
         let mut sockets = SOCKET_SET.lock();
-        // let mut handle_map = HANDLE_MAP.write();
-
-        // self.handles.extend((handlen..backlog).map(|_| {
-        //     let new_socket = Self::new_socket();
-        //     let handle = sockets.add(new_socket);
-        //     let item = HandleItem::new(); // todo:
-        //     handle_map.insert(handle, item);
-        //     handle
-        // }));
 
         (0..handlen).for_each(|i| {
             let handle = self.handles[i];
@@ -417,17 +399,19 @@ impl Socket for TcpSocket {
         );
         assert_ne!(remote.port, 0, "[Tcp {}] remote port is 0", self.handles[0]);
 
-        let mut sockets = SOCKET_SET.lock();
-        let local_socket = sockets.get_mut::<tcp::Socket>(self.handles[0]);
-
+        assert!(self.local_endpoint.is_none());
         let mut port_manager = TCP_PORT_MANAGER.lock();
         let temp_port = port_manager.get_ephemeral_port()?;
         port_manager.bind_port(temp_port)?;
         drop(port_manager);
 
+        yield_now().await; // amazing yield maybe
+
         let driver_write_guard = NET_DEVICES.write();
         let iface = driver_write_guard.get(&0).unwrap().clone(); // now we only have one net device
         drop(driver_write_guard);
+        let mut sockets = SOCKET_SET.lock();
+        let local_socket = sockets.get_mut::<tcp::Socket>(self.handles[0]);
         let mut iface_inner = iface.inner_iface().lock();
         local_socket
             .connect(iface_inner.context(), remote, temp_port)
@@ -435,6 +419,7 @@ impl Socket for TcpSocket {
                 tcp::ConnectError::InvalidState => Errno::EISCONN,
                 tcp::ConnectError::Unaddressable => Errno::EADDRNOTAVAIL,
             })?;
+        assert_eq!(local_socket.state(), tcp::State::SynSent);
 
         drop(sockets);
         drop(iface_inner);
@@ -459,7 +444,22 @@ impl Socket for TcpSocket {
             */
             match local_socket.state() {
                 tcp::State::Closed => {
-                    unreachable!()
+                    error!("[Tcp {}] connect loop: Closed", self.handles[0]);
+                    let driver_write_guard = NET_DEVICES.write();
+                    let iface = driver_write_guard.get(&0).unwrap().clone(); // now we only have one net device
+                    drop(driver_write_guard);
+
+                    let mut iface_inner = iface.inner_iface().lock();
+                    local_socket
+                        .connect(iface_inner.context(), remote, temp_port)
+                        .map_err(|e| match e {
+                            tcp::ConnectError::InvalidState => Errno::EISCONN,
+                            tcp::ConnectError::Unaddressable => Errno::EADDRNOTAVAIL,
+                        })?;
+
+                    drop(sockets);
+                    drop(iface_inner);
+                    yield_now().await;
                 }
                 tcp::State::SynSent => {
                     intermit(|| debug!("[Tcp {}] connect loop: Synsent", self.handles[0]));
@@ -528,6 +528,7 @@ impl Socket for TcpSocket {
                 return Ok((ret_old_socket, remote_endpoint));
             }
 
+            drop(sockets);
             yield_now().await;
         }
     }

@@ -1,5 +1,5 @@
 use alloc::{boxed::Box, vec};
-use core::task::Waker;
+use core::{error, task::Waker};
 
 use async_trait::async_trait;
 use smoltcp::{
@@ -23,6 +23,7 @@ use crate::{
     net::handle::HandleItem,
     sched::utils::yield_now,
     syscall::SysResult,
+    utils::crossover::intermit,
 };
 
 pub struct UdpSocket {
@@ -127,9 +128,11 @@ impl Socket for UdpSocket {
                     drop(sockets);
                     poll_ifaces();
                     debug!(
-                        "[Udp {}] read receive: {:?}",
+                        "[Udp {}] read {} bytes, receive: {:?}, raw: {:?}",
                         self.handle,
-                        alloc::string::String::from_utf8_lossy(buf)
+                        size,
+                        alloc::string::String::from_utf8_lossy(&buf[..10.min(size)]),
+                        &buf[..10.min(size)]
                     );
                     return (Ok(size), Some(metadata.endpoint));
                 }
@@ -137,6 +140,7 @@ impl Socket for UdpSocket {
 
             drop(sockets);
             debug!("[Udp {}] read: no data, yield", self.handle);
+            intermit(|| error!("[Udp {}] read: no data, yielding", self.handle));
             yield_now().await;
         }
     }
@@ -180,7 +184,7 @@ impl Socket for UdpSocket {
                     debug!(
                         "[Udp {}] write send: {:?}",
                         self.handle,
-                        alloc::string::String::from_utf8_lossy(buf)
+                        alloc::string::String::from_utf8_lossy(&buf[..10.min(buf.len())])
                     );
                     Ok(buf.len())
                 }
@@ -204,7 +208,8 @@ impl Socket for UdpSocket {
     fn bind(&mut self, local: IpEndpoint, fd: usize) -> SysResult<()> {
         debug!("[Udp {}] bind to: {:?}", self.handle, local);
         let mut port_manager = UDP_PORT_MANAGER.lock();
-        let port = port_manager.bind_port_with_fd(local.port, fd)?;
+        let port = port_manager.resolve_port(&local)?;
+        let port = port_manager.bind_port_with_fd(port, fd)?;
         drop(port_manager);
 
         let mut sockets = SOCKET_SET.lock();
@@ -216,7 +221,13 @@ impl Socket for UdpSocket {
         } else {
             socket.bind(local)
         }
-        .map_err(|_| Errno::EINVAL)?;
+        .map_err(|e| {
+            error!(
+                "[Udp {}] bind error: {:?}, local: {:?}, remote: {:?}",
+                self.handle, e, local, self.remote_endpoint
+            );
+            Errno::EINVAL
+        })?;
 
         Ok(())
     }
