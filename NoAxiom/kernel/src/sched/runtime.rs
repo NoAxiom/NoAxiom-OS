@@ -1,16 +1,19 @@
+use alloc::sync::Arc;
+
 use arch::{Arch, ArchInt, ArchMemory};
-use async_task::Runnable;
+use async_task::{Builder, Runnable, WithInfo};
 use config::task::INIT_PROCESS_ID;
 use ksync::mutex::SpinLock;
 use lazy_static::lazy_static;
 
 use super::{
+    sched_entity::SchedMetadata,
     scheduler::{Info, MultiLevelScheduler},
     vsched::{Runtime, Scheduler},
 };
 use crate::{
     cpu::{get_hartid, CPUS},
-    task::manager::TASK_MANAGER,
+    task::{manager::TASK_MANAGER, Task},
     time::{gettime::get_time_duration, timer::timer_handler},
 };
 
@@ -33,6 +36,20 @@ impl Runtime<SchedulerImpl, Info> for SimpleRuntime {
     }
     fn schedule(&self, runnable: Runnable<Info>, info: async_task::ScheduleInfo) {
         self.scheduler.lock().push(runnable, info);
+    }
+    fn spawn<F>(self: &'static Self, future: F, task: Option<&Arc<Task>>)
+    where
+        F: core::future::Future<Output: Send + 'static> + Send + 'static,
+    {
+        let metadata = task
+            .map(|task| SchedMetadata::from_task(task))
+            .unwrap_or_else(SchedMetadata::default);
+        let (runnable, handle) = Builder::new().metadata(metadata).spawn(
+            move |_| future,
+            WithInfo(move |runnable, info| self.schedule(runnable, info)),
+        );
+        runnable.schedule();
+        handle.detach();
     }
 }
 

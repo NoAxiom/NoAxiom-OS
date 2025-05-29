@@ -1,7 +1,3 @@
-//! ## async executor
-//! - [`spawn_raw`] to add a task
-//! - [`run`] to run next task
-
 use alloc::collections::vec_deque::VecDeque;
 
 use async_task::Runnable;
@@ -58,6 +54,7 @@ impl Scheduler<Info> for DualPrioScheduler {
     }
 }
 
+// FIXME: should use dual prio scheduler
 type ExpiredSchedulerInnerImpl = FifoScheduler;
 pub struct ExpiredScheduler {
     current: SyncUnsafeCell<ExpiredSchedulerInnerImpl>,
@@ -108,13 +105,6 @@ impl Scheduler<Info> for MultiLevelScheduler {
         }
     }
     fn push(&mut self, runnable: Runnable<Info>, info: async_task::ScheduleInfo) {
-        // let tid = runnable.metadata().tid();
-        // if tid == 4 || tid == 6 {
-        //     debug!(
-        //         "[scheduler] push, tid: {}, woken_while_running: {}",
-        //         tid, info.woken_while_running
-        //     );
-        // }
         let entity = runnable.metadata().sched_entity();
         if let Some(entity) = entity {
             match entity.sched_prio {
