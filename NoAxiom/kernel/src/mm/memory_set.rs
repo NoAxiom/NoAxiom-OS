@@ -511,6 +511,8 @@ impl MemorySet {
 
         // heap
         let area = &self.brk.area;
+        new_set.brk.start = self.brk.start;
+        new_set.brk.end = self.brk.end;
         let mut new_area = MapArea::from_another(area);
         for vpn in area.vpn_range {
             if let Some(frame_tracker) = area.frame_map.get(&vpn) {
