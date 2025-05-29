@@ -38,6 +38,8 @@ pub struct TimeLimitedFuture<T: Future> {
     is_pushed: bool,
 }
 
+const TIMEOUT_MIN_US: u64 = 500;
+
 impl<T: Future> TimeLimitedFuture<T> {
     /// A future that will timeout after a certain amount of time().  
     ///
@@ -45,7 +47,7 @@ impl<T: Future> TimeLimitedFuture<T> {
     /// `timeout`: the timeout duration, None for infinity
     pub fn new(future: T, timeout: Option<Duration>) -> Self {
         // minimal timeout: 500us
-        let timeout = timeout.map(|t| t.max(Duration::from_micros(500)));
+        let timeout = timeout.map(|t| t.max(Duration::from_micros(TIMEOUT_MIN_US)));
         Self {
             future: Box::pin(future),
             limit: match timeout {
@@ -79,10 +81,20 @@ impl<T: Future> Future for TimeLimitedFuture<T> {
     }
 }
 
+pub fn busy_wait_timeout(interval: Duration) {
+    let time = get_time_duration();
+    while get_time_duration() - time < interval {}
+}
+
 /// sleep will suspend the task
 /// if the result is zero, it indicates the task is woken by sleep event
 pub async fn sleep_now(interval: Duration) -> Duration {
-    sleep_now_no_int(interval).await
+    if interval < Duration::from_micros(TIMEOUT_MIN_US) {
+        busy_wait_timeout(interval);
+        return Duration::ZERO;
+    } else {
+        sleep_now_no_int(interval).await
+    }
 }
 
 pub async fn sleep_now_no_int(interval: Duration) -> Duration {
