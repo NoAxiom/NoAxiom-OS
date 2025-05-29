@@ -603,8 +603,10 @@ impl Syscall<'_> {
                 resource,
                 new_limit.read().await?,
             );
-            // todo: check before read??
-            *fd_table.rlimit_mut() = new_limit.read().await?;
+            match resource {
+                Resource::NOFILE => *fd_table.rlimit_mut() = new_limit.read().await?,
+                _ => {}
+            }
         }
         info!(
             "[sys_prlimit64] pid: {}, resource: {:?} new_limit_addr: {:#x}, old_limit_addr: {:#x}",
