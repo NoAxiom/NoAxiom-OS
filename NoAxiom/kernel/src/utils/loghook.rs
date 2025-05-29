@@ -23,6 +23,7 @@ enum LogState {
     On,
 }
 
+#[allow(unused)]
 pub fn log_hook() {
     static mut LOG_STATE: AtomicLogState = AtomicLogState::new(LogState::Uninitialized);
     let current = get_time() / (Arch::get_freq() / MSEC_PER_SEC);

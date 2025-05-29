@@ -257,7 +257,14 @@ impl dyn Dentry {
             if let Some(child) = current.clone().meta().children.lock().get(name) {
                 if idx < max_idx {
                     let inode = child.inode()?;
-                    assert!(inode.file_type() == InodeMode::DIR);
+                    let file_type = inode.file_type();
+                    if file_type != InodeMode::DIR {
+                        error!(
+                            "[kernel] [find_path] {} which is {:?} is not a dir",
+                            name, file_type
+                        );
+                        return Err(Errno::ENOTDIR);
+                    }
                 }
                 current = child.clone();
                 idx += 1;
