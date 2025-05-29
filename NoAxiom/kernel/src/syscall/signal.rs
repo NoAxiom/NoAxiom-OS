@@ -242,7 +242,6 @@ impl Syscall<'_> {
             *pcb.sig_mask_mut() = !expect;
             pcb.pending_sigs.should_wake = expect;
         }
-        pcb.set_suspend();
         debug!(
             "[sys_sigsuspend] tid: {}, suspend with mask: {:?}, old mask: {:?}, invoke_signal: {:?}",
             task.tid(),
@@ -252,9 +251,8 @@ impl Syscall<'_> {
         );
         drop(pcb);
         suspend_now().await;
-        let mut pcb = task.pcb();
-        pcb.set_runnable();
-        // *pcb.sig_mask_mut() = old_mask;
+        // fixme: the signal mask is not restored correctly
+        // *task.pcb().sig_mask_mut() = old_mask;
         Err(Errno::EINTR)
     }
 }

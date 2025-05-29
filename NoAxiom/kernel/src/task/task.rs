@@ -22,7 +22,6 @@ use super::{
     taskid::{TidTracer, PGID, PID, TGID, TID},
 };
 use crate::{
-    config::task::INIT_PROCESS_ID,
     fs::{fdtable::FdTable, path::Path},
     include::{
         fs::InodeMode,
@@ -108,7 +107,7 @@ impl Default for PCB {
         Self {
             children: Vec::new(),
             parent: None,
-            status: TaskStatus::Runnable,
+            status: TaskStatus::Normal,
             exit_code: ExitCode::default(),
             pending_sigs: SigPending::new(),
             sig_stack: None,
@@ -170,18 +169,6 @@ impl PCB {
     #[inline(always)]
     pub fn set_status(&mut self, status: TaskStatus) {
         self.status = status;
-    }
-    #[inline(always)]
-    pub fn set_suspend(&mut self) {
-        self.set_status(TaskStatus::Suspend);
-    }
-    #[inline(always)]
-    pub fn set_runnable(&mut self) {
-        self.set_status(TaskStatus::Runnable);
-    }
-    #[inline(always)]
-    pub fn is_suspend(&self) -> bool {
-        self.status() == TaskStatus::Suspend
     }
 
     // exit code
@@ -330,8 +317,8 @@ impl Task {
     }
 
     /// get waker
-    pub fn waker(&self) -> Waker {
-        self.waker.get().unwrap().clone()
+    pub fn waker(&self) -> Option<Waker> {
+        self.waker.get().cloned()
     }
     /// set waker
     pub fn set_waker(&self, waker: Waker) {

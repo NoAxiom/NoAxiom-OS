@@ -58,6 +58,13 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
     }
 }
 
+/// suspend current task
+/// only used in stopped status
+pub async fn stop_now(task: &Arc<Task>) {
+    suspend_now().await;
+    task.pcb().set_status(TaskStatus::Normal);
+}
+
 /// user task main
 /// called by [`UserTaskFuture`]
 pub async fn task_main(task: Arc<Task>) {
@@ -76,7 +83,7 @@ pub async fn task_main(task: Arc<Task>) {
         assert!(check_no_lock());
         match task.pcb().status() {
             TaskStatus::Terminated => break,
-            TaskStatus::Stopped => suspend_now().await,
+            TaskStatus::Stopped => stop_now(&task).await,
             _ => {}
         }
         assert!(check_no_lock());
@@ -94,7 +101,7 @@ pub async fn task_main(task: Arc<Task>) {
         // check status
         match task.pcb().status() {
             TaskStatus::Terminated => break,
-            TaskStatus::Stopped => suspend_now().await,
+            TaskStatus::Stopped => stop_now(&task).await,
             _ => {}
         }
         assert!(check_no_lock());
@@ -105,7 +112,7 @@ pub async fn task_main(task: Arc<Task>) {
         assert!(check_no_lock());
         match task.pcb().status() {
             TaskStatus::Terminated => break,
-            TaskStatus::Stopped => suspend_now().await,
+            TaskStatus::Stopped => stop_now(&task).await,
             _ => {}
         }
         assert!(check_no_lock());

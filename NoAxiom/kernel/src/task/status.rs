@@ -1,17 +1,12 @@
 #[derive(PartialEq, Clone, Copy, Debug)]
 pub enum TaskStatus {
-    /// a task running on current cpu or in the schedule queue
-    Runnable,
-
-    /// a suspended task without being saved in scheduler
-    /// instead, its waker would be saved by a specific structure
-    /// and it will be woken up later when associated interrupt is triggered
-    Suspend,
-
-    /// a suspend status that it won't be interrupted
-    /// actually, if you don't use suspend_on function, it will lead to
-    /// SuspendNoInt as well
-    SuspendNoInt,
+    /// normal status indicates that the task is not marked as any other special
+    /// status and it is running or waiting to be scheduled
+    ///
+    /// - when the task is in scheduler, it indicates that the task is runnable
+    /// - when the task is in execution, it indicates that the task is running
+    /// - when the task is in reactor, it indicates that the task is suspended
+    Normal,
 
     /// a stopped state indicates that the process should suspend in the future
     Stopped,
@@ -29,6 +24,6 @@ pub enum TaskStatus {
 
 impl Default for TaskStatus {
     fn default() -> Self {
-        TaskStatus::Runnable
+        TaskStatus::Normal
     }
 }
