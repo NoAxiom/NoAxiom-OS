@@ -6,6 +6,7 @@ use alloc::{
 use core::fmt::{self, Debug, Formatter};
 
 use arch::consts::KERNEL_PHYS_MEMORY_END;
+use console::println;
 use ksync::mutex::SpinLock;
 use lazy_static::lazy_static;
 
@@ -95,6 +96,7 @@ trait FrameAllocator {
     fn dealloc(&mut self, ppn: PhysPageNum);
 }
 pub struct StackFrameAllocator {
+    start: usize,
     current: usize,
     end: usize,
     recycled: Vec<usize>,
@@ -102,12 +104,13 @@ pub struct StackFrameAllocator {
 }
 impl StackFrameAllocator {
     pub fn init(&mut self, l: PhysPageNum, r: PhysPageNum) {
+        self.start = l.0;
         self.current = l.0;
         self.end = r.0;
-        info!(
-            "last {} Physical Frames. start: {:#x}, end: {:#x}",
-            (self.end - self.current) as isize,
-            self.current,
+        println!(
+            "[kernel] FRAME: init {} physical frames, range: [{:#x}, {:#x}]",
+            (self.end - self.start) as isize,
+            self.start,
             self.end
         );
     }
@@ -115,6 +118,7 @@ impl StackFrameAllocator {
 impl FrameAllocator for StackFrameAllocator {
     fn new() -> Self {
         Self {
+            start: 0,
             current: 0,
             end: 0,
             recycled: Vec::new(),
@@ -144,12 +148,36 @@ impl FrameAllocator for StackFrameAllocator {
         let ppn = ppn.0;
         // validity check
         // FIXME: only for debug, remove it in release
-        if ppn >= self.current || self.recycled.iter().any(|&v| v == ppn) {
-            panic!("Frame ppn={:#x} has not been allocated!", ppn);
-        }
+        // if ppn >= self.current || self.recycled.iter().any(|&v| v == ppn) {
+        //     panic!("Frame ppn={:#x} has not been allocated!", ppn);
+        // }
         // recycle
         self.recycled.push(ppn);
     }
+}
+
+impl StackFrameAllocator {
+    pub fn debug(&self) {
+        let peak = self.current - self.start;
+        let remained = peak - self.recycled.len();
+        let total = self.end - self.start;
+        let peak_ratio = peak * 100 / total;
+        let remained_ratio = remained * 100 / total;
+        println!(
+            "[frame] current: {:#x}, end: {:#x}, recycled: {} frames",
+            self.current,
+            self.end,
+            self.recycled.len()
+        );
+        println!(
+            "[frame] peak: {}, now: {}, total: {}, peak ratio: {}%, current ratio: {}%",
+            peak, remained, total, peak_ratio, remained_ratio
+        );
+    }
+}
+
+pub fn print_frame_info() {
+    FRAME_ALLOCATOR.lock().debug();
 }
 
 type FrameAllocatorImpl = StackFrameAllocator;
@@ -182,7 +210,7 @@ pub fn frame_dealloc(ppn: PhysPageNum) {
     let mut guard = FRAME_ALLOCATOR.lock();
     guard.dealloc(ppn);
     // FIXME: only for debug, remove it in release
-    assert!(guard.frame_map.contains_key(&ppn.0));
+    // assert!(guard.frame_map.contains_key(&ppn.0));
     guard.frame_map.remove(&ppn.0);
 }
 

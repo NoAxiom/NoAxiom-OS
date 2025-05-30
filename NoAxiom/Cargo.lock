@@ -669,6 +669,7 @@ dependencies = [
  "arch",
  "buddy_system_allocator",
  "config",
+ "console",
  "ksync",
  "lazy_static",
  "log",

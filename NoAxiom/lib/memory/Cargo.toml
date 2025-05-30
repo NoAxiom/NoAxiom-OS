@@ -7,6 +7,7 @@ edition = "2021"
 buddy_system_allocator = "0.9.0"
 log = { workspace = true }
 arch = { workspace = true }
+console = { workspace = true }
 config = { workspace = true }
 ksync = { workspace = true }
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }

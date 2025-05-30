@@ -9,7 +9,7 @@ use crate::{
 /// spawn init process
 #[allow(unused)]
 pub fn schedule_spawn_with_path() {
-    println!("[kernel] initproc = {}", INIT_PROC_NAME);
+    println!("[kernel] INIT_PROC: {}", INIT_PROC_NAME);
     spawn_ktask(async move {
         let path_str = format!("/{}", INIT_PROC_NAME);
         let path = Path::from_or_create(path_str, InodeMode::FILE).await;

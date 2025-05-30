@@ -3,6 +3,7 @@
 use core::panic::PanicInfo;
 
 use arch::{Arch, ArchInfo, ArchTrap};
+use memory::{frame::print_frame_info, heap::print_heap_info};
 
 use crate::{
     cpu::{current_cpu, get_hartid},
@@ -32,6 +33,8 @@ fn panic(info: &PanicInfo) -> ! {
         println!("[PANIC] cx detected: {:#x?}", cx);
     }
     Arch::arch_info_print();
+    print_frame_info();
+    print_heap_info();
     if let Some(location) = info.location() {
         println!(
             "[PANIC] panicked at {}:{}\n[PANIC] HART{}, {}",

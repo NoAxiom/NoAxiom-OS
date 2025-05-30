@@ -54,8 +54,7 @@ impl Scheduler<Info> for DualPrioScheduler {
     }
 }
 
-// FIXME: should use dual prio scheduler
-type ExpiredSchedulerInnerImpl = FifoScheduler;
+type ExpiredSchedulerInnerImpl = DualPrioScheduler;
 pub struct ExpiredScheduler {
     current: SyncUnsafeCell<ExpiredSchedulerInnerImpl>,
     expire: SyncUnsafeCell<ExpiredSchedulerInnerImpl>,

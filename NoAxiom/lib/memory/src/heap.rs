@@ -7,6 +7,7 @@ use core::{
 
 use buddy_system_allocator::Heap;
 use config::mm::KERNEL_HEAP_SIZE;
+use console::println;
 use ksync::mutex::SpinLock;
 
 #[global_allocator]
@@ -32,14 +33,28 @@ unsafe impl GlobalAlloc for HeapAllocator {
     }
 }
 
+pub fn print_heap_info() {
+    if let Some(heap) = HEAP_ALLOCATOR.0.try_lock() {
+        let user = heap.stats_alloc_user();
+        let actual = heap.stats_alloc_actual();
+        let total = heap.stats_total_bytes();
+        // calc in usize
+        println!("[heap] {:?}", heap);
+        println!(
+            "[heap] alloc: {}%, real-used: {}%, utilization: {}%",
+            actual * 100 / total,
+            user * 100 / total,
+            user * 100 / actual,
+        );
+    } else {
+        println!("[heap] HEAP_ALLOCATOR is already locked");
+    }
+}
+
 #[alloc_error_handler]
 /// panic when heap allocation error occurs
 pub fn handle_alloc_error(layout: core::alloc::Layout) -> ! {
-    if let Some(heap) = HEAP_ALLOCATOR.0.try_lock() {
-        error!("{:?}", heap);
-    } else {
-        error!("HEAP_ALLOCATOR is already locked");
-    }
+    print_heap_info();
     panic!("Heap allocation error, layout = {:?}", layout);
 }
 
@@ -47,6 +62,7 @@ pub fn handle_alloc_error(layout: core::alloc::Layout) -> ! {
 static mut HEAP_SPACE: [u8; KERNEL_HEAP_SIZE] = [0; KERNEL_HEAP_SIZE];
 
 /// initiate heap allocator
+/// dont call println since the console isn't fully initialized yet
 pub fn heap_init() {
     unsafe {
         HEAP_ALLOCATOR
