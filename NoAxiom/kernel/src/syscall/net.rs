@@ -15,6 +15,7 @@ use crate::{
     },
     mm::user_ptr::UserPtr,
     net::socketfile::{Sock, SocketFile},
+    sched::utils::intable,
     syscall::Syscall,
 };
 
@@ -118,7 +119,7 @@ impl Syscall<'_> {
         drop(fd_table);
 
         let mut socket = socket_file.socket().await;
-        let (new_tcp_socket, endpoint) = socket.accept().await?;
+        let (new_tcp_socket, endpoint) = intable(self.task, socket.accept(), None).await??;
 
         let sockaddr = SockAddr::from_endpoint(endpoint);
         let user_ptr = UserPtr::<SockAddr>::new(addr);
