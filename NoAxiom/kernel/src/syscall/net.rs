@@ -148,7 +148,7 @@ impl Syscall<'_> {
         drop(fd_table);
 
         let socket = socket_file.socket().await;
-        let local_endpoint = socket.local_endpoint().ok_or(Errno::EINVAL)?;
+        let local_endpoint = socket.local_endpoint().unwrap();
         drop(socket);
 
         let sockaddr = SockAddr::from_endpoint(local_endpoint);
@@ -334,6 +334,9 @@ impl Syscall<'_> {
         let user_ptr = UserPtr::<SockAddr>::new(addr);
         if user_ptr.is_non_null() {
             debug!("[sys_recvfrom] remote endpoint: {:?}", endpoint);
+            warn!("[sys_recvfrom] remote Sockaddr's family: {:?}", unsafe {
+                sockaddr.family
+            });
             user_ptr.write(sockaddr).await?;
         } else {
             warn!(

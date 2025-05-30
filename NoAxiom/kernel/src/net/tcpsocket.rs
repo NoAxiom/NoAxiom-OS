@@ -3,7 +3,11 @@ use alloc::{boxed::Box, vec::Vec};
 use core::task::Waker;
 
 use async_trait::async_trait;
-use smoltcp::{iface::SocketHandle, socket::tcp, wire::IpEndpoint};
+use smoltcp::{
+    iface::SocketHandle,
+    socket::tcp,
+    wire::{IpAddress, IpEndpoint, Ipv4Address},
+};
 
 use super::{
     socket::{poll_ifaces, Socket, SocketMeta},
@@ -55,18 +59,23 @@ impl TcpSocket {
             options,
         );
 
+        let mut port_manager = TCP_PORT_MANAGER.lock();
+        let temp_port = port_manager.get_ephemeral_port().unwrap();
+        port_manager.bind_port(temp_port).unwrap();
+        drop(port_manager);
+        let local = IpEndpoint {
+            addr: IpAddress::Ipv4(Ipv4Address::UNSPECIFIED),
+            port: temp_port,
+        };
+
         debug!("[Tcp] new socket: {}", new_socket_handle);
 
         Self {
             meta,
             state: TcpState::Closed,
             handles: vec![new_socket_handle],
-            local_endpoint: None,
+            local_endpoint: Some(local),
         }
-    }
-
-    fn handle(&self) -> &SocketHandle {
-        self.handles.first().unwrap()
     }
 
     fn from_handle(
@@ -105,7 +114,7 @@ impl TcpSocket {
             );
             return Ok(());
         }
-        let local_endpoint = self.local_endpoint.ok_or(Errno::EINVAL)?;
+        let local_endpoint = self.local_endpoint.unwrap();
         if local_endpoint.addr.is_unspecified() {
             debug!(
                 "[Tcp::do_listen {}] local endpoint: {}:{} is unspecified",
@@ -115,15 +124,19 @@ impl TcpSocket {
                 "[Tcp::do_listen {}] listening: {:?}",
                 self.handles[0], local_endpoint.port
             );
-            socket
-                .listen(local_endpoint.port)
-                .map_err(|_| Errno::EINVAL)?;
+            socket.listen(local_endpoint.port).map_err(|e| {
+                error!("[Tcp {}] listen error: {:?}", self.handles[0], e);
+                Errno::EINVAL
+            })?;
         } else {
             debug!(
                 "[Tcp::do_listen {}] listening: {:?}",
                 self.handles[0], local_endpoint
             );
-            socket.listen(local_endpoint).map_err(|_| Errno::EINVAL)?;
+            socket.listen(local_endpoint).map_err(|e| {
+                error!("[Tcp {}] listen error: {:?}", self.handles[0], e);
+                Errno::EINVAL
+            })?;
         }
         self.state = TcpState::Listen;
         assert!(socket.is_listening());
@@ -378,15 +391,7 @@ impl Socket for TcpSocket {
         );
         assert_ne!(remote.port, 0, "[Tcp {}] remote port is 0", self.handles[0]);
 
-        let temp_port = if self.local_endpoint.is_none() {
-            let mut port_manager = TCP_PORT_MANAGER.lock();
-            let temp_port = port_manager.get_ephemeral_port()?;
-            port_manager.bind_port(temp_port)?;
-            drop(port_manager);
-            temp_port
-        } else {
-            self.local_endpoint.unwrap().port
-        };
+        let temp_port = self.local_endpoint.unwrap().port;
 
         yield_now().await; // amazing yield maybe
 
@@ -540,13 +545,7 @@ impl Socket for TcpSocket {
     }
 
     fn local_endpoint(&self) -> Option<IpEndpoint> {
-        if self.local_endpoint.is_none() {
-            let mut sockets = SOCKET_SET.lock();
-            let local_socket = sockets.get_mut::<tcp::Socket>(self.handles[0]);
-            local_socket.local_endpoint()
-        } else {
-            self.local_endpoint
-        }
+        self.local_endpoint
     }
 
     fn peer_endpoint(&self) -> Option<IpEndpoint> {

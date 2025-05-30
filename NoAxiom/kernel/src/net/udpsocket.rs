@@ -135,7 +135,7 @@ impl Socket for UdpSocket {
 
             drop(sockets);
             debug!("[Udp {}] read: no data, yield", self.handle);
-            intermit(|| error!("[Udp {}] read: no data, yielding", self.handle));
+            // intermit(|| error!("[Udp {}] read: no data, yielding", self.handle));
             yield_now().await;
         }
     }
