@@ -112,15 +112,15 @@ impl Task {
 
 impl Drop for Task {
     fn drop(&mut self) {
-        let parent = self.pcb().parent.as_ref().unwrap().upgrade().unwrap();
+        // let parent = self.pcb().parent.as_ref().unwrap().upgrade().unwrap();
         warn!(
-            "[drop_task] task {} dropped, dropper: {}, parent {}",
+            "[drop_task] task {} dropped, dropper: {}",
             self.tid(),
             current_cpu()
                 .task
                 .as_ref()
                 .map_or_else(|| 0, |task| task.tid()),
-            parent.tid(),
+            // parent.tid(),
         )
     }
 }
