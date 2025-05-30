@@ -51,7 +51,7 @@ impl PortManager {
     /// Bind a port with **SPECIFIC** port and fd
     pub fn bind_port_with_fd(&mut self, port: u16, fd: usize) -> SysResult<u16> {
         if let Some(_) = &self.inner.get(&port) {
-            warn!("[port_manager] Port {port} is already listened (with fd {fd})");
+            error!("[port_manager] Port {port} is already listened (with fd {fd})");
             Err(Errno::EADDRINUSE)
         } else {
             // let waker = current_task().unwrap().waker();

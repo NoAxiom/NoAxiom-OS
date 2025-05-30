@@ -566,9 +566,7 @@ impl Drop for TcpSocket {
             self.handles[0], self.local_endpoint
         );
 
-        if let Some(local) = self.local_endpoint
-            && self.state == TcpState::Listen
-        {
+        if let Some(local) = self.local_endpoint {
             let mut port_manager = TCP_PORT_MANAGER.lock();
             port_manager.unbind_port(local.port);
             drop(port_manager);
