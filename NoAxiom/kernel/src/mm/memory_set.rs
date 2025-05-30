@@ -328,7 +328,6 @@ impl MemorySet {
                     )?;
                 }
                 Interp => {
-                    // iozone: /glibc/lib/ld-linux-riscv64-lp64d.so.1
                     if is_dl_interp {
                         error!("[load_elf] detect recursive dl_interp, skip dl_interp loading");
                         return Err(Errno::ELIBBAD);
@@ -337,19 +336,20 @@ impl MemorySet {
                         error!("[load_elf] dl_interp already set");
                         return Err(Errno::ENOEXEC);
                     }
-                    let mut buf = vec![0u8; ph.file_size() as usize];
-                    if buf.ends_with(&[0u8; 1]) {
-                        buf.pop();
-                    }
-                    elf_file
-                        .read_at(ph.offset() as usize, buf.as_mut_slice())
-                        .await?;
-                    let path = format!(
-                        "{}",
-                        String::from_utf8(buf)
-                            .map_err(|_| Errno::ENOEXEC)?
-                            .trim_end_matches('\0')
-                    );
+                    // let mut buf = vec![0u8; ph.file_size() as usize];
+                    // if buf.ends_with(&[0u8; 1]) {
+                    //     buf.pop();
+                    // }
+                    // elf_file
+                    //     .read_at(ph.offset() as usize, buf.as_mut_slice())
+                    //     .await?;
+                    // let path = format!(
+                    //     "{}",
+                    //     String::from_utf8(buf)
+                    //         .map_err(|_| Errno::ENOEXEC)?
+                    //         .trim_end_matches('\0')
+                    // );
+                    let path = String::from("/lib/musl/libc.so");
                     info!("[load_elf] find interp path: {}", path);
                     assert!(Arch::is_external_interrupt_enabled());
                     dl_interp = Some(Path::from_string(path, current_task().unwrap())?);
