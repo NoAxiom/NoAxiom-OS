@@ -95,6 +95,15 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
         TrapType::LoadPageFault(addr)
         | TrapType::StorePageFault(addr)
         | TrapType::InstructionPageFault(addr) => {
+            trace!(
+                "[user_trap] page fault at hart: {}, tid: {}, trap_type: {:x?}, epc = {:#x}, user_sp = {:#x}, ra = {:#x}",
+                get_hartid(),
+                task.tid(),
+                trap_type,
+                cx[TrapArgs::EPC],
+                cx[TrapArgs::SP],
+                cx[TrapArgs::RA],
+            );
             match task.memory_validate(addr, Some(trap_type), false).await {
                 Ok(_) => trace!("[memory_validate] success in user_trap_handler"),
                 Err(_) => {
@@ -117,7 +126,7 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
                         SigInfo::new_simple(SigNum::SIGSEGV.into(), SigCode::Kernel),
                         false,
                     );
-                    panic!();
+                    // panic!();
                 }
             }
         }

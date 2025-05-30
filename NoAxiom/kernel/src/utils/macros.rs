@@ -62,3 +62,17 @@ macro_rules! time_statistic {
         );
     }};
 }
+
+#[macro_export]
+macro_rules! with_interrupt_on {
+    ($func:expr) => {{
+        use arch::{Arch, ArchInt};
+        let was_enabled = Arch::is_interrupt_enabled();
+        Arch::enable_interrupt();
+        let result = $func;
+        if !was_enabled {
+            Arch::disable_interrupt();
+        }
+        result
+    }};
+}
