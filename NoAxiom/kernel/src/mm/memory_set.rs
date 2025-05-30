@@ -336,20 +336,30 @@ impl MemorySet {
                         error!("[load_elf] dl_interp already set");
                         return Err(Errno::ENOEXEC);
                     }
-                    // let mut buf = vec![0u8; ph.file_size() as usize];
-                    // if buf.ends_with(&[0u8; 1]) {
-                    //     buf.pop();
-                    // }
-                    // elf_file
-                    //     .read_at(ph.offset() as usize, buf.as_mut_slice())
-                    //     .await?;
-                    // let path = format!(
-                    //     "{}",
-                    //     String::from_utf8(buf)
-                    //         .map_err(|_| Errno::ENOEXEC)?
-                    //         .trim_end_matches('\0')
-                    // );
-                    let path = String::from("/lib/musl/libc.so");
+                    let mut buf = vec![0u8; ph.file_size() as usize];
+                    if buf.ends_with(&[0u8; 1]) {
+                        buf.pop();
+                    }
+                    elf_file
+                        .read_at(ph.offset() as usize, buf.as_mut_slice())
+                        .await?;
+                    let mut path = format!(
+                        "{}",
+                        String::from_utf8(buf)
+                            .map_err(|_| Errno::ENOEXEC)?
+                            .trim_end_matches('\0')
+                    );
+                    if path.eq("/lib/ld-musl-riscv64-sf.so.1")
+                        || path.eq("/lib/ld-musl-riscv64.so.1")
+                    {
+                        info!("[load_dl_interp] using musl libc, original path = {}", path);
+                        path = format!("/lib/musl/libc.so");
+                    } else if path.eq("/lib/ld-linux-riscv64-lp64d.so.1") {
+                        info!("[load_dl_interp] using glibc, original path = {}", path);
+                        path = format!("/lib/glibc/ld-2.31.so");
+                    } else {
+                        error!("[load_dl_interp] parse dl_interp error, path = {}", path);
+                    }
                     info!("[load_elf] find interp path: {}", path);
                     assert!(Arch::is_external_interrupt_enabled());
                     dl_interp = Some(Path::from_string(path, current_task().unwrap())?);

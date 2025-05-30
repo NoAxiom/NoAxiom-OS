@@ -14,6 +14,7 @@ use crate::{
     include::mm::{MmapFlags, MmapProts},
     pte_flags,
     syscall::SysResult,
+    with_interrupt_on,
 };
 
 /// single mmap page struct
@@ -40,7 +41,7 @@ impl MmapPage {
                 core::slice::from_raw_parts_mut(kernel_vpn.as_va_usize() as *mut u8, PAGE_SIZE)
             };
             warn!("mmap read file, offset: {:#x}", self.offset);
-            let res = file.read_at(self.offset, buf_slice).await;
+            let res = with_interrupt_on!(file.read_at(self.offset, buf_slice).await);
             if let Err(res) = res {
                 error!("ERROR at mmap read file, msg: {:?}", res);
             }
