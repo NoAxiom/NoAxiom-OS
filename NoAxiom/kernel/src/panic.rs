@@ -33,8 +33,6 @@ fn panic(info: &PanicInfo) -> ! {
         println!("[PANIC] cx detected: {:#x?}", cx);
     }
     Arch::arch_info_print();
-    print_frame_info();
-    print_heap_info();
     if let Some(location) = info.location() {
         println!(
             "[PANIC] panicked at {}:{}\n[PANIC] HART{}, {}",
@@ -50,5 +48,7 @@ fn panic(info: &PanicInfo) -> ! {
             info.message().unwrap()
         );
     }
+    print_frame_info();
+    print_heap_info();
     Syscall::sys_systemshutdown()
 }

@@ -19,7 +19,7 @@ pub mod async_blk;
 pub fn virtio_dma_alloc(pages: usize) -> PhysicalAddress {
     let mut ppn_base = 0;
     for i in 0..pages {
-        let frame = frame_alloc();
+        let frame = frame_alloc().unwrap();
         if i == 0 {
             ppn_base = frame.ppn().into();
         }

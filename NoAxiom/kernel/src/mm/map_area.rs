@@ -103,7 +103,7 @@ impl MapArea {
             }
             // framed: user space
             MapType::Framed => {
-                let frame = frame_alloc();
+                let frame = frame_alloc().unwrap();
                 let ppn = frame.ppn();
                 if self.frame_map.contains_key(&vpn) {
                     panic!("vm area overlap");
@@ -223,7 +223,7 @@ impl MapArea {
         &mut self,
         page_table: &mut PageTable,
         data_info: MapAreaLoadDataInfo<'_>,
-    ) -> SysResult<()> {
+    ) {
         assert_eq!(self.map_type, MapType::Framed);
         let start = data_info.start;
         let mut len = data_info.len;
@@ -250,7 +250,5 @@ impl MapArea {
             }
             current_vpn.step();
         }
-
-        Ok(())
     }
 }

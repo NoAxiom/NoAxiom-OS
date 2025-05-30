@@ -170,7 +170,7 @@ pub async fn lazy_alloc_mmap<'a>(
     vpn: VirtPageNum,
     mut guard: SpinLockGuard<'a, MemorySet>,
 ) -> SysResult<()> {
-    let frame = frame_alloc();
+    let frame = frame_alloc().unwrap();
     let ppn = frame.ppn();
     let kernel_vpn = frame.into_kernel_vpn();
     guard.mmap_manager.frame_trackers.insert(vpn, frame);

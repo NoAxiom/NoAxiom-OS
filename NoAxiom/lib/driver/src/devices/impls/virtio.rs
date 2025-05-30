@@ -20,7 +20,7 @@ unsafe impl Hal for VirtioHalImpl {
     fn dma_alloc(pages: usize, _direction: BufferDirection) -> (VirtioPhysAddr, NonNull<u8>) {
         let mut ppn_base = PhysPageNum::from(0);
         for i in 0..pages {
-            let frame = frame_alloc();
+            let frame = frame_alloc().unwrap();
             if i == 0 {
                 ppn_base = frame.ppn();
             }

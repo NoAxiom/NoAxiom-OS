@@ -260,6 +260,10 @@ impl VpnRange {
     pub fn is_in_range(&self, vpn: VirtPageNum) -> bool {
         self.start <= vpn && vpn < self.end
     }
+    #[inline(always)]
+    pub fn page_count(&self) -> usize {
+        self.end.0 - self.start.0
+    }
 }
 
 impl Debug for VpnRange {

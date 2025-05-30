@@ -24,7 +24,7 @@ impl Page {
     pub fn new() -> Self {
         unsafe { FRAME_ALLOCS.fetch_add(1, core::sync::atomic::Ordering::SeqCst) };
         Self {
-            data: frame_alloc(),
+            data: frame_alloc().unwrap(),
             state: PageState::Invalid,
         }
     }

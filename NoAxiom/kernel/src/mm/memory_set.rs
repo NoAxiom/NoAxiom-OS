@@ -4,6 +4,7 @@ use arch::{Arch, ArchInt, ArchMemory, ArchPageTableEntry, ArchTime, MappingFlags
 use config::mm::{DL_INTERP_OFFSET, SIG_TRAMPOLINE, USER_HEAP_SIZE};
 use include::errno::Errno;
 use ksync::{cell::SyncUnsafeCell, mutex::SpinLock};
+use memory::frame::can_frame_alloc_loosely;
 use spin::Once;
 use xmas_elf::ElfFile;
 
@@ -28,7 +29,7 @@ use crate::{
         permission::MapType,
         shm::SHM_MANAGER,
     },
-    pte_flags,
+    pte_flags, return_errno,
     sched::utils::yield_now,
     syscall::SysResult,
     task::impl_signal::user_sigreturn,
@@ -164,11 +165,7 @@ impl MemorySet {
 
     /// push a map area into current memory set
     /// load data if provided
-    pub fn push_area(
-        &mut self,
-        mut map_area: MapArea,
-        data_info: Option<MapAreaLoadDataInfo<'_>>,
-    ) -> SysResult<()> {
+    pub fn push_area(&mut self, mut map_area: MapArea, data_info: Option<MapAreaLoadDataInfo<'_>>) {
         trace!(
             "push_area: [{:#X}, {:#X})",
             map_area.vpn_range().start().raw() << PAGE_WIDTH,
@@ -186,10 +183,9 @@ impl MemorySet {
             pte.raw_flag(),
         );
         if let Some(data_info) = data_info {
-            map_area.load_data(self.page_table(), data_info)?;
+            map_area.load_data(self.page_table(), data_info);
         }
         self.areas.push(map_area); // bind life cycle
-        Ok(())
     }
 
     /// create kernel space, used in [`KERNEL_SPACE`] initialization
@@ -210,7 +206,7 @@ impl MemorySet {
                                 MapAreaType::KernelSpace,
                             ),
                             None,
-                        ).expect("[init_kernel_space] push area error");
+                        );
                     )*
                 };
             }
@@ -289,6 +285,8 @@ impl MemorySet {
         let mut dl_interp = None;
         let mut head_va = None;
         let mut end_vpn = None;
+        let mut frame_req_num = 0;
+        let mut areas = Vec::new();
 
         for i in 0..ph_count {
             let ph = elf.program_header(i as u16).map_err(handler)?;
@@ -317,7 +315,10 @@ impl MemorySet {
                         ph.mem_size()
                     );
                     end_vpn = Some(map_area.vpn_range.end());
-                    self.push_area(
+                    // we won't map the area immediately
+                    // alloc it after all checks are done
+                    frame_req_num += map_area.vpn_range.page_count();
+                    areas.push((
                         map_area,
                         Some(MapAreaLoadDataInfo {
                             start: ph.offset() as usize,
@@ -325,7 +326,7 @@ impl MemorySet {
                             offset: start_va.offset(),
                             slice: &elf_buf,
                         }),
-                    )?;
+                    ));
                 }
                 Interp => {
                     if is_dl_interp {
@@ -367,9 +368,23 @@ impl MemorySet {
                 _ => {}
             }
         }
+
+        // reserve 20% more frames for later use
+        trace!("frame_req_num: {}", frame_req_num);
+        if !can_frame_alloc_loosely(frame_req_num) {
+            return_errno!(Errno::ENOMEM, "no enough frames to load elf");
+        }
+
+        // fetch start and end va
         let head_va = head_va.ok_or(Errno::ENOMEM)?;
         let end_va = VirtAddr::from(end_vpn.ok_or(Errno::ENOMEM)?);
         let entry_point = elf.header.pt2.entry_point() as usize + base_offset;
+
+        // checks are done! now push areas into memory set
+        for (area, info) in areas {
+            self.push_area(area, info);
+        }
+
         Ok(RawElfInfo {
             head_va,
             end_va,
@@ -623,7 +638,7 @@ impl MemorySet {
             trace!("[realloc_cow] refcount is 1, set flags to RW: {new_flags:?}");
             self.page_table().set_flags(vpn, new_flags);
         } else {
-            let frame = frame_alloc();
+            let frame = frame_alloc().unwrap();
             let new_ppn = frame.ppn();
             let mut target = None;
             for area in self.areas.iter_mut() {
@@ -715,7 +730,7 @@ pub async fn lazy_alloc_mmap<'a>(
 ) -> SysResult<()> {
     let mut ms = memory_set.lock();
     if !ms.mmap_manager.frame_trackers.contains_key(&vpn) {
-        let frame = frame_alloc();
+        let frame = frame_alloc().unwrap();
         let ppn = frame.ppn();
         let kvpn = frame.kernel_vpn();
         ms.mmap_manager.frame_trackers.insert(vpn, frame);

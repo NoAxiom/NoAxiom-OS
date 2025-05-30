@@ -157,10 +157,38 @@ impl FrameAllocator for StackFrameAllocator {
 }
 
 impl StackFrameAllocator {
+    #[inline]
+    pub fn stat_peak(&self) -> usize {
+        self.current - self.start
+    }
+    #[inline]
+    pub fn stat_allocated(&self) -> usize {
+        self.stat_peak() - self.recycled.len()
+    }
+    #[inline]
+    pub fn stat_total(&self) -> usize {
+        self.end - self.start
+    }
+    #[inline]
+    pub fn stat_remain(&self) -> usize {
+        self.stat_total() - self.stat_allocated()
+    }
+
+    pub fn can_alloc(&self, req_num: usize) -> bool {
+        // self.debug();
+        self.stat_remain() >= req_num
+    }
+
+    pub fn can_alloc_loosely(&self, req_num: usize) -> bool {
+        // preserve 20% more frames to be allocated
+        // and restrict the total allocation to 5% more than requested
+        self.can_alloc(req_num + req_num / 5 + self.stat_total() / 20)
+    }
+
     pub fn debug(&self) {
-        let peak = self.current - self.start;
-        let remained = peak - self.recycled.len();
-        let total = self.end - self.start;
+        let peak = self.stat_peak();
+        let remained = self.stat_allocated();
+        let total = self.stat_total();
         let peak_ratio = peak * 100 / total;
         let remained_ratio = remained * 100 / total;
         println!(
@@ -177,7 +205,11 @@ impl StackFrameAllocator {
 }
 
 pub fn print_frame_info() {
-    FRAME_ALLOCATOR.lock().debug();
+    if let Some(guard) = FRAME_ALLOCATOR.try_lock() {
+        guard.debug()
+    } else {
+        println!("[frame] FRAME_ALLOCATOR is already locked");
+    }
 }
 
 type FrameAllocatorImpl = StackFrameAllocator;
@@ -187,12 +219,21 @@ lazy_static! {
         SpinLock::new(FrameAllocatorImpl::new());
 }
 
-pub fn frame_alloc() -> FrameTracker {
+pub fn can_frame_alloc(req_num: usize) -> bool {
+    FRAME_ALLOCATOR.lock().can_alloc(req_num)
+}
+
+pub fn can_frame_alloc_loosely(req_num: usize) -> bool {
+    FRAME_ALLOCATOR.lock().can_alloc_loosely(req_num)
+}
+
+pub fn frame_alloc() -> Option<FrameTracker> {
     let mut guard = FRAME_ALLOCATOR.lock();
-    let ppn = guard.alloc().unwrap();
-    let frame = FrameTrackerRaw::new(ppn).zero_inited();
-    guard.frame_map.insert(ppn.0, Arc::downgrade(&frame.inner));
-    frame
+    guard.alloc().map(|ppn| {
+        let frame = FrameTrackerRaw::new(ppn).zero_inited();
+        guard.frame_map.insert(ppn.0, Arc::downgrade(&frame.inner));
+        frame
+    })
 }
 
 #[allow(unused)]
@@ -238,13 +279,13 @@ pub fn frame_init() {
 pub fn frame_allocator_test() {
     let mut v: Vec<FrameTracker> = Vec::new();
     for i in 0..5 {
-        let frame = frame_alloc();
+        let frame = frame_alloc().unwrap();
         debug!("{:?}", frame);
         v.push(frame);
     }
     v.clear();
     for i in 0..5 {
-        let frame = frame_alloc();
+        let frame = frame_alloc().unwrap();
         debug!("{:?}", frame);
         v.push(frame);
     }

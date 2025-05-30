@@ -64,7 +64,7 @@ struct PipeBuffer {
 impl PipeBuffer {
     fn new() -> Self {
         Self {
-            data: frame_alloc(),
+            data: frame_alloc().unwrap(),
             head: 0,
             tail: 0,
             status: PipeBufferStatus::Empty,

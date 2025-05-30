@@ -30,7 +30,7 @@ impl PageTable {
     /// with allocating a frame for root node
     /// used in raw memory_set initialization
     pub fn new_allocated() -> Self {
-        let frame = frame_alloc();
+        let frame = frame_alloc().unwrap();
         info!("[page_table] root_ppn = {:#x}", frame.ppn().raw());
         PageTable {
             root_ppn: frame.ppn(),
@@ -56,7 +56,7 @@ impl PageTable {
 
     /// clone from another page table, only direct page will be copied
     pub fn clone_from_other(other: &PageTable) -> Self {
-        let new_frame = frame_alloc();
+        let new_frame = frame_alloc().unwrap();
         new_frame
             .ppn()
             .get_bytes_array()
@@ -82,7 +82,7 @@ impl PageTable {
             }
             trace!("pte addr: {:#x}", pte as *mut PageTableEntry as usize);
             if !pte.is_allocated() {
-                let frame = frame_alloc();
+                let frame = frame_alloc().unwrap();
                 *pte = PageTableEntry::new(frame.ppn().raw(), pte_flags!(PT));
                 self.frames.push(frame);
             }

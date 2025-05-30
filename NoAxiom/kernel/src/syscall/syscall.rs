@@ -4,11 +4,9 @@ use arch::{ArchTrapContext, TrapArgs, TrapContext};
 
 use super::{utils::clear_current_syscall, SyscallResult};
 use crate::{
-    fs::pagecache::FRAME_ALLOCS,
     include::{result::Errno, syscall_id::SyscallID},
     syscall::utils::{current_syscall, update_current_syscall},
     task::Task,
-    utils::crossover::intermit,
 };
 
 /// system call tracer for a task
