@@ -16,7 +16,6 @@ use crate::{
         net::{ShutdownType, SocketOptions, SocketType},
         result::Errno,
     },
-    net::{handle::HandleItem, HANDLE_MAP},
     sched::utils::yield_now,
     syscall::SysResult,
     utils::crossover::intermit,
@@ -57,10 +56,6 @@ impl TcpSocket {
         );
 
         debug!("[Tcp] new socket: {}", new_socket_handle);
-
-        let mut handle_map_guard = HANDLE_MAP.write();
-        let item = HandleItem::new();
-        handle_map_guard.insert(new_socket_handle, item);
 
         Self {
             meta,
@@ -222,20 +217,19 @@ impl Socket for TcpSocket {
     /// - Failure: Error code
     async fn read(&self, buf: &mut [u8]) -> (SysResult<usize>, Option<IpEndpoint>) {
         debug!("[Tcp {}] read", self.handles[0]);
-        if HANDLE_MAP
-            .read()
-            .get(&self.handles[0])
-            .unwrap()
-            .get_shutdown_type()
-            .contains(ShutdownType::RCV_SHUTDOWN)
-        {
-            warn!("[Tcp {}] read: socket is closed", self.handles[0]);
-            return (Err(Errno::ENOTCONN), None);
-        }
         loop {
             poll_ifaces();
             let mut sockets = SOCKET_SET.lock();
             let socket = sockets.get_mut::<tcp::Socket>(self.handles[0]);
+
+            match socket.state() {
+                tcp::State::CloseWait | tcp::State::TimeWait => {
+                    return (Ok(0), None);
+                }
+                state => {
+                    debug!("[Tcp {}] read: socket state {:?}", self.handles[0], state);
+                }
+            }
 
             // if socket is closed, return error
             if !socket.is_active() {
@@ -272,11 +266,6 @@ impl Socket for TcpSocket {
                     }
                     Err(tcp::RecvError::Finished) => {
                         // remote write end is closed, we should close the read end
-                        let mut handle_map_guard = HANDLE_MAP.write();
-                        handle_map_guard
-                            .get_mut(self.handle())
-                            .unwrap()
-                            .set_shutdown_type(ShutdownType::RCV_SHUTDOWN);
                         debug!("[Tcp {}] read receive: Finished", self.handles[0]);
                         return (Err(Errno::ENOTCONN), None);
                     }
@@ -298,16 +287,6 @@ impl Socket for TcpSocket {
     /// return: the length of the data written
     async fn write(&self, buf: &[u8], _to: Option<IpEndpoint>) -> SysResult<usize> {
         debug!("[Tcp {}] write: {}", self.handles[0], self.handles[0]);
-        if HANDLE_MAP
-            .read()
-            .get(&self.handles[0])
-            .unwrap()
-            .get_shutdown_type()
-            .contains(ShutdownType::RCV_SHUTDOWN)
-        {
-            warn!("[Tcp {}] write: socket is closed", self.handles[0]);
-            return Err(Errno::ENOTCONN);
-        }
         let mut sockets = SOCKET_SET.lock();
         let socket = sockets.get_mut::<tcp::Socket>(self.handles[0]);
 
@@ -399,11 +378,15 @@ impl Socket for TcpSocket {
         );
         assert_ne!(remote.port, 0, "[Tcp {}] remote port is 0", self.handles[0]);
 
-        assert!(self.local_endpoint.is_none());
-        let mut port_manager = TCP_PORT_MANAGER.lock();
-        let temp_port = port_manager.get_ephemeral_port()?;
-        port_manager.bind_port(temp_port)?;
-        drop(port_manager);
+        let temp_port = if self.local_endpoint.is_none() {
+            let mut port_manager = TCP_PORT_MANAGER.lock();
+            let temp_port = port_manager.get_ephemeral_port()?;
+            port_manager.bind_port(temp_port)?;
+            drop(port_manager);
+            temp_port
+        } else {
+            self.local_endpoint.unwrap().port
+        };
 
         yield_now().await; // amazing yield maybe
 
@@ -457,6 +440,19 @@ impl Socket for TcpSocket {
                             tcp::ConnectError::Unaddressable => Errno::EADDRNOTAVAIL,
                         })?;
 
+                    for (handle, s) in sockets.iter() {
+                        match s {
+                            smoltcp::socket::Socket::Tcp(tcp) => {
+                                debug!(
+                                    "[Tcp {}] poll: socket handle {}, state {:?}",
+                                    self.handles[0],
+                                    handle,
+                                    tcp.state()
+                                );
+                            }
+                            _ => {}
+                        }
+                    }
                     drop(sockets);
                     drop(iface_inner);
                     yield_now().await;
@@ -508,17 +504,6 @@ impl Socket for TcpSocket {
                 let old_socket = sockets.get::<tcp::Socket>(old_socket_handle);
                 let remote_endpoint = old_socket.remote_endpoint().ok_or(Errno::ENOTCONN)?;
 
-                // update HANDLE_MAP
-                let mut handle_map_guard = HANDLE_MAP.write();
-                let mut old = handle_map_guard.remove(&old_socket_handle).unwrap();
-                old.set_shutdown_type(ShutdownType::empty());
-
-                let new_item = HandleItem::new();
-                handle_map_guard.insert(old_socket_handle, new_item);
-                handle_map_guard.insert(new_socket_handle, old);
-
-                drop(handle_map_guard);
-
                 // relisten the new socket
                 let new_socket = sockets.get_mut::<tcp::Socket>(new_socket_handle);
                 if !new_socket.is_listening() {
@@ -538,17 +523,19 @@ impl Socket for TcpSocket {
         let mut sockets = SOCKET_SET.lock();
         let local_socket = sockets.get_mut::<tcp::Socket>(self.handles[0]);
         if operation.contains(ShutdownType::RCV_SHUTDOWN) {
-            info!("[TcpSocket::shutdown {}] socket close", self.handles[0]);
+            info!("[Tcp {}] shutdown: socket close", self.handles[0]);
             local_socket.close();
         } else {
-            info!("[TcpSocket::shutdown {}] socket abort", self.handles[0]);
+            info!("[Tcp {}] shutdown: socket abort", self.handles[0]);
             local_socket.abort();
         }
-        let mut handle_map_guard = HANDLE_MAP.write();
-        handle_map_guard
-            .get_mut(self.handle())
-            .unwrap()
-            .set_shutdown_type(operation);
+        debug!(
+            "[Tcp {}] shutdown: after socket state: {:?}",
+            self.handles[0],
+            local_socket.state()
+        );
+        drop(sockets);
+        poll_ifaces();
         Ok(())
     }
 
@@ -580,7 +567,9 @@ impl Drop for TcpSocket {
             self.handles[0], self.local_endpoint
         );
 
-        if let Some(local) = self.local_endpoint {
+        if let Some(local) = self.local_endpoint
+            && self.state == TcpState::Listen
+        {
             let mut port_manager = TCP_PORT_MANAGER.lock();
             port_manager.unbind_port(local.port);
             drop(port_manager);
@@ -599,10 +588,11 @@ impl Drop for TcpSocket {
             self.handles[0],
             socket.state()
         );
-        sockets.remove(handle);
         drop(sockets);
         poll_ifaces();
 
-        // todo: handle map
+        let mut sockets = SOCKET_SET.lock();
+        sockets.remove(handle);
+        drop(sockets);
     }
 }

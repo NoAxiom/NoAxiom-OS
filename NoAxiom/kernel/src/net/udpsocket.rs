@@ -1,5 +1,5 @@
 use alloc::{boxed::Box, vec};
-use core::{error, task::Waker};
+use core::task::Waker;
 
 use async_trait::async_trait;
 use smoltcp::{
@@ -11,7 +11,6 @@ use smoltcp::{
 use super::{
     socket::{poll_ifaces, Socket, SocketMeta},
     tcpsocket::TcpSocket,
-    HANDLE_MAP, SOCKET_SET, UDP_PORT_MANAGER,
 };
 use crate::{
     constant::net::UDP_CONSTANTS,
@@ -20,7 +19,7 @@ use crate::{
         net::{ShutdownType, SocketOptions, SocketType},
         result::Errno,
     },
-    net::handle::HandleItem,
+    net::{SOCKET_SET, UDP_PORT_MANAGER},
     sched::utils::yield_now,
     syscall::SysResult,
     utils::crossover::intermit,
@@ -45,10 +44,6 @@ impl UdpSocket {
             options,
         );
         debug!("[Udp] new socket: {:?}", new_socket_handle);
-
-        let mut handle_map_guard = HANDLE_MAP.write();
-        let item = HandleItem::new();
-        handle_map_guard.insert(new_socket_handle, item);
 
         Self {
             handle: new_socket_handle,

@@ -18,7 +18,7 @@ use crate::{
     include::{
         fs::{FileFlags, InodeMode},
         io::PollEvent,
-        net::{AddressFamily, PosixSocketType, SockAddr, SocketOptions},
+        net::{AddressFamily, PosixSocketType, ShutdownType, SockAddr, SocketOptions},
         result::Errno,
     },
     net::socket::Socket,
@@ -99,6 +99,12 @@ impl Sock {
                 }
                 socket.write(buf, remote).await
             }
+        }
+    }
+    pub fn shutdown(&mut self, operation: ShutdownType) -> SysResult<()> {
+        match self {
+            Sock::Tcp(socket) => socket.shutdown(operation),
+            _ => Err(Errno::ENOSYS),
         }
     }
 }

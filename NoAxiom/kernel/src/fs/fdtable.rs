@@ -193,6 +193,9 @@ impl FdTable {
         if fd >= self.table.len() {
             return Err(Errno::EBADF);
         }
+        if self.table[fd].is_none() {
+            return Err(Errno::EBADF);
+        }
         self.table[fd] = None;
         Ok(0)
     }

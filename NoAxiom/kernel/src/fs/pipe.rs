@@ -11,11 +11,7 @@
 //!   - read until pipe empty or buf end
 //!   - write until pipe full or buf end
 
-use alloc::{
-    boxed::Box,
-    sync::{Arc, Weak},
-    vec::Vec,
-};
+use alloc::{boxed::Box, sync::Arc, vec::Vec};
 use core::{
     future::Future,
     pin::Pin,

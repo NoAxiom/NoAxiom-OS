@@ -78,7 +78,7 @@ impl<'a> Syscall<'a> {
             // SYS_ACCEPT4 =>      todo!(),
             SYS_SENDTO =>       self.sys_sendto(args[0], args[1], args[2], args[3] as u32, args[4], args[5]).await,
             SYS_RECVFROM =>     self.sys_recvfrom(args[0], args[1], args[2], args[3] as u32, args[4], args[5]).await,
-            SYS_SHUTDOWN =>     todo!(),
+            SYS_SHUTDOWN =>     self.sys_shutdown(args[0], args[1]).await,
             SYS_GETSOCKNAME =>  self.sys_getsockname(args[0], args[1], args[2]).await,
             SYS_GETPEERNAME =>  self.sys_getpeername(args[0], args[1], args[2]).await,
             SYS_SETSOCKOPT =>   self.sys_setsockopt(args[0], args[1], args[2], args[3], args[4]).await,

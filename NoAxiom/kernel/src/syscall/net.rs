@@ -1,13 +1,15 @@
 //! todo: Network socket struct has no lock now
 use alloc::sync::Arc;
 
+use smoltcp::wire::{IpAddress, IpEndpoint, Ipv4Address};
+
 use super::SyscallResult;
 use crate::{
     fs::pipe::PipeFile,
     include::{
         net::{
-            AddressFamily, PosixSocketOption, PosixSocketType, PosixTcpSocketOptions, SockAddr,
-            SocketLevel,
+            AddressFamily, PosixSocketOption, PosixSocketType, PosixTcpSocketOptions, ShutdownType,
+            SockAddr, SocketLevel,
         },
         result::Errno,
     },
@@ -325,7 +327,10 @@ impl Syscall<'_> {
 
         let n = n?;
 
-        let sockaddr = SockAddr::from_endpoint(endpoint.unwrap());
+        let sockaddr = SockAddr::from_endpoint(endpoint.unwrap_or(IpEndpoint {
+            addr: IpAddress::Ipv4(Ipv4Address::UNSPECIFIED),
+            port: 0,
+        }));
         let user_ptr = UserPtr::<SockAddr>::new(addr);
         if user_ptr.is_non_null() {
             debug!("[sys_recvfrom] remote endpoint: {:?}", endpoint);
@@ -371,6 +376,21 @@ impl Syscall<'_> {
         drop(socket);
 
         Ok(n as isize)
+    }
+
+    pub async fn sys_shutdown(&self, sockfd: usize, how: usize) -> SyscallResult {
+        info!("[sys_shutdown] sockfd: {}, how: {}", sockfd, how);
+
+        let fd_table = self.task.fd_table();
+        let socket_file = fd_table
+            .get_socketfile(sockfd as usize)
+            .ok_or(Errno::EBADF)?;
+        drop(fd_table);
+
+        let mut socket = socket_file.socket().await;
+        socket.shutdown(ShutdownType::from_bits_truncate(how as u8))?;
+
+        Ok(0)
     }
 
     // socketpair now is like pipe
