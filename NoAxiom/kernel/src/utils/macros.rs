@@ -4,9 +4,9 @@ macro_rules! return_errno {
         #[cfg(feature = "debug_sig")]
         {
             let time = crate::time::gettime::get_time();
-            warn!("\x1B[93m[{:>1}] {}:{} Errno: {}\x1B[0m", time, file!(), line!(), $errno);
+            error!("\x1B[93m[{:>1}] {}:{} Errno: {}\x1B[0m", time, file!(), line!(), $errno);
             $(
-                warn!("\x1B[32m[{:>1}] Reason: {}\x1B[0m", time, format!($fmt $(, $($arg)+)?));
+                error!("\x1B[32m[{:>1}] Reason: {}\x1B[0m", time, format!($fmt $(, $($arg)+)?));
             )?
         }
         return Err($errno);
