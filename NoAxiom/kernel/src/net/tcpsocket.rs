@@ -463,7 +463,9 @@ impl Socket for TcpSocket {
                     yield_now().await;
                 }
                 tcp::State::SynSent => {
-                    intermit(|| debug!("[Tcp {}] connect loop: Synsent", self.handles[0]));
+                    intermit(1000, || {
+                        debug!("[Tcp {}] connect loop: Synsent", self.handles[0])
+                    });
                     drop(sockets);
                     yield_now().await;
                 }

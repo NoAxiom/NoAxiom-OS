@@ -66,6 +66,7 @@ impl Sock {
             Sock::Udp(socket) => socket.setsockopt(level, optname, optval), /* _ => Err(Errno::ENOSYS), */
         }
     }
+    #[allow(unused)]
     pub fn meta(&self) -> &SocketMeta {
         match self {
             Sock::Tcp(socket) => socket.meta(),

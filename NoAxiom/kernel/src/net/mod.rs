@@ -47,9 +47,7 @@ pub mod test {
         time::Instant,
     };
 
-    use crate::{
-        constant::net::UDP_CONSTANTS, time::gettime::get_time_ms, utils::crossover::intermit,
-    };
+    use crate::{constant::net::UDP_CONSTANTS, time::gettime::get_time_ms};
 
     /// 元数据的缓冲区的大小
     pub const DEFAULT_METADATA_BUF_SIZE: usize = 1024;
@@ -144,10 +142,10 @@ pub mod test {
             let server_2 = sockets_guard.get::<tcp::Socket>(server_handle_2);
             let client = sockets_guard.get::<tcp::Socket>(client_handle);
             let client_2 = sockets_guard.get::<tcp::Socket>(client_handle_2);
-            intermit(|| debug!("server   state: {:?}", server.state()));
-            intermit(|| debug!("server_2 state: {:?}", server_2.state()));
-            intermit(|| debug!("client   state: {:?}", client.state()));
-            intermit(|| debug!("client_2 state: {:?}", client_2.state()));
+            debug!("server   state: {:?}", server.state());
+            debug!("server_2 state: {:?}", server_2.state());
+            debug!("client   state: {:?}", client.state());
+            debug!("client_2 state: {:?}", client_2.state());
         }
     }
 

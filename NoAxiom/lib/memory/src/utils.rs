@@ -25,3 +25,8 @@ pub fn kernel_vpn_to_ppn(vpn: usize) -> usize {
 pub fn kernel_ppn_to_vpn(ppn: usize) -> usize {
     ppn | KERNEL_PAGENUM_MASK
 }
+
+pub fn print_mem_info() {
+    crate::heap::print_heap_info_simple();
+    crate::frame::print_frame_info_simple();
+}

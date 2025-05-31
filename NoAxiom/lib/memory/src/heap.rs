@@ -51,6 +51,19 @@ pub fn print_heap_info() {
     }
 }
 
+pub fn print_heap_info_simple() {
+    if let Some(heap) = HEAP_ALLOCATOR.0.try_lock() {
+        let user = heap.stats_alloc_user();
+        let actual = heap.stats_alloc_actual();
+        let total = heap.stats_total_bytes();
+        println!(
+            "[heap]  alloc: {}%, used: {}%",
+            actual * 100 / total,
+            user * 100 / total,
+        );
+    }
+}
+
 #[alloc_error_handler]
 /// panic when heap allocation error occurs
 pub fn handle_alloc_error(layout: core::alloc::Layout) -> ! {

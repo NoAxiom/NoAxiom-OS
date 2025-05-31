@@ -2,7 +2,7 @@ use alloc::boxed::Box;
 
 use async_trait::async_trait;
 use downcast_rs::{impl_downcast, DowncastSync};
-use smoltcp::{socket, wire::IpEndpoint};
+use smoltcp::wire::IpEndpoint;
 
 use super::{tcpsocket::TcpSocket, NET_DEVICES, SOCKET_SET};
 use crate::{
@@ -11,6 +11,7 @@ use crate::{
 };
 
 #[derive(Debug, Clone)]
+#[allow(unused)]
 pub struct SocketMeta {
     /// socket的类型
     pub socket_type: SocketType,
@@ -97,6 +98,7 @@ pub trait Socket: Send + Sync + DowncastSync {
     fn shutdown(&mut self, operation: ShutdownType) -> SysResult<()>;
 
     /// Get the socket's metadata
+    #[allow(unused)]
     fn meta(&self) -> &SocketMeta;
 
     /// It is used to get the local endpoint of the socket.

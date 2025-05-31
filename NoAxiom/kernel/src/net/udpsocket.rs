@@ -22,7 +22,6 @@ use crate::{
     net::{SOCKET_SET, UDP_PORT_MANAGER},
     sched::utils::yield_now,
     syscall::SysResult,
-    utils::crossover::intermit,
 };
 
 pub struct UdpSocket {

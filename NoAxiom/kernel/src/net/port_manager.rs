@@ -1,6 +1,6 @@
 use alloc::{boxed::Box, collections::btree_map::BTreeMap};
 
-use smoltcp::wire::{IpEndpoint, IpListenEndpoint};
+use smoltcp::wire::IpEndpoint;
 
 use crate::{include::result::Errno, syscall::SysResult};
 

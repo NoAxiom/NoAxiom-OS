@@ -212,6 +212,15 @@ pub fn print_frame_info() {
     }
 }
 
+pub fn print_frame_info_simple() {
+    if let Some(guard) = FRAME_ALLOCATOR.try_lock() {
+        let remained = guard.stat_allocated();
+        let total = guard.stat_total();
+        let remained_ratio = remained * 100 / total;
+        println!("[frame] alloc: {}%", remained_ratio);
+    }
+}
+
 type FrameAllocatorImpl = StackFrameAllocator;
 
 lazy_static! {

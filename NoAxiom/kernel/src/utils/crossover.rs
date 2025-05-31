@@ -36,8 +36,7 @@ lazy_static::lazy_static! {
 
 #[allow(unused)]
 /// Execute a function every `interval` times
-pub fn intermit(f: impl FnOnce()) {
-    let interval = 1000;
+pub fn intermit(interval: usize, f: impl FnOnce()) {
     let id = &f as *const _ as usize;
     let mut guard = CrossoverManager.lock();
     let crossover = guard.entry(id).or_insert(Crossover::new(interval));

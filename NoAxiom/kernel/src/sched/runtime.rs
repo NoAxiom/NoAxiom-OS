@@ -1,10 +1,11 @@
 use alloc::sync::Arc;
 
-use arch::{Arch, ArchInt, ArchMemory};
+use arch::{Arch, ArchAsm, ArchInt, ArchMemory};
 use async_task::{Builder, Runnable, WithInfo};
 use config::task::INIT_PROCESS_ID;
 use ksync::mutex::SpinLock;
 use lazy_static::lazy_static;
+use memory::utils::print_mem_info;
 
 use super::{
     sched_entity::SchedMetadata,
@@ -12,9 +13,10 @@ use super::{
     vsched::{Runtime, Scheduler},
 };
 use crate::{
-    cpu::{get_hartid, CPUS},
+    cpu::{current_cpu, get_hartid, CPUS},
     task::{manager::TASK_MANAGER, Task},
     time::{gettime::get_time_duration, timer::timer_handler},
+    utils::crossover::intermit,
 };
 
 type SchedulerImpl = MultiLevelScheduler;
@@ -30,6 +32,17 @@ impl Runtime<SchedulerImpl, Info> for SimpleRuntime {
     }
     fn run(&self) {
         let runnable = self.scheduler.lock().pop();
+        intermit(10000000, || {
+            println!(
+                "[kernel hart {} tid {}] memory info:",
+                Arch::get_hartid(),
+                current_cpu()
+                    .task
+                    .as_ref()
+                    .map_or_else(|| 0, |task| task.tid()),
+            )
+        });
+        intermit(10000000, || print_mem_info());
         if let Some(runnable) = runnable {
             runnable.run();
         }
