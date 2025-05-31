@@ -49,10 +49,13 @@ pub fn handle_irq() {
         use arch::Arch;
         assert!(!Arch::is_interrupt_enabled());
         let irq = plic::claim();
-        assert_eq!(irq, 1); // now we only support blk dev
-        get_blk_dev()
-            .handle_interrupt()
-            .expect("handle interrupt error");
+        if irq == 1 {
+            get_blk_dev()
+                .handle_interrupt()
+                .expect("handle interrupt error");
+        } else {
+            log::error!("[driver] unhandled irq: {}", irq);
+        }
         plic::complete(irq);
         assert!(!Arch::is_interrupt_enabled());
     }
