@@ -1,10 +1,14 @@
+use alloc::collections::vec_deque::VecDeque;
 use core::{
     cell::UnsafeCell,
     ops::{Deref, DerefMut},
     sync::atomic::{AtomicBool, Ordering},
+    task::Waker,
 };
 
-use futures_lite::future::yield_now;
+use kfuture::{suspend::SuspendFuture, take_waker::TakeWakerFuture};
+
+use crate::mutex::SpinLock;
 
 /// Async Mutex implemented with `AtomicBool`
 ///
@@ -14,6 +18,7 @@ use futures_lite::future::yield_now;
 pub struct AsyncMutex<T> {
     locked: AtomicBool,
     data: UnsafeCell<T>,
+    waiters: SpinLock<VecDeque<Waker>>,
 }
 
 impl<T> AsyncMutex<T> {
@@ -22,11 +27,12 @@ impl<T> AsyncMutex<T> {
         Self {
             locked: AtomicBool::new(false),
             data: UnsafeCell::new(data),
+            waiters: SpinLock::new(VecDeque::new()),
         }
     }
 
     /// Try to get the lock, returning `true` if successful
-    pub fn try_lock(&self) -> Result<AsyncMutexGuard<'_, T>, ()> {
+    pub fn try_lock(&self) -> Option<AsyncMutexGuard<'_, T>> {
         // `Ordering::Acquire` gaurantees that the lock read is sync after the lock
         // write
         match self
@@ -34,11 +40,12 @@ impl<T> AsyncMutex<T> {
             .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
             .is_ok()
         {
-            true => Ok(AsyncMutexGuard {
+            true => Some(AsyncMutexGuard {
                 data: unsafe { &mut *self.data.get() },
                 lock: &self.locked,
+                waiters: &self.waiters,
             }),
-            false => Err(()),
+            false => None,
         }
     }
 
@@ -48,10 +55,14 @@ impl<T> AsyncMutex<T> {
     pub async fn lock(&self) -> AsyncMutexGuard<'_, T> {
         loop {
             match self.try_lock() {
-                Ok(guard) => return guard,
-                Err(_) => {
-                    // todo: save wakers and wake them up when unlocked, discard the `yield_now`
-                    yield_now().await;
+                // Some(guard) => return guard,
+                // None => {
+                //     kfuture::yield_fut::YieldFuture::new().await;
+                // }
+                Some(guard) => return guard,
+                None => {
+                    self.waiters.lock().push_back(TakeWakerFuture.await);
+                    SuspendFuture::new().await;
                 }
             }
         }
@@ -61,6 +72,7 @@ impl<T> AsyncMutex<T> {
 pub struct AsyncMutexGuard<'a, T> {
     data: &'a mut T,
     lock: &'a AtomicBool,
+    waiters: &'a SpinLock<VecDeque<Waker>>,
 }
 
 impl<T> Deref for AsyncMutexGuard<'_, T> {
@@ -78,6 +90,7 @@ impl<T> DerefMut for AsyncMutexGuard<'_, T> {
 
 impl<T> Drop for AsyncMutexGuard<'_, T> {
     fn drop(&mut self) {
+        self.waiters.lock().pop_front().map(|waker| waker.wake());
         self.lock.store(false, Ordering::Release);
     }
 }

@@ -558,6 +558,7 @@ dependencies = [
  "futures",
  "hashbrown 0.14.5",
  "include",
+ "kfuture",
  "ksync",
  "lazy_static",
  "libc",
@@ -590,13 +591,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "kfuture"
+version = "0.1.0"
+
+[[package]]
 name = "ksync"
 version = "0.1.0"
 dependencies = [
  "arch",
  "config",
- "futures-lite",
  "kernel-sync",
+ "kfuture",
  "spin 0.9.8",
 ]
 
