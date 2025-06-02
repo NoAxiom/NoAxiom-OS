@@ -102,7 +102,10 @@ impl Syscall<'_> {
         if path.starts_with('/') {
             *cwd_guard = Path::try_from(path)?;
         } else {
-            *cwd_guard = cwd_guard.clone().from_cd(&path)?;
+            let cwd = cwd_guard.clone();
+            drop(cwd_guard);
+            let new_cwd = cwd.from_cd(&path)?;
+            *self.task.cwd() = new_cwd;
         }
         Ok(0)
     }
