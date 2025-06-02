@@ -112,6 +112,7 @@ impl<'a> Syscall<'a> {
             SYS_TKILL =>        self.sys_tkill(args[0], args[1] as i32),
             SYS_SIGPROCMASK =>  self.sys_sigprocmask(args[0], args[1], args[2], args[3]).await,
             SYS_SIGSUSPEND =>   self.sys_sigsuspend(args[0]).await,
+            SYS_TGKILL =>       self.sys_tgkill(args[0], args[1], args[2] as _),
 
             // mm
             SYS_MEMBARRIER =>   Self::empty_syscall("membarrier", 0), // fixme: should impl this in multicore

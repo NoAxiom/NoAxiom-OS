@@ -364,7 +364,7 @@ impl Syscall<'_> {
         if signal == 0 {
             return Ok(0);
         }
-        trace!("tid : {} signal num : {}", tid, signal);
+        trace!("[sys_tkill] tid: {}, signal num: {}", tid, signal);
         let task = TASK_MANAGER.get(tid).ok_or(Errno::ESRCH)?;
         let pid = task.tgid() as _;
         task.recv_siginfo(
@@ -373,6 +373,33 @@ impl Syscall<'_> {
                 code: SigCode::TKill,
                 errno: 0,
                 detail: SigDetail::Kill(SigKillDetail { pid }),
+            },
+            true,
+        );
+        Ok(0)
+    }
+
+    pub fn sys_tgkill(&self, tgid: usize, tid: usize, signal: i32) -> SyscallResult {
+        if signal == 0 {
+            return Ok(0);
+        }
+        trace!(
+            "[sys_tgkill] tgid: {}, tid: {}, signal num: {}",
+            tgid,
+            tid,
+            signal
+        );
+        let task = TASK_MANAGER.get(tid).ok_or(Errno::ESRCH)?;
+        if task.tgid() != tgid {
+            return Err(Errno::ESRCH);
+        }
+        let cur_pid = self.task.tgid();
+        task.recv_siginfo(
+            SigInfo {
+                signo: signal,
+                code: SigCode::TKill,
+                errno: 0,
+                detail: SigDetail::Kill(SigKillDetail { pid: cur_pid }),
             },
             true,
         );
