@@ -389,21 +389,26 @@ impl Syscall<'_> {
             tid,
             signal
         );
-        let task = TASK_MANAGER.get(tid).ok_or(Errno::ESRCH)?;
-        if task.tgid() != tgid {
-            return Err(Errno::ESRCH);
+        match tgid as isize {
+            -1 => self.sys_tkill(tid, signal),
+            _ => {
+                let task = TASK_MANAGER.get(tid).ok_or(Errno::ESRCH)?;
+                if task.tgid() != tgid {
+                    return Err(Errno::ESRCH);
+                }
+                let cur_pid = self.task.tgid();
+                task.recv_siginfo(
+                    SigInfo {
+                        signo: signal,
+                        code: SigCode::TKill,
+                        errno: 0,
+                        detail: SigDetail::Kill(SigKillDetail { pid: cur_pid }),
+                    },
+                    true,
+                );
+                Ok(0)
+            }
         }
-        let cur_pid = self.task.tgid();
-        task.recv_siginfo(
-            SigInfo {
-                signo: signal,
-                code: SigCode::TKill,
-                errno: 0,
-                detail: SigDetail::Kill(SigKillDetail { pid: cur_pid }),
-            },
-            true,
-        );
-        Ok(0)
     }
 
     pub async fn sys_getrusage(&self, who: isize, usage: usize) -> SyscallResult {
