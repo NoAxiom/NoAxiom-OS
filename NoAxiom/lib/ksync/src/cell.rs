@@ -35,9 +35,6 @@ impl<T> SyncUnsafeCell<T> {
     pub fn get(&self) -> *mut T {
         self.inner.get()
     }
-    pub fn get_mut(&mut self) -> &mut T {
-        self.inner.get_mut()
-    }
     pub fn as_ref(&self) -> &T {
         unsafe { &*self.inner.get() }
     }

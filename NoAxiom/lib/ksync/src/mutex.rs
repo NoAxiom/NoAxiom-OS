@@ -34,7 +34,7 @@ impl MutexTracer {
 const DEFAULT_CPU: SyncUnsafeCell<MutexTracer> = SyncUnsafeCell::new(MutexTracer::new());
 static mut HART_MUTEX_TRACERS: [SyncUnsafeCell<MutexTracer>; CPU_NUM] = [DEFAULT_CPU; CPU_NUM];
 fn current_mutex_tracer() -> &'static mut MutexTracer {
-    unsafe { HART_MUTEX_TRACERS[Arch::get_hartid()].get_mut() }
+    unsafe { HART_MUTEX_TRACERS[Arch::get_hartid()].as_ref_mut() }
 }
 
 pub fn current_lock_depth() -> usize {

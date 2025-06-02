@@ -149,6 +149,7 @@ impl<'a> Syscall<'a> {
             SYS_SYSLOG =>          Self::sys_syslog(args[0] as u32, args[1], args[2]).await,
             SYS_SYSTEMSHUTDOWN =>  Self::sys_systemshutdown(),
             SYS_GETRANDOM =>       self.sys_getrandom(args[0], args[1], args[2]).await,
+            SYS_GET_MEMPOLICY =>   Self::empty_syscall("get_mempolicy", 0),
 
             // unsupported
             _ => {
@@ -176,7 +177,7 @@ impl<'a> Syscall<'a> {
         if id.is_debug_on() {
             let cx = self.task.trap_context();
             use arch::TrapArgs::*;
-            warn!(
+            info!(
                 "[syscall] id: {:?}, tid: {}, sp: {:#x}, pc: {:#x}, ra: {:#x}, args: {:X?}",
                 id,
                 self.task.tid(),
@@ -223,7 +224,7 @@ pub fn get_syscall_result(res: SyscallResult) -> isize {
     match res {
         Ok(res) => res,
         Err(errno) => {
-            trace!("syscall error: {:?} during {:?}", errno, current_syscall());
+            warn!("syscall error: {:?} during {:?}", errno, current_syscall());
             let errno: isize = errno as isize;
             match errno > 0 {
                 true => -errno,

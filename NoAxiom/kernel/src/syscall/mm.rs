@@ -37,8 +37,8 @@ impl Syscall<'_> {
         offset: usize,
     ) -> SyscallResult {
         let length = align_up(length, PAGE_SIZE);
-        let prot = MmapProts::from_bits(prot).unwrap();
-        let flags = MmapFlags::from_bits(flags).unwrap();
+        let prot = MmapProts::from_bits_truncate(prot);
+        let flags = MmapFlags::from_bits_truncate(flags);
         if addr % PAGE_SIZE != 0 || length == 0 {
             return Err(Errno::EINVAL);
         }
