@@ -1,7 +1,7 @@
 use alloc::{sync::Arc, vec::Vec};
 
 use config::task::INIT_PROCESS_ID;
-use ksync::mutex::check_no_lock;
+use ksync::assert_no_lock;
 
 use super::{SysResult, Syscall, SyscallResult};
 use crate::{
@@ -455,7 +455,7 @@ impl Syscall<'_> {
         // info!("[sys_getdents64] file_name: {:?}", file_name);
         let user_ptr = UserPtr::<u8>::new(buf);
         let buf_slice = user_ptr.as_slice_mut_checked(len).await?;
-        assert!(check_no_lock());
+        assert_no_lock!();
         file.read_dir(buf_slice).await
     }
 

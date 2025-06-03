@@ -5,7 +5,7 @@ use alloc::boxed::Box;
 use arch::{Arch, ArchMemory};
 use async_trait::async_trait;
 use config::fs::WAKE_NUM;
-use ksync::mutex::check_no_lock;
+use ksync::assert_no_lock;
 
 use crate::{
     devices::impls::{
@@ -136,12 +136,12 @@ impl Device for VirtIOAsyncBlock {
         Ok(())
     }
     async fn read(&self, id: usize, buf: &mut [u8]) -> DevResult<usize> {
-        assert!(check_no_lock());
+        assert_no_lock!();
         self.read_block(id, buf).await;
         Ok(buf.len())
     }
     async fn write(&self, id: usize, buf: &[u8]) -> DevResult<usize> {
-        assert!(check_no_lock());
+        assert_no_lock!();
         self.write_block(id, buf).await;
         Ok(buf.len())
     }

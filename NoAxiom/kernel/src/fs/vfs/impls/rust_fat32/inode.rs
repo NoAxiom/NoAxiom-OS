@@ -78,7 +78,7 @@ impl Fat32DirInode {
         }
     }
     pub fn get_dir(&self) -> Arc<Mutex<IFatFileDir>> {
-        assert!(ksync::mutex::check_no_lock());
+        assert_no_lock!();
         self.file.clone()
     }
 }

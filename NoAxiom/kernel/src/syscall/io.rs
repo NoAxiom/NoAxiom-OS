@@ -2,7 +2,7 @@ use alloc::vec::Vec;
 use core::time::Duration;
 
 use include::errno::Errno;
-use ksync::mutex::check_no_lock;
+use ksync::assert_no_lock;
 
 use super::{Syscall, SyscallResult};
 use crate::{
@@ -75,7 +75,7 @@ impl Syscall<'_> {
         // we can't hold pcb lock than call .await, but we should ensure the pcb's
         // sig_mask will not changed
 
-        assert!(check_no_lock());
+        assert_no_lock!();
         let fut = TimeLimitedFuture::new(PpollFuture::new(poll_items), timeout);
         let intable = intable(self.task, fut, None);
         let res = match intable.await? {
@@ -184,7 +184,7 @@ impl Syscall<'_> {
         pcb.set_wake_signal(!sig_mask);
         drop(pcb);
 
-        assert!(check_no_lock());
+        assert_no_lock!();
         let pselect_future = PselectFuture::new(poll_items);
         let res = if let Some(timeout) = timeout {
             let fut = TimeLimitedFuture::new(pselect_future, Some(timeout));

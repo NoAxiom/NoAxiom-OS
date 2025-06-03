@@ -8,7 +8,7 @@ use driver::devices::impls::{
     block::BlockDevice,
     device::{DevResult, Device},
 };
-use ksync::{cell::SyncUnsafeCell, mutex::check_no_lock};
+use ksync::{cell::SyncUnsafeCell, assert_no_lock};
 use lru::LruCache;
 
 use crate::config::fs::{BLOCK_SIZE, MAX_LRU_CACHE_SIZE};
@@ -54,7 +54,7 @@ impl AsyncBlockCache {
 
         // else read the data from cache
         let mut data = [0; BLOCK_SIZE];
-        assert!(check_no_lock());
+        assert_no_lock!();
         self.block_device
             .read(sector, &mut data)
             .await
@@ -66,7 +66,7 @@ impl AsyncBlockCache {
         let write_back = cache_guard.push(sector, data.clone());
         if let Some((key, value)) = write_back {
             // trace!("read_sector: write back");
-            assert!(check_no_lock());
+            assert_no_lock!();
             let _ = self.block_device.write(key, &*value).await;
         }
         data
@@ -87,7 +87,7 @@ impl AsyncBlockCache {
         let write_back = cache_guard.push(sector, data);
         if let Some((key, value)) = write_back {
             // trace!("write_sector: write back");
-            assert!(check_no_lock());
+            assert_no_lock!();
             let _ = self.block_device.write(key, &*value).await;
         }
     }
@@ -101,7 +101,7 @@ impl AsyncBlockCache {
             dirty_data.push((*sector, cache.clone()));
         }
         for (sector, data) in dirty_data {
-            assert!(check_no_lock());
+            assert_no_lock!();
             let _ = self.block_device.write(sector, &*data).await;
         }
         info!("[AsyncBlockCache] cache sync all!");

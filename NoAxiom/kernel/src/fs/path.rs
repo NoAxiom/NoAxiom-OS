@@ -5,7 +5,7 @@ use alloc::{
 };
 use core::fmt::Debug;
 
-use ksync::mutex::check_no_lock;
+use ksync::assert_no_lock;
 
 use super::vfs::{basic::dentry::Dentry, root_dentry};
 use crate::{include::fs::InodeMode, syscall::SysResult, task::Task};
@@ -99,7 +99,7 @@ impl Path {
     /// Get the path from relative path, the path should exist
     #[inline(always)]
     pub fn from_cd(&self, path: &str) -> SysResult<Self> {
-        assert!(check_no_lock());
+        assert_no_lock!();
         Self::try_from(self.cd(path))
     }
 

@@ -74,11 +74,11 @@ impl Dentry for Fat32Dentry {
         let super_block = &self.meta().super_block;
         assert!(inode.file_type() == InodeMode::DIR);
         if mode.contains(InodeMode::FILE) {
-            assert!(ksync::mutex::check_no_lock());
+            assert_no_lock!();
             let dir = inode
                 .downcast_arc::<Fat32DirInode>()
                 .map_err(|_| Errno::EIO)?;
-            assert!(ksync::mutex::check_no_lock());
+            assert_no_lock!();
             let new_file = dir
                 .get_dir()
                 .lock()
@@ -88,11 +88,11 @@ impl Dentry for Fat32Dentry {
             let new_inode = Fat32FileInode::new(super_block.clone(), new_file);
             Ok(self.into_dyn().add_child(name, Arc::new(new_inode)))
         } else if mode.contains(InodeMode::DIR) {
-            assert!(ksync::mutex::check_no_lock());
+            assert_no_lock!();
             let dir = inode
                 .downcast_arc::<Fat32DirInode>()
                 .map_err(|_| Errno::EIO)?;
-            assert!(ksync::mutex::check_no_lock());
+            assert_no_lock!();
             debug!("create dir: {}", name);
             let new_dir = dir
                 .get_dir()

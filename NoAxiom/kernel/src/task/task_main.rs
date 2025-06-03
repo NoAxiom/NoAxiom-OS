@@ -7,7 +7,7 @@ use core::{
 };
 
 use arch::{Arch, ArchInt, ArchTrap, ArchTrapContext, ArchUserFloatContext};
-use ksync::mutex::check_no_lock;
+use ksync::assert_no_lock;
 
 use crate::{
     cpu::current_cpu,
@@ -67,7 +67,7 @@ pub async fn stop_now(task: &Arc<Task>) {
 /// called by [`UserTaskFuture`]
 pub async fn task_main(task: Arc<Task>) {
     task.set_waker(take_waker().await);
-    assert!(check_no_lock());
+    assert_no_lock!();
     loop {
         // kernel -> user
         trace!("[task_main] trap_restore, cx: {:#x?}", task.trap_context());
@@ -78,13 +78,13 @@ pub async fn task_main(task: Arc<Task>) {
         task.time_stat_mut().record_trap_out();
 
         // check sigmask and status
-        assert!(check_no_lock());
+        assert_no_lock!();
         match task.pcb().status() {
             TaskStatus::Terminated => break,
             TaskStatus::Stopped => stop_now(&task).await,
             _ => {}
         }
-        assert!(check_no_lock());
+        assert_no_lock!();
 
         // user -> kernel, enter the handler
         trace!(
@@ -92,7 +92,7 @@ pub async fn task_main(task: Arc<Task>) {
             task.trap_context()
         );
         assert!(!Arch::is_interrupt_enabled());
-        assert!(check_no_lock());
+        assert_no_lock!();
         user_trap_handler(&task, trap_type).await;
         assert!(Arch::is_interrupt_enabled());
 
@@ -102,19 +102,19 @@ pub async fn task_main(task: Arc<Task>) {
             TaskStatus::Stopped => stop_now(&task).await,
             _ => {}
         }
-        assert!(check_no_lock());
+        assert_no_lock!();
 
         // check signal before return to user
         trace!("[task_main] check_signal");
         task.check_signal(None).await;
-        assert!(check_no_lock());
+        assert_no_lock!();
         match task.pcb().status() {
             TaskStatus::Terminated => break,
             TaskStatus::Stopped => stop_now(&task).await,
             _ => {}
         }
-        assert!(check_no_lock());
+        assert_no_lock!();
     }
-    assert!(check_no_lock());
+    assert_no_lock!();
     task.exit_handler().await;
 }

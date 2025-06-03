@@ -13,7 +13,7 @@ use core::{
 use include::errno::Errno;
 pub use kfuture::block::block_on;
 use kfuture::{suspend::SuspendFuture, take_waker::TakeWakerFuture, yield_fut::YieldFuture};
-use ksync::mutex::check_no_lock;
+use ksync::assert_no_lock;
 use pin_project_lite::pin_project;
 
 use crate::{cpu::current_task, signal::sig_set::SigMask, syscall::SysResult, task::Task};
@@ -48,7 +48,7 @@ pub async fn take_waker() -> Waker {
 /// suspend current task
 /// difference with yield_now: it won't wake the task immediately
 pub async fn suspend_now() {
-    assert!(check_no_lock());
+    assert_no_lock!();
     SuspendFuture::new().await;
 }
 

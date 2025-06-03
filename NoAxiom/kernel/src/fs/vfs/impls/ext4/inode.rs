@@ -79,7 +79,7 @@ impl Inode for Ext4FileInode {
             "[Ext4FileInode] truncate inode: {}, new_size: {}",
             inode.inode_num, new
         );
-        assert!(check_no_lock());
+        assert_no_lock!();
         assert!(Arch::is_interrupt_enabled());
         ext4.truncate_inode(&mut inode, new as u64)
             .await

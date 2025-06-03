@@ -4,7 +4,7 @@ use core::task::Waker;
 use arch::{Arch, ArchInt};
 use async_trait::async_trait;
 use ext4_rs::InodeFileType;
-use ksync::mutex::check_no_lock;
+use ksync::assert_no_lock;
 
 use super::{dentry::Ext4Dentry, inode::Ext4FileInode, superblock::Ext4SuperBlock};
 use crate::{
@@ -47,7 +47,7 @@ impl File for Ext4File {
     //  - offset == cursor.offset: normal read
     //  - offset != cursor.offset: seek and read
     async fn base_read(&self, offset: usize, buf: &mut [u8]) -> SyscallResult {
-        assert!(check_no_lock());
+        assert_no_lock!();
         assert!(Arch::is_interrupt_enabled());
         if offset > self.meta.inode.size() {
             return Ok(0);
@@ -64,7 +64,7 @@ impl File for Ext4File {
 
         match inode.file_type() {
             InodeMode::FILE => {
-                assert!(check_no_lock());
+                assert_no_lock!();
                 assert!(Arch::is_interrupt_enabled());
                 let x = ext4.read_at(self.ino, offset, buf).await.map_err(fs_err)? as isize;
                 Ok(x)
@@ -82,7 +82,7 @@ impl File for Ext4File {
 
     /// write all the buf content, extend the file if necessary
     async fn base_write(&self, offset: usize, buf: &[u8]) -> SyscallResult {
-        assert!(check_no_lock());
+        assert_no_lock!();
         assert!(Arch::is_interrupt_enabled());
         let inode = &self.meta.inode;
         let super_block = self.meta.dentry().super_block();
@@ -99,7 +99,7 @@ impl File for Ext4File {
         }
         match inode.file_type() {
             InodeMode::FILE => {
-                assert!(check_no_lock());
+                assert_no_lock!();
                 assert!(Arch::is_interrupt_enabled());
                 Ok(ext4.write_at(self.ino, offset, buf).await.map_err(fs_err)? as isize)
             }
@@ -177,7 +177,7 @@ impl File for Ext4Dir {
             .get_fs()
             .await;
         trace!("[ext4dir] load get lock succeed");
-        assert!(check_no_lock());
+        assert_no_lock!();
         assert!(Arch::is_interrupt_enabled());
 
         let entries = ext4.dir_get_entries(self.ino).await;
@@ -221,7 +221,7 @@ impl File for Ext4Dir {
             .unwrap()
             .get_fs()
             .await;
-        assert!(check_no_lock());
+        assert_no_lock!();
         assert!(Arch::is_interrupt_enabled());
         let mut inode = ext4.get_inode_ref(self.ino).await;
         ext4.dir_remove_entry(&mut inode, &name)

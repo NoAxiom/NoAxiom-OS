@@ -170,7 +170,7 @@ impl dyn File {
         let page_cache = self.page_cache().await;
         if page_cache.is_none() {
             drop(page_cache);
-            assert!(check_no_lock());
+            assert_no_lock!();
             return self.base_read(offset, buf).await;
         }
         let size = self.size();
@@ -242,7 +242,7 @@ impl dyn File {
         let page_cache = self.page_cache().await;
         if page_cache.is_none() {
             drop(page_cache);
-            assert!(check_no_lock());
+            assert_no_lock!();
             return self.base_write(offset, buf).await;
         }
         let size = self.size();

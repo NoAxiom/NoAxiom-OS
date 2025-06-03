@@ -3,7 +3,7 @@ use core::mem::size_of;
 
 use arch::{ArchTrapContext, ArchUserFloatContext, TrapArgs};
 use config::mm::SIG_TRAMPOLINE;
-use ksync::mutex::check_no_lock;
+use ksync::assert_no_lock;
 
 use crate::{
     mm::user_ptr::UserPtr,
@@ -118,7 +118,7 @@ impl Task {
                         uc_sig: [0; 16],
                         uc_mcontext: MContext::from_cx(&cx),
                     };
-                    assert!(check_no_lock());
+                    assert_no_lock!();
                     ucontext_ptr.write(ucontext).await.unwrap_or_else(|err| {
                         error!("[sigstack] write ucontext failed: {:?}", err);
                     });
@@ -142,7 +142,7 @@ impl Task {
                         siginfo_v.si_code = si.code as i32;
                         new_sp -= size_of::<LinuxSigInfo>();
                         let siginfo_ptr: UserPtr<LinuxSigInfo> = new_sp.into();
-                        assert!(check_no_lock());
+                        assert_no_lock!();
                         siginfo_ptr.try_write(siginfo_v).await.unwrap();
                         cx[A1] = new_sp;
                     }

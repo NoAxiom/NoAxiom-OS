@@ -250,7 +250,7 @@ impl dyn Dentry {
                         "[find_path] the {} is not open! Now open it.",
                         current.name()
                     );
-                    assert!(check_no_lock());
+                    assert_no_lock!();
                     block_on(current_dir.load_dir()).unwrap();
                 }
             }
@@ -306,7 +306,7 @@ impl dyn Dentry {
             assert!(current.clone().inode().unwrap().file_type() == InodeMode::DIR);
             if current.clone().children().is_empty() {
                 if let Ok(current_dir) = current.clone().open() {
-                    assert!(check_no_lock());
+                    assert_no_lock!();
                     current_dir.load_dir().await.unwrap();
                 }
             }
@@ -324,12 +324,12 @@ impl dyn Dentry {
 
             if idx < max_idx {
                 debug!("[find_path_or_create] create dir {}", name);
-                assert!(check_no_lock());
+                assert_no_lock!();
                 assert!(arch::Arch::is_interrupt_enabled());
                 current = current.create(name, InodeMode::DIR).await.unwrap();
             } else {
                 debug!("[find_path_or_create] create file {}", name);
-                assert!(check_no_lock());
+                assert_no_lock!();
                 assert!(arch::Arch::is_interrupt_enabled());
                 current = current.create(name, mode).await.unwrap();
             }
