@@ -25,13 +25,9 @@ extern "C" {
 }
 
 impl Task {
-    pub fn peek_has_pending_signal(self: &Arc<Self>, mask: &Option<SigMask>) -> bool {
+    pub fn peek_has_pending_signal(self: &Arc<Self>, mask: &SigMask) -> bool {
         let pcb = self.pcb();
-        let pcb_mask = pcb.sig_mask();
-        let mask = match mask {
-            Some(m) => pcb_mask | *m,
-            None => pcb_mask,
-        };
+        let mask = pcb.sig_mask() | *mask;
         pcb.pending_sigs.has_expect_signals(!mask)
     }
     pub async fn check_signal(self: &Arc<Self>, tmp_mask: Option<SigMask>) {

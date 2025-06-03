@@ -134,16 +134,25 @@ impl SigActionList {
             "[SigActionList] set_sigaction: signum {:?}, action: {:?}, cur_bitmap: {:?}",
             SigNum::from(signum),
             action,
-            self.get_bitmap()
+            self.get_user_bitmap()
         );
     }
     pub fn get(&self, signum: SigNum) -> Option<&KSigAction> {
         self.actions.get(signum as usize)
     }
-    pub fn get_bitmap(&self) -> SigSet {
+    pub fn get_user_bitmap(&self) -> SigSet {
         let mut res = SigSet::empty();
         for (i, sa) in self.actions.iter().enumerate() {
             if let SAHandlerType::User { handler: _ } = sa.handler {
+                res |= SigSet::from_signum(i as u32);
+            }
+        }
+        res
+    }
+    pub fn get_ignored_bitmap(&self) -> SigSet {
+        let mut res = SigSet::empty();
+        for (i, sa) in self.actions.iter().enumerate() {
+            if sa.handler == SAHandlerType::Ignore {
                 res |= SigSet::from_signum(i as u32);
             }
         }

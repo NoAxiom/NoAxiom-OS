@@ -58,7 +58,7 @@ pin_project! {
         task: &'a Arc<Task>,
         #[pin]
         fut: F,
-        mask: Option<SigMask>,
+        mask: SigMask,
     }
 }
 
@@ -89,10 +89,11 @@ pub async fn intable<T>(
     fut: impl Future<Output = T>,
     block_sig: Option<SigMask>,
 ) -> SysResult<T> {
+    let addition = task.sa_list().get_ignored_bitmap();
     IntableFuture {
         task,
         fut,
-        mask: block_sig,
+        mask: block_sig.unwrap_or(SigMask::empty()) | addition,
     }
     .await
 }

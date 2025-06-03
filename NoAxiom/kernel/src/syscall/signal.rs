@@ -226,7 +226,7 @@ impl Syscall<'_> {
         let task = self.task;
         let mut mask = mask.read().await?;
         mask.remove(SigSet::SIGKILL | SigSet::SIGSTOP);
-        let invoke_signal = task.sa_list().get_bitmap();
+        let invoke_signal = task.sa_list().get_user_bitmap();
         debug!(
             "[sys_sigsuspend] tid: {}, new_mask: {:?}, invoke_signal: {:?}",
             task.tid(),

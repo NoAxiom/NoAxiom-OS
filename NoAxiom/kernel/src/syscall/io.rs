@@ -185,16 +185,11 @@ impl Syscall<'_> {
         drop(pcb);
 
         assert_no_lock!();
-        let pselect_future = PselectFuture::new(poll_items);
-        let res = if let Some(timeout) = timeout {
-            let fut = TimeLimitedFuture::new(pselect_future, Some(timeout));
-            let intable = intable(self.task, fut, None);
-            match intable.await? {
-                TimeLimitedType::Ok(res) => Some(res),
-                TimeLimitedType::TimeOut => None,
-            }
-        } else {
-            Some(pselect_future.await)
+        let fut = TimeLimitedFuture::new(PselectFuture::new(poll_items), timeout);
+        let intable = intable(self.task, fut, None);
+        let res = match intable.await? {
+            TimeLimitedType::Ok(res) => Some(res),
+            TimeLimitedType::TimeOut => None,
         };
 
         read_fds.as_mut().map(|fds| fds.clear());
