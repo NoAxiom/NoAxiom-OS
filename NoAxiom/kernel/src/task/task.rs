@@ -341,6 +341,14 @@ impl Task {
         self.tcb.as_ref_mut()
     }
 
+    /// sched entity
+    pub fn sched_entity(&self) -> &SchedEntity {
+        self.sched_entity.as_ref()
+    }
+    pub fn sched_entity_mut(&self) -> &mut SchedEntity {
+        self.sched_entity.as_ref_mut()
+    }
+
     /// time stat
     pub fn time_stat(&self) -> &TimeInfo {
         &self.sched_entity.as_ref_mut().time_stat

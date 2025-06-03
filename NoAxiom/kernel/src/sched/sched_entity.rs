@@ -4,7 +4,7 @@ use crate::{include::sched::CpuMask, task::Task, time::time_info::TimeInfo};
 
 #[derive(Debug, Clone, Copy)]
 pub enum SchedPrio {
-    RealTime(usize),
+    RealTime(#[allow(unused)] usize),
     Normal,
     IdlePrio,
 }
@@ -13,6 +13,7 @@ pub struct SchedEntity {
     pub sched_prio: SchedPrio, // scheduling priority
     pub time_stat: TimeInfo,   // task time
     pub cpu_mask: CpuMask,     // cpu mask
+    pub yield_req: bool,       // need yield
 }
 
 impl Default for SchedEntity {
@@ -21,7 +22,19 @@ impl Default for SchedEntity {
             sched_prio: SchedPrio::Normal,
             time_stat: TimeInfo::default(),
             cpu_mask: CpuMask::new(),
+            yield_req: false,
         }
+    }
+}
+impl SchedEntity {
+    pub fn clear_pending_yield(&mut self) {
+        self.yield_req = false;
+    }
+    pub fn set_pending_yield(&mut self) {
+        self.yield_req = true;
+    }
+    pub fn need_yield(&self) -> bool {
+        self.time_stat.is_timeup() || self.yield_req
     }
 }
 
@@ -45,6 +58,7 @@ impl SchedMetadata {
             unsafe { Some(&*self.ptr) }
         }
     }
+    #[allow(unused)]
     pub fn tid(&self) -> usize {
         self.tid
     }

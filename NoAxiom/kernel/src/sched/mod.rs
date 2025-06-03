@@ -4,7 +4,6 @@
 //! - [`scheduler`] provides scheduler for async tasks, usually we use CFS
 //! - [`utils`] contains useful func for async tasks execution
 
-// mod cfs;
 pub mod runtime;
 pub mod sched_entity;
 pub mod scheduler;

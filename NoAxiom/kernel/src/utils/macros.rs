@@ -75,4 +75,38 @@ macro_rules! with_interrupt_on {
         }
         result
     }};
+    ($func:block) => {{
+        use arch::{Arch, ArchInt};
+        let was_enabled = Arch::is_interrupt_enabled();
+        Arch::enable_interrupt();
+        let result = ($func);
+        if !was_enabled {
+            Arch::disable_interrupt();
+        }
+        result
+    }};
+}
+
+#[macro_export]
+macro_rules! with_interrupt_off {
+    ($func:expr) => {{
+        use arch::{Arch, ArchInt};
+        let was_enabled = Arch::is_interrupt_enabled();
+        Arch::disable_interrupt();
+        let result = $func;
+        if was_enabled {
+            Arch::enable_interrupt();
+        }
+        result
+    }};
+    ($func:block) => {{
+        use arch::{Arch, ArchInt};
+        let was_enabled = Arch::is_interrupt_enabled();
+        Arch::disable_interrupt();
+        let result = ($func);
+        if was_enabled {
+            Arch::enable_interrupt();
+        }
+        result
+    }};
 }

@@ -24,15 +24,16 @@ impl Task {
     /// and will create an await point for the current task flow
     #[inline(always)]
     pub async fn yield_now(&self) {
+        self.set_sched_prio_idle();
+        self.sched_entity_mut().clear_pending_yield();
         YieldFuture::new().await;
+        self.set_sched_prio_normal();
     }
 }
 
 #[inline(always)]
 pub async fn yield_now() {
-    current_task().unwrap().set_sched_prio_idle();
-    YieldFuture::new().await;
-    current_task().unwrap().set_sched_prio_normal();
+    current_task().unwrap().yield_now().await;
 }
 
 /// Take the waker of the current future

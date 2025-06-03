@@ -18,7 +18,7 @@ lazy_static::lazy_static! {
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
     println!(
-        "[PANIC] HART{}, TID{}, PANIC at {}ms, epc={:#x}",
+        "[PANIC] HART{}, TID{}, PANIC at {}ms, epc={:#x}, trap_depth={}",
         get_hartid(),
         current_cpu()
             .task
@@ -26,6 +26,7 @@ fn panic(info: &PanicInfo) -> ! {
             .map_or_else(|| 0, |task| task.tid()),
         get_time_ms(),
         Arch::read_epc(),
+        current_cpu().trap_depth(),
     );
     println!("[PANIC] during syscall {:?}", current_syscall());
     if let Some(task) = current_cpu().task.as_ref() {

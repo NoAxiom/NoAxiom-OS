@@ -121,3 +121,9 @@ impl Scheduler<Info> for MultiLevelScheduler {
         self.normal.pop()
     }
 }
+
+impl MultiLevelScheduler {
+    pub fn pop_realtime(&mut self) -> Option<Runnable<Info>> {
+        self.realtime.pop()
+    }
+}

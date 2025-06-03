@@ -11,9 +11,11 @@ use ksync::mutex::check_no_lock;
 
 use crate::{
     cpu::current_cpu,
+    mm::memory_set::kernel_space_activate,
     sched::utils::{suspend_now, take_waker},
     task::{status::TaskStatus, Task},
     trap::handler::user_trap_handler,
+    with_interrupt_off,
 };
 
 pub struct UserTaskFuture<F: Future + Send + 'static> {
@@ -31,29 +33,25 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
     type Output = F::Output;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        // ===== before executing task future =====
-        assert!(Arch::is_interrupt_enabled());
-        Arch::disable_interrupt();
         let this = unsafe { self.get_unchecked_mut() };
         let task = &this.task;
         let future = &mut this.future;
-        task.time_stat_mut().record_switch_in();
-        current_cpu().set_task(task);
-        fence(Ordering::AcqRel);
+        with_interrupt_off!({
+            task.time_stat_mut().record_switch_in();
+            current_cpu().set_task(task);
+            task.memory_activate();
+            fence(Ordering::AcqRel);
+        });
         task.restore_cx_int_en();
-        // ===== before executing task future =====
-
         let ret = unsafe { Pin::new_unchecked(future).poll(cx) };
-
-        // ===== after executing task future =====
         task.record_cx_int_en();
-        Arch::disable_interrupt();
-        task.time_stat_mut().record_switch_out();
-        task.trap_context_mut().freg_mut().yield_task();
-        current_cpu().clear_task();
-        fence(Ordering::AcqRel);
-        Arch::enable_interrupt();
-        // ===== after executing task future =====
+        with_interrupt_off!({
+            task.time_stat_mut().record_switch_out();
+            task.trap_context_mut().freg_mut().yield_task();
+            current_cpu().clear_task();
+            kernel_space_activate();
+            fence(Ordering::AcqRel);
+        });
         ret
     }
 }

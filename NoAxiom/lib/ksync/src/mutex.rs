@@ -44,6 +44,18 @@ pub fn check_no_lock() -> bool {
     current_mutex_tracer().depth == 0
 }
 
+#[macro_export]
+macro_rules! assert_no_lock {
+    () => {
+        if !ksync::mutex::check_no_lock() {
+            panic!(
+                "lock assertion failed, current lock depth={}",
+                ksync::mutex::current_lock_depth()
+            );
+        }
+    };
+}
+
 /// maintain riscv arch interrupt behavior for lock action
 pub struct NoIrqLockAction;
 impl LockAction for NoIrqLockAction {

@@ -1,8 +1,7 @@
-use alloc::sync::Arc;
+use alloc::{collections::vec_deque::VecDeque, sync::Arc};
 
-use arch::{Arch, ArchAsm, ArchInt, ArchMemory};
+use arch::{Arch, ArchInt};
 use async_task::{Builder, Runnable, WithInfo};
-use config::task::INIT_PROCESS_ID;
 use ksync::mutex::SpinLock;
 use lazy_static::lazy_static;
 use memory::utils::print_mem_info;
@@ -13,37 +12,31 @@ use super::{
     vsched::{Runtime, Scheduler},
 };
 use crate::{
-    cpu::{current_cpu, get_hartid, CPUS},
-    task::{manager::TASK_MANAGER, Task},
-    time::{gettime::get_time_duration, timer::timer_handler},
+    cpu::get_hartid,
+    task::Task,
+    time::{
+        time_slice::{set_next_trigger, TimeSliceInfo},
+        timer::timer_handler,
+    },
     utils::crossover::intermit,
 };
 
 type SchedulerImpl = MultiLevelScheduler;
-pub struct SimpleRuntime {
+pub struct MultiLevelRuntime {
     scheduler: SpinLock<SchedulerImpl>,
 }
 
-impl Runtime<SchedulerImpl, Info> for SimpleRuntime {
+impl Runtime<Info> for MultiLevelRuntime {
     fn new() -> Self {
         Self {
             scheduler: SpinLock::new(SchedulerImpl::new()),
         }
     }
     fn run(&self) {
-        let runnable = self.scheduler.lock().pop();
-        intermit(10000000, || {
-            println!(
-                "[kernel hart {} tid {}] memory info:",
-                Arch::get_hartid(),
-                current_cpu()
-                    .task
-                    .as_ref()
-                    .map_or_else(|| 0, |task| task.tid()),
-            )
-        });
         intermit(10000000, || print_mem_info());
+        let runnable = self.scheduler.lock().pop();
         if let Some(runnable) = runnable {
+            set_next_trigger(None);
             runnable.run();
         }
     }
@@ -66,7 +59,23 @@ impl Runtime<SchedulerImpl, Info> for SimpleRuntime {
     }
 }
 
-type RuntimeImpl = SimpleRuntime;
+impl MultiLevelRuntime {
+    pub fn handle_realtime(&self) {
+        let mut sched = self.scheduler.lock();
+        let mut tasks = VecDeque::new();
+        while let Some(task) = sched.pop_realtime() {
+            tasks.push_back(task);
+        }
+        drop(sched);
+        assert_no_lock!();
+        for task in tasks {
+            set_next_trigger(Some(TimeSliceInfo::realtime()));
+            task.run();
+        }
+    }
+}
+
+type RuntimeImpl = MultiLevelRuntime;
 lazy_static! {
     pub static ref RUNTIME: RuntimeImpl = RuntimeImpl::new();
 }
@@ -76,43 +85,8 @@ lazy_static! {
 pub fn run_tasks() -> ! {
     info!("[kernel] hart {} has been booted", get_hartid());
     loop {
-        assert!(Arch::is_interrupt_enabled());
         timer_handler();
+        Arch::enable_interrupt();
         RUNTIME.run();
-        // context_switch_test();
-    }
-}
-
-#[allow(unused)]
-fn context_switch_test() {
-    if let Some(init_proc) = TASK_MANAGER.get(INIT_PROCESS_ID) {
-        let time0 = get_time_duration();
-        const NUM: usize = 100000;
-        let mut counter = 0;
-        for i in 0..NUM {
-            CPUS[get_hartid()].as_ref_mut().set_task(&init_proc);
-            counter += i;
-            CPUS[get_hartid()].as_ref_mut().clear_task();
-        }
-        let time1 = get_time_duration();
-        for i in 0..NUM {
-            Arch::tlb_flush();
-            counter += i;
-            Arch::tlb_flush();
-        }
-        let time2 = get_time_duration();
-        for i in 0..NUM {
-            counter += i;
-        }
-        let time3 = get_time_duration();
-        println!(
-            "[kernel] hart {} switch time: {:?}, flush time: {:?}, arith time: {:?}, n: {}, counter: {}",
-            get_hartid(),
-            time1 - time0,
-            time2 - time1,
-            time3 - time2,
-            NUM,
-            counter
-        );
     }
 }

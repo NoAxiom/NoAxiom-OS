@@ -7,7 +7,7 @@ use arch::{consts::KERNEL_ADDR_OFFSET, Arch, ArchInt, ArchTrap, TrapArgs, TrapTy
 use super::{ext_int::ext_int_handler, ipi::ipi_handler};
 use crate::{
     cpu::{current_cpu, get_hartid},
-    sched::utils::{block_on, yield_now},
+    sched::utils::block_on,
     signal::{
         sig_info::{SigCode, SigInfo},
         sig_num::SigNum,
@@ -15,11 +15,13 @@ use crate::{
     syscall::utils::current_syscall,
     task::Task,
     time::time_slice::set_next_trigger,
+    trap::ktimer::kernel_timer_trap_handler,
 };
 
 /// kernel trap handler
 #[no_mangle]
 fn kernel_trap_handler() {
+    current_cpu().add_trap_depth();
     let trap_type = Arch::read_trap_type(None);
     let epc = Arch::read_epc();
     let kernel_panic = |msg: &str| {
@@ -50,12 +52,18 @@ fn kernel_trap_handler() {
         }
         TrapType::SupervisorExternal => ext_int_handler(),
         TrapType::Timer => {
-            set_next_trigger();
+            trace!(
+                "[kernel_trap] SupervisorTimer trap at hart: {}, epc: {:#x}",
+                get_hartid(),
+                epc,
+            );
+            kernel_timer_trap_handler();
         }
         TrapType::SupervisorSoft => ipi_handler(),
         TrapType::None => {}
         _ => kernel_panic("unsupported trap type"),
     }
+    current_cpu().sub_trap_depth();
 }
 
 /// user trap handler
@@ -65,13 +73,13 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
     trace!("[trap_handler] call trap handler");
 
     // check if need schedule
-    if task.time_stat().is_timeup() {
+    if task.sched_entity().need_yield() {
         trace!(
             "task {} time_stat timeup by time = {:?}",
             task.tid(),
             task.time_stat(),
         );
-        yield_now().await;
+        task.yield_now().await;
     }
 
     // def: context, user trap pc, trap type
@@ -137,7 +145,7 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
                 get_hartid(),
                 task.tid(),
             );
-            set_next_trigger();
+            set_next_trigger(None);
             task.yield_now().await;
         }
         TrapType::SupervisorExternal => {

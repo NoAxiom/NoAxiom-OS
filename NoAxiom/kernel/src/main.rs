@@ -48,6 +48,8 @@ extern crate alloc;
 extern crate log;
 #[macro_use]
 extern crate console;
+#[macro_use]
+extern crate ksync;
 
 use config;
 mod constant;
