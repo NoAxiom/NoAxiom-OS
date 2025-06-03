@@ -9,7 +9,7 @@ use core::panic;
 
 use async_trait::async_trait;
 use downcast_rs::DowncastSync;
-use ksync::mutex::{check_no_lock, SpinLock, SpinLockGuard};
+use ksync::mutex::{SpinLock, SpinLockGuard};
 
 type Mutex<T> = SpinLock<T>;
 type MutexGuard<'a, T> = SpinLockGuard<'a, T>;

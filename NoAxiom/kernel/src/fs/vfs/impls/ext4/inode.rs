@@ -3,10 +3,7 @@ use alloc::{boxed::Box, sync::Arc};
 use arch::{Arch, ArchInt};
 use async_trait::async_trait;
 use include::errno::Errno;
-use ksync::{
-    async_mutex::AsyncMutex,
-    mutex::{check_no_lock, SpinLock},
-};
+use ksync::{async_mutex::AsyncMutex, mutex::SpinLock};
 
 use super::{fs_err, superblock::Ext4SuperBlock, IExtInode};
 use crate::{

@@ -11,7 +11,7 @@ use config::mm::PAGE_SIZE;
 use downcast_rs::{impl_downcast, DowncastSync};
 use ksync::{
     async_mutex::AsyncMutexGuard,
-    mutex::{check_no_lock, SpinLock, SpinLockGuard},
+    mutex::{SpinLock, SpinLockGuard},
 };
 type Mutex<T> = SpinLock<T>;
 type MutexGuard<'a, T> = SpinLockGuard<'a, T>;
