@@ -1,7 +1,8 @@
-use alloc::vec::Vec;
+use alloc::{string::ToString, vec::Vec};
 use core::time::Duration;
 
 use arch::TrapArgs;
+use config::task::BUSYBOX;
 
 use super::{Syscall, SyscallResult};
 use crate::{
@@ -114,19 +115,31 @@ impl Syscall<'_> {
         debug!("[sys_execve] path: {:?}", path);
 
         // args and envs init
-        if path.contains(".sh") {
+        if path.ends_with(".sh") {
             info!("[execve] executing .sh script, path: {:?}", path);
-            path = format!("busybox");
+            path = BUSYBOX.to_string();
             args.push(format!("busybox"));
             args.push(format!("sh"));
         } else if path.ends_with("ls") {
             info!("[execve] executing ls, path: {:?}", path);
-            path = format!("busybox");
+            path = BUSYBOX.to_string();
             args.push(format!("busybox"));
         } else if path.ends_with("sleep") {
             info!("[execve] executing sleep, path: {:?}", path);
-            path = format!("busybox");
+            path = BUSYBOX.to_string();
             args.push(format!("busybox"));
+        }
+
+        #[cfg(feature = "debug_sig")]
+        {
+            use crate::utils::loghook::{logoff, logon};
+            if path.ends_with("logon") {
+                logon();
+                return Ok(0);
+            } else if path.ends_with("logoff") {
+                logoff();
+                return Ok(0);
+            }
         }
 
         let file_path = Path::from_string(path, self.task)?;

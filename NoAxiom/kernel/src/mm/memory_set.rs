@@ -350,16 +350,40 @@ impl MemorySet {
                             .map_err(|_| Errno::ENOEXEC)?
                             .trim_end_matches('\0')
                     );
-                    if path.eq("/lib/ld-musl-riscv64-sf.so.1")
-                        || path.eq("/lib/ld-musl-riscv64.so.1")
-                    {
-                        info!("[load_dl_interp] using musl libc, original path = {}", path);
-                        path = format!("/lib/musl/libc.so");
-                    } else if path.eq("/lib/ld-linux-riscv64-lp64d.so.1") {
-                        info!("[load_dl_interp] using glibc, original path = {}", path);
-                        path = format!("/lib/glibc/ld-2.31.so");
-                    } else {
-                        error!("[load_dl_interp] parse dl_interp error, path = {}", path);
+                    match path.as_str() {
+                        // rv
+                        "/lib/ld-linux-riscv64-lp64d.so.1" | "/lib/ld-linux-riscv64-lp64.so.1" => {
+                            path = format!("/glibc/lib/ld-linux-riscv64-lp64d.so.1");
+                        }
+                        "/lib/libc.so.6" => {
+                            path = format!("/glibc/lib/libc.so");
+                        }
+                        "/lib/libm.so.6" => {
+                            path = format!("/glibc/lib/libm.so");
+                        }
+                        "/lib/ld-musl-riscv64-sf.so.1" => {
+                            path = format!("/musl/lib/libc.so");
+                        }
+                        // la
+                        "/lib64/ld-linux-loongarch-lp64d.so.1" => {
+                            path = format!("/glibc/lib/ld-linux-loongarch-lp64d.so.1");
+                        }
+                        "/lib64/libc.so.6" | "/usr/lib64/libc.so.6" => {
+                            path = format!("/glibc/lib/libc.so.6");
+                        }
+                        "/lib64/libm.so.6" | "/usr/lib64/libm.so.6" => {
+                            path = format!("/glibc/lib/libm.so.6");
+                        }
+                        "/lib/ld-musl-loongarch64-lp64d.so.1"
+                        | "/lib64/ld-musl-loongarch-lp64d.so.1" => {
+                            path = format!("/musl/lib/libc.so");
+                        }
+                        s => {
+                            panic!(
+                                "[load_dl_interp] unknown interpreter path: {s}, path = {}",
+                                path
+                            );
+                        }
                     }
                     info!("[load_elf] find interp path: {}", path);
                     assert!(Arch::is_external_interrupt_enabled());

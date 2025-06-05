@@ -23,6 +23,23 @@ enum LogState {
     On,
 }
 
+#[inline(always)]
+pub fn logoff() {
+    log::set_max_level(log::LevelFilter::Off);
+}
+
+#[inline(always)]
+pub fn logon() {
+    log::set_max_level(match option_env!("LOG") {
+        Some("ERROR") => log::LevelFilter::Error,
+        Some("WARN") => log::LevelFilter::Warn,
+        Some("INFO") => log::LevelFilter::Info,
+        Some("DEBUG") => log::LevelFilter::Debug,
+        Some("TRACE") => log::LevelFilter::Trace,
+        _ => log::LevelFilter::Off,
+    });
+}
+
 #[allow(unused)]
 pub fn log_hook() {
     static mut LOG_STATE: AtomicLogState = AtomicLogState::new(LogState::Uninitialized);
@@ -30,7 +47,7 @@ pub fn log_hook() {
 
     match unsafe { LOG_STATE.load(core::sync::atomic::Ordering::SeqCst) } {
         LogState::Uninitialized => {
-            log::set_max_level(log::LevelFilter::Off);
+            logoff();
             unsafe {
                 LOG_STATE.store(LogState::Off, core::sync::atomic::Ordering::SeqCst);
             };
@@ -38,14 +55,7 @@ pub fn log_hook() {
         LogState::Off => {
             if current >= LOG_BEGIN.into_ms() {
                 println!("[kernel] Logging started at {} ms", current);
-                log::set_max_level(match option_env!("LOG") {
-                    Some("ERROR") => log::LevelFilter::Error,
-                    Some("WARN") => log::LevelFilter::Warn,
-                    Some("INFO") => log::LevelFilter::Info,
-                    Some("DEBUG") => log::LevelFilter::Debug,
-                    Some("TRACE") => log::LevelFilter::Trace,
-                    _ => log::LevelFilter::Off,
-                });
+                logon();
                 unsafe {
                     LOG_STATE.store(LogState::On, core::sync::atomic::Ordering::SeqCst);
                 };

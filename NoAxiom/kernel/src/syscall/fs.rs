@@ -1,4 +1,4 @@
-use alloc::{sync::Arc, vec::Vec};
+use alloc::{string::ToString, sync::Arc, vec::Vec};
 
 use config::task::INIT_PROCESS_ID;
 use ksync::assert_no_lock;
@@ -473,12 +473,17 @@ impl Syscall<'_> {
         let ptr = UserPtr::<u8>::new(dir);
         let dir = get_string_from_ptr(&ptr);
         let ptr = UserPtr::<u8>::new(fstype);
-        let fstype = get_string_from_ptr(&ptr);
+        let mut fstype = get_string_from_ptr(&ptr);
         let flags = MountFlags::from_bits(flags as u32).ok_or(Errno::EINVAL)?;
         info!(
             "[sys_mount] special: {}, dir: {}, fstype: {}, flags: {:?}",
             special, dir, fstype, flags
         );
+
+        if fstype == "vfat" {
+            warn!("[sys_mount] vfat is deprecated, use ext4 instead");
+            fstype = "ext4".to_string();
+        }
 
         let fs = FS_MANAGER.get(&fstype).ok_or(Errno::EINVAL)?;
 

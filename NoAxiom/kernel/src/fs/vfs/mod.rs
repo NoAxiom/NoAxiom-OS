@@ -61,8 +61,17 @@ pub async fn fs_init() {
     // InodeMode::FILE).await; passwd.dentry().open().expect("open /etc/passwd
     // failed");
 
-    let ls = Path::from_or_create(format!("/ls"), InodeMode::FILE).await;
-    ls.dentry().open().expect("open ls failed");
+    #[cfg(feature = "debug_sig")]
+    {
+        let ls = Path::from_or_create(format!("/ls"), InodeMode::FILE).await;
+        ls.dentry().open().expect("open ls failed");
+
+        let logon = Path::from_or_create(format!("/logon"), InodeMode::FILE).await;
+        logon.dentry().open().expect("open logon failed");
+
+        let logoff = Path::from_or_create(format!("/logoff"), InodeMode::FILE).await;
+        logoff.dentry().open().expect("open logoff failed");
+    }
 }
 
 pub fn root_dentry() -> Arc<dyn basic::dentry::Dentry> {
