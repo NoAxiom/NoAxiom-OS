@@ -344,50 +344,50 @@ impl MemorySet {
                     elf_file
                         .read_at(ph.offset() as usize, buf.as_mut_slice())
                         .await?;
-                    let mut path = format!(
+                    let path = format!(
                         "{}",
                         String::from_utf8(buf)
                             .map_err(|_| Errno::ENOEXEC)?
                             .trim_end_matches('\0')
                     );
-                    match path.as_str() {
-                        // rv
-                        "/lib/ld-linux-riscv64-lp64d.so.1" | "/lib/ld-linux-riscv64-lp64.so.1" => {
-                            path = format!("/glibc/lib/ld-linux-riscv64-lp64d.so.1");
-                        }
-                        "/lib/libc.so.6" => {
-                            path = format!("/glibc/lib/libc.so");
-                        }
-                        "/lib/libm.so.6" => {
-                            path = format!("/glibc/lib/libm.so");
-                        }
-                        "/lib/ld-musl-riscv64-sf.so.1" => {
-                            path = format!("/musl/lib/libc.so");
-                        }
-                        // la
-                        "/lib64/ld-linux-loongarch-lp64d.so.1" => {
-                            path = format!("/glibc/lib/ld-linux-loongarch-lp64d.so.1");
-                        }
-                        "/lib64/libc.so.6" | "/usr/lib64/libc.so.6" => {
-                            path = format!("/glibc/lib/libc.so.6");
-                        }
-                        "/lib64/libm.so.6" | "/usr/lib64/libm.so.6" => {
-                            path = format!("/glibc/lib/libm.so.6");
-                        }
-                        "/lib/ld-musl-loongarch64-lp64d.so.1"
-                        | "/lib64/ld-musl-loongarch-lp64d.so.1" => {
-                            path = format!("/musl/lib/libc.so");
-                        }
-                        s => {
-                            panic!(
-                                "[load_dl_interp] unknown interpreter path: {s}, path = {}",
-                                path
-                            );
-                        }
-                    }
+                    // match path.as_str() {
+                    //     // rv
+                    //     "/lib/ld-linux-riscv64-lp64d.so.1" | "/lib/ld-linux-riscv64-lp64.so.1" =>
+                    // {         path =
+                    // format!("/glibc/lib/ld-linux-riscv64-lp64d.so.1");     }
+                    //     "/lib/libc.so.6" => {
+                    //         path = format!("/glibc/lib/libc.so");
+                    //     }
+                    //     "/lib/libm.so.6" => {
+                    //         path = format!("/glibc/lib/libm.so");
+                    //     }
+                    //     "/lib/ld-musl-riscv64-sf.so.1" => {
+                    //         path = format!("/musl/lib/libc.so");
+                    //     }
+                    //     // la
+                    //     "/lib64/ld-linux-loongarch-lp64d.so.1" => {
+                    //         path = format!("/glibc/lib/ld-linux-loongarch-lp64d.so.1");
+                    //     }
+                    //     "/lib64/libc.so.6" | "/usr/lib64/libc.so.6" => {
+                    //         path = format!("/glibc/lib/libc.so.6");
+                    //     }
+                    //     "/lib64/libm.so.6" | "/usr/lib64/libm.so.6" => {
+                    //         path = format!("/glibc/lib/libm.so.6");
+                    //     }
+                    //     "/lib/ld-musl-loongarch64-lp64d.so.1"
+                    //     | "/lib64/ld-musl-loongarch-lp64d.so.1" => {
+                    //         path = format!("/musl/lib/libc.so");
+                    //     }
+                    //     s => {
+                    //         panic!(
+                    //             "[load_dl_interp] unknown interpreter path: {s}, path = {}",
+                    //             path
+                    //         );
+                    //     }
+                    // }
                     info!("[load_elf] find interp path: {}", path);
                     assert!(Arch::is_external_interrupt_enabled());
-                    dl_interp = Some(Path::from_string(path, current_task().unwrap())?);
+                    dl_interp = Some(Path::from_string(path, current_task().unwrap()).unwrap());
                 }
                 _ => {}
             }
