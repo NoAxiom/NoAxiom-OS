@@ -134,7 +134,7 @@ run:
 	@$(QEMU) $(QFLAGS) $(RUN_OPTION)
 	@echo -e $(NORMAL)"Qemu exited. Log is saved to: $(LOG_SAVE_PATH)"$(RESET)
 
-gdb-server: build-kernel
+gdb-server: backup build
 	$(QEMU) $(QFLAGS) -s -S
 
 GDB_FLAGS := 

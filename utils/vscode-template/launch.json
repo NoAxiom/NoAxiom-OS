@@ -5,7 +5,7 @@
       "type": "cppdbg",
       "request": "launch",
       "name": "Debug RISC-V",
-      "program": "${workspaceFolder}/target/riscv64gc-unknown-none-elf/release/kernel",
+      "program": "${workspaceFolder}/NoAxiom/target/riscv64gc-unknown-none-elf/release/kernel",
       "cwd": "${workspaceFolder}/NoAxiom/kernel",
       "stopAtEntry": true,
       "environment": [],
@@ -21,12 +21,46 @@
           "description": "Set architecture to riscv:rv64",
           "text": "set arch riscv:rv64",
           "ignoreFailures": false
+        },
+        {
+          "description": "Set GDB remote timeout",
+          "text": "set remotetimeout 60",
+          "ignoreFailures": false
         }
       ],
       "miDebuggerServerAddress": "localhost:1234",
-      "miDebuggerPath": "${workspaceFolder}/toolchain/riscv64-unknown-elf-gdb",
+      "miDebuggerPath": "${workspaceFolder}/utils/toolchain/riscv64-unknown-elf-gdb",
       "args": [
-        "-ex 'file target/riscv64gc-unknown-none-elf/release/kernel.bin'"
+        // "-ex 'file target/riscv64gc-unknown-none-elf/release/kernel.bin'"
+      ],
+      "preLaunchTask": "qemu"
+    },
+    {
+      "type": "cppdbg",
+      "request": "launch",
+      "name": "Debug Loongarch",
+      "program": "${workspaceFolder}/NoAxiom/target/loongarch64-unknown-linux-gnu/release/kernel",
+      "cwd": "${workspaceFolder}/NoAxiom/kernel",
+      "stopAtEntry": true,
+      "environment": [],
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "setupCommands": [
+        {
+          "description": "Enable pretty-printing for gdb",
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": true
+        },
+        {
+          "description": "Set GDB remote timeout",
+          "text": "set remotetimeout 60",
+          "ignoreFailures": false
+        }
+      ],
+      "miDebuggerServerAddress": "localhost:1234",
+      "miDebuggerPath": "${workspaceFolder}/utils/toolchain/loongarch64-linux-gnu-gdb",
+      "args": [
+        // "-ex 'file target/riscv64gc-unknown-none-elf/release/kernel.bin'"
       ],
       "preLaunchTask": "qemu"
     }
