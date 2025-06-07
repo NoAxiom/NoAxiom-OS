@@ -90,12 +90,8 @@ pub async fn intable<T>(
     block_sig: Option<SigMask>,
 ) -> SysResult<T> {
     let addition = task.sa_list().get_ignored_bitmap();
-    IntableFuture {
-        task,
-        fut,
-        mask: block_sig.unwrap_or(SigMask::empty()) | addition,
-    }
-    .await
+    let mask = (block_sig.unwrap_or(SigMask::empty()) | addition).without_kill();
+    IntableFuture { task, fut, mask }.await
 }
 
 pub async fn realtime<T>(task: &Arc<Task>, fut: impl Future<Output = T>) -> T {

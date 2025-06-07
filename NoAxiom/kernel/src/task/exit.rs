@@ -6,6 +6,7 @@ use super::Task;
 use crate::{
     config::task::INIT_PROCESS_ID,
     cpu::current_cpu,
+    include::process::{PidSel, WaitOption},
     mm::user_ptr::UserPtr,
     signal::{
         sig_detail::{SigChildDetail, SigDetail},
@@ -22,13 +23,38 @@ use crate::{
 pub async fn init_proc_exit_handler(task: &Arc<Task>) {
     let inner = task.pcb();
     if !inner.children.is_empty() {
-        warn!("[exit_handler] init_proc try to exited before its children!!!");
+        println!("[exit_handler] ERROR: init_proc try to exited before its children!!!");
+        for i in inner.children.iter() {
+            println!(
+                "[exit_handler] child tid: {}, during syscall: {:?}, sigmask: {:?}",
+                i.tid(),
+                i.tcb().current_syscall,
+                i.pcb().sig_mask(),
+            );
+            i.recv_siginfo(
+                SigInfo {
+                    signo: SigNum::SIGKILL.into(),
+                    code: SigCode::Kernel,
+                    errno: 0,
+                    detail: SigDetail::None,
+                },
+                true,
+            );
+        }
         let ch_tid: Vec<usize> = inner.children.iter().map(|it| it.tid()).collect();
         warn!("[exit_handler] child info: {:?}", ch_tid);
+        let mut cnt = 0;
         while !inner.children.is_empty() {
-            let pid = Syscall::new(task).sys_wait4(-1, 0, 0).await;
+            let pid = task
+                .wait_child(PidSel::Task(None), WaitOption::empty())
+                .await;
             if let Ok(pid) = pid {
                 info!("[exit_handler] child finally exited: {:?}", pid);
+            }
+            cnt += 1;
+            if cnt > 100000 {
+                println!("[exit_handler] init_proc exit handler timeout, force shutdown");
+                break;
             }
         }
     }
