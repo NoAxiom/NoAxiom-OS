@@ -114,6 +114,26 @@ impl PageTable {
             flags,
             pte as *mut PageTableEntry as usize
         );
+        // if vpn.as_va_usize() == 0 {
+        //     warn!(
+        //         "mapping: vpn: {:#x?}, ppn: {:#x?}, flags: {:?}, pte_addr: {:#x}",
+        //         vpn, ppn, flags, pte as *mut PageTableEntry as usize
+        //     );
+        // }
+        *pte = PageTableEntry::new(ppn.raw(), flags | pte_flags!(V, D, A));
+    }
+
+    /// map unchecked
+    pub unsafe fn map_unchecked(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: MappingFlags) {
+        let pte = self.create_pte(vpn);
+        if pte.is_allocated() {
+            warn!(
+                "mapping {:#x?} again, flags: {:?}, ppn: {:#x}",
+                vpn,
+                flags,
+                ppn.raw()
+            );
+        }
         *pte = PageTableEntry::new(ppn.raw(), flags | pte_flags!(V, D, A));
     }
 

@@ -33,7 +33,7 @@ impl Task {
     pub async fn check_signal(self: &Arc<Self>, tmp_mask: Option<SigMask>) {
         let mut pcb = self.pcb();
         let old_mask = tmp_mask.unwrap_or(pcb.pending_sigs.sig_mask.clone());
-        debug!(
+        trace!(
             "[check_signal] tid: {}, check pending signals, old_mask: {:?}",
             self.tid(),
             old_mask
