@@ -166,7 +166,7 @@ count:
 	@echo "kernel code statistic:"
 	@cd $(PROJECT) && cloc $(KERNEL) lib --exclude-dir=.trash,.trashbin --exclude-ext=md,toml
 
-DOCKER ?= docker.educg.net/cg/os-contest:20250516
+DOCKER ?= docker.educg.net/cg/os-contest:20250605
 docker:
 	docker run --rm -it -v .:/code --entrypoint bash -w /code --privileged $(DOCKER)
 
