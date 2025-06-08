@@ -57,7 +57,7 @@ pub fn print_heap_info_simple() {
         let actual = heap.stats_alloc_actual();
         let total = heap.stats_total_bytes();
         println!(
-            "[heap]  alloc: {}%, used: {}%",
+            "\u{1B}[1;90m[heap]  alloc: {}%, used: {}%\u{1B}[0m",
             actual * 100 / total,
             user * 100 / total,
         );

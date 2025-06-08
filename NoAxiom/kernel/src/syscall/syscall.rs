@@ -4,9 +4,7 @@ use arch::{ArchTrapContext, TrapArgs, TrapContext};
 
 use super::{utils::clear_current_syscall, SyscallResult};
 use crate::{
-    include::{result::Errno, syscall_id::SyscallID},
-    syscall::utils::{current_syscall, update_current_syscall},
-    task::Task,
+    include::{result::Errno, syscall_id::SyscallID}, return_errno, syscall::utils::{current_syscall, update_current_syscall}, task::Task
 };
 
 /// system call tracer for a task

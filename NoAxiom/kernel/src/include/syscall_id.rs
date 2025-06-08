@@ -290,9 +290,7 @@ pub enum SyscallID {
     SYS_STATX = 291,
 
     // for debug
-    #[cfg(feature = "debug_sig")]
     NO_SYSCALL = -1,
-    #[cfg(feature = "debug_sig")]
     NO_TASK = -2,
 }
 

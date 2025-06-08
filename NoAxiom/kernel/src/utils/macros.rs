@@ -3,10 +3,10 @@ macro_rules! return_errno {
     ($errno:expr $(, $fmt:literal $(, $($arg: tt)+)?)?) => {{
         #[cfg(feature = "debug_sig")]
         {
-            let time = crate::time::gettime::get_time();
-            error!("\x1B[93m[{:>1}] {}:{} Errno: {}\x1B[0m", time, file!(), line!(), $errno);
+            let time = crate::time::gettime::get_time_duration();
+            println!("\x1B[91m[SYSCALL ERROR at {:?}] {}:{} Errno: {}\x1B[0m", time, file!(), line!(), $errno);
             $(
-                error!("\x1B[32m[{:>1}] Reason: {}\x1B[0m", time, format!($fmt $(, $($arg)+)?));
+                println!("\x1B[91m[SYSCALL ERROR at {:?}] Reason: {}\x1B[0m", time, format!($fmt $(, $($arg)+)?));
             )?
         }
         return Err($errno);

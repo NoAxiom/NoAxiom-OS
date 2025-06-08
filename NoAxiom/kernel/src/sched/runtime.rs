@@ -33,7 +33,9 @@ impl Runtime<Info> for MultiLevelRuntime {
         }
     }
     fn run(&self) {
+        #[cfg(feature = "debug_sig")]
         intermit(10000000, || print_mem_info());
+
         let runnable = self.scheduler.lock().pop();
         if let Some(runnable) = runnable {
             set_next_trigger(None);

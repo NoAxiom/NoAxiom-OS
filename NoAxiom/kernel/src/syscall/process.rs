@@ -233,7 +233,7 @@ impl Syscall<'_> {
 
     pub fn sys_setpgid(&self, pid: usize, pgid: usize) -> SyscallResult {
         if (pgid as isize) < 0 {
-            return Err(Errno::EINVAL);
+            return_errno!(Errno::EINVAL);
         }
 
         // If pid is zero, then the process ID of the calling process is used
@@ -374,7 +374,7 @@ impl Syscall<'_> {
                 );
                 Ok(task.futex().requeue(old_pa, new_pa, val, val2 as u32) as isize)
             }
-            _ => Err(Errno::EINVAL),
+            _ => return_errno!(Errno::EINVAL),
         }
     }
 
@@ -449,7 +449,7 @@ impl Syscall<'_> {
 
     pub async fn sys_getrusage(&self, who: isize, usage: usize) -> SyscallResult {
         if who != RUSAGE_SELF {
-            return Err(Errno::EINVAL);
+            return_errno!(Errno::EINVAL);
         }
         let usage = UserPtr::<Rusage>::from(usage);
         let mut rusage = Rusage::new();

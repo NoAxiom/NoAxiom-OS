@@ -217,7 +217,7 @@ pub fn print_frame_info_simple() {
         let remained = guard.stat_allocated();
         let total = guard.stat_total();
         let remained_ratio = remained * 100 / total;
-        println!("[frame] alloc: {}%", remained_ratio);
+        println!("\u{1B}[1;90m[frame] alloc: {}%\u{1B}[0m", remained_ratio);
     }
 }
 
