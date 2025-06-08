@@ -250,6 +250,7 @@ impl Syscall<'_> {
             invoke_signal,
         );
         drop(pcb);
+        assert_no_lock!();
         suspend_now().await;
         // fixme: the signal mask is not restored correctly
         // *task.pcb().sig_mask_mut() = old_mask;

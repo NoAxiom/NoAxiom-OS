@@ -127,11 +127,12 @@ impl Syscall<'_> {
             info!("[execve] executing ls, path: {:?}", path);
             path = BUSYBOX.to_string();
             args.push(format!("busybox"));
-        } else if path.ends_with("sleep") {
-            info!("[execve] executing sleep, path: {:?}", path);
-            path = BUSYBOX.to_string();
-            args.push(format!("busybox"));
         }
+        // else if path.ends_with("sleep") {
+        //     info!("[execve] executing sleep, path: {:?}", path);
+        //     path = BUSYBOX.to_string();
+        //     args.push(format!("busybox"));
+        // }
 
         #[cfg(feature = "debug_sig")]
         {

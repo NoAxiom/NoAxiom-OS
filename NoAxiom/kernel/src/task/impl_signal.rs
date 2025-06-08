@@ -235,12 +235,22 @@ impl Task {
 
     /// terminate the process
     fn sig_default_terminate(&self) {
+        warn!(
+            "sig_default_terminate: terminate the process, tid: {}, during: {:?}",
+            self.tid(),
+            self.tcb().current_syscall
+        );
         debug!("[sig_default_terminate] terminate the process");
         self.terminate_group(ExitCode::default());
         debug!("[sig_default_terminate] terminate the process done");
     }
     /// stop the process
     fn sig_default_stop(&self) {
+        warn!(
+            "sig_default_stop: stop the process, tid: {}, during: {:?}",
+            self.tid(),
+            self.tcb().current_syscall
+        );
         let tg = self.thread_group();
         for (_, t) in tg.0.iter() {
             let task = t.upgrade().unwrap();
@@ -249,6 +259,11 @@ impl Task {
     }
     /// continue the process
     fn sig_default_continue(&self) {
+        warn!(
+            "sig_default_continue: continue the process, tid: {}, during: {:?}",
+            self.tid(),
+            self.tcb().current_syscall
+        );
         let tg = self.thread_group();
         for (_, t) in tg.0.iter() {
             let task = t.upgrade().unwrap();
