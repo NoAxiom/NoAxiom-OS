@@ -1,4 +1,4 @@
-use alloc::{sync::Arc, vec::Vec};
+use alloc::sync::Arc;
 
 use ksync::assert_no_lock;
 
@@ -6,17 +6,13 @@ use super::Task;
 use crate::{
     config::task::INIT_PROCESS_ID,
     cpu::current_cpu,
-    include::{
-        futex::FUTEX_BITSET_MATCH_ANY,
-        process::{PidSel, WaitOption},
-    },
+    include::futex::FUTEX_BITSET_MATCH_ANY,
     mm::user_ptr::UserPtr,
     signal::{
         sig_detail::{SigChildDetail, SigDetail},
         sig_info::{SigCode, SigInfo},
         sig_num::SigNum,
     },
-    syscall::Syscall,
     task::{
         manager::{PROCESS_GROUP_MANAGER, TASK_MANAGER},
         status::TaskStatus,
@@ -26,9 +22,9 @@ use crate::{
 pub async fn init_proc_exit_handler(task: &Arc<Task>) {
     let inner = task.pcb();
     if !inner.children.is_empty() {
-        println!("[exit_handler] ERROR: init_proc try to exited before its children!!!");
+        error!("[exit_handler] ERROR: init_proc try to exited before its children!!!");
         for i in inner.children.iter() {
-            println!(
+            error!(
                 "[exit_handler] child tid: {}, during syscall: {:?}, sigmask: {:?}",
                 i.tid(),
                 i.tcb().current_syscall,
@@ -44,22 +40,22 @@ pub async fn init_proc_exit_handler(task: &Arc<Task>) {
                 true,
             );
         }
-        let ch_tid: Vec<usize> = inner.children.iter().map(|it| it.tid()).collect();
-        warn!("[exit_handler] child info: {:?}", ch_tid);
-        let mut cnt = 0;
-        while !inner.children.is_empty() {
-            let pid = task
-                .wait_child(PidSel::Task(None), WaitOption::empty())
-                .await;
-            if let Ok(pid) = pid {
-                info!("[exit_handler] child finally exited: {:?}", pid);
-            }
-            cnt += 1;
-            if cnt > 100000 {
-                println!("[exit_handler] init_proc exit handler timeout, force shutdown");
-                break;
-            }
-        }
+        error!("[exit_handler] forced shutdown");
+        // let mut cnt = 0;
+        // while !inner.children.is_empty() {
+        //     let pid = task
+        //         .wait_child(PidSel::Task(None), WaitOption::WNOHANG)
+        //         .await;
+        //     yield_now().await;
+        //     if let Ok(pid) = pid {
+        //         info!("[exit_handler] child finally exited: {:?}", pid);
+        //     }
+        //     cnt += 1;
+        //     if cnt > 10000000 {
+        //         error!("[exit_handler] init_proc exit handler timeout, force
+        // shutdown");         break;
+        //     }
+        // }
     }
     let exit_code = inner.exit_code();
     // !PAY ATTENTION!! Now we don't sync_all the dirty data.

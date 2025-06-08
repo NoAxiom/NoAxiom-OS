@@ -1,5 +1,5 @@
 use super::{Syscall, SyscallResult};
-use crate::{mm::user_ptr::UserPtr, time::gettime::get_time_duration, utils::random_fill};
+use crate::{mm::user_ptr::UserPtr, utils::random_fill};
 
 impl Syscall<'_> {
     /// get a random number
@@ -13,11 +13,14 @@ impl Syscall<'_> {
 
     /// systemshutdown
     pub fn sys_systemshutdown() -> ! {
-        println!(
-            "[kernel] press any key to shutdown, system time: {:?}",
-            get_time_duration()
-        );
-        while platform::getchar() as i8 == -1 {}
+        #[cfg(feature = "debug_sig")]
+        {
+            println!(
+                "[kernel] press any key to shutdown, system time: {:?}",
+                crate::time::gettime::get_time_duration()
+            );
+            while platform::getchar() as i8 == -1 {}
+        }
         platform::shutdown()
     }
 }
