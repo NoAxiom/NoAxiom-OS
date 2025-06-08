@@ -58,7 +58,7 @@ name = "arch"
 version = "0.1.0"
 dependencies = [
  "bit_field",
- "bitflags 2.6.0",
+ "bitflags 2.9.1",
  "config",
  "log",
  "loongArch64",
@@ -135,9 +135,9 @@ checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
 name = "bitflags"
-version = "2.6.0"
+version = "2.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b048fb63fd8b5923fc5aa7b340d8e156aec7ec02f0c78fa8a6ddc2613f6f71de"
+checksum = "1b8e56985ec62d17e9c1001dc89c88ecd7dc08e47eba5ec7c29c7b5eeecde967"
 
 [[package]]
 name = "buddy_system_allocator"
@@ -266,7 +266,7 @@ version = "0.1.0"
 dependencies = [
  "arch",
  "async-trait",
- "bitflags 2.6.0",
+ "bitflags 2.9.1",
  "cfg-if",
  "config",
  "fdt",
@@ -325,7 +325,7 @@ version = "1.3.0"
 source = "git+https://github.com/YuXuaann/ext4_rs-async-smp#ab082178d098fb3f105866451637d49ad70d1dd0"
 dependencies = [
  "async-trait",
- "bitflags 2.6.0",
+ "bitflags 2.9.1",
  "log",
 ]
 
@@ -334,7 +334,7 @@ name = "fatfs"
 version = "0.4.0"
 dependencies = [
  "async-trait",
- "bitflags 2.6.0",
+ "bitflags 2.9.1",
  "chrono",
  "console",
  "env_logger",
@@ -546,7 +546,7 @@ dependencies = [
  "async-trait",
  "atomic_enum",
  "bit_field",
- "bitflags 2.6.0",
+ "bitflags 2.9.1",
  "buddy_system_allocator",
  "config",
  "console",
@@ -632,9 +632,9 @@ dependencies = [
 
 [[package]]
 name = "log"
-version = "0.4.22"
+version = "0.4.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a7a70ba024b9dc04c27ea2f0c0548feb474ec5c54bba33a7f72f873a39d07b24"
+checksum = "13dc2df351e3202783a1fe0d44375f7295ffb4049267b0f3018346dc122a1d94"
 
 [[package]]
 name = "loongArch64"
@@ -725,7 +725,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13a40144d5ef66b7a98069a59c807d2f6ff812da1362b63f67091ba0c5187560"
 dependencies = [
  "aarch64-cpu",
- "bitflags 2.6.0",
+ "bitflags 2.9.1",
  "memory_addr",
  "x86_64",
 ]
@@ -1028,7 +1028,7 @@ version = "0.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d6a39747311dabb3d37807037ed1c3c38d39f99198d091b5b79ecd5c8d82f799"
 dependencies = [
- "bitflags 2.6.0",
+ "bitflags 2.9.1",
  "enumn",
  "log",
  "zerocopy",
@@ -1039,7 +1039,7 @@ name = "virtio-drivers-async"
 version = "0.7.5"
 source = "git+https://github.com/YuXuaann/virtio-drivers-async#02498516ab8727fb27ce8e51e9ab470c3ba3bf3d"
 dependencies = [
- "bitflags 2.6.0",
+ "bitflags 2.9.1",
  "enumn",
  "futures-lite",
  "log",
@@ -1242,16 +1242,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4bc79523af8abf92fb1a970c3e086c5a343f6bcc1a0eb890f575cbb3b45743df"
 dependencies = [
  "bit_field",
- "bitflags 2.6.0",
+ "bitflags 2.9.1",
  "rustversion",
  "volatile 0.4.6",
 ]
 
 [[package]]
 name = "xmas-elf"
-version = "0.9.1"
+version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42c49817e78342f7f30a181573d82ff55b88a35f86ccaf07fc64b3008f56d1c6"
+checksum = "18245fcbb8b3de8dd198ce7944fdd4096986fd6cd306b0fcfa27df817bd545d6"
 dependencies = [
  "zero",
 ]
