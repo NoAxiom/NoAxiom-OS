@@ -18,6 +18,7 @@ export ERROR := "\e[31m"
 export WARN := "\e[33m"
 export NORMAL := "\e[32m"
 export RESET := "\e[0m"
+export RELEASE ?= false
 
 # Arch config
 ifeq ($(ARCH_NAME),riscv64) # RISC-V64
@@ -222,8 +223,8 @@ vscode:
 env: add-target git-update vendor
 
 build-all:
-	@make build ARCH_NAME=riscv64 LOG=OFF
-	@make build ARCH_NAME=loongarch64 LOG=OFF
+	@make build ARCH_NAME=riscv64 LOG=OFF RELEASE=true
+	@make build ARCH_NAME=loongarch64 LOG=OFF RELEASE=true
 
 all: clean env build-all
 	@echo "Kernel build finished. See output elf in $(OUTPUT_DIR)"
