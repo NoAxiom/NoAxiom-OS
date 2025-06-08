@@ -96,11 +96,10 @@ impl Syscall<'_> {
             ptid.write(new_tid).await?;
         }
         if flags.contains(CloneFlags::CHILD_SETTID) {
-            let ctid = UserPtr::<usize>::new(ctid);
-            ctid.write(new_tid).await?;
+            new_task.tcb_mut().set_child_tid = Some(ctid);
         }
         if flags.contains(CloneFlags::CHILD_CLEARTID) {
-            new_task.set_clear_tid_address(ctid);
+            new_task.tcb_mut().clear_child_tid = Some(ctid);
         }
         new_cx[RES] = 0;
         trace!("[sys_fork] new task context: {:?}", new_cx);
@@ -217,7 +216,7 @@ impl Syscall<'_> {
 
     pub fn sys_set_tid_address(&self, tidptr: usize) -> SyscallResult {
         let task = self.task;
-        task.set_clear_tid_address(tidptr);
+        task.tcb_mut().clear_child_tid = Some(tidptr);
         Ok(task.tid() as isize)
     }
 

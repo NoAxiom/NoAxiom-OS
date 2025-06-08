@@ -37,7 +37,10 @@ use crate::{
         memory_set::{ElfMemoryInfo, MemorySet},
         user_ptr::UserPtr,
     },
-    sched::sched_entity::{SchedEntity, SchedPrio},
+    sched::{
+        sched_entity::{SchedEntity, SchedPrio},
+        utils::take_waker,
+    },
     signal::{
         sig_action::SigActionList,
         sig_pending::SigPending,
@@ -117,6 +120,7 @@ impl Default for PCB {
 }
 
 pub struct TCB {
+    pub set_child_tid: Option<usize>,   // set tid address
     pub clear_child_tid: Option<usize>, // clear tid address
     pub current_syscall: SyscallID,     // only for debug, current syscall id
 }
@@ -124,6 +128,7 @@ pub struct TCB {
 impl Default for TCB {
     fn default() -> Self {
         Self {
+            set_child_tid: None,
             clear_child_tid: None,
             current_syscall: SyscallID::NO_SYSCALL,
         }
@@ -381,14 +386,6 @@ impl Task {
     /// sched entity
     pub fn get_sched_entity(&self) -> *mut SchedEntity {
         self.sched_entity.get()
-    }
-
-    /// clear child tid address
-    pub fn clear_child_tid(&self) -> Option<usize> {
-        self.tcb().clear_child_tid
-    }
-    pub fn set_clear_tid_address(&self, value: usize) {
-        self.tcb_mut().clear_child_tid = Some(value)
     }
 
     /// futex wait queue
@@ -719,6 +716,21 @@ impl Task {
         self.sa_list().reset();
         self.fd_table().close_on_exec();
         Ok(())
+    }
+
+    /// init thread only resources
+    pub async fn thread_init(self: &Arc<Self>) {
+        if let Some(tid) = self.tcb().set_child_tid {
+            let ptr = UserPtr::<usize>::new(tid);
+            let _ = ptr.write(self.tid()).await.inspect_err(|err| {
+                error!(
+                    "[kernel] failed to write set_child_tid: {}, tid: {}",
+                    err,
+                    self.tid()
+                )
+            });
+        }
+        self.set_waker(take_waker().await);
     }
 
     #[allow(unused)]

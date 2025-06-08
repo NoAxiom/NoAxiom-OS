@@ -12,7 +12,7 @@ use ksync::assert_no_lock;
 use crate::{
     cpu::current_cpu,
     mm::memory_set::kernel_space_activate,
-    sched::utils::{suspend_now, take_waker},
+    sched::utils::suspend_now,
     task::{status::TaskStatus, Task},
     trap::handler::user_trap_handler,
     with_interrupt_off,
@@ -67,7 +67,7 @@ pub async fn stop_now(task: &Arc<Task>) {
 /// user task main
 /// called by [`UserTaskFuture`]
 pub async fn task_main(task: Arc<Task>) {
-    task.set_waker(take_waker().await);
+    task.thread_init().await;
     assert_no_lock!();
     loop {
         // kernel -> user

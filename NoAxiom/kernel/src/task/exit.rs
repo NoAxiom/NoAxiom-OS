@@ -88,7 +88,7 @@ impl Task {
         PROCESS_GROUP_MANAGER.lock().remove(self);
 
         // clear child tid
-        if let Some(tidaddress) = self.clear_child_tid() {
+        if let Some(tidaddress) = self.tcb().clear_child_tid {
             info!("[exit_handler] clear child tid {:#x}", tidaddress);
             let ptr = UserPtr::<usize>::new(tidaddress);
             assert_no_lock!();
@@ -96,6 +96,7 @@ impl Task {
             let _ = ptr
                 .translate_pa()
                 .await
+                .inspect_err(|err| error!("[exit_handler] clear child tid failed: {}", err))
                 .map(|pa| self.futex().wake_waiter(pa, 1, FUTEX_BITSET_MATCH_ANY));
         }
 
