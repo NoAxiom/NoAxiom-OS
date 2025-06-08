@@ -8,7 +8,10 @@ use super::{Syscall, SyscallResult};
 use crate::{
     fs::path::Path,
     include::{
-        futex::{FUTEX_CLOCK_REALTIME, FUTEX_CMD_MASK, FUTEX_REQUEUE, FUTEX_WAIT, FUTEX_WAKE},
+        futex::{
+            FUTEX_BITSET_MATCH_ANY, FUTEX_CLOCK_REALTIME, FUTEX_CMD_MASK, FUTEX_REQUEUE,
+            FUTEX_WAIT, FUTEX_WAIT_BITSET, FUTEX_WAKE, FUTEX_WAKE_BITSET,
+        },
         process::{
             robust_list::RobustList,
             rusage::{Rusage, RUSAGE_SELF},
@@ -297,8 +300,15 @@ impl Syscall<'_> {
         val3: u32,
     ) -> SyscallResult {
         let option = futex_op & FUTEX_CMD_MASK;
-        if futex_op & FUTEX_CLOCK_REALTIME != 0 && option != FUTEX_WAIT {
-            return_errno!(Errno::EPERM);
+        if (futex_op & FUTEX_CLOCK_REALTIME) != 0
+            && option != FUTEX_WAIT
+            && option != FUTEX_WAIT_BITSET
+        {
+            return_errno!(
+                Errno::EPERM,
+                "[FUTEX ERROR] uaddr {:#x}, futex_op {:#x}, option {:#x}, val {:#x}, val2 {:#x}, uaddr2 {:#x}, val3 {:#x}",
+                uaddr, futex_op, option, val, val2, uaddr2, val3,
+            );
         }
         info!(
             "[sys_futex] uaddr {:#x}, futex_op {:#x}, val {:#x}, val2 {:#x}, uaddr2 {:#x}, val3 {:#x}",
@@ -307,7 +317,12 @@ impl Syscall<'_> {
 
         let task = self.task;
         match option {
-            FUTEX_WAIT => {
+            FUTEX_WAIT | FUTEX_WAIT_BITSET => {
+                let bitset: u32 = match option {
+                    FUTEX_WAIT_BITSET => val3,
+                    FUTEX_WAIT => FUTEX_BITSET_MATCH_ANY,
+                    _ => unreachable!(),
+                };
                 let futex_word = UserPtr::<u32>::new(uaddr);
                 let pa = futex_word.translate_pa().await?;
                 let timeout = match val2 {
@@ -322,17 +337,25 @@ impl Syscall<'_> {
                 };
                 let res = intable(
                     self.task,
-                    TimeLimitedFuture::new(FutexFuture::new(uaddr, pa, val), timeout),
+                    TimeLimitedFuture::new(FutexFuture::new(uaddr, pa, val, bitset), timeout),
                     None,
                 )
                 .await?
                 .map_timeout(Err(Errno::ETIMEDOUT))?;
                 Ok(res)
             }
-            FUTEX_WAKE => {
+            FUTEX_WAKE | FUTEX_WAKE_BITSET => {
+                let bitset = match option {
+                    FUTEX_WAKE_BITSET => val3,
+                    FUTEX_WAKE => FUTEX_BITSET_MATCH_ANY,
+                    _ => unreachable!(),
+                };
+                if bitset == 0 {
+                    return_errno!(Errno::EINVAL, "[sys_futex] bitset is 0");
+                }
                 let futex_word = UserPtr::<u32>::new(uaddr);
                 let pa = futex_word.translate_pa().await?;
-                let res = task.futex().wake_waiter(pa, val);
+                let res = task.futex().wake_waiter(pa, val, bitset);
                 info!(
                     "[sys_futex] futex wake, uaddr = {:#x}, val = {}, res: {:?}",
                     uaddr, val, res

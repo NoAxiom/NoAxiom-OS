@@ -6,7 +6,10 @@ use super::Task;
 use crate::{
     config::task::INIT_PROCESS_ID,
     cpu::current_cpu,
-    include::process::{PidSel, WaitOption},
+    include::{
+        futex::FUTEX_BITSET_MATCH_ANY,
+        process::{PidSel, WaitOption},
+    },
     mm::user_ptr::UserPtr,
     signal::{
         sig_detail::{SigChildDetail, SigDetail},
@@ -97,7 +100,7 @@ impl Task {
             let _ = ptr
                 .translate_pa()
                 .await
-                .map(|pa| self.futex().wake_waiter(pa, 1));
+                .map(|pa| self.futex().wake_waiter(pa, 1, FUTEX_BITSET_MATCH_ANY));
         }
 
         // send SIGCHLD to parent

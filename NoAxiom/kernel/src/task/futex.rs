@@ -9,10 +9,13 @@ use core::{
 use include::errno::Errno;
 use memory::address::PhysAddr;
 
-use crate::{cpu::current_task, mm::user_ptr::UserPtr, syscall::SyscallResult};
+use crate::{
+    cpu::current_task, include::futex::FUTEX_BITSET_MATCH_ANY, mm::user_ptr::UserPtr,
+    syscall::SyscallResult,
+};
 
-/// waiter queue: a map of TID -> Waker
-type WaiterQueueInner = VecDeque<Waker>;
+/// waiter queue: a map of TID -> Waker, bitset
+type WaiterQueueInner = VecDeque<(Waker, u32)>;
 pub struct WaiterQueue(WaiterQueueInner);
 impl WaiterQueue {
     pub fn new() -> Self {
@@ -44,12 +47,12 @@ impl FutexQueue {
     }
 
     /// insert a new waiter into the queue
-    pub fn insert_waiter(&mut self, pa: PhysAddr, waker: Waker) {
+    pub fn insert_waiter(&mut self, pa: PhysAddr, waker: Waker, bitset: u32) {
         if let Some(waiters) = self.inner.get_mut(&pa) {
-            waiters.push_back(waker);
+            waiters.push_back((waker, bitset));
         } else {
             let mut waiters = WaiterQueue::new();
-            waiters.push_back(waker);
+            waiters.push_back((waker, bitset));
             self.inner.insert(pa, waiters);
         }
     }
@@ -60,16 +63,22 @@ impl FutexQueue {
     }
 
     /// wake up all valid waiters, return the number of waiters woken up
-    pub fn wake_waiter(&mut self, pa: PhysAddr, wake_num: u32) -> usize {
+    pub fn wake_waiter(&mut self, pa: PhysAddr, wake_num: u32, bitset: u32) -> usize {
         let mut count = 0;
         if let Some(waiters) = self.get_waiter_queue(pa) {
-            while let Some(waker) = waiters.pop_front() {
-                waker.wake();
-                count += 1;
-                if count >= wake_num {
-                    break;
+            let mut tmp_waiters = VecDeque::new();
+            while let Some((waker, w_bs)) = waiters.pop_front() {
+                if w_bs & bitset == 0 {
+                    tmp_waiters.push_back((waker, w_bs));
+                } else {
+                    waker.wake();
+                    count += 1;
+                    if count >= wake_num {
+                        break;
+                    }
                 }
             }
+            waiters.append(&mut tmp_waiters);
         }
         count as usize
     }
@@ -80,7 +89,7 @@ impl FutexQueue {
     /// return the sum number of waiters woken up and requeued
     pub fn requeue(&mut self, old_pa: PhysAddr, new_pa: PhysAddr, n_wake: u32, n_rq: u32) -> usize {
         // first wake up the waiters in old_pa
-        let wake_count = self.wake_waiter(old_pa, n_wake);
+        let wake_count = self.wake_waiter(old_pa, n_wake, FUTEX_BITSET_MATCH_ANY);
         let Some(old_waiters) = self.get_waiter_queue(old_pa) else {
             return wake_count;
         };
@@ -117,15 +126,17 @@ pub struct FutexFuture {
     pa: PhysAddr,
     val: u32,
     is_in: bool,
+    bitset: u32, // for bitset futex
 }
 
 impl FutexFuture {
-    pub fn new(uaddr: usize, pa: PhysAddr, val: u32) -> Self {
+    pub fn new(uaddr: usize, pa: PhysAddr, val: u32, bitset: u32) -> Self {
         Self {
             uaddr,
             pa,
             val,
             is_in: false,
+            bitset,
         }
     }
 }
@@ -139,7 +150,7 @@ impl Future for FutexFuture {
             if unsafe { UserPtr::from(self.uaddr as *const u32).atomic_load_acquire() } == self.val
             {
                 self.is_in = true;
-                futex.insert_waiter(self.pa, cx.waker().clone());
+                futex.insert_waiter(self.pa, cx.waker().clone(), self.bitset);
                 debug!(
                     "[futex] task {} yield with value = {}",
                     current_task().unwrap().tid(),
