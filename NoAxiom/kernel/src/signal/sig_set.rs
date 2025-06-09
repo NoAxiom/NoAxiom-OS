@@ -2,11 +2,13 @@ use bitflags::bitflags;
 
 use crate::constant::signal::MAX_SIGNUM;
 
+pub type SigSetReprType = usize;
+
 bitflags! {
     /// Signal mask
     /// to record which signal is blocked
     #[derive(PartialEq, Eq, Debug, Copy, Clone)]
-    pub struct SigSet: usize {
+    pub struct SigSet: SigSetReprType {
         const SIGHUP      = 1 << 0;
         const SIGINT      = 1 << 1;
         const SIGQUIT     = 1 << 2;

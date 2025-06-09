@@ -111,7 +111,7 @@ impl Task {
                         // fixme: always returns default here
                         uc_stack,
                         uc_sigmask: old_mask,
-                        uc_sig: [0; 16],
+                        __unused: [0; 1024 / 8 - core::mem::size_of::<SigMask>()],
                         uc_mcontext: MContext::from_cx(&cx),
                     };
                     assert_no_lock!();

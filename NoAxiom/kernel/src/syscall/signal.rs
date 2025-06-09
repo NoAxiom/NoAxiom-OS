@@ -71,6 +71,7 @@ impl Syscall<'_> {
         pcb.sig_stack = (ucontext.uc_stack.ss_size != 0).then_some(ucontext.uc_stack);
         cx[EPC] = ucontext.uc_mcontext.epc();
         *cx.gprs_mut() = ucontext.uc_mcontext.gprs();
+        info!("[sys_sigreturn] cx: {:#x?}", cx);
         drop(pcb);
 
         Ok(cx[RES] as isize)

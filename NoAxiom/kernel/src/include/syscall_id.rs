@@ -289,6 +289,9 @@ pub enum SyscallID {
     SYS_PKEY_FREE = 290,
     SYS_STATX = 291,
 
+    // additional
+    SYS_CLONE3 = 435,
+
     // for debug
     NO_SYSCALL = -1,
     NO_TASK = -2,

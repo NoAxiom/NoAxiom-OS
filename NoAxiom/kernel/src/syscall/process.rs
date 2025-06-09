@@ -15,7 +15,7 @@ use crate::{
         process::{
             robust_list::RobustList,
             rusage::{Rusage, RUSAGE_SELF},
-            CloneFlags, PidSel, WaitOption,
+            CloneArgs, CloneFlags, PidSel, WaitOption,
         },
         result::Errno,
         time::TimeSpec,
@@ -61,21 +61,9 @@ impl Syscall<'_> {
         flags: usize,
         stack: usize,
         ptid: usize,
-        #[allow(unused_mut)] mut tls: usize,
-        #[allow(unused_mut)] mut ctid: usize,
+        tls: usize,
+        ctid: usize,
     ) -> SyscallResult {
-        /*
-           On x86-32, and several other common architectures (including
-           score, ARM, ARM 64, PA-RISC, arc, Power PC, xtensa, and MIPS), the
-           order of the last two arguments is reversed.
-           And so on loongarch64.
-           ref1: https://www.man7.org/linux/man-pages/man2/clone.2.html#VERSIONS
-           ref2: https://inbox.vuxu.org/musl/1a5a097f.12d7.1794a6de3a8.Coremail.zhaixiaojuan%40loongson.cn/t/
-           sys_clone(u64 flags, u64 ustack_base, u64 parent_tidptr, u64 child_tidptr, u64 tls)
-        */
-        #[cfg(target_arch = "loongarch64")]
-        core::mem::swap(&mut tls, &mut ctid);
-
         let flags = CloneFlags::from_bits(flags & !0xff).unwrap();
         let new_task = self.task.fork(flags);
         let new_tid = new_task.tid();
@@ -106,6 +94,19 @@ impl Syscall<'_> {
         spawn_utask(new_task);
         // TASK_MANAGER.get_init_proc().print_child_tree();
         Ok(new_tid as isize)
+    }
+
+    /// clone3
+    pub async fn sys_clone3(&self, cl_args: usize, _size: usize) -> SyscallResult {
+        let cl_args = UserPtr::<CloneArgs>::new(cl_args);
+        let cl_args = cl_args.read().await?;
+        warn!("[sys_clone3] cl_args: {:#x?}", cl_args);
+        let flags = cl_args.flags as usize;
+        let stack = cl_args.stack as usize + cl_args.stack_size as usize - 16;
+        let ptid = cl_args.parent_tid as usize;
+        let ctid = cl_args.child_tid as usize;
+        let tls = cl_args.tls as usize;
+        self.sys_clone(flags, stack, ptid, tls, ctid).await
     }
 
     /// execve syscall impl

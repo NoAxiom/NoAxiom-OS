@@ -44,8 +44,8 @@ pub struct UContext {
     pub uc_stack: SigAltStack,
     /// when the ucontext is activated, will block sigs by this sigmask
     pub uc_sigmask: SigMask,
-    // don't know why, struct need to be exact the same with musl libc
-    pub uc_sig: [usize; 16],
+    /// padding
+    pub __unused: [usize; 1024 / 8 - core::mem::size_of::<SigMask>()],
     /// machine context
     pub uc_mcontext: MContext,
 }

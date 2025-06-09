@@ -1,4 +1,7 @@
 use bitflags::bitflags;
+use memory::address::VirtAddr;
+
+use crate::signal::sig_num::SigNum;
 
 bitflags! {
     #[derive(Debug, Clone, Copy)]
@@ -202,4 +205,19 @@ pub mod rusage {
             unsafe { core::slice::from_raw_parts(self as *const _ as usize as *const u8, size) }
         }
     }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct CloneArgs {
+    pub flags: u64,        /* Flags bit mask */
+    pub pidfd: u64,        /* Where to store PID file descriptor (int *) */
+    pub child_tid: u64,    /* Where to store child TID, in child's memory (pid_t *) */
+    pub parent_tid: u64,   /* Where to store child TID, in parent's memory (pid_t *) */
+    pub exit_signal: u64,  /* Signal to deliver to parent on child termination */
+    pub stack: u64,        /* Pointer to lowest byte of stack */
+    pub stack_size: u64,   /* Size of stack */
+    pub tls: u64,          /* Location of new TLS */
+    pub set_tid: u64,      /* Pointer to a pid_t array (since Linux 5.5) */
+    pub set_tid_size: u64, /* Number of elements in set_tid (since Linux 5.5) */
+    pub cgroup: u64,       /* File descriptor for target cgroupof child (since Linux 5.7) */
 }
