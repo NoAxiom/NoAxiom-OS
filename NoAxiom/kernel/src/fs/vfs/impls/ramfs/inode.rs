@@ -1,4 +1,4 @@
-use alloc::sync::Arc;
+use alloc::{boxed::Box, sync::Arc};
 
 use crate::{
     config::fs::BLOCK_SIZE,
@@ -7,8 +7,8 @@ use crate::{
         superblock::SuperBlock,
     },
     include::fs::{InodeMode, Stat},
+    syscall::SysResult,
 };
-
 pub struct RamFsFileInode {
     meta: InodeMeta,
 }
@@ -21,6 +21,7 @@ impl RamFsFileInode {
     }
 }
 
+#[async_trait::async_trait]
 impl Inode for RamFsFileInode {
     fn meta(&self) -> &InodeMeta {
         &self.meta
@@ -49,6 +50,10 @@ impl Inode for RamFsFileInode {
             st_ctime_nsec: inner.ctime_nsec as u64,
             unused: 0,
         })
+    }
+    async fn truncate(&self, _new: usize) -> SysResult<()> {
+        warn!("[RamFsFileInode] truncate is just return");
+        Ok(())
     }
 }
 

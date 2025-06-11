@@ -72,14 +72,13 @@ impl Dentry for RamFsDentry {
         }
     }
 
-    /// Just create. Don't like real fs that link to its parent
     async fn create(self: Arc<Self>, name: &str, mode: InodeMode) -> SysResult<Arc<dyn Dentry>> {
         let super_block = self.meta.super_block.clone();
 
         let sub_inode: Arc<dyn Inode> = if mode.contains(InodeMode::FILE) {
-            Arc::new(RamFsDirInode::new(super_block, 0))
-        } else if mode.contains(InodeMode::DIR) {
             Arc::new(RamFsFileInode::new(super_block, 0))
+        } else if mode.contains(InodeMode::DIR) {
+            Arc::new(RamFsDirInode::new(super_block, 0))
         } else if mode.contains(InodeMode::SOCKET) {
             Arc::new(RamFsFileInode::new(super_block, 0))
         } else {
