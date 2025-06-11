@@ -84,7 +84,7 @@ impl TryFrom<u16> for AddressFamily {
 
     fn try_from(value: u16) -> Result<Self, Self::Error> {
         match value {
-            1 => Ok(Self::AF_UNIX),
+            // 1 => Ok(Self::AF_UNIX),
             2 => Ok(Self::AF_INET),
             10 => Ok(Self::AF_INET6),
             _ => Err(Self::Error::EINVAL),
