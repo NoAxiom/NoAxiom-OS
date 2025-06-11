@@ -167,6 +167,7 @@ impl<'a> Syscall<'a> {
             SYS_SYSTEMSHUTDOWN =>  Self::sys_systemshutdown(),
             SYS_GETRANDOM =>       self.sys_getrandom(args[0], args[1], args[2]).await,
             SYS_GET_MEMPOLICY =>   Self::empty_syscall("get_mempolicy", 0),
+            SYS_MLOCK =>           Self::empty_syscall("mlock", 0),
 
             // unsupported
             _ => {
