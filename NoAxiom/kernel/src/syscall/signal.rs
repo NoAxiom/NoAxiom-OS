@@ -227,7 +227,9 @@ impl Syscall<'_> {
 
     pub async fn sys_sigsuspend(&self, mask: usize) -> SyscallResult {
         let mask = UserPtr::<SigSet>::from(mask).read().await?;
-        self.__sys_sigsuspend(mask, false).await
+        // FIXME: we add restore_mask_when_return to provide a temporary compatibility,
+        // in old unixbench test, restoring mask will cause non-waker deadlock
+        self.__sys_sigsuspend(mask, true).await
     }
 
     async fn __sys_sigsuspend(
@@ -245,7 +247,8 @@ impl Syscall<'_> {
             invoke_signal
         );
         let mut pcb = task.pcb();
-        let old_mask = core::mem::replace(&mut pcb.sig_mask(), mask);
+        let mut old_mask = core::mem::replace(&mut pcb.sig_mask(), mask);
+        old_mask.remove(SigSet::SIGKILL | SigSet::SIGSTOP);
         let expect = mask | invoke_signal;
         if pcb.pending_sigs.has_expect_signals(expect) {
             return Err(Errno::EINTR);
