@@ -229,7 +229,7 @@ impl Syscall<'_> {
         let mask = UserPtr::<SigSet>::from(mask).read().await?;
         // FIXME: we add restore_mask_when_return to provide a temporary compatibility,
         // in old unixbench test, restoring mask will cause non-waker deadlock
-        self.__sys_sigsuspend(mask, true).await
+        self.__sys_sigsuspend(mask, false).await
     }
 
     async fn __sys_sigsuspend(
