@@ -27,6 +27,11 @@ pub enum SigCode {
     TKill = -6,
 }
 
+pub struct RawSigInfo {
+    pub signo: usize,
+    pub code: i32,
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct SigInfo {
     /// signal number
@@ -57,6 +62,12 @@ impl SigInfo {
             code,
             errno,
             detail,
+        }
+    }
+    pub fn into_raw(self) -> RawSigInfo {
+        RawSigInfo {
+            signo: self.signo as usize,
+            code: self.code as i32,
         }
     }
 }

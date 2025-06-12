@@ -121,7 +121,7 @@ impl<'a> Syscall<'a> {
             SYS_GETRUSAGE =>            self.sys_getrusage(args[0] as _, args[1]).await,
             
             // signal
-            SYS_SIGTIMEDWAIT => Self::empty_syscall("sigtimedwait", 0),
+            SYS_SIGTIMEDWAIT => self.sys_sigtimedwait(args[0], args[1], args[2]).await,
             SYS_SIGACTION =>    self.sys_sigaction(args[0] as i32, args[1], args[2]).await,
             SYS_SIGRETURN =>    self.sys_sigreturn().await,
             SYS_KILL =>         self.sys_kill(args[0] as isize, args[1] as i32),

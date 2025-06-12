@@ -4,7 +4,6 @@ use arch::{Arch, ArchInt};
 use async_task::{Builder, Runnable, WithInfo};
 use ksync::mutex::SpinLock;
 use lazy_static::lazy_static;
-use memory::utils::print_mem_info;
 
 use super::{
     sched_entity::SchedMetadata,
@@ -18,7 +17,6 @@ use crate::{
         time_slice::{set_next_trigger, TimeSliceInfo},
         timer::timer_handler,
     },
-    utils::crossover::intermit,
 };
 
 type SchedulerImpl = MultiLevelScheduler;
@@ -34,7 +32,7 @@ impl Runtime<Info> for MultiLevelRuntime {
     }
     fn run(&self) {
         #[cfg(feature = "debug_sig")]
-        intermit(10000000, || print_mem_info());
+        crate::utils::crossover::intermit(10000000, || memory::utils::print_mem_info());
 
         let runnable = self.scheduler.lock().pop();
         if let Some(runnable) = runnable {

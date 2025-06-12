@@ -4,23 +4,26 @@
 //! sys_sigreturn
 //! sys_sigsuspend
 
+use core::time::Duration;
+
 use arch::{ArchTrapContext, TrapArgs};
 
 use super::{Syscall, SyscallResult};
 use crate::{
     config::task::INIT_PROCESS_ID,
     constant::signal::MAX_SIGNUM,
-    include::result::Errno,
+    include::{result::Errno, time::TimeSpec},
     mm::user_ptr::UserPtr,
     sched::utils::suspend_now,
     signal::{
         sig_action::{KSigAction, USigAction},
         sig_detail::{SigDetail, SigKillDetail},
-        sig_info::{SigCode, SigInfo},
+        sig_info::{RawSigInfo, SigCode, SigInfo},
         sig_num::{SigNum, Signo},
         sig_set::SigSet,
     },
     task::manager::{PROCESS_GROUP_MANAGER, TASK_MANAGER},
+    time::timeout::TimeLimitedFuture,
 };
 
 impl Syscall<'_> {
@@ -223,9 +226,16 @@ impl Syscall<'_> {
     }
 
     pub async fn sys_sigsuspend(&self, mask: usize) -> SyscallResult {
-        let mask = UserPtr::<SigSet>::from(mask);
+        let mask = UserPtr::<SigSet>::from(mask).read().await?;
+        self.__sys_sigsuspend(mask, false).await
+    }
+
+    async fn __sys_sigsuspend(
+        &self,
+        mut mask: SigSet,
+        restore_mask_when_return: bool,
+    ) -> SyscallResult {
         let task = self.task;
-        let mut mask = mask.read().await?;
         mask.remove(SigSet::SIGKILL | SigSet::SIGSTOP);
         let invoke_signal = task.sa_list().get_user_bitmap();
         debug!(
@@ -254,7 +264,35 @@ impl Syscall<'_> {
         assert_no_lock!();
         suspend_now().await;
         // fixme: the signal mask is not restored correctly
-        // *task.pcb().sig_mask_mut() = old_mask;
+        if restore_mask_when_return {
+            *task.pcb().sig_mask_mut() = old_mask;
+        }
         Err(Errno::EINTR)
+    }
+
+    pub async fn sys_sigtimedwait(&self, set: usize, info: usize, timeout: usize) -> SyscallResult {
+        let set = UserPtr::new(set).read().await?;
+        let info = UserPtr::new(info);
+        let timeout = UserPtr::new(timeout).read().await?;
+        self.__sys_sigtimedwait(set, info, timeout).await
+    }
+
+    async fn __sys_sigtimedwait(
+        &self,
+        mut mask: SigSet,
+        info: UserPtr<RawSigInfo>,
+        timeout: TimeSpec,
+    ) -> SyscallResult {
+        mask.remove(SigSet::SIGKILL | SigSet::SIGSTOP);
+        let timeout = Duration::from(timeout);
+        TimeLimitedFuture::new(self.__sys_sigsuspend(mask, true), Some(timeout));
+        let si = self.task.pcb().pending_sigs.pop_with_mask(mask);
+        if let Some(si) = si {
+            let raw_si = si.into_raw();
+            info.try_write(raw_si).await?;
+            return Ok(si.signo as isize);
+        } else {
+            return Err(Errno::EAGAIN);
+        }
     }
 }
