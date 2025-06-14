@@ -56,7 +56,7 @@ FS_IMG := $(TEST_DIR)/$(TEST_TYPE)/tmp-img/fs-$(ARCH_NAME).fs.img
 QFLAGS := 
 ifeq ($(ARCH_NAME),riscv64) # RISC-V64
 QFLAGS += -machine virt -kernel $(KERNEL_BIN)
-QFLAGS += -m 128
+QFLAGS += -m 1024
 QFLAGS += -nographic
 QFLAGS += -smp $(MULTICORE)
 QFLAGS += -bios default
@@ -224,7 +224,7 @@ build-all:
 	@make build ARCH_NAME=riscv64 LOG=OFF RELEASE=true INIT_PROC=runtests
 	@make build ARCH_NAME=loongarch64 LOG=OFF RELEASE=true INIT_PROC=runtests
 
-all: clean env build-all
+all: build-all
 	@echo "Kernel build finished. See output elf in kernel-rv/kernel-la"
 
 .PHONY: default all build run clean      # basic make

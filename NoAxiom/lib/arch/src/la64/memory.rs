@@ -11,7 +11,7 @@ const PA_WIDTH: usize = 48;
 const VA_WIDTH: usize = 48;
 const INDEX_LEVELS: usize = 4;
 const PHYS_MEMORY_START: usize = 0x9000_0000;
-const MEMORY_SIZE: usize = 0x1000_0000;
+const MEMORY_SIZE: usize = 0x4000_0000;
 const PHYS_MEMORY_END: usize = PHYS_MEMORY_START + MEMORY_SIZE;
 pub(crate) const KERNEL_ADDR_OFFSET: usize = 0x9000_0000_0000_0000;
 

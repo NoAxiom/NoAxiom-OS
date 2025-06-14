@@ -19,7 +19,8 @@ pub const PPN_WIDTH: usize = PA_WIDTH - PAGE_WIDTH; // 44
 pub const PPN_MASK: usize = (1 << PPN_WIDTH) - 1;
 
 pub const PHYS_MEMORY_START: usize = 0x8020_0000;
-pub const PHYS_MEMORY_END: usize = 0x8800_0000;
+pub const PHYS_MEMORY_SIZE: usize = 0x4000_0000;
+pub const PHYS_MEMORY_END: usize = PHYS_MEMORY_START + PHYS_MEMORY_SIZE;
 pub const KERNEL_ADDR_OFFSET: usize = 0xffff_ffc0_0000_0000;
 
 pub struct PageTable {
