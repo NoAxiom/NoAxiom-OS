@@ -177,8 +177,8 @@ impl PCB {
     }
 
     // exit code
-    pub fn exit_code(&self) -> i32 {
-        self.exit_code.inner()
+    pub fn exit_code(&self) -> ExitCode {
+        self.exit_code
     }
     pub fn set_exit_code(&mut self, exit_code: ExitCode) {
         self.exit_code = exit_code;

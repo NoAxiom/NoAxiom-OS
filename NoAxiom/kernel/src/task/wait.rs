@@ -5,14 +5,17 @@ use core::{
     task::{Context, Poll},
 };
 
-use super::{status::TaskStatus, Task};
+use super::{exit::ExitCode, status::TaskStatus, Task};
 use crate::{
     include::{
         process::{PidSel, WaitOption},
         result::Errno,
     },
+    return_errno,
     syscall::SysResult,
 };
+
+type WaitChildOutput = (ExitCode, usize);
 
 pub struct WaitChildFuture<'a> {
     task: &'a Arc<Task>,
@@ -31,7 +34,7 @@ impl<'a> WaitChildFuture<'a> {
             PidSel::Task(Some(tgid)) => match pcb.children.iter().find(|child| child.tid() == tgid)
             {
                 Some(child) => Some(child.clone()),
-                None => return Err(Errno::ECHILD),
+                None => return_errno!(Errno::ECHILD),
             },
             PidSel::Group(_) => return Err(Errno::EINVAL),
         };
@@ -46,7 +49,7 @@ impl<'a> WaitChildFuture<'a> {
 }
 
 impl Future for WaitChildFuture<'_> {
-    type Output = SysResult<(i32, usize)>;
+    type Output = SysResult<WaitChildOutput>;
     fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
         let res = match &self.target {
             None => {
@@ -68,7 +71,12 @@ impl Future for WaitChildFuture<'_> {
                 match ch_pcb.status() {
                     TaskStatus::Zombie => {
                         let child_tid = child.tid();
-                        let exit_code = ch_pcb.exit_code();
+                        let exit_code = ch_pcb.exit_code;
+                        trace!(
+                            "[wait4] child_tid: {}, exit_code: {}",
+                            child_tid,
+                            exit_code.inner()
+                        );
                         drop(ch_pcb);
                         // since we already collected exit info
                         // so just delete it from zombie children
@@ -89,7 +97,7 @@ impl Future for WaitChildFuture<'_> {
             Poll::Pending => {
                 if self.wait_option.contains(WaitOption::WNOHANG) && res.is_pending() {
                     trace!("[sys_wait4] return nohang");
-                    Poll::Ready(Ok((0, 0)))
+                    Poll::Ready(Ok((ExitCode::new(0), 0)))
                 } else {
                     trace!("[sys_wait4] suspend for child exit");
                     Poll::Pending
@@ -109,7 +117,7 @@ impl Task {
         self: &Arc<Self>,
         pid_type: PidSel,
         wait_option: WaitOption,
-    ) -> SysResult<(i32, usize)> {
+    ) -> SysResult<WaitChildOutput> {
         WaitChildFuture::new(self, pid_type, wait_option)?.await
     }
 }

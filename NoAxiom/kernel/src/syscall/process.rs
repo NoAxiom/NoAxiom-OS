@@ -190,11 +190,11 @@ impl Syscall<'_> {
         .await??;
         if status.is_non_null() {
             trace!(
-                "[sys_wait4]: write exit_code at status_addr = {:#x}",
+                "[sys_wait4]: write exit_code at status_addr = {:#x}, value: ",
                 status.va_addr().raw(),
             );
-            status.write(ExitCode::new(exit_code).inner()).await?;
-            trace!("[sys_wait4]: write exit code {:#x}", exit_code);
+            status.write(exit_code.inner()).await?;
+            trace!("[sys_wait4]: write exit code {:#x}", exit_code.inner());
         }
         Ok(tid as isize)
     }

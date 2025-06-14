@@ -60,14 +60,14 @@ pub async fn init_proc_exit_handler(task: &Arc<Task>) {
     let exit_code = inner.exit_code();
     // !PAY ATTENTION!! Now we don't sync_all the dirty data.
     // root_dentry().super_block().sync_all().await;
-    match exit_code {
+    match exit_code.inner() {
         0 => info!(
             "[exit_handler] init_proc exited successfully, exit_code: {}",
-            exit_code
+            exit_code.inner()
         ),
         _ => println!(
             "[kernel] init_proc exited unexpectedly, exit_code: {}",
-            exit_code,
+            exit_code.inner(),
         ),
     }
     platform::shutdown();
@@ -114,7 +114,7 @@ impl Task {
                     0,
                     SigDetail::Child(SigChildDetail {
                         pid: self.tgid() as u32,
-                        status: Some(pcb.exit_code()),
+                        status: Some(pcb.exit_code().inner()),
                         utime: None,
                         stime: None,
                     }),
@@ -160,6 +160,9 @@ impl ExitCode {
     #[allow(unused)]
     pub fn new_raw(code: i32) -> Self {
         Self(code)
+    }
+    pub fn to_raw(self) -> i32 {
+        (self.0 >> 8) & 0xFF
     }
     pub fn inner(&self) -> i32 {
         self.0
