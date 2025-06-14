@@ -42,7 +42,6 @@ endif
 # Kernel config
 export TARGET_DIR := $(ROOT)/$(PROJECT)/target/$(TARGET)/$(MODE)
 export TOOLCHAIN_DIR := $(ROOT)/utils/toolchain
-export OUTPUT_DIR := $(ROOT)/output
 export KERNEL_ELF := $(TARGET_DIR)/$(KERNEL)
 export KERNEL_BIN := $(KERNEL_ELF).bin
 export KERNEL_SYMBOL_TABLE := $(KERNEL_ELF).txt
@@ -94,8 +93,7 @@ config:
 	@cp $(CONFIG_DIR)/$(CONFIG).mk $(ROOT)/config.mk
 
 build: build-user build-kernel
-	@mkdir -p $(OUTPUT_DIR)
-	@cp $(KERNEL_ELF) $(OUTPUT_DIR)/kernel-$(SIMPLE_ARCH_NAME)
+	@cp $(KERNEL_ELF) ./kernel-$(SIMPLE_ARCH_NAME)
 
 build-kernel:
 	@cd $(PROJECT)/kernel && make build
@@ -154,8 +152,8 @@ clean:
 	@rm -f $(FS_IMG)
 	@rm -rf $(TEST_DIR)/build
 	@rm -rf $(TEST_DIR)/riscv64
-	@rm -rf $(OUTPUT_DIR)
-	@rm -f $(ROOT)/config.mk
+	@rm -f ./kernel-rv
+	@rm -f ./kernel-la
 	@cd $(PROJECT) && cargo clean
 
 vendor:
@@ -223,11 +221,11 @@ vscode:
 env: add-target git-update vendor
 
 build-all:
-	@make build ARCH_NAME=riscv64 LOG=OFF RELEASE=true
-	@make build ARCH_NAME=loongarch64 LOG=OFF RELEASE=true
+	@make build ARCH_NAME=riscv64 LOG=OFF RELEASE=true INIT_PROC=runtests
+	@make build ARCH_NAME=loongarch64 LOG=OFF RELEASE=true INIT_PROC=runtests
 
 all: clean env build-all
-	@echo "Kernel build finished. See output elf in $(OUTPUT_DIR)"
+	@echo "Kernel build finished. See output elf in kernel-rv/kernel-la"
 
 .PHONY: default all build run clean      # basic make
 .PHONY: gdb-server gdb                   # debug client
