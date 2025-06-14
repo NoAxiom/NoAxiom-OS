@@ -45,6 +45,11 @@ export TOOLCHAIN_DIR := $(ROOT)/utils/toolchain
 export KERNEL_ELF := $(TARGET_DIR)/$(KERNEL)
 export KERNEL_BIN := $(KERNEL_ELF).bin
 export KERNEL_SYMBOL_TABLE := $(KERNEL_ELF).txt
+ifeq ($(ARCH_NAME),riscv64) # RISC-V64
+export KERNEL_FILE := $(KERNEL_BIN)
+else ifeq ($(ARCH_NAME),loongarch64) # LoongArch64
+export KERNEL_FILE := $(KERNEL_ELF)
+endif
 
 # Test and fs image config
 TEST_DIR := $(ROOT)/$(PROJECT)-OS-Test
@@ -55,7 +60,7 @@ FS_IMG := $(TEST_DIR)/$(TEST_TYPE)/tmp-img/fs-$(ARCH_NAME).fs.img
 # Qemu flags config
 QFLAGS := 
 ifeq ($(ARCH_NAME),riscv64) # RISC-V64
-QFLAGS += -machine virt -kernel $(KERNEL_BIN)
+QFLAGS += -machine virt -kernel $(KERNEL_FILE)
 QFLAGS += -m 1024
 QFLAGS += -nographic
 QFLAGS += -smp $(MULTICORE)
@@ -67,7 +72,7 @@ QFLAGS += -rtc base=utc
 # QFLAGS += -drive file=disk.img,if=none,format=raw,id=x1 
 # QFLAGS += -device virtio-blk-device,drive=x1,bus=virtio-mmio-bus.1
 else ifeq ($(ARCH_NAME),loongarch64) # LoongArch64
-QFLAGS += -kernel $(KERNEL_ELF)
+QFLAGS += -kernel $(KERNEL_FILE)
 QFLAGS += -m 1024
 QFLAGS += -nographic
 QFLAGS += -smp $(MULTICORE)
@@ -80,7 +85,7 @@ QFLAGS += -rtc base=utc
 # QFLAGS += -device virtio-blk-pci,drive=x1,bus=virtio-mmio-bus.1
 endif
 
-MAKE_OPTION ?= backup build run
+MAKE_OPTION ?= build run
 default: $(MAKE_OPTION)
 
 CONFIG_DIR := ./utils/config
@@ -93,7 +98,7 @@ config:
 	@cp $(CONFIG_DIR)/$(CONFIG).mk $(ROOT)/config.mk
 
 build: build-user build-kernel
-	@cp $(KERNEL_ELF) ./kernel-$(SIMPLE_ARCH_NAME)
+	@cp $(KERNEL_FILE) ./kernel-$(SIMPLE_ARCH_NAME)
 
 build-kernel:
 	@cd $(PROJECT)/kernel && make build
@@ -127,7 +132,7 @@ RUN_OPTION += | tee $(LOG_SAVE_PATH)
 else ifeq ($(ON_SCREEN),false)
 RUN_OPTION += > $(LOG_SAVE_PATH)
 endif
-run:
+run: backup
 	@cp $(KERNEL_BIN) kernel-qemu
 	@echo -e $(NORMAL)"Qemu launched. Log is saved to: $(LOG_SAVE_PATH)"$(RESET)
 	@$(QEMU) $(QFLAGS) $(RUN_OPTION)
