@@ -23,12 +23,16 @@ impl Syscall<'_> {
         mask: usize,
     ) -> SyscallResult {
         let mask = UserPtr::<CpuMask>::new(mask);
+        let mask_size = core::mem::size_of::<CpuMask>();
+        if cpusetsize < mask_size {
+            return Err(Errno::EINVAL);
+        }
         match pid {
             0 => {
                 // get current cpu mask
                 let cpu_mask = self.task.cpu_mask().clone();
                 mask.write(cpu_mask).await?;
-                Ok(0)
+                Ok(mask_size as isize)
             }
             _ => {
                 // get task cpu mask
@@ -36,7 +40,7 @@ impl Syscall<'_> {
                     let tg = task.thread_group();
                     if let Some(Some(task)) = tg.0.get(&pid).map(|t| t.upgrade()) {
                         mask.write(task.cpu_mask().clone()).await?;
-                        Ok(0)
+                        Ok(mask_size as isize)
                     } else {
                         Err(Errno::ESRCH)
                     }
@@ -54,6 +58,10 @@ impl Syscall<'_> {
         mask: usize,
     ) -> SyscallResult {
         let mask = UserPtr::<CpuMask>::new(mask).read().await?;
+        let mask_size = core::mem::size_of::<CpuMask>();
+        if cpusetsize < mask_size {
+            return Err(Errno::EINVAL);
+        }
         match pid {
             0 => {
                 // set current cpu mask
