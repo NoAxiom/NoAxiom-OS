@@ -61,7 +61,7 @@ FS_IMG := $(TEST_DIR)/$(TEST_TYPE)/tmp-img/fs-$(ARCH_NAME).fs.img
 QFLAGS := 
 ifeq ($(ARCH_NAME),riscv64) # RISC-V64
 QFLAGS += -machine virt -kernel $(KERNEL_FILE)
-QFLAGS += -m 1024
+QFLAGS += -m 1G
 QFLAGS += -nographic
 QFLAGS += -smp $(MULTICORE)
 QFLAGS += -bios default
@@ -73,7 +73,7 @@ QFLAGS += -rtc base=utc
 # QFLAGS += -device virtio-blk-device,drive=x1,bus=virtio-mmio-bus.1
 else ifeq ($(ARCH_NAME),loongarch64) # LoongArch64
 QFLAGS += -kernel $(KERNEL_FILE)
-QFLAGS += -m 1024
+QFLAGS += -m 1G
 QFLAGS += -nographic
 QFLAGS += -smp $(MULTICORE)
 QFLAGS += -drive file=$(FS_IMG),if=none,format=raw,id=x0
