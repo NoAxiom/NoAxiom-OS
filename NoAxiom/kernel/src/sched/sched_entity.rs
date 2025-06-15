@@ -21,7 +21,7 @@ impl Default for SchedEntity {
         Self {
             sched_prio: SchedPrio::Normal,
             time_stat: TimeInfo::default(),
-            cpu_mask: CpuMask::new(),
+            cpu_mask: CpuMask::default(),
             yield_req: false,
         }
     }

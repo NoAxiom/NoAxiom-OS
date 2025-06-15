@@ -1,3 +1,5 @@
+use config::cpu::CPU_NUM;
+
 pub const SCHED_OTHER: isize = 0;
 pub const SCHED_FIFO: isize = 1;
 pub const SCHED_RR: isize = 2;
@@ -38,7 +40,7 @@ pub struct CpuMask {
     mask: [u8; CPU_MASK_SIZE],
 }
 impl CpuMask {
-    pub fn new() -> Self {
+    pub fn new_bare() -> Self {
         Self {
             mask: [0; CPU_MASK_SIZE],
         }
@@ -58,5 +60,14 @@ impl CpuMask {
     }
     pub fn as_bytes_mut(&mut self) -> &mut [u8] {
         &mut self.mask
+    }
+}
+impl Default for CpuMask {
+    fn default() -> Self {
+        let mut new_mask = Self::new_bare();
+        for i in 0..CPU_NUM {
+            new_mask.set(i);
+        }
+        new_mask
     }
 }
