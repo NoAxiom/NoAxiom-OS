@@ -230,7 +230,7 @@ build-all:
 	@make build ARCH_NAME=loongarch64 LOG=OFF RELEASE=true INIT_PROC=runtests
 
 all: build-all
-	@echo "Kernel build finished. See output elf in kernel-rv/kernel-la"
+	@echo "Kernel build finished. See output elf in kernel-rv & kernel-la"
 
 .PHONY: default all build run clean      # basic make
 .PHONY: gdb-server gdb                   # debug client

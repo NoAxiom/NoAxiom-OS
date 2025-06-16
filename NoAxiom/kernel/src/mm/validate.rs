@@ -49,9 +49,11 @@ pub async fn validate(
             Err(Errno::EFAULT)
         } else {
             error!(
-                "[validate] unknown error, vpn: {:#x}, flag: {:?}",
+                "[validate] unknown error, vpn: {:#x}, flag: {:?}, trap_type: {:#x?}, pte_raw: {:#x}",
                 vpn.raw(),
-                flags
+                flags,
+                trap_type,
+                pte.0
             );
             Err(Errno::EFAULT)
         }

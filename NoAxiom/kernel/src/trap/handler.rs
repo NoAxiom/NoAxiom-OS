@@ -124,12 +124,12 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
                         cx[TrapArgs::SP],
                         cx[TrapArgs::RA],
                     );
-                    println!(
-                        "[kernel] task {} trigger SIGSEGV at pc={:#x}, addr={:#x}",
-                        task.tid(),
-                        cx[TrapArgs::EPC],
-                        addr,
-                    );
+                    // println!(
+                    //     "[kernel] task {} trigger SIGSEGV at pc={:#x}, addr={:#x}",
+                    //     task.tid(),
+                    //     cx[TrapArgs::EPC],
+                    //     addr,
+                    // );
                     task.recv_siginfo(
                         SigInfo::new_simple(SigNum::SIGSEGV.into(), SigCode::Kernel),
                         false,

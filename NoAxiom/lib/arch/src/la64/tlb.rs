@@ -18,14 +18,14 @@ pub fn set_tlb_refill_entry(tlbrentry: usize) {
 #[allow(unused)]
 pub fn flush_vaddr(va: usize) {
     unsafe {
-        core::arch::asm!("invtlb 0x05, $r0, {reg}", reg = in(reg) va);
+        core::arch::asm!("dbar 0; invtlb 0x05, $r0, {reg}", reg = in(reg) va);
     }
 }
 
 #[inline]
 pub fn tlb_flush_all() {
     unsafe {
-        core::arch::asm!("invtlb 0x3, $zero, $zero");
+        core::arch::asm!("dbar 0; invtlb 0x3, $zero, $zero");
     }
 }
 
