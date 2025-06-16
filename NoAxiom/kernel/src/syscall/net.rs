@@ -72,8 +72,7 @@ impl Syscall<'_> {
                 drop(fd_table);
                 Ok(0)
             }
-            r => {
-                r.unwrap();
+            _ => {
                 debug!("[sys_bind] bind ok");
                 Ok(0)
             }
