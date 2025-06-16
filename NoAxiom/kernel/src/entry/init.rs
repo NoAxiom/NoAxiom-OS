@@ -94,7 +94,7 @@ pub extern "C" fn _boot_hart_init(_hartid: usize, dtb: usize) -> ! {
 
     // print hello message
     println!("{}", NOAXIOM_BANNER);
-    println!("\u{1B}[1;34m=============================================\u{1B}[0m\n");
+    println!("=============================================");
 
     // start task runner
     run_tasks()
