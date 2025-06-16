@@ -17,7 +17,8 @@ use super::{
     LA64,
 };
 use crate::{
-    ArchAsm, ArchInt, ArchTrap, ArchTrapContext, ArchUserFloatContext, TrapType, UserPtrResult,
+    la64::interrupt::is_interrupt_enabled, ArchAsm, ArchInt, ArchTrap, ArchTrapContext,
+    ArchUserFloatContext, TrapType, UserPtrResult,
 };
 
 global_asm!(include_str!("./trap.S"));
@@ -211,9 +212,9 @@ impl ArchTrap for LA64 {
         set_user_trap_entry();
         cx.freg_mut().restore();
         unsafe { __user_trapret(cx) };
-        cx.freg_mut().mark_save_if_needed();
-        disable_interrupt();
         set_kernel_trap_entry();
+        cx.freg_mut().mark_save_if_needed();
+        assert!(!is_interrupt_enabled());
     }
     /// try read user ptr
     fn check_read(addr: usize) -> UserPtrResult {

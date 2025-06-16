@@ -7,11 +7,11 @@ pub const PAGE_SIZE: usize = 1 << PAGE_WIDTH;
 
 /// kernel stack width
 /// fixme: reset to 16 later?
-pub const KERNEL_STACK_WIDTH: usize = 20;
-/// kernel stack size: 64KB (*CPU_NUM = 128KB)
+pub const KERNEL_STACK_WIDTH: usize = 24;
+/// kernel stack size: 1024KB (*CPU_NUM = 2048KB)
 pub const KERNEL_STACK_SIZE: usize = 1 << KERNEL_STACK_WIDTH;
 /// kernel heap size: 256MB
-pub const KERNEL_HEAP_SIZE: usize = 0x1000_0000;
+pub const KERNEL_HEAP_SIZE: usize = 0x1800_0000;
 
 /// raw vpn & ppn width: 9
 pub const PAGE_NUM_WIDTH: usize = PAGE_WIDTH - 3;
