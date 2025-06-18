@@ -1,4 +1,3 @@
-//! todo: Network socket struct has no lock now
 use alloc::sync::Arc;
 
 use smoltcp::wire::{IpAddress, IpEndpoint, Ipv4Address};
@@ -322,7 +321,7 @@ impl Syscall<'_> {
         let mut socket = socket_file.socket().await;
         let buf_ptr = UserPtr::<u8>::new(buf);
         let buf_slice = buf_ptr.as_slice_mut_checked(len).await?;
-        let (n, endpoint) = socket.read(buf_slice).await;
+        let (n, endpoint) = intable(self.task, socket.read(buf_slice), None).await?;
         drop(socket);
 
         let n = n?;
@@ -375,7 +374,7 @@ impl Syscall<'_> {
         } else {
             Some(SockAddr::new(addr, addr_len)?.get_endpoint())
         };
-        let n = socket.write(buf_slice, remote_endpoint).await?;
+        let n = intable(self.task, socket.write(buf_slice, remote_endpoint), None).await??;
         drop(socket);
 
         Ok(n as isize)

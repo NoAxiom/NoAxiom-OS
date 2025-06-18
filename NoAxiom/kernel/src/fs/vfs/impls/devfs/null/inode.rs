@@ -29,13 +29,13 @@ impl Inode for NullInode {
         let inner = self.meta.inner.lock();
         let mode = self.meta.inode_mode.bits();
         Ok(Stat {
-            st_dev: 0,
+            st_dev: 1,
             st_ino: self.meta.id as u64,
             st_mode: mode,
             st_nlink: 1,
             st_uid: 0,
             st_gid: 0,
-            st_rdev: 0,
+            st_rdev: (1 << 8) | 0x3,
             __pad: 0,
             st_size: inner.size as u64,
             st_blksize: BLOCK_SIZE as u32,
