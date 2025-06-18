@@ -70,6 +70,7 @@ pub async fn init_proc_exit_handler(task: &Arc<Task>) {
             exit_code.inner(),
         ),
     }
+    println!("[kernel] system shutdown (normal exit)");
     platform::shutdown();
 }
 

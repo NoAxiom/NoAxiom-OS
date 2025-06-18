@@ -21,6 +21,7 @@ impl Syscall<'_> {
             );
             while platform::getchar() as i8 == -1 {}
         }
+        println!("[kernel] system shutdown (syscall)");
         platform::shutdown()
     }
 }
