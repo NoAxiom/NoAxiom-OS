@@ -31,7 +31,14 @@ pub fn get_old_socket_fd(port: u16) -> usize {
     if let Some(port_item) = port_manager.inner.get(&port) {
         port_item.fd
     } else {
-        unreachable!("[port_manager] Port {port} is not listened")
+        drop(port_manager);
+        let port_manager = TCP_PORT_MANAGER.lock();
+        error!("[tcp_port_manager] Port {port} is already listened");
+        let item = port_manager
+            .inner
+            .get(&port)
+            .expect("Port {port} is not listened");
+        item.fd
     }
 }
 

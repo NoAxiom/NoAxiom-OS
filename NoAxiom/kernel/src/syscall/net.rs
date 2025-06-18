@@ -58,7 +58,7 @@ impl Syscall<'_> {
         let res = socket.bind(sock_addr, sockfd);
         match res {
             // !fixme: now we SPECIALLY handle EADDRINUSE, to handle the case that multiple sockets
-            // !use the same port
+            // !use the same port, and we just assume at the same task
             Err(Errno::EADDRINUSE) => {
                 warn!("[sys_bind] address already in use, so we copy from the old socket file");
                 // get the old socket file
