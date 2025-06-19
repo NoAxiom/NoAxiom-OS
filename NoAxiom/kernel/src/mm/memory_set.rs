@@ -747,33 +747,3 @@ impl MemorySet {
         SHM_MANAGER.lock().get_nattch(key)
     }
 }
-
-pub async fn lazy_alloc_mmap<'a>(
-    memory_set: &Arc<SpinLock<MemorySet>>,
-    vpn: VirtPageNum,
-) -> SysResult<()> {
-    let mut ms = memory_set.lock();
-    if !ms.mmap_manager.frame_trackers.contains_key(&vpn) {
-        let frame = frame_alloc().unwrap();
-        let ppn = frame.ppn();
-        let kvpn = frame.kernel_vpn();
-        ms.mmap_manager.frame_trackers.insert(vpn, frame);
-        let mut mmap_page = ms.mmap_manager.mmap_map.get(&vpn).cloned().unwrap();
-        drop(ms);
-        mmap_page.lazy_map_page(kvpn).await?;
-        let ms = memory_set.lock();
-        let pte_flags: MappingFlags = MappingFlags::from(mmap_page.prot) | MappingFlags::U;
-        ms.page_table().map(vpn, ppn, pte_flags);
-    } else {
-        // todo: use suspend
-        warn!("[lazy_alloc_mmap] page {vpn:x?} already mapped, yield for it");
-        while PageTable::from_ppn(Arch::current_root_ppn())
-            .find_pte(vpn)
-            .is_none()
-        {
-            yield_now().await;
-        }
-    }
-    Arch::tlb_flush();
-    Ok(())
-}

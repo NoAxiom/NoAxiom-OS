@@ -2,15 +2,12 @@ use alloc::sync::Arc;
 
 use arch::{Arch, ArchMemory, ArchPageTableEntry, MappingFlags, PageTableEntry, TrapType};
 use ksync::mutex::SpinLock;
-use memory::address::VirtAddr;
+use memory::{address::VirtAddr, frame::frame_alloc};
 
 use super::{address::VirtPageNum, memory_set::MemorySet};
 use crate::{
-    cpu::current_task,
-    include::result::Errno,
-    mm::{memory_set::lazy_alloc_mmap, page_table::PageTable},
-    syscall::SysResult,
-    task::Task,
+    cpu::current_task, include::result::Errno, mm::page_table::PageTable, sched::utils::yield_now,
+    syscall::SysResult, task::Task,
 };
 
 /// # memory validate
@@ -85,8 +82,39 @@ pub async fn validate(
                 vpn.raw(),
                 current_task().unwrap().trap_context()[arch::TrapArgs::EPC],
             );
-            drop(ms);
-            lazy_alloc_mmap(memory_set, vpn).await?;
+            // lazy alloc mmap
+            if !ms.mmap_manager.frame_trackers.contains_key(&vpn) {
+                let frame = frame_alloc().unwrap();
+                let ppn = frame.ppn();
+                let kvpn = frame.kernel_vpn();
+                ms.mmap_manager.frame_trackers.insert(vpn, frame);
+                let mut mmap_page = ms.mmap_manager.mmap_map.get(&vpn).cloned().unwrap();
+                drop(ms);
+                mmap_page.lazy_map_page(kvpn).await?;
+                let ms = memory_set.lock();
+                let pte_flags: MappingFlags = MappingFlags::from(mmap_page.prot) | MappingFlags::U;
+                ms.page_table().map(vpn, ppn, pte_flags);
+                info!(
+                    "mmap done! vpn: {:#x}, ppn: {:#x}, pte: {:?}",
+                    vpn.raw(),
+                    ppn.raw(),
+                    pte_flags
+                );
+                Arch::tlb_flush();
+                drop(ms);
+            } else {
+                // todo: use suspend
+                warn!(
+                    "[lazy_alloc_mmap] page {:x?} already mapped, yield for it",
+                    vpn
+                );
+                while PageTable::from_ppn(Arch::current_root_ppn())
+                    .find_pte(vpn)
+                    .is_none()
+                {
+                    yield_now().await;
+                }
+            }
             Ok(())
         } else {
             error!("[validate] not in any area, vpn: {:#x}", vpn.raw());
