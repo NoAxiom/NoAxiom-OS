@@ -4,11 +4,8 @@ use alloc::{boxed::Box, sync::Arc, vec::Vec};
 use core::num::NonZeroUsize;
 
 use async_trait::async_trait;
-use driver::devices::impls::{
-    block::BlockDevice,
-    device::{DevResult, Device},
-};
-use ksync::{cell::SyncUnsafeCell, assert_no_lock};
+use driver::devices::impls::device::{BlockDevice, DevResult};
+use ksync::{assert_no_lock, cell::SyncUnsafeCell};
 use lru::LruCache;
 
 use crate::config::fs::{BLOCK_SIZE, MAX_LRU_CACHE_SIZE};
@@ -109,24 +106,25 @@ impl AsyncBlockCache {
 }
 
 #[async_trait]
-impl Device for AsyncBlockCache {
+impl BlockDevice for AsyncBlockCache {
     fn device_name(&self) -> &'static str {
         "AsyncBlockCache"
+    }
+    async fn read(&self, id: usize, buf: &mut [u8]) -> DevResult<usize> {
+        assert_eq!(buf.len(), BLOCK_SIZE);
+        let data = self.read_sector(id).await;
+        buf.copy_from_slice(&*data);
+        Ok(buf.len())
+    }
+    async fn write(&self, id: usize, buf: &[u8]) -> DevResult<usize> {
+        assert_eq!(buf.len(), BLOCK_SIZE);
+        let mut data: [u8; BLOCK_SIZE] = [0; BLOCK_SIZE];
+        data.copy_from_slice(buf);
+        self.write_sector(id, &data).await;
+        Ok(buf.len())
     }
     async fn sync_all(&self) -> DevResult<()> {
         self.sync_all().await;
         Ok(())
-    }
-}
-
-#[async_trait]
-impl BlockDevice for AsyncBlockCache {
-    async fn read_block(&self, id: usize, buf: &mut [u8; BLOCK_SIZE]) {
-        let data = self.read_sector(id).await;
-        buf.copy_from_slice(&*data);
-    }
-
-    async fn write_block(&self, id: usize, buf: &[u8; BLOCK_SIZE]) {
-        self.write_sector(id, buf).await;
     }
 }

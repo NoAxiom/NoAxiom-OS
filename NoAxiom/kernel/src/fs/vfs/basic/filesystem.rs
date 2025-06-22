@@ -5,7 +5,7 @@ use alloc::{
 };
 
 use async_trait::async_trait;
-use driver::devices::impls::block::BlockDevice;
+use driver::devices::impls::device::BlockDevice;
 
 use super::{dentry::Dentry, superblock::SuperBlock};
 use crate::include::fs::MountFlags;

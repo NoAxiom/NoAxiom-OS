@@ -3,9 +3,8 @@
 
 use alloc::sync::Arc;
 
-use arch::ArchInt;
 use devices::{
-    impls::{block::BlockDevice, net::NetWorkDev},
+    impls::{device::BlockDevice, net::NetWorkDev},
     ALL_DEVICES,
 };
 
@@ -46,7 +45,7 @@ pub fn get_display_dev() -> Arc<&'static devices::impls::DisplayDevice> {
 pub fn handle_irq() {
     #[cfg(feature = "interruptable_async")]
     {
-        use arch::Arch;
+        use arch::{Arch, ArchInt};
         assert!(!Arch::is_interrupt_enabled());
         let irq = plic::claim();
         if irq == 1 {

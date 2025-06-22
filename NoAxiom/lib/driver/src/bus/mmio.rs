@@ -14,7 +14,7 @@ impl Devices {
                     use core::ptr::NonNull;
 
                     use include::errno::Errno;
-                    use spin::Mutex;
+                    use ksync::cell::SyncUnsafeCell;
                     use virtio_drivers_async::{
                         device::blk::VirtIOBlk,
                         transport::mmio::{MmioTransport, VirtIOHeader},
@@ -29,8 +29,9 @@ impl Devices {
                             .map_err(|_| Errno::EINVAL)?
                     };
 
-                    let blk_dev =
-                        BlkDevice::Mmio(Mutex::new(VirtIOBlk::new(transport).map_err(dev_err)?));
+                    let blk_dev = BlkDevice::Mmio(SyncUnsafeCell::new(
+                        VirtIOBlk::new(transport).map_err(dev_err)?,
+                    ));
 
                     self.add_blk_device(blk_dev);
                 }

@@ -1,7 +1,7 @@
 use alloc::{boxed::Box, sync::Arc, vec::Vec};
 
 use async_trait::async_trait;
-use driver::devices::impls::block::BlockDevice;
+use driver::devices::impls::device::BlockDevice;
 use fatfs::*;
 
 use crate::config::fs::BLOCK_SIZE;
@@ -57,7 +57,7 @@ impl DiskCursor {
             0 => {
                 let mut data = [[0u8; BLOCK_SIZE]; BLK_NUMS];
                 for i in 0..BLK_NUMS {
-                    blk.read_block(blk_id + i, &mut data[i]).await;
+                    blk.read(blk_id + i, &mut data[i]).await.unwrap();
                 }
                 for i in 0..BLK_NUMS {
                     res[i * BLOCK_SIZE..(i + 1) * BLOCK_SIZE].copy_from_slice(&data[i]);
@@ -66,7 +66,7 @@ impl DiskCursor {
             _ => {
                 let mut data = [[0u8; BLOCK_SIZE]; BLK_NUMS + 1];
                 for i in 0..BLK_NUMS + 1 {
-                    blk.read_block(blk_id + i, &mut data[i]).await;
+                    blk.read(blk_id + i, &mut data[i]).await.unwrap();
                 }
 
                 // sector 0
@@ -118,18 +118,18 @@ impl DiskCursor {
 
         if st_blk_id == ed_blk_id {
             let mut data = [0u8; BLOCK_SIZE];
-            blk.read_block(st_blk_id, &mut data).await;
+            blk.read(st_blk_id, &mut data).await.unwrap();
             data[st_offset..ed_offset].copy_from_slice(&buf);
-            blk.write_block(st_blk_id, &data).await;
+            blk.write(st_blk_id, &data).await.unwrap();
             log::trace!("base_write_exact_offset ok");
             return;
         }
 
         // sector 0
         let mut data = [0u8; BLOCK_SIZE];
-        blk.read_block(st_blk_id, &mut data).await;
+        blk.read(st_blk_id, &mut data).await.unwrap();
         data[st_offset..].copy_from_slice(&buf[..BLOCK_SIZE - st_offset]);
-        blk.write_block(st_blk_id, &data).await;
+        blk.write(st_blk_id, &data).await.unwrap();
 
         // sector mid
         let mid_offset = BLOCK_SIZE - st_offset;
@@ -139,15 +139,15 @@ impl DiskCursor {
             data.copy_from_slice(
                 &buf[mid_offset + kth * BLOCK_SIZE..mid_offset + (kth + 1) * BLOCK_SIZE],
             );
-            blk.write_block(i, &data).await;
+            blk.write(i, &data).await.unwrap();
         }
 
         // sector ed
         if ed_offset != 0 {
             let mut data = [0u8; BLOCK_SIZE];
-            blk.read_block(ed_blk_id, &mut data).await;
+            blk.read(ed_blk_id, &mut data).await.unwrap();
             data[..ed_offset].copy_from_slice(&buf[buf.len() - ed_offset..]);
-            blk.write_block(ed_blk_id, &data).await;
+            blk.write(ed_blk_id, &data).await.unwrap();
         }
         log::trace!("base_write_exact_offset ok");
     }
@@ -194,7 +194,7 @@ impl Read for DiskCursor {
     /// operation should be retried if there is nothing else to do.
     async fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
         let mut data = [0u8; BLOCK_SIZE];
-        self.blk.read_block(self.blk_id, &mut data).await;
+        self.blk.read(self.blk_id, &mut data).await.unwrap();
         let read_size = (BLOCK_SIZE - self.offset).min(buf.len());
         buf[..read_size].copy_from_slice(&data[self.offset..self.offset + read_size]);
         self.move_cursor(read_size);
@@ -218,10 +218,10 @@ impl Write for DiskCursor {
     /// to this writer.
     async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
         let mut data = [0u8; BLOCK_SIZE];
-        self.blk.read_block(self.blk_id, &mut data).await;
+        self.blk.read(self.blk_id, &mut data).await.unwrap();
         let write_size = (BLOCK_SIZE - self.offset).min(buf.len());
         data[self.offset..self.offset + write_size].copy_from_slice(&buf[..write_size]);
-        self.blk.write_block(self.blk_id as usize, &data).await;
+        self.blk.write(self.blk_id as usize, &data).await.unwrap();
         self.move_cursor(write_size);
         Ok(write_size)
     }

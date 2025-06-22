@@ -9,14 +9,11 @@ use ksync::assert_no_lock;
 
 use crate::{
     devices::impls::{
-        block::{
-            async_virtio_driver::{
-                block::{InterruptRet, VirtIOBlock},
-                mmio::VirtIOHeader,
-            },
-            BlockDevice,
+        block::async_virtio_driver::{
+            block::{InterruptRet, VirtIOBlock},
+            mmio::VirtIOHeader,
         },
-        device::{DevResult, Device},
+        device::{BlockDevice, DevResult},
     },
     dtb::dtb_info,
 };
@@ -123,7 +120,7 @@ impl VirtIOAsyncBlock {
 }
 
 #[async_trait]
-impl Device for VirtIOAsyncBlock {
+impl BlockDevice for VirtIOAsyncBlock {
     fn device_name(&self) -> &'static str {
         "virtio_async_block"
     }
@@ -146,5 +143,3 @@ impl Device for VirtIOAsyncBlock {
         Ok(buf.len())
     }
 }
-
-impl BlockDevice for VirtIOAsyncBlock {}

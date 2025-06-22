@@ -48,7 +48,7 @@ impl Devices {
                         if let Some(transport) =
                             probe_pci(&mut root, bdf, DeviceType::Block, &dev_info)
                         {
-                            use spin::Mutex;
+                            use ksync::cell::SyncUnsafeCell;
                             use virtio_drivers_async::device::blk::VirtIOBlk;
 
                             use crate::devices::impls::{
@@ -60,7 +60,7 @@ impl Devices {
                                 bdf,
                             );
                             let blk_dev = VirtIOBlk::new(transport).map_err(dev_err)?;
-                            let blk_dev = VirtioBlockType::Pci(Mutex::new(blk_dev));
+                            let blk_dev = VirtioBlockType::Pci(SyncUnsafeCell::new(blk_dev));
                             self.add_blk_device(blk_dev);
                         }
                     }
