@@ -5,10 +5,15 @@ use alloc::{
 };
 use core::fmt::Debug;
 
-use ksync::assert_no_lock;
+use hashbrown::HashMap;
+use ksync::{assert_no_lock, mutex::SpinLock};
 
 use super::vfs::{basic::dentry::Dentry, root_dentry};
 use crate::{include::fs::InodeMode, syscall::SysResult, task::Task};
+
+lazy_static::lazy_static! {
+    pub static ref PATH_CACHE: SpinLock<HashMap<String, Path>> = SpinLock::new(HashMap::new());
+}
 
 #[derive(Clone)]
 pub struct Path {
@@ -35,15 +40,22 @@ impl Path {
             abs_path
         );
         trace!("Path::from: {}", abs_path);
+
+        if let Some(path) = PATH_CACHE.lock().get(&abs_path) {
+            return Ok(path.clone());
+        }
+
         let mut split_path = abs_path.split('/').collect::<Vec<&str>>();
         if split_path.ends_with(&[""]) {
             split_path.pop();
         }
         let dentry = root_dentry().find_path(&split_path)?;
-        Ok(Self {
-            inner: abs_path,
+        let res = Self {
+            inner: abs_path.clone(),
             dentry,
-        })
+        };
+        PATH_CACHE.lock().insert(abs_path, res.clone());
+        Ok(res)
     }
 
     /// Get the path from absolute path, create the path if not exist

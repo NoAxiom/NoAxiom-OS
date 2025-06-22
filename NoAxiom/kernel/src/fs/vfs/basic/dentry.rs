@@ -181,6 +181,8 @@ impl dyn Dentry {
 
     /// Remove a child dentry with `name`.
     pub fn remove_child(self: &Arc<Self>, name: &str) -> Option<Arc<dyn Dentry>> {
+        let path = self.clone().path().unwrap().as_string();
+        crate::fs::path::PATH_CACHE.lock().remove(&path);
         self.meta().children.lock().remove(name)
     }
 
@@ -190,7 +192,6 @@ impl dyn Dentry {
     }
 
     /// Get the path of the dentry, panic if the dentry is deleted.
-    /// todo: this function cost a lot, we should add PathCache
     pub fn path(self: Arc<Self>) -> SysResult<Path> {
         let mut path = self.name();
         let mut current = self.clone();
@@ -203,29 +204,6 @@ impl dyn Dentry {
         }
         assert!(path.starts_with('/'));
         Path::try_from(path)
-    }
-
-    /// Find the dentry with `name` in the **WHOLE** sub-tree of the dentry.
-    #[allow(unused)]
-    pub fn find(self: Arc<Self>, name: &str) -> Option<Arc<dyn Dentry>> {
-        if self.name() == name {
-            return Some(self.clone());
-        }
-
-        for child in self.meta().children.lock().values() {
-            if child.name() == name {
-                return Some(child.clone());
-            }
-
-            if let Ok(inode) = child.inode() {
-                if inode.file_type() == InodeMode::DIR {
-                    if let Some(d) = child.clone().find(name) {
-                        return Some(d);
-                    }
-                }
-            }
-        }
-        None
     }
 
     /// Find the dentry with `path`, Error if not found.
