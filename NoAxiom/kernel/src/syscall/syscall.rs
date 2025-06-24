@@ -44,7 +44,7 @@ impl<'a> Syscall<'a> {
             SYS_GETDENTS64 =>       self.sys_getdents64(args[0], args[1], args[2]).await,
             SYS_MOUNT =>            self.sys_mount(args[0], args[1], args[2], args[3], args[4]).await,
             SYS_UMOUNT2 =>          self.sys_umount2(args[0], args[1]),
-            SYS_LINKAT =>           self.sys_linkat(args[0] as isize,args[1],args[2] as isize,args[3],args[4]),
+            SYS_LINKAT =>           self.sys_linkat(args[0] as isize,args[1],args[2] as isize,args[3],args[4]).await,
             SYS_UNLINKAT =>         self.sys_unlinkat(args[0] as isize, args[1], args[2]).await,
             SYS_PRLIMIT64 =>        self.sys_prlimit64(args[0], args[1] as u32, args[2], args[3]).await,
             SYS_FCNTL =>            self.sys_fcntl(args[0], args[1], args[2]),

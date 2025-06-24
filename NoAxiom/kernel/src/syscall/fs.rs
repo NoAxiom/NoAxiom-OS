@@ -516,7 +516,7 @@ impl Syscall<'_> {
     }
 
     /// Create a hard link
-    pub fn sys_linkat(
+    pub async fn sys_linkat(
         &self,
         olddirfd: isize,
         oldpath: usize,
@@ -524,13 +524,30 @@ impl Syscall<'_> {
         newpath: usize,
         _flags: usize,
     ) -> SyscallResult {
-        info!("[sys_linkat]");
         let task = self.task;
         let old_path = get_path(task.clone(), oldpath, olddirfd, "sys_linkat")?;
-        let new_path = get_path(task.clone(), newpath, newdirfd, "sys_linkat")?;
-        let old_dentry = old_path.dentry();
+        let new_path = get_path_or_create(
+            task.clone(),
+            newpath,
+            newdirfd,
+            InodeMode::LINK,
+            "sys_linkat",
+        )
+        .await?;
+        info!(
+            "[sys_linkat] old_path: {:?}, new_path: {:?}",
+            old_path, new_path
+        );
+        let old_dentry = if old_path.as_str() == "/" {
+            Path::try_from("/musl/busybox".to_string())
+                .unwrap()
+                .dentry()
+        } else {
+            old_path.dentry()
+        };
         let new_dentry = new_path.dentry();
-        new_dentry.link_to(old_dentry)?;
+        new_dentry.set_inode_none();
+        new_dentry.link_to(old_dentry).await?;
         Ok(0)
     }
 
@@ -945,8 +962,6 @@ impl Syscall<'_> {
 
 /// create if not exist
 /// and the created file/dir is NON-NEGATIVE
-///
-/// todo: add function: create with the last file negative
 async fn get_path_or_create(
     task: Arc<Task>,
     rawpath: usize,

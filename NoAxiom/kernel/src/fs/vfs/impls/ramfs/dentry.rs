@@ -87,4 +87,8 @@ impl Dentry for RamFsDentry {
 
         Ok(self.into_dyn().add_child(name, sub_inode))
     }
+
+    async fn symlink(self: Arc<Self>, _name: &str, _tar_name: &str) -> SysResult<()> {
+        unreachable!("RamFsDentry should not create symlink");
+    }
 }

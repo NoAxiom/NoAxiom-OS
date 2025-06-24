@@ -73,6 +73,8 @@ pub trait Dentry: Send + Sync + DowncastSync {
     fn from_name(self: Arc<Self>, name: &str) -> Arc<dyn Dentry>;
     /// Create a new dentry with `name` and `mode`
     async fn create(self: Arc<Self>, name: &str, mode: InodeMode) -> SysResult<Arc<dyn Dentry>>;
+    /// Create a sym link to `tar_name` in the dentry
+    async fn symlink(self: Arc<Self>, name: &str, tar_name: &str) -> SysResult<()>;
     /// Get the inode of the dentry
     fn inode(&self) -> SysResult<Arc<dyn Inode>> {
         if let Some(inode) = self.meta().inode.lock().as_ref() {
@@ -317,14 +319,15 @@ impl dyn Dentry {
     }
 
     /// Hard link, link self to `target`.
-    pub fn link_to(self: Arc<Self>, target: Arc<dyn Dentry>) -> SysResult<Arc<dyn Dentry>> {
+    pub async fn link_to(self: Arc<Self>, target: Arc<dyn Dentry>) -> SysResult<()> {
         if !self.is_negative() {
             return Err(Errno::EEXIST);
         }
+        let name = self.name();
         let inode = target.inode()?;
+        self.set_inode(inode.clone());
         inode.meta().inner.lock().nlink += 1;
-        self.set_inode(inode);
-        Ok(self)
+        self.symlink(&name, &target.name()).await
     }
 
     /// Unlink, unlink self and delete the inner file if nlink is 0.
@@ -442,6 +445,10 @@ impl Dentry for EmptyDentry {
     }
 
     async fn create(self: Arc<Self>, _name: &str, _mode: InodeMode) -> SysResult<Arc<dyn Dentry>> {
+        unreachable!()
+    }
+
+    async fn symlink(self: Arc<Self>, _name: &str, _tar_name: &str) -> SysResult<()> {
         unreachable!()
     }
 }

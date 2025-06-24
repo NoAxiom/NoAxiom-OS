@@ -82,12 +82,12 @@ impl Dentry for Ext4Dentry {
         assert_no_lock!();
         assert!(Arch::is_interrupt_enabled());
         let inode = self.inode()?;
+        assert!(inode.file_type() == InodeMode::DIR);
         let downcast_inode = inode
             .clone()
             .downcast_arc::<Ext4DirInode>()
             .map_err(|_| Errno::EIO)?;
         let this_inode_num = downcast_inode.get_inode().lock().inode_num;
-        assert!(inode.file_type() == InodeMode::DIR);
         let super_block = self.clone().into_dyn().super_block();
         trace!("[ext4] try to get lock super block");
         let ext4 = super_block
@@ -120,7 +120,7 @@ impl Dentry for Ext4Dentry {
         assert!(Arch::is_interrupt_enabled());
         if mode.contains(InodeMode::FILE) {
             debug!(
-                "create file: {}, parent_inode: {}",
+                "[ext4] create file: {}, parent_inode: {}",
                 child_path, this_inode_num
             );
             let new_file_inode = ext4
@@ -134,7 +134,7 @@ impl Dentry for Ext4Dentry {
             let new_inode = Ext4FileInode::new(super_block.clone(), new_file_inode);
             Ok(self.into_dyn().add_child(name, Arc::new(new_inode)))
         } else if mode.contains(InodeMode::DIR) {
-            debug!("create dir: {}", child_path);
+            debug!("[ext4] create dir: {}", child_path);
             ext4.dir_mk(&child_path).await.map_err(fs_err)?;
             let inode_num = ext4.ext4_dir_open(&child_path).await.map_err(fs_err)?;
             let new_dir_inode = ext4.get_inode_ref(inode_num).await;
@@ -145,5 +145,53 @@ impl Dentry for Ext4Dentry {
         } else {
             Err(Errno::EINVAL)
         }
+    }
+    async fn symlink(self: Arc<Self>, name: &str, tar_name: &str) -> SysResult<()> {
+        debug!("[ext4] create link: {}", name);
+        let inode = self.inode()?;
+        assert!(inode.file_type() == InodeMode::FILE);
+
+        let inode = self.clone().into_dyn().parent().unwrap().inode()?;
+        let downcast_inode = inode
+            .clone()
+            .downcast_arc::<Ext4DirInode>()
+            .map_err(|_| Errno::EIO)?;
+        let parent_inode_num = downcast_inode.get_inode().lock().inode_num;
+        let super_block = self.clone().into_dyn().super_block();
+        assert_no_lock!();
+        assert!(Arch::is_interrupt_enabled());
+        let mut ext4 = super_block
+            .downcast_ref::<Ext4SuperBlock>()
+            .unwrap()
+            .get_fs()
+            .await;
+        debug!("[ext4] get lock super block succeed!");
+
+        // todo: because of the ext4_rs `fuse_symlimk` MUST CREATE a file, so we delete
+        // the existed file first
+        assert_no_lock!();
+        assert!(Arch::is_interrupt_enabled());
+        let mut inode = ext4.get_inode_ref(parent_inode_num).await;
+
+        debug!(
+            "[ext4] remove entry: {}, parent_inode: {}",
+            name, parent_inode_num
+        );
+
+        assert_no_lock!();
+        assert!(Arch::is_interrupt_enabled());
+        ext4.dir_remove_entry(&mut inode, &name)
+            .await
+            .map_err(fs_err)?;
+
+        debug!("[ext4] remove entry succeed!");
+
+        assert_no_lock!();
+        assert!(Arch::is_interrupt_enabled());
+        ext4.fuse_symlink(parent_inode_num as u64, name, tar_name)
+            .await
+            .map_err(fs_err)?;
+        debug!("[ext4] symlink succeed!");
+        Ok(())
     }
 }

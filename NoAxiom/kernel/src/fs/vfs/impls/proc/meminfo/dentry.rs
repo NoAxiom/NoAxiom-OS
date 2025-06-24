@@ -49,4 +49,8 @@ impl Dentry for MemInfoDentry {
     async fn create(self: Arc<Self>, _name: &str, _mode: InodeMode) -> SysResult<Arc<dyn Dentry>> {
         unreachable!("meminfo dentry should not create child");
     }
+
+    async fn symlink(self: Arc<Self>, _name: &str, _tar_name: &str) -> SysResult<()> {
+        unreachable!("MemInfoDentry should not create symlink");
+    }
 }

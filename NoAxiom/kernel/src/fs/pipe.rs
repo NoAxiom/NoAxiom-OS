@@ -270,6 +270,10 @@ impl Dentry for PipeDentry {
     async fn create(self: Arc<Self>, _name: &str, _mode: InodeMode) -> SysResult<Arc<dyn Dentry>> {
         unreachable!("pipe dentry should not create child");
     }
+
+    async fn symlink(self: Arc<Self>, _name: &str, _tar_name: &str) -> SysResult<()> {
+        unreachable!("pipe dentry shouldn't create symlink");
+    }
 }
 
 pub struct PipeInode {

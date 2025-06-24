@@ -107,4 +107,8 @@ impl Dentry for Fat32Dentry {
             Err(Errno::EINVAL)
         }
     }
+
+    async fn symlink(self: Arc<Self>, _name: &str, _tar_name: &str) -> SysResult<()> {
+        unreachable!("Fat32Dentry doesn't support symlink");
+    }
 }
