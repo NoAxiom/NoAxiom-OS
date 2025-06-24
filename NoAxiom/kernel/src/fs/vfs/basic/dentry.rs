@@ -327,7 +327,8 @@ impl dyn Dentry {
         let inode = target.inode()?;
         self.set_inode(inode.clone());
         inode.meta().inner.lock().nlink += 1;
-        self.symlink(&name, &target.name()).await
+        Ok(())
+        // self.symlink(&name, &target.name()).await
     }
 
     /// Unlink, unlink self and delete the inner file if nlink is 0.
