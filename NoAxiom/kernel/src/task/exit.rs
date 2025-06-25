@@ -20,6 +20,7 @@ use crate::{
 };
 
 pub async fn init_proc_exit_handler(task: &Arc<Task>) {
+    task.fd_table().exit_files();
     let inner = task.pcb();
     if !inner.children.is_empty() {
         error!("[exit_handler] ERROR: init_proc try to exited before its children!!!");
@@ -83,6 +84,7 @@ impl Task {
         }
 
         // thread resources clean up
+        self.fd_table().exit_files();
         self.delete_children();
         self.thread_group().remove(tid);
         TASK_MANAGER.remove(tid);
