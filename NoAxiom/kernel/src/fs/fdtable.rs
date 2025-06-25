@@ -210,6 +210,10 @@ impl FdTable {
         }
     }
 
+    pub fn exit_files(&mut self) {
+        self.table.clear();
+    }
+
     #[allow(unused)]
     pub fn check_all_has_name(&self) -> bool {
         for entry in self.table.iter() {

@@ -81,7 +81,10 @@ impl Task {
                 SAHandlerType::Continue => self.sig_default_continue(),
                 SAHandlerType::User { handler } => {
                     let mut pcb = self.pcb();
-                    info!("[handle_signal] start to handle user sigaction, signum: {}, handler: {:#x}", si.signo, handler);
+                    info!(
+                        "[handle_signal] start to handle user sigaction, signum: {}, handler: {:#x}, flags: {:?}",
+                        si.signo, handler, action.flags
+                    );
                     if !action.flags.contains(SAFlags::SA_NODEFER) {
                         pcb.pending_sigs.sig_mask.enable(si.signo as u32);
                     };
@@ -149,8 +152,10 @@ impl Task {
                     // fixme: should we update gp & tp?
                     cx[EPC] = handler;
                     cx[RA] = if action.flags.contains(SAFlags::SA_RESTORER) {
+                        info!("[sigstack] use restorer: {:#x}", action.restorer);
                         action.restorer
                     } else {
+                        info!("[sigstack] use default return: {:#x}", SIG_TRAMPOLINE);
                         SIG_TRAMPOLINE
                     };
                     cx[SP] = new_sp;

@@ -123,10 +123,6 @@ impl Syscall<'_> {
             path = BUSYBOX.to_string();
             args.push(format!("busybox"));
             args.push(format!("sh"));
-        } else if path.ends_with("ls") {
-            info!("[execve] executing ls, path: {:?}", path);
-            path = BUSYBOX.to_string();
-            args.push(format!("busybox"));
         }
         // else if path.ends_with("sleep") {
         //     info!("[execve] executing sleep, path: {:?}", path);

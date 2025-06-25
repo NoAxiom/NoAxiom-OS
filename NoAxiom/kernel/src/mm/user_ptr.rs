@@ -10,6 +10,7 @@ use super::{address::VirtAddr, page_table::PageTable, validate::validate};
 use crate::{
     cpu::current_task,
     mm::address::VpnRange,
+    return_errno,
     sched::utils::block_on,
     syscall::{utils::current_syscall, SysResult},
 };
@@ -150,7 +151,8 @@ impl<T> UserPtr<T> {
                     Ok(unsafe { self.read_unchecked() })
                 }
                 _ => {
-                    panic!(
+                    return_errno!(
+                        Errno::EFAULT,
                         "[user_ptr] trigger unexpected trap in read, trap_type: {:?}",
                         trap_type
                     );
