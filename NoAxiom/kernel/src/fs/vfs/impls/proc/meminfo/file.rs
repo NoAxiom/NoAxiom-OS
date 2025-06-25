@@ -29,20 +29,14 @@ impl File for MemInfoFile {
     fn meta(&self) -> &FileMeta {
         &self.meta
     }
-    #[allow(unused)]
     async fn base_read(&self, offset: usize, buf: &mut [u8]) -> SyscallResult {
-        // todo: maybe can just read empty
-        return Ok(0);
-        // let data = self.meminfo.serialize();
-        // assert!(
-        //     data.len() > offset,
-        //     "data's len: {}, offset: {}",
-        //     data.len(),
-        //     offset
-        // );
-        // let len = core::cmp::min(data.len() - offset, buf.len());
-        // buf[..len].copy_from_slice(&data.as_bytes()[offset..offset + len]);
-        // Ok(len as isize)
+        let data = self.meminfo.serialize();
+        if offset >= data.len() {
+            return Ok(0);
+        }
+        let len = core::cmp::min(data.len() - offset, buf.len());
+        buf[..len].copy_from_slice(&data.as_bytes()[offset..offset + len]);
+        Ok(len as isize)
     }
     async fn base_readlink(&self, _buf: &mut [u8]) -> SyscallResult {
         unreachable!()
