@@ -57,6 +57,22 @@ impl SigPending {
         }
     }
 
+    pub fn peek_with_mask(&self, mask: &SigMask) -> Option<&SigInfo> {
+        let accept_set = self.pending_set & !mask.without_kill();
+        if accept_set.is_empty() {
+            return None;
+        } else {
+            for i in 0..self.queue.len() {
+                let signo = self.queue[i].signo;
+                if accept_set.contain_signum(signo as u32) {
+                    return Some(&self.queue[i]);
+                }
+            }
+            error!("[pop_with_mask] signal not found");
+            return None;
+        }
+    }
+
     pub fn has_expect_signals(&self, expect: SigSet) -> bool {
         !((expect & self.pending_set).is_empty())
     }

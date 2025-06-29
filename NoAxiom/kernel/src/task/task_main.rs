@@ -6,7 +6,7 @@ use core::{
     task::{Context, Poll},
 };
 
-use arch::{Arch, ArchInt, ArchTrap, ArchTrapContext, ArchUserFloatContext, TrapType};
+use arch::{Arch, ArchInt, ArchTrap, ArchTrapContext, ArchUserFloatContext};
 use ksync::assert_no_lock;
 
 use crate::{
@@ -69,22 +69,14 @@ pub async fn stop_now(task: &Arc<Task>) {
 pub async fn task_main(task: Arc<Task>) {
     task.thread_init().await;
     assert_no_lock!();
-    let mut trap_type = TrapType::Unknown;
-    let mut res = None;
     loop {
         // kernel -> user
-        let tcb = task.tcb_mut();
-        if !tcb.should_restart || tcb.is_in_sigacion {
-            trace!("[task_main] trap_restore, cx: {:#x?}", task.trap_context());
-            task.update_syscall_result(res);
-            task.time_stat_mut().record_trap_in();
-            let cx = task.trap_context_mut();
-            Arch::trap_restore(cx); // restore context and return to user mode
-            trap_type = Arch::read_trap_type(Some(cx));
-            task.time_stat_mut().record_trap_out();
-        } else {
-            task.prepare_restart_syscall();
-        }
+        trace!("[task_main] trap_restore, cx: {:#x?}", task.trap_context());
+        task.time_stat_mut().record_trap_in();
+        let cx = task.trap_context_mut();
+        Arch::trap_restore(cx); // restore context and return to user mode
+        let trap_type = Arch::read_trap_type(Some(cx));
+        task.time_stat_mut().record_trap_out();
 
         // check sigmask and status
         assert_no_lock!();
@@ -103,7 +95,7 @@ pub async fn task_main(task: Arc<Task>) {
         );
         Arch::disable_interrupt();
         assert_no_lock!();
-        res = user_trap_handler(&task, trap_type).await;
+        user_trap_handler(&task, trap_type).await;
         Arch::enable_interrupt();
 
         // check status

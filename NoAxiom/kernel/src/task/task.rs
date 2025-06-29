@@ -125,7 +125,6 @@ pub struct TCB {
     pub current_syscall: SyscallID,     // only for debug, current syscall id
     pub interrupted: bool,
     pub is_in_sigacion: bool,
-    pub should_restart: bool,
 }
 
 impl Default for TCB {
@@ -136,7 +135,6 @@ impl Default for TCB {
             current_syscall: SyscallID::NO_SYSCALL,
             interrupted: false,
             is_in_sigacion: false,
-            should_restart: false,
         }
     }
 }
@@ -740,14 +738,6 @@ impl Task {
             });
         }
         self.set_waker(take_waker().await);
-    }
-
-    pub fn prepare_restart_syscall(&self) {
-        let tcb = self.tcb_mut();
-        assert!(tcb.should_restart);
-        tcb.should_restart = false;
-        let cx = self.trap_context_mut();
-        cx[TrapArgs::EPC] -= 4;
     }
 
     #[allow(unused)]

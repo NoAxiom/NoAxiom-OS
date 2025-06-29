@@ -412,6 +412,7 @@ impl Socket for TcpSocket {
         drop(sockets);
         drop(iface_inner);
 
+        let mut retry_cnt = 0;
         loop {
             poll_ifaces();
             let mut sockets = SOCKET_SET.lock();
@@ -432,6 +433,11 @@ impl Socket for TcpSocket {
             */
             match local_socket.state() {
                 tcp::State::Closed => {
+                    retry_cnt += 1;
+                    if retry_cnt > 100 {
+                        error!("[Tcp {}] connect loop: Closed and Refused", self.handles[0]);
+                        return Err(Errno::ECONNREFUSED);
+                    }
                     error!("[Tcp {}] connect loop: Closed", self.handles[0]);
                     let driver_write_guard = NET_DEVICES.write();
                     let iface = driver_write_guard.get(&0).unwrap().clone(); // now we only have one net device

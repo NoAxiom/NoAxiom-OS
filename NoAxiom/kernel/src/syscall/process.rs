@@ -6,6 +6,7 @@ use config::task::BUSYBOX;
 
 use super::{Syscall, SyscallResult};
 use crate::{
+    constant::signal::MAX_SIGNUM,
     fs::path::Path,
     include::{
         futex::{
@@ -421,6 +422,9 @@ impl Syscall<'_> {
     pub fn sys_tgkill(&self, tgid: usize, tid: usize, signal: i32) -> SyscallResult {
         if signal == 0 {
             return Ok(0);
+        }
+        if signal >= MAX_SIGNUM as i32 {
+            return Err(Errno::EINVAL);
         }
         trace!(
             "[sys_tgkill] tgid: {}, tid: {}, signal num: {}",

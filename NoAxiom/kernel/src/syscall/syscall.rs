@@ -252,11 +252,11 @@ impl Task {
             .await;
         res
     }
-    pub fn update_syscall_result(self: &Arc<Self>, res: Option<SyscallResult>) {
-        if let Some(res) = res {
-            let cx = self.trap_context_mut();
-            cx[TrapArgs::RES] = get_syscall_result(res) as usize;
-        }
+    pub fn update_syscall_result(self: &Arc<Self>, res: SyscallResult) {
+        self.trap_context_mut()[TrapArgs::RES] = get_syscall_result(res) as usize;
+    }
+    pub fn clear_syscall_result(self: &Arc<Self>) {
+        self.trap_context_mut()[TrapArgs::RES] = 0;
     }
 }
 

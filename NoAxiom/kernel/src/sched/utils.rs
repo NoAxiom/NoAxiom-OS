@@ -17,7 +17,7 @@ use ksync::assert_no_lock;
 use pin_project_lite::pin_project;
 
 use crate::{
-    cpu::current_task, gen_errno, signal::sig_set::SigMask, syscall::SysResult, task::Task,
+    cpu::current_task, gen_errno, signal::{sig_action::SAFlags, sig_num::SigNum, sig_set::SigMask}, syscall::SysResult, task::Task,
 };
 
 impl Task {
@@ -78,14 +78,14 @@ where
                 // start to handle signal
                 let mask = this.mask;
                 // let info = task.peek_get_pending_signal(mask);
-                if task.peek_has_pending_signal(mask) {
-                    // Poll::Ready(gen_errno!(
-                    //     Errno::EINTR,
-                    //     "task {} got interrupted by signal {:?}",
-                    //     task.tid(),
-                    //     info
-                    // ))
-                    task.tcb_mut().interrupted = true;
+                if let Some(info) = task.pcb().pending_sigs.peek_with_mask(&mask) {
+                    let sa_list = task.sa_list();
+                    if let Some(sa) = sa_list.get(SigNum::from(info.signo)) {
+                        if sa.flags.contains(SAFlags::SA_RESTART) {
+                            return Poll::Pending;
+                        }
+                    }
+                    // task.tcb_mut().interrupted = true;
                     Poll::Ready(Err(Errno::EINTR))
                 } else {
                     Poll::Pending

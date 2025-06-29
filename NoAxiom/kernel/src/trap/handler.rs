@@ -69,7 +69,7 @@ fn kernel_trap_handler() {
 
 /// user trap handler
 #[no_mangle]
-pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) -> Option<SyscallResult> {
+pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
     assert!(!arch::Arch::is_interrupt_enabled());
     trace!("[trap_handler] call trap handler");
 
@@ -98,7 +98,7 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) -> Option<
         TrapType::SysCall => {
             Arch::enable_interrupt();
             let result = task.syscall(cx).await;
-            return Some(result);
+            task.update_syscall_result(result);
         }
         // page fault: try to handle copy-on-write, or exit the task
         TrapType::LoadPageFault(addr)
@@ -170,5 +170,4 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) -> Option<
             panic!("unsupported trap type: {trap_type:x?}");
         }
     }
-    None
 }

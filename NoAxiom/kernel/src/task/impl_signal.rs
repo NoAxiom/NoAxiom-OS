@@ -11,7 +11,7 @@ use crate::{
         sig_action::{SAFlags, SAHandlerType},
         sig_info::SigInfo,
         sig_num::SigNum,
-        sig_set::{SigMask, SigSet},
+        sig_set::SigMask,
         sig_stack::{MContext, UContext},
     },
     task::{exit::ExitCode, status::TaskStatus, Task},
@@ -25,17 +25,6 @@ extern "C" {
 }
 
 impl Task {
-    pub fn peek_has_pending_signal(self: &Arc<Self>, mask: &SigMask) -> bool {
-        let pcb = self.pcb();
-        let mask = pcb.sig_mask() | *mask;
-        pcb.pending_sigs.has_expect_signals(!mask)
-    }
-    pub fn peek_get_pending_signal(self: &Arc<Self>, mask: &SigMask) -> Vec<SigInfo> {
-        let pcb = self.pcb();
-        let mask = pcb.sig_mask() | *mask;
-        let vec = pcb.pending_sigs.queue.iter().map(|x| x.clone()).collect();
-        vec
-    }
     pub async fn check_signal(self: &Arc<Self>) {
         let mut pcb = self.pcb();
         let old_mask = pcb.pending_sigs.sig_mask.clone();
@@ -55,7 +44,7 @@ impl Task {
         drop(pcb);
 
         let sa_list = self.sa_list();
-        for (_i, si) in pending.into_iter().enumerate() {
+        for si in pending {
             let signum = SigNum::from(si.signo);
             let action = sa_list.get(signum).unwrap().clone();
             info!(
@@ -66,10 +55,11 @@ impl Task {
             // check interrpt syscall
             let tcb = self.tcb_mut();
             if tcb.interrupted && action.flags.contains(SAFlags::SA_RESTART) {
-                tcb.should_restart = true;
-                println_debug!("should restart!!!");
+                self.trap_context_mut()[TrapArgs::EPC] -= 4;
+                self.clear_syscall_result();
+                tcb.interrupted = false;
+                println_debug!("restart!!!");
             }
-            tcb.interrupted = false;
 
             // start handle
             match action.handler {
@@ -79,15 +69,6 @@ impl Task {
                 SAHandlerType::Continue => self.sig_default_continue(),
                 SAHandlerType::User { handler } => {
                     drop(sa_list);
-                    if tcb.is_in_sigacion {
-                        // avoid multiple sigaction
-                        println_debug!(
-                            "[check_signal] tid: {}, already in sigaction, skip signal {}",
-                            self.tid(),
-                            si.signo
-                        );
-                        return;
-                    }
                     let mut pcb = self.pcb();
                     info!(
                         "[handle_signal] start to handle user sigaction, signum: {}, handler: {:#x}, flags: {:?}",
@@ -167,9 +148,6 @@ impl Task {
                         SIG_TRAMPOLINE
                     };
                     cx[SP] = new_sp;
-
-                    // fixme: this return could cause signal missing
-                    tcb.is_in_sigacion = true;
                     return;
                 }
             }

@@ -85,7 +85,8 @@ impl SigSet {
     pub fn enable(&mut self, signum: u32) {
         let signum = signum - 1;
         if signum >= MAX_SIGNUM {
-            panic!("[Kernel] invalid signum when enable signum {}", signum);
+            error!("[Kernel] invalid signum when enable signum {}", signum);
+            return;
         }
         *self |= SigSet::from_bits_truncate(1 << signum);
     }

@@ -85,7 +85,7 @@ pub enum SigNum {
 // signum <> usize
 impl From<usize> for SigNum {
     fn from(value: usize) -> Self {
-        if value <= MAX_SIGNUM as usize {
+        if value < MAX_SIGNUM as usize {
             let ret: SigNum = unsafe { core::mem::transmute(value) };
             return ret;
         } else {
