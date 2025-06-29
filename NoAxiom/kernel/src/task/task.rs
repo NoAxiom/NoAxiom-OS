@@ -434,8 +434,8 @@ impl Task {
         }
     }
 
-    /// create new process from elf
-    pub async fn new_process(elf: ElfMemoryInfo) -> Arc<Self> {
+    /// create new init process from elf
+    pub async fn new_init_process(elf: ElfMemoryInfo) -> Arc<Self> {
         trace!("[kernel] spawn new process from elf");
         let ElfMemoryInfo {
             memory_set,
@@ -455,7 +455,13 @@ impl Task {
             tid,
             tgid,
             pgid: Shared::new_atomic(tgid),
-            pcb: Mutable::new(PCB::default()),
+            pcb: Mutable::new(PCB {
+                pending_sigs: SigPending {
+                    sig_mask: SigSet::all() - SigSet::SIGCHLD,
+                    ..Default::default()
+                },
+                ..Default::default()
+            }),
             thread_group: Shared::new(ThreadGroup::new()),
             memory_set: Shared::new(memory_set),
             cx: ThreadOnly::new(TaskContext::new(

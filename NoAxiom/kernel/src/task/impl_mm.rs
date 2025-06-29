@@ -82,7 +82,7 @@ impl Task {
         // if contains fix flag, should remove the existing mapping
         if flags.contains(MmapFlags::MAP_FIXED) {
             start_va = VirtAddr::from(addr);
-            memory_set.mmap_manager.remove(start_va, length);
+            memory_set.mmap_manager.remove(start_va, length)?;
         }
 
         // get target file

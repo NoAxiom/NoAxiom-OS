@@ -1,7 +1,3 @@
-use core::result::Result;
-
-use crate::include::result::Errno;
-
 pub mod fs;
 pub mod io;
 pub mod mm;

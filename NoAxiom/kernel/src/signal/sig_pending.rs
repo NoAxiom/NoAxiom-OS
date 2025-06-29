@@ -61,3 +61,9 @@ impl SigPending {
         !((expect & self.pending_set).is_empty())
     }
 }
+
+impl Default for SigPending {
+    fn default() -> Self {
+        Self::new()
+    }
+}
