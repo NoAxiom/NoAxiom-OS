@@ -181,11 +181,19 @@ impl<'a> Syscall<'a> {
 
             // unsupported
             _ => {
-                return_errno!(
-                    Errno::ENOSYS,
-                    "[kernel] unsupported syscall id: {:?}, tid: {}, args: {:x?}",
-                    id, self.task.tid(), args
-                )
+                #[cfg(feature = "debug_sig")]
+                {
+                    println!(
+                        "\x1B[91m[kernel] unsupported syscall id: {:?}, tid: {}, args: {:x?}\x1B[0m",
+                        id, self.task.tid(), args
+                    );
+                }
+                return Ok(0);
+                // return_errno!(
+                //     Errno::ENOSYS,
+                //     "[kernel] unsupported syscall id: {:?}, tid: {}, args: {:x?}",
+                //     id, self.task.tid(), args
+                // )
             }
         }
     }
