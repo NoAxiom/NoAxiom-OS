@@ -78,9 +78,17 @@ impl Inode for Ext4FileInode {
         );
         assert_no_lock!();
         assert!(Arch::is_interrupt_enabled());
-        ext4.truncate_inode(&mut inode, new as u64)
-            .await
-            .map_err(fs_err)?;
+
+        let old_size = inode.inode.size() as usize;
+        if new <= old_size {
+            ext4.truncate_inode(&mut inode, new as u64)
+                .await
+                .map_err(fs_err)?;
+        } else {
+            ext4.write_at(inode.inode_num, new, &[0; 1])
+                .await
+                .map_err(fs_err)?;
+        }
         Ok(())
     }
 }

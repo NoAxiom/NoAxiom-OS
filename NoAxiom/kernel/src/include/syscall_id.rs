@@ -306,8 +306,6 @@ impl SyscallID {
             | SyscallID::SYS_IOCTL
             | SyscallID::SYS_FSTAT
             | SyscallID::SYS_NEWFSTATAT
-            | SyscallID::SYS_WRITEV
-            | SyscallID::SYS_READV
             | SyscallID::SYS_PSELECT => false,
             _ => true,
         }

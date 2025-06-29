@@ -283,10 +283,11 @@ impl Syscall<'_> {
             iov_ptr.as_slice_const_checked(Iovec::size()).await?;
 
             let iov = iov_ptr.read().await?;
-            // let buf_ptr = UserPtr::<u8>::new(iov.iov_base);
-            // let buf_slice = buf_ptr.as_slice_mut_checked(iov.iov_len).await?;
-            let buf_slice =
-                unsafe { core::slice::from_raw_parts(iov.iov_base as *const u8, iov.iov_len) };
+            if iov.iov_len == 0 {
+                continue;
+            }
+            let buf_ptr = UserPtr::<u8>::new(iov.iov_base);
+            let buf_slice = buf_ptr.as_slice_mut_checked(iov.iov_len).await?;
             write_size += file.write(buf_slice).await?;
         }
         Ok(write_size)
