@@ -20,7 +20,7 @@ use crate::{
     config::mm::{PAGE_SIZE, PAGE_WIDTH, USER_STACK_SIZE},
     cpu::current_task,
     fs::{path::Path, vfs::basic::file::File},
-    include::process::auxv::*,
+    include::{mm::MmapFlags, process::auxv::*},
     map_permission,
     mm::{
         address::{VirtAddr, VirtPageNum},
@@ -577,12 +577,25 @@ impl MemorySet {
             trace!("[clone_cow] mmap vpn {:#x} is mapped as cow", vpn.raw());
             let old_pte = self.page_table().find_pte(vpn).unwrap();
             let old_flags = old_pte.flags();
-            if old_flags.contains(MappingFlags::W) {
-                let new_flags = flags_switch_to_cow(&old_flags);
-                old_pte.set_flags(new_flags);
-                new_set
-                    .page_table()
-                    .map(vpn, old_pte.ppn().into(), new_flags);
+            if !self
+                .mmap_manager
+                .mmap_map
+                .get(&vpn)
+                .unwrap()
+                .flags
+                .contains(MmapFlags::MAP_SHARED)
+            {
+                if old_flags.contains(MappingFlags::W) {
+                    let new_flags = flags_switch_to_cow(&old_flags);
+                    old_pte.set_flags(new_flags);
+                    new_set
+                        .page_table()
+                        .map(vpn, old_pte.ppn().into(), new_flags);
+                } else {
+                    new_set
+                        .page_table()
+                        .map(vpn, old_pte.ppn().into(), old_flags);
+                }
             } else {
                 new_set
                     .page_table()
@@ -647,11 +660,12 @@ impl MemorySet {
         Arch::tlb_flush();
     }
 
-    pub fn brk_grow(&mut self, new_end_vpn: VirtPageNum) {
+    pub fn brk_grow(&mut self, new_end_vpn: VirtPageNum) -> SysResult<()> {
         self.brk
             .area
-            .change_end_vpn(new_end_vpn, self.page_table.as_ref_mut());
+            .change_end_vpn(new_end_vpn, self.page_table.as_ref_mut())?;
         Arch::tlb_flush();
+        Ok(())
     }
 
     pub fn realloc_cow(&mut self, vpn: VirtPageNum, pte: &PageTableEntry) -> SysResult<()> {
@@ -701,7 +715,7 @@ impl MemorySet {
         Ok(())
     }
 
-    pub fn attach_shm(&mut self, key: usize, start_va: VirtAddr) -> SysResult<()>{
+    pub fn attach_shm(&mut self, key: usize, start_va: VirtAddr) -> SysResult<()> {
         let (start_pa, size) = SHM_MANAGER.lock().get_address_and_size(key);
         warn!("attach_shm start_pa {:#x}", start_pa.raw());
         warn!("attach_shm start_va {:#x}", start_va.raw());

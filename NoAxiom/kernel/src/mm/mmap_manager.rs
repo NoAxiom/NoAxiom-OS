@@ -23,6 +23,9 @@ pub struct MmapPage {
     /// mmap protection
     pub prot: MmapProts,
 
+    /// mmap flags
+    pub flags: MmapFlags,
+
     /// validity, indicating whether the page is acutally mapped
     pub valid: bool,
 
@@ -99,7 +102,7 @@ impl MmapManager {
         start_va: VirtAddr,
         length: usize,
         prot: MmapProts,
-        _flags: MmapFlags, // unused
+        flags: MmapFlags,
         st_offset: usize,
         file: Option<Arc<dyn File>>,
     ) -> SysResult<usize> {
@@ -109,6 +112,7 @@ impl MmapManager {
             // created a mmap page with lazy-mapping
             let mmap_page = MmapPage {
                 prot,
+                flags,
                 valid: false,
                 file: file.clone(),
                 offset,

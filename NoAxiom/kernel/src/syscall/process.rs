@@ -91,6 +91,11 @@ impl Syscall<'_> {
         }
         new_cx[RES] = 0;
         trace!("[sys_fork] new task context: {:?}", new_cx);
+        info!(
+            "[sys_fork] parent: TID{} child: TID{}",
+            self.task.tid(),
+            new_task.tid(),
+        );
         spawn_utask(new_task);
         // TASK_MANAGER.get_init_proc().print_child_tree();
         Ok(new_tid as isize)
@@ -148,8 +153,13 @@ impl Syscall<'_> {
         envs.append(&mut UserPtr::<UserPtr<u8>>::new(envp).get_string_vec().await?);
 
         info!(
-            "[sys_exec] path: {:?}, argv: {:#x}, envp: {:#x}, arg: {:?}, env: {:?}",
-            file_path, argv, envp, args, envs,
+            "[sys_exec] TID{}, path: {:?}, argv: {:#x}, envp: {:#x}, arg: {:?}, env: {:?}",
+            self.task.tid(),
+            file_path,
+            argv,
+            envp,
+            args,
+            envs,
         );
         self.task.execve(file_path, args, envs).await?;
 

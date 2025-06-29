@@ -39,7 +39,7 @@ impl Task {
             }
             ms.brk.end = new_brk;
         }
-        ms.brk_grow(VirtAddr::from(new_brk).ceil());
+        ms.brk_grow(VirtAddr::from(new_brk).ceil())?;
         let brk_end = ms.brk.end;
 
         // for debug

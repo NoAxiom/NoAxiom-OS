@@ -1,7 +1,3 @@
-use alloc::{string::String, vec::Vec};
-
-use crate::mm::user_ptr::UserPtr;
-
 #[inline(always)]
 #[allow(unused)]
 pub fn align_up(addr: usize, align: usize) -> usize {
