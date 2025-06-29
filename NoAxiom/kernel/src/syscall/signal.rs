@@ -82,6 +82,7 @@ impl Syscall<'_> {
         info!("[sys_sigreturn] cx: {:#x?}", cx);
         drop(pcb);
 
+        self.task.tcb_mut().is_in_sigacion = false;
         Ok(cx[RES] as isize)
     }
 

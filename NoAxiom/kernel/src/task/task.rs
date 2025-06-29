@@ -124,6 +124,7 @@ pub struct TCB {
     pub clear_child_tid: Option<usize>, // clear tid address
     pub current_syscall: SyscallID,     // only for debug, current syscall id
     pub interrupted: bool,
+    pub is_in_sigacion: bool,
     pub should_restart: bool,
 }
 
@@ -134,6 +135,7 @@ impl Default for TCB {
             clear_child_tid: None,
             current_syscall: SyscallID::NO_SYSCALL,
             interrupted: false,
+            is_in_sigacion: false,
             should_restart: false,
         }
     }
@@ -742,7 +744,7 @@ impl Task {
 
     pub fn prepare_restart_syscall(&self) {
         let tcb = self.tcb_mut();
-        tcb.interrupted = false;
+        assert!(tcb.should_restart);
         tcb.should_restart = false;
         let cx = self.trap_context_mut();
         cx[TrapArgs::EPC] -= 4;

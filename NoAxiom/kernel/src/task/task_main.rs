@@ -74,7 +74,7 @@ pub async fn task_main(task: Arc<Task>) {
     loop {
         // kernel -> user
         let tcb = task.tcb_mut();
-        if !tcb.should_restart {
+        if !tcb.should_restart || tcb.is_in_sigacion {
             trace!("[task_main] trap_restore, cx: {:#x?}", task.trap_context());
             task.update_syscall_result(res);
             task.time_stat_mut().record_trap_in();
@@ -101,7 +101,7 @@ pub async fn task_main(task: Arc<Task>) {
             "[task_main] user_trap_handler, cx: {:#x?}",
             task.trap_context()
         );
-        assert!(!Arch::is_interrupt_enabled());
+        Arch::disable_interrupt();
         assert_no_lock!();
         res = user_trap_handler(&task, trap_type).await;
         Arch::enable_interrupt();

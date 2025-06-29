@@ -85,6 +85,7 @@ where
                     //     task.tid(),
                     //     info
                     // ))
+                    task.tcb_mut().interrupted = true;
                     Poll::Ready(Err(Errno::EINTR))
                 } else {
                     Poll::Pending
