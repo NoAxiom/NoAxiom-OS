@@ -53,7 +53,7 @@ impl Syscall<'_> {
             .memory_set()
             .lock()
             .mmap_manager
-            .remove(VirtAddr::from(start), length);
+            .remove(VirtAddr::from(start), length)?;
         Ok(0)
     }
 
@@ -67,7 +67,7 @@ impl Syscall<'_> {
 
         let start_va = VirtAddr::from(addr);
         let end_va = VirtAddr::from(addr + length);
-        let vpn_range = VpnRange::new_from_va(start_va, end_va);
+        let vpn_range = VpnRange::new_from_va(start_va, end_va)?;
         if !start_va.is_aligned() {
             return_errno!(Errno::EINVAL);
         }
@@ -143,7 +143,7 @@ impl Syscall<'_> {
         } else {
             addr
         };
-        memory_set.attach_shm(key, addr.into());
+        memory_set.attach_shm(key, addr.into())?;
         drop(memory_set);
         Ok(addr as isize)
     }

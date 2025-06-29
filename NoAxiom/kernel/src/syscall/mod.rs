@@ -17,5 +17,4 @@ pub mod utils;
 
 pub use syscall::Syscall;
 
-pub type SysResult<T> = Result<T, Errno>;
-pub type SyscallResult = SysResult<isize>;
+pub use crate::include::result::{SysResult, SyscallResult};

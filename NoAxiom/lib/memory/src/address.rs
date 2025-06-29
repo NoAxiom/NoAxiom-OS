@@ -7,6 +7,10 @@ use arch::{
     PageTableEntry,
 };
 use config::mm::*;
+use include::{
+    errno::{Errno, SysResult},
+    return_errno,
+};
 
 use crate::utils::{kernel_va_to_pa, kernel_vpn_to_ppn};
 
@@ -240,12 +244,14 @@ pub struct VpnRange {
     end: VirtPageNum,
 }
 impl VpnRange {
-    pub fn new(start: VirtPageNum, end: VirtPageNum) -> Self {
-        assert!(start <= end, "start {:#x?} > end {:#x?}!", start, end);
-        Self { start, end }
+    pub fn new(start: VirtPageNum, end: VirtPageNum) -> SysResult<Self> {
+        if start > end {
+            return_errno!(Errno::EFAULT, "start {:#x?} > end {:#x?}!", start, end);
+        }
+        Ok(Self { start, end })
     }
     #[inline(always)]
-    pub fn new_from_va(start_va: VirtAddr, end_va: VirtAddr) -> Self {
+    pub fn new_from_va(start_va: VirtAddr, end_va: VirtAddr) -> SysResult<Self> {
         Self::new(start_va.floor(), end_va.ceil())
     }
     #[inline(always)]

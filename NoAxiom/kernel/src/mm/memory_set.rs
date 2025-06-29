@@ -204,7 +204,7 @@ impl MemorySet {
                                 MapType::Direct,
                                 $permission,
                                 MapAreaType::KernelSpace,
-                            ),
+                            ).unwrap(),
                             None,
                         );
                     )*
@@ -306,7 +306,7 @@ impl MemorySet {
                         MapType::Framed,
                         permission,
                         MapAreaType::ElfBinary,
-                    );
+                    )?;
                     info!(
                         "[map_elf] [{:#x}, {:#x}], permission: {:?}, ph offset {:#x}, file size {:#x}, mem size {:#x}",
                         start_va.raw(), end_va.raw(), permission,
@@ -433,7 +433,7 @@ impl MemorySet {
             MapType::Framed,
             map_permission!(U, R, W),
             MapAreaType::UserStack,
-        );
+        )?;
         memory_set.stack = map_area;
         info!(
             "[memory_set] user stack mapped! [{:#x}, {:#x})",
@@ -453,7 +453,7 @@ impl MemorySet {
                 MapType::Framed,
                 map_permission!(U, R, W),
                 MapAreaType::UserHeap,
-            ),
+            )?,
         };
         info!(
             "[memory_set] user heap inserted! [{:#x}, {:#x})",
@@ -701,7 +701,7 @@ impl MemorySet {
         Ok(())
     }
 
-    pub fn attach_shm(&mut self, key: usize, start_va: VirtAddr) {
+    pub fn attach_shm(&mut self, key: usize, start_va: VirtAddr) -> SysResult<()>{
         let (start_pa, size) = SHM_MANAGER.lock().get_address_and_size(key);
         warn!("attach_shm start_pa {:#x}", start_pa.raw());
         warn!("attach_shm start_va {:#x}", start_va.raw());
@@ -725,8 +725,9 @@ impl MemorySet {
             MapType::Framed,
             map_permission!(R, W),
             MapAreaType::Shared,
-        );
+        )?;
         self.shm.shm_areas.push(vma);
+        Ok(())
     }
 
     pub fn detach_shm(&mut self, start_va: VirtAddr) -> usize {

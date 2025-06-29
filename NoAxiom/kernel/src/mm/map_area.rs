@@ -50,7 +50,7 @@ pub struct MapArea {
 impl MapArea {
     pub fn new_bare() -> Self {
         Self {
-            vpn_range: VpnRange::new(VirtPageNum::from(0), VirtPageNum::from(0)),
+            vpn_range: VpnRange::new(VirtPageNum::from(0), VirtPageNum::from(0)).unwrap(),
             frame_map: BTreeMap::new(),
             map_permission: MapPermission::empty(),
             map_type: MapType::Identical,
@@ -65,14 +65,15 @@ impl MapArea {
         map_type: MapType,
         map_permission: MapPermission,
         map_area_type: MapAreaType,
-    ) -> Self {
-        Self {
-            vpn_range: VpnRange::new_from_va(start_va, end_va),
+    ) -> SysResult<Self> {
+        let vpn_range = VpnRange::new_from_va(start_va, end_va)?;
+        Ok(Self {
+            vpn_range,
             frame_map: BTreeMap::new(),
             map_permission,
             map_type,
             area_type: map_area_type,
-        }
+        })
     }
 
     /// create new from another map area
@@ -164,9 +165,13 @@ impl MapArea {
     }
 
     /// modify end vpn of current map area
-    pub fn change_end_vpn(&mut self, new_end_vpn: VirtPageNum, page_table: &mut PageTable) {
+    pub fn change_end_vpn(
+        &mut self,
+        new_end_vpn: VirtPageNum,
+        page_table: &mut PageTable,
+    ) -> SysResult<()> {
         let old_end_vpn = self.vpn_range.end();
-        self.vpn_range = VpnRange::new(self.vpn_range.start(), new_end_vpn);
+        self.vpn_range = VpnRange::new(self.vpn_range.start(), new_end_vpn)?;
         trace!(
             "[change_end_vpn]: old: {:#x}, new: {:#x}",
             old_end_vpn.raw(),
@@ -178,12 +183,13 @@ impl MapArea {
                 new_end_vpn.raw(),
                 old_end_vpn.raw()
             );
-            for vpn in VpnRange::new(new_end_vpn, old_end_vpn).into_iter() {
+            for vpn in VpnRange::new(new_end_vpn, old_end_vpn)?.into_iter() {
                 self.frame_map.remove(&vpn);
                 self.unmap_one(vpn, page_table);
             }
             Arch::tlb_flush();
         }
+        Ok(())
     }
 
     // /// load data from byte slice
@@ -219,11 +225,7 @@ impl MapArea {
     // }
 
     /// load data from byte slice
-    pub fn load_data(
-        &mut self,
-        page_table: &mut PageTable,
-        data_info: MapAreaLoadDataInfo<'_>,
-    ) {
+    pub fn load_data(&mut self, page_table: &mut PageTable, data_info: MapAreaLoadDataInfo<'_>) {
         assert_eq!(self.map_type, MapType::Framed);
         let start = data_info.start;
         let mut len = data_info.len;

@@ -99,7 +99,7 @@ impl Task {
         );
         memory_set
             .mmap_manager
-            .insert(start_va, length, prot, flags, offset, file);
+            .insert(start_va, length, prot, flags, offset, file)?;
         Ok(start_va.raw())
     }
 }

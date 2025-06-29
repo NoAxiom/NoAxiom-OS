@@ -184,11 +184,6 @@ impl PCB {
         self.exit_code = exit_code;
     }
 
-    /// suspend task can be woken up
-    pub fn can_wake(&self) -> bool {
-        true
-    }
-
     /// set wake signal
     pub fn set_wake_signal(&mut self, sig: SigSet) {
         self.pending_sigs.should_wake = sig;

@@ -547,3 +547,21 @@ pub enum Errno {
     #[error("[EHWPOISON] Memory page has hardware error")]
     EHWPOISON = 133,
 }
+
+pub type SysResult<T> = Result<T, Errno>;
+pub type SyscallResult = SysResult<isize>;
+
+#[macro_export]
+macro_rules! return_errno {
+    ($errno:expr $(, $fmt:literal $(, $($arg: tt)+)?)?) => {{
+        #[cfg(feature = "debug_sig")]
+        {
+            let time = crate::time::gettime::get_time_duration();
+            println!("\x1B[91m[SYSCALL ERROR at {:?}] {}:{} Errno: {}\x1B[0m", time, file!(), line!(), $errno);
+            $(
+                println!("\x1B[91m[SYSCALL ERROR at {:?}] Reason: {}\x1B[0m", time, format!($fmt $(, $($arg)+)?));
+            )?
+        }
+        return Err($errno);
+    }};
+}

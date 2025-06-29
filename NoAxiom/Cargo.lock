@@ -675,6 +675,7 @@ dependencies = [
  "buddy_system_allocator",
  "config",
  "console",
+ "include",
  "ksync",
  "lazy_static",
  "log",

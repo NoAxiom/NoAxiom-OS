@@ -355,7 +355,7 @@ impl UserPtr<u8> {
         for vpn in VpnRange::new_from_va(
             VirtAddr::from(self.addr()),
             VirtAddr::from(self.addr() + len),
-        ) {
+        )? {
             if page_table.find_pte(vpn).is_none() {
                 let trap_type = match is_write {
                     true => TrapType::StorePageFault(vpn.as_va_usize()),

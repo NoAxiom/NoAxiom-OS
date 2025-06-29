@@ -102,10 +102,10 @@ impl MmapManager {
         _flags: MmapFlags, // unused
         st_offset: usize,
         file: Option<Arc<dyn File>>,
-    ) -> usize {
+    ) -> SysResult<usize> {
         let end_va = VirtAddr::from(start_va.raw() + length);
         let mut offset = st_offset;
-        for vpn in VpnRange::new_from_va(start_va, end_va) {
+        for vpn in VpnRange::new_from_va(start_va, end_va)? {
             // created a mmap page with lazy-mapping
             let mmap_page = MmapPage {
                 prot,
@@ -119,16 +119,17 @@ impl MmapManager {
         if self.mmap_top <= start_va {
             self.mmap_top = (start_va.raw() + length).into();
         }
-        start_va.raw()
+        Ok(start_va.raw())
     }
 
     /// remove a mmap range in mmap space
-    pub fn remove(&mut self, start_va: VirtAddr, length: usize) {
+    pub fn remove(&mut self, start_va: VirtAddr, length: usize) -> SysResult<()> {
         let end_va = VirtAddr::from(start_va.raw() + length);
-        for vpn in VpnRange::new_from_va(start_va, end_va) {
+        for vpn in VpnRange::new_from_va(start_va, end_va)? {
             self.mmap_map.remove(&vpn);
             self.frame_trackers.remove(&vpn);
         }
+        Ok(())
     }
 
     /// is a va in mmap space
