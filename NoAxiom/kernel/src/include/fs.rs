@@ -575,11 +575,20 @@ pub enum RtcIoctlCmd {
     RTCRDTIME = 0xffffffff80247009,
 }
 
+#[derive(FromRepr, Debug)]
+#[repr(usize)]
+pub enum NoAxiomIoctlCmd {
+    /// ONLY FOR TESTS
+    INTOTESTCASE = 0x114514,
+    OUTOFTESTCASE = 0x1919810,
+}
+
 #[derive(Debug)]
 #[repr(usize)]
 pub enum IoctlCmd {
     Tty(TtyIoctlCmd),
     Rtc(RtcIoctlCmd),
+    Other(NoAxiomIoctlCmd),
 }
 
 /// Defined in <asm-generic/termbits.h>

@@ -10,7 +10,8 @@ use crate::{
     include::{
         fs::{
             FcntlArgFlags, FcntlFlags, FileFlags, InodeMode, IoctlCmd, Iovec, Kstat, MountFlags,
-            RenameFlags, RtcIoctlCmd, SeekFrom, Statfs, Statx, TtyIoctlCmd, Whence,
+            NoAxiomIoctlCmd, RenameFlags, RtcIoctlCmd, SeekFrom, Statfs, Statx, TtyIoctlCmd,
+            Whence,
         },
         resource::Resource,
         result::Errno,
@@ -20,6 +21,7 @@ use crate::{
     sched::utils::intable,
     task::Task,
     time::gettime::get_time_duration,
+    utils::hack::{switch_into_ltp, switch_outof_ltp},
 };
 
 impl Syscall<'_> {
@@ -417,6 +419,8 @@ impl Syscall<'_> {
             IoctlCmd::Tty(cmd)
         } else if let Some(cmd) = RtcIoctlCmd::from_repr(request) {
             IoctlCmd::Rtc(cmd)
+        } else if let Some(cmd) = NoAxiomIoctlCmd::from_repr(request) {
+            IoctlCmd::Other(cmd)
         } else {
             return Err(Errno::EINVAL);
         };
@@ -442,6 +446,18 @@ impl Syscall<'_> {
             IoctlCmd::Rtc(x) => match x {
                 RtcIoctlCmd::RTCRDTIME => {
                     return file.ioctl(request, arg);
+                }
+            },
+            IoctlCmd::Other(x) => match x {
+                NoAxiomIoctlCmd::INTOTESTCASE => match arg {
+                    _ => {
+                        switch_into_ltp();
+                        println!("[sys_ioctl] into testcase")
+                    }
+                },
+                NoAxiomIoctlCmd::OUTOFTESTCASE => {
+                    switch_outof_ltp();
+                    println!("[sys_ioctl] outof testcase");
                 }
             },
         }
