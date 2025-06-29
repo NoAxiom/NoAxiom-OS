@@ -289,7 +289,7 @@ impl Syscall<'_> {
                 continue;
             }
             let buf_ptr = UserPtr::<u8>::new(iov.iov_base);
-            let buf_slice = buf_ptr.as_slice_mut_checked(iov.iov_len).await?;
+            let buf_slice = buf_ptr.as_slice_const_checked(iov.iov_len).await?;
             write_size += file.write(buf_slice).await?;
         }
         Ok(write_size)
