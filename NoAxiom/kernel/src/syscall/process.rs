@@ -112,7 +112,7 @@ impl Syscall<'_> {
     /// execve syscall impl
     /// execute a new program, replacing the current process image
     pub async fn sys_execve(&self, path: usize, argv: usize, envp: usize) -> SyscallResult {
-        let mut path = UserPtr::new(path).get_cstr();
+        let mut path = UserPtr::new(path).get_cstr()?;
         let mut args = Vec::new();
         let mut envs = Vec::new();
         debug!("[sys_execve] path: {:?}", path);
@@ -332,12 +332,13 @@ impl Syscall<'_> {
                         Some(limit_time)
                     }
                 };
-                let res = intable(
-                    self.task,
-                    TimeLimitedFuture::new(FutexFuture::new(uaddr, pa, val, bitset), timeout),
-                    None,
-                )
-                .await?
+                let res = TimeLimitedFuture::new(FutexFuture::new(uaddr, pa, val, bitset), timeout).await
+                // intable(
+                //     self.task,
+                //     TimeLimitedFuture::new(FutexFuture::new(uaddr, pa, val, bitset), timeout),
+                //     None,
+                // )
+                // .await?
                 .map_timeout(Err(Errno::ETIMEDOUT))?;
                 Ok(res)
             }

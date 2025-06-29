@@ -20,13 +20,6 @@ pub fn align_offset(offset: usize, align: usize) -> (usize, usize) {
     (offset_aligned, offset_inner)
 }
 
-pub fn get_string_from_ptr(ptr: &UserPtr<u8>) -> String {
-    let slice = ptr.clone_as_vec_until(|&c: &u8| c == 0);
-    let res = String::from_utf8(Vec::from(slice)).unwrap();
-    trace!("get_string_from_ptr: {}", res);
-    res
-}
-
 /// Generate a **Random** number at an **EXTREMELY** efficient way
 pub fn random() -> u64 {
     static mut SEED: u64 = 253496567482;

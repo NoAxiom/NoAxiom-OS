@@ -2,6 +2,7 @@ use alloc::{string::String, vec::Vec};
 use core::{intrinsics::atomic_load_acquire, marker::PhantomData};
 
 use arch::{Arch, ArchMemory, ArchTrap, TrapType};
+use config::mm::PAGE_SIZE;
 use include::errno::Errno;
 use ksync::mutex::check_no_lock;
 use memory::address::PhysAddr;
@@ -90,6 +91,17 @@ impl<T> UserPtr<T> {
     #[inline(always)]
     pub const fn addr(&self) -> usize {
         self.addr as usize
+    }
+
+    pub const fn ptr_will_cross_page(addr: usize) -> bool {
+        let next_addr = addr + core::mem::size_of::<T>();
+        let current_page = addr & !(PAGE_SIZE - 1);
+        let next_page = next_addr & !(PAGE_SIZE - 1);
+        current_page != next_page
+    }
+
+    pub const fn will_cross_page(&self) -> bool {
+        Self::ptr_will_cross_page(self.addr())
     }
 
     pub async fn get_ref(&self) -> SysResult<Option<&T>> {
@@ -238,23 +250,29 @@ impl<T> UserPtr<T> {
     }
 
     /// get user slice until the checker returns true
-    pub fn clone_as_vec_until(&self, checker: impl Fn(&T) -> bool) -> Vec<T>
+    pub fn clone_as_vec_until(&self, checker: impl Fn(&T) -> bool) -> SysResult<Vec<T>>
     where
         T: Copy,
     {
         let mut ptr = self.addr as usize;
         let mut res = Vec::new();
         let step = core::mem::size_of::<T>();
+        let mut cross_flag = true;
         loop {
+            let u_ptr = Self::from(ptr);
+            if cross_flag {
+                block_on(u_ptr.read())?;
+            }
             trace!("[as_vec_while] ptr: {:#x}", ptr);
             let value = unsafe { &*(ptr as *const T) };
             if checker(value) {
                 break;
             }
             res.push(*value);
+            cross_flag = u_ptr.will_cross_page();
             ptr += step;
         }
-        res
+        Ok(res)
     }
 
     pub async fn as_slice_mut_checked<'a>(&self, len: usize) -> SysResult<&mut [T]> {
@@ -314,11 +332,11 @@ impl<T> UserPtr<T> {
 
 impl UserPtr<u8> {
     /// get user string
-    pub fn get_cstr(&self) -> String {
-        let slice = self.clone_as_vec_until(|&c: &u8| c as char == '\0');
+    pub fn get_cstr(&self) -> SysResult<String> {
+        let slice = self.clone_as_vec_until(|&c: &u8| c as char == '\0')?;
         trace!("slice: {:?}", slice);
         let res = String::from_utf8(Vec::from(slice)).unwrap();
-        res
+        Ok(res)
     }
 
     /// convert ptr into an slice
@@ -335,6 +353,15 @@ impl UserPtr<u8> {
         }
         Ok(unsafe { core::slice::from_raw_parts_mut(self.ptr(), len) })
     }
+
+    /// get string from u8 ptr
+    /// this function only requires read permission
+    pub fn get_string_from_ptr(&self) -> SysResult<String> {
+        let checker = |&c: &u8| c == 0;
+        let slice = self.clone_as_vec_until(checker)?;
+        let res = String::from_utf8(Vec::from(slice)).unwrap();
+        Ok(res)
+    }
 }
 
 impl UserPtr<UserPtr<u8>> {
@@ -348,7 +375,7 @@ impl UserPtr<UserPtr<u8>> {
                 ptr.va_addr().raw(),
                 ptr.read().await?.va_addr().raw()
             );
-            let data = ptr.read().await?.get_cstr();
+            let data = ptr.read().await?.get_cstr()?;
             res.push(data);
             ptr.inc(1);
         }

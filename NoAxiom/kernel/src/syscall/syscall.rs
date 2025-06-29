@@ -178,6 +178,7 @@ impl<'a> Syscall<'a> {
             SYS_BPF =>             Self::empty_syscall("SYS_BPF", 0),
             SYS_KEYCTL =>          Self::empty_syscall("SYS_KEYCTL", 0),
             SYS_ADD_KEY =>         Self::empty_syscall("SYS_ADD_KEY", 0),
+            SYS_SETUID =>          Self::empty_syscall("SYS_SETUID", 0),
 
             // unsupported
             _ => {

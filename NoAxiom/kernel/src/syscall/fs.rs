@@ -20,7 +20,6 @@ use crate::{
     sched::utils::intable,
     task::Task,
     time::gettime::get_time_duration,
-    utils::get_string_from_ptr,
 };
 
 impl Syscall<'_> {
@@ -95,7 +94,7 @@ impl Syscall<'_> {
     /// Switch to a new work directory
     pub fn sys_chdir(&self, path: usize) -> SyscallResult {
         let ptr = UserPtr::<u8>::new(path);
-        let path = get_string_from_ptr(&ptr);
+        let path = ptr.get_string_from_ptr()?;
         info!("[sys_chdir] path: {}", path);
 
         if path.starts_with('/') {
@@ -120,8 +119,7 @@ impl Syscall<'_> {
         flags: u32,
         mode: u32,
     ) -> SyscallResult {
-        let ptr = UserPtr::<u8>::new(filename);
-        let path_str = get_string_from_ptr(&ptr);
+        let path_str = UserPtr::<u8>::new(filename).get_string_from_ptr()?;
         let mode = InodeMode::from_bits_truncate(mode);
         let flags = FileFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
         info!(
@@ -471,11 +469,11 @@ impl Syscall<'_> {
         _data: usize,
     ) -> SyscallResult {
         let ptr = UserPtr::<u8>::new(special);
-        let special = get_string_from_ptr(&ptr);
+        let special = ptr.get_string_from_ptr()?;
         let ptr = UserPtr::<u8>::new(dir);
-        let dir = get_string_from_ptr(&ptr);
+        let dir = ptr.get_string_from_ptr()?;
         let ptr = UserPtr::<u8>::new(fstype);
-        let mut fstype = get_string_from_ptr(&ptr);
+        let mut fstype = ptr.get_string_from_ptr()?;
         let flags = MountFlags::from_bits(flags as u32).ok_or(Errno::EINVAL)?;
         info!(
             "[sys_mount] special: {}, dir: {}, fstype: {}, flags: {:?}",
@@ -504,7 +502,7 @@ impl Syscall<'_> {
     /// Unmount a file system
     pub fn sys_umount2(&self, dir: usize, flags: usize) -> SyscallResult {
         let ptr = UserPtr::<u8>::new(dir);
-        let dir = get_string_from_ptr(&ptr);
+        let dir = ptr.get_string_from_ptr()?;
         info!("[sys_umount2] target: {}", dir);
 
         let _flags = MountFlags::from_bits(flags as u32).ok_or(Errno::EINVAL)?;
@@ -579,11 +577,7 @@ impl Syscall<'_> {
 
     /// Unlink a file, also delete the file if nlink is 0
     pub async fn sys_unlinkat(&self, dirfd: isize, path: usize, _flags: usize) -> SyscallResult {
-        info!(
-            "[sys_unlinkat] dirfd: {}, path: {}",
-            dirfd,
-            get_string_from_ptr(&UserPtr::<u8>::new(path))
-        );
+        info!("[sys_unlinkat] dirfd: {}", dirfd);
         let task = self.task;
         let path = get_path(task.clone(), path, dirfd, "sys_unlinkat")?;
         let dentry = path.dentry();
@@ -869,7 +863,8 @@ impl Syscall<'_> {
 
     /// get fs status
     pub async fn sys_statfs(&self, path: usize, buf: usize) -> SyscallResult {
-        let path = get_string_from_ptr(&UserPtr::<u8>::new(path as usize));
+        let ptr = UserPtr::<u8>::new(path as usize);
+        let path = ptr.get_string_from_ptr()?;
         info!("[sys_statfs] path: {}, buf: {:#x}", path, buf);
         let statfs = Statfs::new();
         let ptr = UserPtr::<Statfs>::new(buf);
@@ -971,7 +966,8 @@ async fn get_path_or_create(
     mode: InodeMode,
     debug_syscall_name: &str,
 ) -> SysResult<Path> {
-    let path_str = get_string_from_ptr(&UserPtr::<u8>::new(rawpath));
+    let ptr = UserPtr::<u8>::new(rawpath);
+    let path_str = ptr.get_string_from_ptr()?;
     if !path_str.starts_with('/') {
         if fd == AT_FDCWD {
             let cwd = task.cwd().clone();
@@ -998,7 +994,8 @@ fn get_path(
     fd: isize,
     debug_syscall_name: &str,
 ) -> SysResult<Path> {
-    let path_str = get_string_from_ptr(&UserPtr::<u8>::new(rawpath));
+    let ptr = UserPtr::<u8>::new(rawpath);
+    let path_str = ptr.get_string_from_ptr()?;
     debug!("[{debug_syscall_name}] path: {}", path_str);
     if !path_str.starts_with('/') {
         if fd == AT_FDCWD {
