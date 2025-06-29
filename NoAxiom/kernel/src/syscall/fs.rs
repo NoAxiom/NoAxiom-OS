@@ -689,7 +689,7 @@ impl Syscall<'_> {
         let file = fd_table.get(fd).ok_or(Errno::EBADF)?;
         // let file_name = file.dentry().path()?;
         // info!("[sys_fcntl] file_name: {:?}", file_name);
-        let op = FcntlFlags::from_bits(cmd).unwrap();
+        let op = FcntlFlags::from_bits(cmd).unwrap_or(FcntlFlags::F_GETOWN_EX);
 
         info!("[sys_fcntl] fd: {fd}, cmd: {op:?}, arg: {flags:?}");
         match op {
