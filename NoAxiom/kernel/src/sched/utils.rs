@@ -16,7 +16,9 @@ use kfuture::{suspend::SuspendFuture, take_waker::TakeWakerFuture, yield_fut::Yi
 use ksync::assert_no_lock;
 use pin_project_lite::pin_project;
 
-use crate::{cpu::current_task, signal::sig_set::SigMask, syscall::SysResult, task::Task};
+use crate::{
+    cpu::current_task, gen_errno, signal::sig_set::SigMask, syscall::SysResult, task::Task,
+};
 
 impl Task {
     /// yield current task by awaiting this future,
@@ -74,7 +76,15 @@ where
             Poll::Ready(res) => Poll::Ready(Ok(res)),
             Poll::Pending => {
                 // start to handle signal
-                if task.peek_has_pending_signal(this.mask) {
+                let mask = this.mask;
+                // let info = task.peek_get_pending_signal(mask);
+                if task.peek_has_pending_signal(mask) {
+                    // Poll::Ready(gen_errno!(
+                    //     Errno::EINTR,
+                    //     "task {} got interrupted by signal {:?}",
+                    //     task.tid(),
+                    //     info
+                    // ))
                     Poll::Ready(Err(Errno::EINTR))
                 } else {
                     Poll::Pending
@@ -91,6 +101,7 @@ pub async fn intable<T>(
 ) -> SysResult<T> {
     let addition = task.sa_list().get_ignored_bitmap();
     let mask = (block_sig.unwrap_or(SigMask::empty()) | addition).without_kill();
+    debug!("[intable] task{} wait with mask: {:?}", task.tid(), mask);
     IntableFuture { task, fut, mask }.await
 }
 

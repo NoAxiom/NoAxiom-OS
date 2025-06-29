@@ -7,7 +7,7 @@ use alloc::{
 };
 use core::{marker::PhantomData, ptr::null, sync::atomic::AtomicUsize, task::Waker};
 
-use arch::{Arch, ArchInfo, ArchInt, ArchMemory, ArchTrapContext, TrapContext};
+use arch::{Arch, ArchInfo, ArchInt, ArchMemory, ArchTrapContext, TrapArgs, TrapContext};
 use ksync::{
     cell::SyncUnsafeCell,
     mutex::{SpinLock, SpinLockGuard},
@@ -123,6 +123,8 @@ pub struct TCB {
     pub set_child_tid: Option<usize>,   // set tid address
     pub clear_child_tid: Option<usize>, // clear tid address
     pub current_syscall: SyscallID,     // only for debug, current syscall id
+    pub interrupted: bool,
+    pub should_restart: bool,
 }
 
 impl Default for TCB {
@@ -131,6 +133,8 @@ impl Default for TCB {
             set_child_tid: None,
             clear_child_tid: None,
             current_syscall: SyscallID::NO_SYSCALL,
+            interrupted: false,
+            should_restart: false,
         }
     }
 }
@@ -734,6 +738,14 @@ impl Task {
             });
         }
         self.set_waker(take_waker().await);
+    }
+
+    pub fn prepare_restart_syscall(&self) {
+        let tcb = self.tcb_mut();
+        tcb.interrupted = false;
+        tcb.should_restart = false;
+        let cx = self.trap_context_mut();
+        cx[TrapArgs::EPC] -= 4;
     }
 
     #[allow(unused)]

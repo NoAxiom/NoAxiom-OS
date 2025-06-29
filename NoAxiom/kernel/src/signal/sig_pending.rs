@@ -60,6 +60,10 @@ impl SigPending {
     pub fn has_expect_signals(&self, expect: SigSet) -> bool {
         !((expect & self.pending_set).is_empty())
     }
+
+    pub fn get_pending_signals_with_expect(&self, expect: SigSet) -> SigSet {
+        expect & self.pending_set
+    }
 }
 
 impl Default for SigPending {

@@ -235,6 +235,7 @@ impl<'a> Syscall<'a> {
         //         FRAME_ALLOCS.load(core::sync::atomic::Ordering::SeqCst)
         //     )
         // });
+        clear_current_syscall();
         res
     }
     fn empty_syscall(name: &str, res: isize) -> SyscallResult {
@@ -244,16 +245,18 @@ impl<'a> Syscall<'a> {
 }
 
 impl Task {
-    pub async fn syscall(self: &Arc<Self>, cx: &mut TrapContext) -> isize {
+    pub async fn syscall(self: &Arc<Self>, cx: &mut TrapContext) -> SyscallResult {
         cx[TrapArgs::EPC] += 4;
-        let res = get_syscall_result(
-            Syscall::new(self)
-                .syscall(cx.get_syscall_id(), cx.get_syscall_args())
-                .await,
-        );
-        cx[TrapArgs::RES] = res as usize;
-        clear_current_syscall();
+        let res = Syscall::new(self)
+            .syscall(cx.get_syscall_id(), cx.get_syscall_args())
+            .await;
         res
+    }
+    pub fn update_syscall_result(self: &Arc<Self>, res: Option<SyscallResult>) {
+        if let Some(res) = res {
+            let cx = self.trap_context_mut();
+            cx[TrapArgs::RES] = get_syscall_result(res) as usize;
+        }
     }
 }
 
@@ -261,8 +264,7 @@ pub fn get_syscall_result(res: SyscallResult) -> isize {
     match res {
         Ok(res) => res,
         Err(errno) => {
-            warn!("syscall error: {:?} during {:?}", errno, current_syscall());
-            let errno: isize = errno as isize;
+            let errno = errno as isize;
             match errno > 0 {
                 true => -errno,
                 false => errno,

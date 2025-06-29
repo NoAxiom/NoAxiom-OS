@@ -3,6 +3,9 @@ name = "console"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+debug_sig = []
+
 [dependencies]
 platform = { workspace = true }
 ksync = { workspace = true }

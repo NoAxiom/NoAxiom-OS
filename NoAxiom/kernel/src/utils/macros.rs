@@ -13,6 +13,21 @@ macro_rules! return_errno {
     }};
 }
 
+#[macro_export]
+macro_rules! gen_errno {
+    ($errno:expr $(, $fmt:literal $(, $($arg: tt)+)?)?) => {{
+        #[cfg(feature = "debug_sig")]
+        {
+            let time = crate::time::gettime::get_time_duration();
+            println!("\x1B[91m[SYSCALL ERROR at {:?}] {}:{} Errno: {}\x1B[0m", time, file!(), line!(), $errno);
+            $(
+                println!("\x1B[91m[SYSCALL ERROR at {:?}] Reason: {}\x1B[0m", time, format!($fmt $(, $($arg)+)?));
+            )?
+        }
+        Err($errno)
+    }};
+}
+
 /// returns pte flags with multiple flag bits
 #[macro_export]
 macro_rules! pte_flags {

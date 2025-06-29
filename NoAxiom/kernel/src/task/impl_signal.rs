@@ -11,7 +11,7 @@ use crate::{
         sig_action::{SAFlags, SAHandlerType},
         sig_info::SigInfo,
         sig_num::SigNum,
-        sig_set::SigMask,
+        sig_set::{SigMask, SigSet},
         sig_stack::{MContext, UContext},
     },
     task::{exit::ExitCode, status::TaskStatus, Task},
@@ -30,9 +30,15 @@ impl Task {
         let mask = pcb.sig_mask() | *mask;
         pcb.pending_sigs.has_expect_signals(!mask)
     }
-    pub async fn check_signal(self: &Arc<Self>, tmp_mask: Option<SigMask>) {
+    pub fn peek_get_pending_signal(self: &Arc<Self>, mask: &SigMask) -> Vec<SigInfo> {
+        let pcb = self.pcb();
+        let mask = pcb.sig_mask() | *mask;
+        let vec = pcb.pending_sigs.queue.iter().map(|x| x.clone()).collect();
+        vec
+    }
+    pub async fn check_signal(self: &Arc<Self>) {
         let mut pcb = self.pcb();
-        let old_mask = tmp_mask.unwrap_or(pcb.pending_sigs.sig_mask.clone());
+        let old_mask = pcb.pending_sigs.sig_mask.clone();
         trace!(
             "[check_signal] tid: {}, check pending signals, old_mask: {:?}",
             self.tid(),
@@ -74,6 +80,16 @@ impl Task {
                 "[check_signal] sig {:?}: start to handle, handler: {:?}",
                 signum, action.handler
             );
+
+            // check interrpt syscall
+            let tcb = self.tcb_mut();
+            if tcb.interrupted && action.flags.contains(SAFlags::SA_RESTART) {
+                tcb.should_restart = true;
+                println!("should restart!!!");
+            }
+            tcb.interrupted = false;
+
+            // start handle
             match action.handler {
                 SAHandlerType::Ignore => self.sig_default_ignore(),
                 SAHandlerType::Kill => self.sig_default_terminate(),

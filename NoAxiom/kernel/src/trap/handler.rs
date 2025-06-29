@@ -3,6 +3,7 @@
 use alloc::sync::Arc;
 
 use arch::{consts::KERNEL_ADDR_OFFSET, Arch, ArchInt, ArchTrap, TrapArgs, TrapType};
+use include::errno::SyscallResult;
 
 use super::{ext_int::ext_int_handler, ipi::ipi_handler};
 use crate::{
@@ -68,7 +69,7 @@ fn kernel_trap_handler() {
 
 /// user trap handler
 #[no_mangle]
-pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
+pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) -> Option<SyscallResult> {
     assert!(!arch::Arch::is_interrupt_enabled());
     trace!("[trap_handler] call trap handler");
 
@@ -97,7 +98,7 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
         TrapType::SysCall => {
             Arch::enable_interrupt();
             let result = task.syscall(cx).await;
-            trace!("[syscall] done! result {:#x}", result);
+            return Some(result);
         }
         // page fault: try to handle copy-on-write, or exit the task
         TrapType::LoadPageFault(addr)
@@ -169,7 +170,5 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
             panic!("unsupported trap type: {trap_type:x?}");
         }
     }
-
-    // enable interrupt after handler
-    Arch::enable_interrupt();
+    None
 }

@@ -14,9 +14,10 @@ use crate::{
     constant::signal::MAX_SIGNUM,
     include::{result::Errno, time::TimeSpec},
     mm::user_ptr::UserPtr,
+    return_errno,
     sched::utils::suspend_now,
     signal::{
-        sig_action::{KSigAction, USigAction},
+        sig_action::{KSigAction, SAHandlerType, USigAction},
         sig_detail::{SigDetail, SigKillDetail},
         sig_info::{RawSigInfo, SigCode, SigInfo},
         sig_num::{SigNum, Signo},
@@ -28,17 +29,13 @@ use crate::{
 
 impl Syscall<'_> {
     pub async fn sys_sigaction(&self, signo: Signo, act: usize, old_act: usize) -> SyscallResult {
-        debug!(
-            "[sys_sigaction]: signum {:?}, new act ptr {:#x}, old act ptr {:#x}",
-            SigNum::from(signo),
-            act,
-            old_act,
-        );
-
         let signum = SigNum::from(signo);
-        if signo >= MAX_SIGNUM as i32 || signum == SigNum::SIGKILL || signum == SigNum::SIGSTOP {
-            // signum out of range
-            return Err(Errno::EINVAL);
+        if signo >= MAX_SIGNUM as i32
+            || signum == SigNum::SIGKILL
+            || signum == SigNum::SIGSTOP
+            || signum == SigNum::INVALID
+        {
+            return_errno!(Errno::EINVAL);
         }
 
         let act = UserPtr::<USigAction>::new(act);
@@ -50,7 +47,15 @@ impl Syscall<'_> {
         let old = sa.get(signum).unwrap().into_sa();
         // when detect new sig action, register it into sigaction list
         if let Some(act) = act {
-            sa.set_sigaction(signum as usize, KSigAction::from_sa(act, signum));
+            let kaction = KSigAction::from_sa(act, signum);
+            if kaction.handler == SAHandlerType::Ignore {
+                println_debug!(
+                    "[sys_sigaction]: task{} IGNORE {:?}",
+                    self.task.tid(),
+                    SigNum::from(signo),
+                );
+            }
+            sa.set_sigaction(signum as usize, kaction);
         }
         drop(sa);
 

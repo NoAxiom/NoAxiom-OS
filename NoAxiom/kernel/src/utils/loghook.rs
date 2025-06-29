@@ -1,5 +1,4 @@
 use arch::{Arch, ArchTime};
-use log::{self};
 use platform::shutdown;
 
 use crate::{constant::time::MSEC_PER_SEC, include::time::TimeSpec, time::gettime::get_time};

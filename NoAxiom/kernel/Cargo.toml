@@ -10,7 +10,7 @@ runtests = []
 qemu = ["platform/qemu"]
 interruptable_async = ["driver/interruptable_async"]
 async = ["driver/async"]
-debug_sig = []
+debug_sig = [] #["console/debug_sig"]
 log_print = ["debug_sig"]
 
 [dependencies]

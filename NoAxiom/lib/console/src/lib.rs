@@ -6,6 +6,7 @@ use core::fmt::{self, Write};
 use ksync::mutex::SpinLock;
 
 static PRINT_MUTEX: SpinLock<Stdout> = SpinLock::new(Stdout::new());
+
 struct Stdout;
 impl Stdout {
     pub const fn new() -> Self {
@@ -37,5 +38,15 @@ macro_rules! print {
 macro_rules! println {
     ($fmt: literal $(, $($arg: tt)+)?) => {
         $crate::print(format_args!(concat!($fmt, "\n") $(, $($arg)+)?));
+    }
+}
+
+#[macro_export]
+macro_rules! println_debug {
+    ($fmt: literal $(, $($arg: tt)+)?) => {
+        #[cfg(feature = "debug_sig")]
+        {
+            $crate::print(format_args!(concat!($fmt, "\n") $(, $($arg)+)?));
+        }
     }
 }
