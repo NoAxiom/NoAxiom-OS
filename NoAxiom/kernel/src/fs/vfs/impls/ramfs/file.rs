@@ -65,8 +65,15 @@ impl File for RamFsFile {
     fn ioctl(&self, _cmd: usize, _arg: usize) -> SyscallResult {
         Err(Errno::ENOTTY)
     }
-    fn poll(&self, _req: &PollEvent, _waker: Waker) -> PollEvent {
-        unreachable!("RamfsFile::poll not supported now");
+    fn poll(&self, req: &PollEvent, _waker: Waker) -> PollEvent {
+        let mut res = PollEvent::empty();
+        if req.contains(PollEvent::POLLIN) {
+            res |= PollEvent::POLLIN;
+        }
+        if req.contains(PollEvent::POLLOUT) {
+            res |= PollEvent::POLLOUT;
+        }
+        res
     }
 }
 
