@@ -1,6 +1,11 @@
+use alloc::sync::Arc;
+
 use bitflags::bitflags;
 use config::fs::BLOCK_SIZE;
+use include::errno::SysResult;
 use strum::FromRepr;
+
+use crate::fs::vfs::basic::inode::Inode;
 
 bitflags! {
     #[derive(Debug, Clone, Copy)]
@@ -331,11 +336,13 @@ pub struct Kstat {
 }
 
 impl Kstat {
-    pub fn from_stat(stat: Stat) -> Self {
-        Kstat {
+    pub fn from_stat(inode: Arc<dyn Inode>) -> SysResult<Self> {
+        let stat = inode.stat()?;
+        let st_mode = inode.privilege();
+        Ok(Kstat {
             st_dev: stat.st_dev,
             st_ino: stat.st_ino,
-            st_mode: stat.st_mode, // 0777 permission, we don't care about permission
+            st_mode: st_mode.bits(),
             st_nlink: stat.st_nlink,
             st_uid: stat.st_uid,
             st_gid: stat.st_gid,
@@ -352,7 +359,7 @@ impl Kstat {
             st_ctime_sec: stat.st_ctime_sec as isize,
             st_ctime_nsec: stat.st_ctime_nsec as isize,
             __unused: [0; 2],
-        }
+        })
     }
 }
 

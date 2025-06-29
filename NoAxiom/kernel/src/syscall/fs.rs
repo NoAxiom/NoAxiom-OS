@@ -363,7 +363,7 @@ impl Syscall<'_> {
         drop(fd_table);
         // let file_name = file.dentry().path()?;
         // info!("[sys_fstat] file_name: {:?}", file_name);
-        let kstat = Kstat::from_stat(file.inode().stat()?);
+        let kstat = Kstat::from_stat(file.inode())?;
         let ptr = UserPtr::<Kstat>::new(stat_buf);
         ptr.write(kstat).await?;
         Ok(0)
@@ -404,7 +404,7 @@ impl Syscall<'_> {
             path,
             stat_buf
         );
-        let kstat = Kstat::from_stat(path.dentry().inode()?.stat()?);
+        let kstat = Kstat::from_stat(path.dentry().inode()?)?;
         let ptr = UserPtr::<Kstat>::new(stat_buf);
         ptr.write(kstat).await?;
         Ok(0)
@@ -999,6 +999,16 @@ impl Syscall<'_> {
         }
 
         Ok(out_len as isize)
+    }
+
+    pub fn sys_fchmodat(&self, fd: usize, path: usize, mode: usize, _flag: usize) -> SyscallResult {
+        let path = get_path(self.task.clone(), path, fd as isize, "sys_fchmodat")?;
+        let mode = InodeMode::from_bits_truncate(mode as u32);
+        info!("[sys_fchmodat] set {:?} mode to {:?}, flags", mode, path);
+
+        let inode = path.dentry().inode()?;
+        inode.set_privilege(mode);
+        Ok(0)
     }
 }
 

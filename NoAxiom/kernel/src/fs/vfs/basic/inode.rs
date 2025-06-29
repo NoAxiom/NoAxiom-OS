@@ -66,6 +66,7 @@ impl InodeMeta {
                 mtime_nsec: 0,
                 ctime_sec: 0,
                 ctime_nsec: 0,
+                privilege: inode_mode,
             }),
             inode_mode,
             super_block,
@@ -90,6 +91,8 @@ pub struct InodeMetaInner {
     /// Last status change time.
     pub ctime_sec: usize,
     pub ctime_nsec: usize,
+
+    pub privilege: InodeMode,
 }
 
 #[async_trait]
@@ -113,6 +116,12 @@ impl dyn Inode {
     }
     pub fn set_size(&self, size: usize) {
         self.meta().inner.lock().size = size;
+    }
+    pub fn privilege(&self) -> InodeMode {
+        self.meta().inner.lock().privilege
+    }
+    pub fn set_privilege(&self, mode: InodeMode) {
+        self.meta().inner.lock().privilege = mode;
     }
     pub async fn page_cache(&self) -> Option<AsyncMutexGuard<'_, PageCache>> {
         if let Some(page_cache) = &self.meta().page_cache {
