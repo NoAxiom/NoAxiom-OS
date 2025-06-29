@@ -44,7 +44,7 @@ impl Sock {
     pub fn listen(&mut self, backlog: usize) -> SysResult<()> {
         match self {
             Sock::Tcp(socket) => socket.listen(backlog),
-            _ => Err(Errno::ENOSYS),
+            _ => Err(Errno::EOPNOTSUPP),
         }
     }
     pub async fn connect(&mut self, addr: SockAddr) -> SysResult<()> {
@@ -57,7 +57,7 @@ impl Sock {
     pub async fn accept(&mut self) -> SysResult<(TcpSocket, IpEndpoint)> {
         match self {
             Sock::Tcp(socket) => socket.accept().await,
-            _ => Err(Errno::ENOSYS),
+            _ => Err(Errno::EOPNOTSUPP),
         }
     }
     pub fn setsockopt(&mut self, level: usize, optname: usize, optval: &[u8]) -> SysResult<()> {
@@ -105,7 +105,7 @@ impl Sock {
     pub fn shutdown(&mut self, operation: ShutdownType) -> SysResult<()> {
         match self {
             Sock::Tcp(socket) => socket.shutdown(operation),
-            _ => Err(Errno::ENOSYS),
+            _ => Err(Errno::EOPNOTSUPP),
         }
     }
 }

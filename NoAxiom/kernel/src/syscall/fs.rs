@@ -616,7 +616,7 @@ impl Syscall<'_> {
                 .write(match resource {
                     Resource::NOFILE => fd_table.rlimit().clone(),
                     Resource::STACK => RLimit::default(),
-                    _ => todo!(),
+                    _ => RLimit::default(), //TODO: add rlimit for Task
                 })
                 .await?;
         }

@@ -22,6 +22,7 @@ impl<'a> Syscall<'a> {
         match id {
             // fs
             SYS_FCHMODAT =>         Self::empty_syscall("fchmodat", 0),
+            SYS_FCHOWNAT =>         Self::empty_syscall("fchownat", 0),
             SYS_UMASK =>            Self::empty_syscall("umask", 0x777),
             SYS_SYNC =>             Self::empty_syscall("sync", 0),
             SYS_FSYNC =>            Self::empty_syscall("fsync", 0),
@@ -61,6 +62,7 @@ impl<'a> Syscall<'a> {
             SYS_STATFS =>           self.sys_statfs(args[0], args[1]).await,
             SYS_SPLICE =>           self.sys_splice(args[0], args[1], args[2], args[3], args[4], args[5]).await,
             SYS_STATX =>            self.sys_statx(args[0] as isize, args[1], args[2] as u32, args[3] as u32, args[4]).await,
+            // SYS_FCHOWNAT =>         self.sys_fchownat(args[0], args[1], args[2], args[3]),
 
             // io
             SYS_PPOLL =>    self.sys_ppoll(args[0], args[1], args[2], args[3]).await,
