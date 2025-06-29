@@ -5,6 +5,7 @@ use arch::{ArchTrapContext, TrapArgs, TrapContext};
 use super::{utils::clear_current_syscall, SyscallResult};
 use crate::{
     include::{result::Errno, syscall_id::SyscallID},
+    return_errno,
     syscall::utils::{current_syscall, update_current_syscall},
     task::Task,
 };
@@ -168,16 +169,23 @@ impl<'a> Syscall<'a> {
             SYS_SYSLOG =>          Self::sys_syslog(args[0] as u32, args[1], args[2]).await,
             SYS_SYSTEMSHUTDOWN =>  Self::sys_systemshutdown(),
             SYS_GETRANDOM =>       self.sys_getrandom(args[0], args[1], args[2]).await,
-            SYS_GET_MEMPOLICY =>   Self::empty_syscall("get_mempolicy", 0),
-            SYS_MLOCK =>           Self::empty_syscall("mlock", 0),
+
+            // empty syscall
+            SYS_GET_MEMPOLICY =>   Self::empty_syscall("SYS_GET_MEMPOLICY", 0),
+            SYS_MLOCK =>           Self::empty_syscall("SYS_MLOCK", 0),
+            SYS_ADJTIMEX =>        Self::empty_syscall("SYS_ADJTIMEX", 0),
+            SYS_CAPGET =>          Self::empty_syscall("SYS_CAPGET", 0),
+            SYS_BPF =>             Self::empty_syscall("SYS_BPF", 0),
+            SYS_KEYCTL =>          Self::empty_syscall("SYS_KEYCTL", 0),
+            SYS_ADD_KEY =>         Self::empty_syscall("SYS_ADD_KEY", 0),
 
             // unsupported
             _ => {
-                println!(
+                return_errno!(
+                    Errno::ENOSYS,
                     "[kernel] unsupported syscall id: {:?}, tid: {}, args: {:x?}",
-                    id, self.task.tid(), args,
-                );
-                Err(Errno::ENOSYS)
+                    id, self.task.tid(), args
+                )
             }
         }
     }
