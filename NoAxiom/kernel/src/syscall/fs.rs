@@ -683,7 +683,8 @@ impl Syscall<'_> {
                 fd_table.copyfrom(fd, new_fd)
             }
             _ => {
-                unimplemented!("fcntl cmd: {op:?} not implemented");
+                warn!("fcntl cmd: {op:?} not implemented");
+                Ok(0)
             }
         }
     }
