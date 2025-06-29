@@ -333,7 +333,11 @@ impl dyn Dentry {
 
     /// Unlink, unlink self and delete the inner file if nlink is 0.
     pub async fn unlink(self: Arc<Self>) -> SyscallResult {
-        let inode = self.inode()?;
+        let inode = if let Ok(inode) = self.inode() {
+            inode
+        } else {
+            return Ok(0);
+        };
         let mut nlink = inode.meta().inner.lock().nlink;
         debug!(
             "[Vfs::unlink] nlink: {}, file_type: {:?}",
