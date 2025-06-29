@@ -331,11 +331,11 @@ impl MemorySet {
                 Interp => {
                     if is_dl_interp {
                         error!("[load_elf] detect recursive dl_interp, skip dl_interp loading");
-                        return Err(Errno::ELIBBAD);
+                        return_errno!(Errno::ELIBBAD);
                     }
                     if dl_interp.is_some() {
                         error!("[load_elf] dl_interp already set");
-                        return Err(Errno::ENOEXEC);
+                        return_errno!(Errno::ENOEXEC);
                     }
                     let mut buf = vec![0u8; ph.file_size() as usize];
                     if buf.ends_with(&[0u8; 1]) {

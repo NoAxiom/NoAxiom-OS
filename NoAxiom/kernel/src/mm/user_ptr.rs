@@ -1,7 +1,7 @@
 use alloc::{string::String, vec::Vec};
 use core::{intrinsics::atomic_load_acquire, marker::PhantomData};
 
-use arch::{Arch, ArchMemory, ArchTrap, TrapType};
+use arch::{Arch, ArchMemory, ArchPageTableEntry, ArchTrap, MappingFlags, TrapType};
 use config::mm::PAGE_SIZE;
 use include::errno::Errno;
 use ksync::mutex::check_no_lock;
@@ -352,11 +352,18 @@ impl UserPtr<u8> {
     async fn as_slice_checked_raw<'a>(&self, len: usize, is_write: bool) -> SysResult<&mut [u8]> {
         let page_table = PageTable::from_ppn(Arch::current_root_ppn());
         let memory_set = current_task().unwrap().memory_set();
-        for vpn in VpnRange::new_from_va(
+        let range = VpnRange::new_from_va(
             VirtAddr::from(self.addr()),
             VirtAddr::from(self.addr() + len),
-        )? {
-            if page_table.find_pte(vpn).is_none() {
+        )?;
+        for vpn in range {
+            let pte = page_table.find_pte(vpn);
+            let should_validate = if pte.is_none() {
+                true
+            } else {
+                is_write && !pte.unwrap().flags().contains(MappingFlags::W)
+            };
+            if should_validate {
                 let trap_type = match is_write {
                     true => TrapType::StorePageFault(vpn.as_va_usize()),
                     false => TrapType::LoadPageFault(vpn.as_va_usize()),
