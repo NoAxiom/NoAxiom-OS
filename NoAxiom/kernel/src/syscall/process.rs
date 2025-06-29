@@ -64,7 +64,7 @@ impl Syscall<'_> {
         tls: usize,
         ctid: usize,
     ) -> SyscallResult {
-        let flags = CloneFlags::from_bits(flags & !0xff).unwrap();
+        let flags = CloneFlags::from_bits(flags & !0xff).ok_or(Errno::EINVAL)?;
         let new_task = self.task.fork(flags);
         let new_tid = new_task.tid();
         let new_cx = new_task.trap_context_mut();

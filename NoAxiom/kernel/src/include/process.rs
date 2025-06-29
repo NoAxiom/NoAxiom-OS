@@ -1,7 +1,4 @@
 use bitflags::bitflags;
-use memory::address::VirtAddr;
-
-use crate::signal::sig_num::SigNum;
 
 bitflags! {
     #[derive(Debug, Clone, Copy)]
@@ -14,6 +11,8 @@ bitflags! {
         const FILES = 0x0000400;
         /// set if signal handlers and blocked signals shared
         const SIGHAND = 0x00000800;
+        /// Set if a pidfd should be placed in parent.
+        const PIDFD = 0x00001000;
         /// set if we want to have the same parent as the cloner
         const PARENT = 0x00008000;
         /// Same thread group?
@@ -32,6 +31,24 @@ bitflags! {
         const CHILD_SETTID = 0x01000000;
         /// clear child signal handler
         const CHILD_CLEAR_SIGHAND = 0x100000000;
+        /// Set if the tracing process can't
+        const UNTRACED = 0x00800000;
+        /// New cgroup namespace.
+        const NEWCGROUP = 0x02000000;
+        /// New utsname group.
+        const NEWUTS = 0x04000000;
+        /// New ipcs.
+        const NEWIPC = 0x08000000;
+        /// New user namespace.
+        const NEWUSER = 0x10000000;
+        /// New pid namespace.
+        const NEWPID = 0x20000000;
+        /// New network namespace.
+        const NEWNET = 0x40000000;
+        /// Clone I/O context.
+        const IO = 0x80000000 ;
+        /// CLone_legacy_flag
+        const LEGACY_FLAGS = 0xffffffff;
     }
 }
 
