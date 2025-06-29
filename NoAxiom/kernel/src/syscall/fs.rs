@@ -98,6 +98,9 @@ impl Syscall<'_> {
         let ptr = UserPtr::<u8>::new(path);
         let path = ptr.get_string_from_ptr()?;
         info!("[sys_chdir] path: {}", path);
+        if path.len() > 255 {
+            return Err(Errno::ENAMETOOLONG);
+        }
 
         if path.starts_with('/') {
             let tar = Path::try_from(path)?;
