@@ -142,6 +142,7 @@ impl dyn Dentry {
         let mut children = self.meta().children.lock();
 
         let res = if let Some(child) = children.get(name) {
+            warn!("[add_child] {} already exists, replace it", name);
             child.set_inode(child_inode);
             child.clone()
         } else {
@@ -331,15 +332,17 @@ impl dyn Dentry {
     }
 
     /// Hard link, link self to `target`.
-    pub async fn link_to(self: Arc<Self>, target: Arc<dyn Dentry>) -> SysResult<()> {
+    pub async fn link_to(self: Arc<Self>, target: Arc<dyn Dentry>) -> SysResult<isize> {
         if !self.is_negative() {
             return Err(Errno::EEXIST);
         }
         let name = self.name();
         let inode = target.inode()?;
+        debug!("[Vfs::linkto] set_inode {} to xxx", name);
         self.set_inode(inode.clone());
+        let nlink = inode.meta().inner.lock().nlink;
         inode.meta().inner.lock().nlink += 1;
-        Ok(())
+        Ok(nlink as isize)
         // self.symlink(&name, &target.name()).await
     }
 

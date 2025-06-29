@@ -561,20 +561,26 @@ impl Syscall<'_> {
         _flags: usize,
     ) -> SyscallResult {
         let task = self.task;
+        let cwd = task.cwd().clone();
+        let cwd = cwd.as_str();
         let old_path = get_path(task.clone(), oldpath, olddirfd, "sys_linkat")?;
-        let new_path = get_path_or_create(
-            task.clone(),
-            newpath,
-            newdirfd,
-            InodeMode::LINK,
-            "sys_linkat",
-        )
-        .await?;
+        let new_path = if cwd == "/" {
+            get_path_or_create(
+                task.clone(),
+                newpath,
+                newdirfd,
+                InodeMode::LINK,
+                "sys_linkat",
+            )
+            .await?
+        } else {
+            get_path(task.clone(), newpath, newdirfd, "sys_linkat")?
+        };
         info!(
             "[sys_linkat] old_path: {:?}, new_path: {:?}",
             old_path, new_path
         );
-        let old_dentry = if old_path.as_str() == "/" {
+        let old_dentry = if cwd == "/" {
             Path::try_from("/musl/busybox".to_string())
                 .unwrap()
                 .dentry()
@@ -583,8 +589,7 @@ impl Syscall<'_> {
         };
         let new_dentry = new_path.dentry();
         new_dentry.set_inode_none();
-        new_dentry.link_to(old_dentry).await?;
-        Ok(0)
+        new_dentry.link_to(old_dentry).await
     }
 
     /// Read link file, error if the file is not a link
@@ -1006,6 +1011,9 @@ async fn get_path_or_create(
     let ptr = UserPtr::<u8>::new(rawpath);
     let path_str = ptr.get_string_from_ptr()?;
     debug!("[{debug_syscall_name}] path(may create): {}", path_str);
+    if path_str.len() > 255 {
+        return Err(Errno::ENAMETOOLONG);
+    }
     if !path_str.starts_with('/') {
         if fd == AT_FDCWD {
             let cwd = task.cwd().clone();
@@ -1035,6 +1043,9 @@ fn get_path(
     let ptr = UserPtr::<u8>::new(rawpath);
     let path_str = ptr.get_string_from_ptr()?;
     debug!("[{debug_syscall_name}] path: {}", path_str);
+    if path_str.len() > 255 {
+        return Err(Errno::ENAMETOOLONG);
+    }
     if !path_str.starts_with('/') {
         if fd == AT_FDCWD {
             let cwd = task.cwd().clone();
