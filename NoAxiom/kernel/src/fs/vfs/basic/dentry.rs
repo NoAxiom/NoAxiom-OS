@@ -271,7 +271,7 @@ impl dyn Dentry {
         self: Arc<Self>,
         path: &Vec<&str>,
         mode: InodeMode,
-    ) -> Arc<dyn Dentry> {
+    ) -> SysResult<Arc<dyn Dentry>> {
         use arch::ArchInt;
 
         let mut idx = 0;
@@ -279,11 +279,24 @@ impl dyn Dentry {
         let mut current = self.clone();
         while idx <= max_idx {
             let name = path[idx];
+            if !current
+                .clone()
+                .inode()
+                .unwrap()
+                .file_type()
+                .contains(InodeMode::DIR)
+            {
+                error!(
+                    "[dentry::find_path_or_create] {} is not a dir, return ENOTDIR",
+                    current.name()
+                );
+                return Err(Errno::ENOTDIR);
+            }
+            debug!("[find_path_or_create] {}: {}", idx, name);
             if name.is_empty() || name == "." {
                 idx += 1;
                 continue;
             }
-            assert!(current.clone().inode().unwrap().file_type() == InodeMode::DIR);
             if current.clone().children().is_empty() {
                 if let Ok(current_dir) = current.clone().open() {
                     assert_no_lock!();
@@ -314,7 +327,7 @@ impl dyn Dentry {
             }
             idx += 1;
         }
-        current
+        Ok(current)
     }
 
     /// Hard link, link self to `target`.

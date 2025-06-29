@@ -449,7 +449,9 @@ impl Task {
         let tid = tid_alloc();
         let tgid = tid.0;
         // def root path
-        let path = Path::from_or_create(format!("/"), InodeMode::DIR).await;
+        let path = Path::from_or_create(format!("/"), InodeMode::DIR)
+            .await
+            .unwrap();
         // create task
         let task = Arc::new(Self {
             tid,

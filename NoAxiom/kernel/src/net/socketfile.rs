@@ -165,12 +165,12 @@ unsafe impl Send for SocketFile {}
 unsafe impl Sync for SocketFile {}
 
 impl SocketFile {
-    pub fn new(addr_family: AddressFamily, type_: PosixSocketType) -> Self {
+    pub fn new(addr_family: AddressFamily, type_: PosixSocketType) -> SysResult<Self> {
         let sock = match addr_family {
             AddressFamily::AF_INET | AddressFamily::AF_INET6 => match type_ {
                 PosixSocketType::Stream => Sock::Tcp(TcpSocket::new(SocketOptions::default())),
                 PosixSocketType::Datagram => Sock::Udp(UdpSocket::new(SocketOptions::default())),
-                _ => unimplemented!("Unsupported socket type"),
+                _ => return Err(Errno::ENOSYS),
             },
             AddressFamily::AF_UNIX => todo!("Unsupported address family AF_UNIX"),
         };
@@ -180,11 +180,11 @@ impl SocketFile {
         let meta = FileMeta::new(dentry, Arc::new(empty_inode));
         meta.set_flags(FileFlags::O_RDWR);
 
-        Self {
+        Ok(Self {
             meta,
             sock: AsyncMutex::new(sock),
             type_,
-        }
+        })
     }
 
     pub fn new_from_socket(socket: Arc<SocketFile>, sock: Sock) -> Self {

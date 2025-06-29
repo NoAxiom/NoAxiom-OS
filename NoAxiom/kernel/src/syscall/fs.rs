@@ -326,10 +326,15 @@ impl Syscall<'_> {
             self.task.clone(),
             path,
             dirfd,
-            mode.union(InodeMode::DIR),
+            InodeMode::DIR,
             "sys_mkdirat",
         )
         .await?;
+        assert_eq!(
+            path.dentry().inode()?.file_type(),
+            InodeMode::DIR,
+            "sys_mkdirat: path must be a directory",
+        );
         info!(
             "[sys_mkdirat] dirfd: {}, path: {:?}, mode: {:?}",
             dirfd, path, mode
@@ -502,7 +507,12 @@ impl Syscall<'_> {
             fstype = "ext4".to_string();
         }
 
-        let fs = FS_MANAGER.get(&fstype).ok_or(Errno::EINVAL)?;
+        let fs = if let Some(fs) = FS_MANAGER.get(&fstype) {
+            fs
+        } else {
+            warn!("[sys_mount] file system {} not found", fstype);
+            return Ok(0);
+        };
 
         // normally, we should choose the device by special
         // but now we just use the default device
@@ -526,7 +536,16 @@ impl Syscall<'_> {
 
         let mut split_path = dir.split('/').collect::<Vec<&str>>();
         let name = split_path.pop().unwrap();
-        let parent = root_dentry().find_path(&split_path)?;
+        if split_path.is_empty() {
+            warn!("[sys_umount2] path {} cannot umount", dir);
+            return Ok(0);
+        }
+        let parent = if let Ok(p) = root_dentry().find_path(&split_path) {
+            p
+        } else {
+            warn!("[sys_umount2] path {} not found", dir);
+            return Ok(0);
+        };
         parent.remove_child(name).unwrap();
 
         Ok(0)
@@ -986,11 +1005,12 @@ async fn get_path_or_create(
 ) -> SysResult<Path> {
     let ptr = UserPtr::<u8>::new(rawpath);
     let path_str = ptr.get_string_from_ptr()?;
+    debug!("[{debug_syscall_name}] path(may create): {}", path_str);
     if !path_str.starts_with('/') {
         if fd == AT_FDCWD {
             let cwd = task.cwd().clone();
             trace!("[{debug_syscall_name}] cwd: {:?}", cwd);
-            Ok(cwd.from_cd_or_create(&path_str, mode).await)
+            cwd.from_cd_or_create(&path_str, mode).await
         } else {
             let cwd = task
                 .fd_table()
@@ -999,10 +1019,10 @@ async fn get_path_or_create(
                 .dentry()
                 .path()?;
             trace!("[{debug_syscall_name}] cwd: {:?}", cwd);
-            Ok(cwd.from_cd_or_create(&path_str, mode).await)
+            cwd.from_cd_or_create(&path_str, mode).await
         }
     } else {
-        Ok(Path::from_or_create(path_str, mode).await)
+        Path::from_or_create(path_str, mode).await
     }
 }
 

@@ -59,7 +59,7 @@ impl Path {
     }
 
     /// Get the path from absolute path, create the path if not exist
-    pub async fn from_or_create(abs_path: String, mode: InodeMode) -> Self {
+    pub async fn from_or_create(abs_path: String, mode: InodeMode) -> SysResult<Self> {
         assert!(
             abs_path.starts_with('/'),
             "{} is not absolute path!",
@@ -70,11 +70,11 @@ impl Path {
         if split_path.ends_with(&[""]) {
             split_path.pop();
         }
-        let dentry = root_dentry().find_path_or_create(&split_path, mode).await; // todo: don't walk from root
-        Self {
+        let dentry = root_dentry().find_path_or_create(&split_path, mode).await?; // todo: don't walk from root
+        Ok(Self {
             inner: abs_path,
             dentry,
-        }
+        })
     }
 
     fn cd(&self, path: &str) -> String {
@@ -117,7 +117,7 @@ impl Path {
 
     /// Get the path from relative path, create the path if not exist
     #[inline(always)]
-    pub async fn from_cd_or_create(&self, path: &str, mode: InodeMode) -> Self {
+    pub async fn from_cd_or_create(&self, path: &str, mode: InodeMode) -> SysResult<Self> {
         Self::from_or_create(self.cd(path), mode).await
     }
 

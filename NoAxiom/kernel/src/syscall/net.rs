@@ -34,7 +34,7 @@ impl Syscall<'_> {
         let socket_file = SocketFile::new(
             AddressFamily::try_from(address_family as u16)?,
             PosixSocketType::try_from(socket_type & 0xf)?,
-        );
+        )?;
 
         let mut fd_table = self.task.fd_table();
         let socket_fd = fd_table.alloc_fd()?;

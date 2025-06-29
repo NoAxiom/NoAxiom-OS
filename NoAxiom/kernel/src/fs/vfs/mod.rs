@@ -60,16 +60,22 @@ pub async fn fs_init() {
     // let passwd = Path::from_or_create(String::from("/etc/passwd"),
     // InodeMode::FILE).await; passwd.dentry().open().expect("open /etc/passwd
     // failed");
-    
+
     #[cfg(feature = "debug_sig")]
     {
-        let ls = Path::from_or_create(format!("/ls"), InodeMode::FILE).await;
+        let ls = Path::from_or_create(format!("/ls"), InodeMode::FILE)
+            .await
+            .unwrap();
         ls.dentry().open().expect("open ls failed");
 
-        let logon = Path::from_or_create(format!("/logon"), InodeMode::FILE).await;
+        let logon = Path::from_or_create(format!("/logon"), InodeMode::FILE)
+            .await
+            .unwrap();
         logon.dentry().open().expect("open logon failed");
 
-        let logoff = Path::from_or_create(format!("/logoff"), InodeMode::FILE).await;
+        let logoff = Path::from_or_create(format!("/logoff"), InodeMode::FILE)
+            .await
+            .unwrap();
         logoff.dentry().open().expect("open logoff failed");
     }
 }
