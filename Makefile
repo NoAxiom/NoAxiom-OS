@@ -19,6 +19,7 @@ export WARN := "\e[33m"
 export NORMAL := "\e[32m"
 export RESET := "\e[0m"
 export RELEASE ?= false
+export TOOLCHAIN_DIR := $(ROOT)/utils/toolchain
 
 # Arch config
 ifeq ($(ARCH_NAME),riscv64) # RISC-V64
@@ -27,7 +28,7 @@ export OBJDUMP := riscv64-unknown-elf-objdump
 export OBJCOPY := rust-objcopy --binary-architecture=riscv64
 export QEMU := qemu-system-riscv64
 export MULTICORE ?= 1
-export GDB := riscv64-unknown-elf-gdb
+export GDB := $(TOOLCHAIN_DIR)/riscv64-unknown-elf-gdb
 export SIMPLE_ARCH_NAME := rv
 else ifeq ($(ARCH_NAME),loongarch64) # LoongArch64
 export TARGET := loongarch64-unknown-linux-gnu
@@ -41,7 +42,6 @@ endif
 
 # Kernel config
 export TARGET_DIR := $(ROOT)/$(PROJECT)/target/$(TARGET)/$(MODE)
-export TOOLCHAIN_DIR := $(ROOT)/utils/toolchain
 export KERNEL_ELF := $(TARGET_DIR)/$(KERNEL)
 export KERNEL_BIN := $(KERNEL_ELF).bin
 export KERNEL_SYMBOL_TABLE := $(KERNEL_ELF).txt

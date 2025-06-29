@@ -8,6 +8,7 @@ use crate::{
     cpu::current_task,
     fs::vfs::basic::file::{File, FileMeta},
     include::io::PollEvent,
+    return_errno,
     syscall::{SysResult, SyscallResult},
 };
 
@@ -39,11 +40,19 @@ impl File for ExeFile {
     }
 
     async fn base_read(&self, _offset: usize, _buf: &mut [u8]) -> SyscallResult {
-        unreachable!("read from exe");
+        return_errno!(
+            Errno::ENOEXEC,
+            "ExeFile::base_read not supported for {}",
+            self.meta().dentry().name()
+        );
     }
 
     async fn base_write(&self, _offset: usize, _buf: &[u8]) -> SyscallResult {
-        unreachable!("write to exe");
+        return_errno!(
+            Errno::ENOEXEC,
+            "ExeFile::base_write not supported for {}",
+            self.meta().dentry().name()
+        );
     }
 
     async fn load_dir(&self) -> SysResult<()> {

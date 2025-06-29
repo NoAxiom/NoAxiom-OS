@@ -60,7 +60,7 @@ pub async fn fs_init() {
     // let passwd = Path::from_or_create(String::from("/etc/passwd"),
     // InodeMode::FILE).await; passwd.dentry().open().expect("open /etc/passwd
     // failed");
-
+    
     #[cfg(feature = "debug_sig")]
     {
         let ls = Path::from_or_create(format!("/ls"), InodeMode::FILE).await;

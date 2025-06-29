@@ -1,9 +1,8 @@
 use alloc::{
     boxed::Box,
     string::{String, ToString},
-    sync::Arc,
 };
-use core::{fmt::Write, task::Waker};
+use core::task::Waker;
 
 use async_trait::async_trait;
 use include::errno::Errno;
@@ -11,9 +10,8 @@ use include::errno::Errno;
 use crate::{
     cpu::current_task,
     fs::vfs::basic::file::{File, FileMeta},
-    include::{fs::StatusInfo, io::PollEvent},
+    include::io::PollEvent,
     syscall::{SysResult, SyscallResult},
-    task::status::TaskStatus,
 };
 
 pub struct StatusFile {
@@ -35,12 +33,11 @@ impl File for StatusFile {
     fn meta(&self) -> &FileMeta {
         &self.meta
     }
-    #[allow(unused)]
+    // todo: /proc/self/status isn't well implemented
     async fn base_read(&self, offset: usize, buf: &mut [u8]) -> SyscallResult {
         // todo: maybe can just read empty
         let task = current_task().unwrap();
 
-        let mut proc_info = String::new();
         // 名称：这里我们用执行路径的文件名部分作为任务名（类似 bash）
         let name = "cyclictest";
         let umask = 0o022; // 默认umask为022(fake)
@@ -60,7 +57,7 @@ impl File for StatusFile {
         let sgid = 0;
         let fsgid = 0;
         let fdsize = task.fd_table().rlimit().rlim_cur as usize;
-        let mut groups = String::new();
+        let groups = String::new();
         let nstgid = task.tgid(); // pid 所属的每个 PID 命名空间中的线程组 ID
         let nstpid = task.tid(); // pid 所属的每个 PID 命名空间中的线程 ID
         let nspgid = task.get_pgid(); // pid 所属的每个 PID 命名空间中的进程组 ID
@@ -109,8 +106,7 @@ impl File for StatusFile {
         let nonvoluntary_ctxt_switches = 0; // 非自愿上下文切换次数（fake）
 
         // 构造信息
-        write!(
-            proc_info,
+        let proc_info = format!(
             "\
             Name:\t{}\n\
             Umask:\t{:04o}\n\
@@ -232,15 +228,13 @@ impl File for StatusFile {
             mems_allowed_list,
             voluntary_ctxt_switches,
             nonvoluntary_ctxt_switches,
-        )
-        .unwrap();
+        );
 
         if offset >= proc_info.len() {
             return Ok(0);
         }
 
         let write_bytes = proc_info.as_bytes();
-        let write_len = write_bytes.len();
         let ret_len = core::cmp::min(buf.len(), proc_info.len() - offset);
         buf[..ret_len].copy_from_slice(&write_bytes[offset..offset + ret_len]);
         Ok(ret_len as isize)

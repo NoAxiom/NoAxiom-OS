@@ -36,7 +36,12 @@ impl File for RamFsFile {
     }
     async fn base_read(&self, offset: usize, buf: &mut [u8]) -> SyscallResult {
         let data = self.data.read();
-        assert!(data.len() > offset);
+        assert!(
+            data.len() > offset,
+            "RamFsFile::base_read: offset out of bounds, datalen: {}, offset: {}",
+            data.len(),
+            offset
+        );
         let len = core::cmp::min(data.len() - offset, buf.len());
         buf[..len].copy_from_slice(&data[offset..offset + len]);
         Ok(len as isize)
