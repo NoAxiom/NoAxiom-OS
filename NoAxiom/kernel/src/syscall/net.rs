@@ -206,7 +206,7 @@ impl Syscall<'_> {
         let mut socket = socket_file.socket().await;
 
         let user_ptr = UserPtr::<u8>::new(optval_ptr);
-        let buf_slice = user_ptr.as_slice_mut_checked(optlen).await?;
+        let buf_slice = user_ptr.as_slice_const_checked(optlen).await?;
         socket.setsockopt(level, optname, &buf_slice)?;
         Ok(0)
     }
@@ -368,7 +368,7 @@ impl Syscall<'_> {
 
         let mut socket = socket_file.socket().await;
         let buf_ptr = UserPtr::<u8>::new(buf);
-        let buf_slice = buf_ptr.as_slice_mut_checked(len).await?;
+        let buf_slice = buf_ptr.as_slice_const_checked(len).await?;
         let remote_endpoint = if addr == 0 {
             None
         } else {

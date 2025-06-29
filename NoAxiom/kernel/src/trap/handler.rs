@@ -42,7 +42,7 @@ fn kernel_trap_handler() {
                     addr,
                     current_syscall(),
                 );
-                match block_on(task.memory_validate(addr, Some(trap_type), true)) {
+                match block_on(task.memory_validate(addr, trap_type, true)) {
                     Ok(_) => trace!("[memory_validate] success in kernel_trap_handler"),
                     Err(_) => kernel_panic("memory_validate failed"),
                 }
@@ -112,7 +112,7 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
                 cx[TrapArgs::SP],
                 cx[TrapArgs::RA],
             );
-            match task.memory_validate(addr, Some(trap_type), false).await {
+            match task.memory_validate(addr, trap_type, false).await {
                 Ok(_) => trace!("[memory_validate] success in user_trap_handler"),
                 Err(_) => {
                     error!(

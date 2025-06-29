@@ -210,7 +210,7 @@ impl Syscall<'_> {
         for i in 0..iovcnt {
             let iov_ptr = UserPtr::<Iovec>::new(iovp + i * Iovec::size());
             // todo: check lazy?
-            iov_ptr.as_slice_mut_checked(Iovec::size()).await?;
+            iov_ptr.as_slice_const_checked(Iovec::size()).await?;
 
             let iov = iov_ptr.read().await?;
             let buf_ptr = UserPtr::<u8>::new(iov.iov_base);
@@ -254,7 +254,7 @@ impl Syscall<'_> {
         // info!("[sys_write] file_name: {:?}", file_name);
 
         let user_ptr = UserPtr::<u8>::new(buf);
-        let buf_slice = user_ptr.as_slice_mut_checked(len).await?;
+        let buf_slice = user_ptr.as_slice_const_checked(len).await?;
 
         if !file.meta().writable() {
             return Err(Errno::EINVAL);
@@ -280,7 +280,7 @@ impl Syscall<'_> {
         for i in 0..iovcnt {
             let iov_ptr = UserPtr::<Iovec>::new(iovp + i * Iovec::size());
             // todo: check lazy?
-            iov_ptr.as_slice_mut_checked(Iovec::size()).await?;
+            iov_ptr.as_slice_const_checked(Iovec::size()).await?;
 
             let iov = iov_ptr.read().await?;
             // let buf_ptr = UserPtr::<u8>::new(iov.iov_base);
@@ -312,7 +312,7 @@ impl Syscall<'_> {
             return Err(Errno::EINVAL);
         }
         let user_ptr = UserPtr::<u8>::new(buf);
-        let buf_slice = user_ptr.as_slice_mut_checked(len).await?;
+        let buf_slice = user_ptr.as_slice_const_checked(len).await?;
         file.write_at(offset, buf_slice).await
     }
 

@@ -3,6 +3,7 @@
 pub mod crossover;
 pub mod loghook;
 pub mod utils;
+pub mod arch_utils;
 
 #[macro_use]
 pub mod macros;

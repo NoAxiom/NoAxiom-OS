@@ -7,7 +7,7 @@ use memory::{address::VirtAddr, frame::frame_alloc};
 use super::{address::VirtPageNum, memory_set::MemorySet};
 use crate::{
     cpu::current_task, include::result::Errno, mm::page_table::PageTable, sched::utils::yield_now,
-    syscall::SysResult, task::Task,
+    syscall::SysResult, task::Task, utils::arch_utils::flag_match_with_trap_type,
 };
 
 /// # memory validate
@@ -28,7 +28,7 @@ use crate::{
 pub async fn validate(
     memory_set: &Arc<SpinLock<MemorySet>>,
     vpn: VirtPageNum,
-    trap_type: Option<TrapType>,
+    trap_type: TrapType,
     pte: Option<&mut PageTableEntry>,
 ) -> SysResult<()> {
     if let Some(pte) = pte {
@@ -37,7 +37,7 @@ pub async fn validate(
             trace!("[validate] realloc COW, vpn={:#x}", vpn.raw());
             memory_set.lock().realloc_cow(vpn, pte)?;
             Ok(())
-        } else if trap_type.is_some() && matches!(trap_type.unwrap(), TrapType::StorePageFault(_)) {
+        } else if matches!(trap_type, TrapType::StorePageFault(_)) {
             error!(
                 "[validate] store at invalid area, flags: {:?}, tid: {}",
                 flags,
@@ -84,15 +84,25 @@ pub async fn validate(
             );
             // lazy alloc mmap
             if !ms.mmap_manager.frame_trackers.contains_key(&vpn) {
+                let mut mmap_page = ms.mmap_manager.mmap_map.get(&vpn).cloned().unwrap();
+                let pte_flags: MappingFlags = MappingFlags::from(mmap_page.prot) | MappingFlags::U;
+                if !flag_match_with_trap_type(pte_flags, trap_type) {
+                    error!(
+                        "[validate] prot mismatch, vpn: {:#x}, prot: {:?}, trap_type: {:?}",
+                        vpn.raw(),
+                        mmap_page.prot,
+                        trap_type
+                    );
+                    return Err(Errno::EFAULT);
+                }
+
                 let frame = frame_alloc().unwrap();
                 let ppn = frame.ppn();
                 let kvpn = frame.kernel_vpn();
                 ms.mmap_manager.frame_trackers.insert(vpn, frame);
-                let mut mmap_page = ms.mmap_manager.mmap_map.get(&vpn).cloned().unwrap();
                 drop(ms);
                 mmap_page.lazy_map_page(kvpn).await?;
                 let ms = memory_set.lock();
-                let pte_flags: MappingFlags = MappingFlags::from(mmap_page.prot) | MappingFlags::U;
                 ms.page_table().map(vpn, ppn, pte_flags);
                 info!(
                     "mmap done! vpn: {:#x}, ppn: {:#x}, pte: {:?}",
@@ -127,7 +137,7 @@ impl Task {
     pub async fn memory_validate(
         self: &Arc<Self>,
         addr: usize,
-        trap_type: Option<TrapType>,
+        trap_type: TrapType,
         is_blockon: bool,
     ) -> SysResult<()> {
         trace!(

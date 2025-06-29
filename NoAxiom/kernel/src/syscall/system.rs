@@ -22,7 +22,7 @@ impl Syscall<'_> {
         match log_type {
             SyslogAction::OPEN | SyslogAction::CLOSE => Ok(0),
             SyslogAction::READ | SyslogAction::ReadAll | SyslogAction::ReadClear => {
-                user_ptr.as_slice_mut_checked(len).await?;
+                user_ptr.as_slice_const_checked(len).await?;
                 Ok(0)
             }
             SyslogAction::Unknown => Err(Errno::EINVAL),

@@ -151,14 +151,14 @@ impl<T> UserPtr<T> {
                     );
                     let task = current_task().unwrap();
                     if check_no_lock() {
-                        task.memory_validate(addr, Some(trap_type), false).await?;
+                        task.memory_validate(addr, trap_type, false).await?;
                     } else {
                         warn!(
                             "[read] block on addr {:#x} during syscall {:?}",
                             self.addr(),
                             current_syscall()
                         );
-                        block_on(task.memory_validate(addr, Some(trap_type), true))?;
+                        block_on(task.memory_validate(addr, trap_type, true))?;
                     }
                     Ok(unsafe { self.read_unchecked() })
                 }
@@ -217,14 +217,14 @@ impl<T> UserPtr<T> {
                     );
                     let task = current_task().unwrap();
                     if check_no_lock() {
-                        task.memory_validate(addr, Some(trap_type), false).await?;
+                        task.memory_validate(addr, trap_type, false).await?;
                     } else {
                         warn!(
                             "[write] block on addr {:#x} during syscall {:?}",
                             self.addr(),
                             current_syscall()
                         );
-                        block_on(task.memory_validate(addr, Some(trap_type), true))?;
+                        block_on(task.memory_validate(addr, trap_type, true))?;
                     }
                     unsafe { self.write_unchecked(value) };
                     Ok(())
@@ -275,15 +275,22 @@ impl<T> UserPtr<T> {
         Ok(res)
     }
 
+    pub async fn as_slice_const_checked<'a>(&self, len: usize) -> SysResult<&[T]> {
+        let ptr_u8 = UserPtr::<u8>::new(self.addr as usize);
+        let len_u8 = len * core::mem::size_of::<T>();
+        let slice = ptr_u8.as_slice_checked_raw(len_u8, false).await?;
+        Ok(unsafe { core::slice::from_raw_parts(slice.as_ptr() as *const T, len) })
+    }
+
     pub async fn as_slice_mut_checked<'a>(&self, len: usize) -> SysResult<&mut [T]> {
         let ptr_u8 = UserPtr::<u8>::new(self.addr as usize);
         let len_u8 = len * core::mem::size_of::<T>();
-        let slice = ptr_u8.as_slice_mut_checked_raw(len_u8).await?;
+        let slice = ptr_u8.as_slice_checked_raw(len_u8, true).await?;
         Ok(unsafe { core::slice::from_raw_parts_mut(slice.as_ptr() as *mut T, len) })
     }
 
     async fn raw_validate(&self) -> SysResult<()> {
-        self.as_slice_mut_checked(1).await?;
+        self.as_slice_const_checked(1).await?;
         Ok(())
     }
 
@@ -314,7 +321,7 @@ impl<T> UserPtr<T> {
             );
             let task = current_task().unwrap();
             if check_no_lock() {
-                task.memory_validate(self.addr(), Some(trap_type), false)
+                task.memory_validate(self.addr(), trap_type, false)
                     .await?;
             } else {
                 warn!(
@@ -322,7 +329,7 @@ impl<T> UserPtr<T> {
                     self.addr(),
                     current_syscall()
                 );
-                block_on(task.memory_validate(self.addr(), Some(trap_type), true))?;
+                block_on(task.memory_validate(self.addr(), trap_type, true))?;
             }
         }
         let page_table = PageTable::from_ppn(Arch::current_root_ppn());
@@ -340,7 +347,7 @@ impl UserPtr<u8> {
     }
 
     /// convert ptr into an slice
-    pub async fn as_slice_mut_checked_raw<'a>(&self, len: usize) -> SysResult<&mut [u8]> {
+    async fn as_slice_checked_raw<'a>(&self, len: usize, is_write: bool) -> SysResult<&mut [u8]> {
         let page_table = PageTable::from_ppn(Arch::current_root_ppn());
         let memory_set = current_task().unwrap().memory_set();
         for vpn in VpnRange::new_from_va(
@@ -348,7 +355,11 @@ impl UserPtr<u8> {
             VirtAddr::from(self.addr() + len),
         ) {
             if page_table.find_pte(vpn).is_none() {
-                validate(memory_set, vpn, None, None).await?;
+                let trap_type = match is_write {
+                    true => TrapType::StorePageFault(vpn.as_va_usize()),
+                    false => TrapType::LoadPageFault(vpn.as_va_usize()),
+                };
+                validate(memory_set, vpn, trap_type, None).await?;
             }
         }
         Ok(unsafe { core::slice::from_raw_parts_mut(self.ptr(), len) })
