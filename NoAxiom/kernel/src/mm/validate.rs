@@ -6,8 +6,9 @@ use memory::{address::VirtAddr, frame::frame_alloc};
 
 use super::{address::VirtPageNum, memory_set::MemorySet};
 use crate::{
-    cpu::current_task, include::result::Errno, mm::page_table::PageTable, sched::utils::yield_now,
-    syscall::SysResult, task::Task, utils::arch_utils::flag_match_with_trap_type,
+    cpu::current_task, include::result::Errno, mm::page_table::PageTable, return_errno,
+    sched::utils::yield_now, syscall::SysResult, task::Task,
+    utils::arch_utils::flag_match_with_trap_type,
 };
 
 /// # memory validate
@@ -93,7 +94,7 @@ pub async fn validate(
                         mmap_page.prot,
                         trap_type
                     );
-                    return Err(Errno::EFAULT);
+                    return_errno!(Errno::EFAULT);
                 }
 
                 let frame = frame_alloc().unwrap();

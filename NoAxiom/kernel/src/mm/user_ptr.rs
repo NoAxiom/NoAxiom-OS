@@ -107,7 +107,7 @@ impl<T> UserPtr<T> {
     pub async fn get_ref(&self) -> SysResult<Option<&T>> {
         match unsafe { self.ptr().as_ref() } {
             Some(ptr) => {
-                self.validate().await?;
+                self.validate(false).await?;
                 Ok(Some(ptr))
             }
             None => Ok(None),
@@ -117,7 +117,7 @@ impl<T> UserPtr<T> {
     pub async fn get_ref_mut(&self) -> SysResult<Option<&mut T>> {
         match unsafe { self.ptr().as_mut() } {
             Some(ptr) => {
-                self.validate().await?;
+                self.validate(true).await?;
                 Ok(Some(ptr))
             }
             None => Ok(None),
@@ -289,24 +289,27 @@ impl<T> UserPtr<T> {
         Ok(unsafe { core::slice::from_raw_parts_mut(slice.as_ptr() as *mut T, len) })
     }
 
-    async fn raw_validate(&self) -> SysResult<()> {
-        self.as_slice_const_checked(1).await?;
+    async fn raw_validate(&self, is_write: bool) -> SysResult<()> {
+        let _ = match is_write {
+            false => self.as_slice_const_checked(1).await?,
+            true => self.as_slice_mut_checked(1).await?,
+        };
         Ok(())
     }
 
     /// validate the user pointer
     /// this will check the page table and allocate valid map areas
     /// or it will return EFAULT
-    pub async fn validate(&self) -> SysResult<()> {
+    pub async fn validate(&self, is_write: bool) -> SysResult<()> {
         if check_no_lock() {
-            self.raw_validate().await?;
+            self.raw_validate(is_write).await?;
         } else {
             warn!(
                 "[validate] block on addr {:#x} during syscall {:?}",
                 self.addr(),
                 current_syscall()
             );
-            block_on(self.raw_validate())?;
+            block_on(self.raw_validate(is_write))?;
         }
         Ok(())
     }
@@ -321,8 +324,7 @@ impl<T> UserPtr<T> {
             );
             let task = current_task().unwrap();
             if check_no_lock() {
-                task.memory_validate(self.addr(), trap_type, false)
-                    .await?;
+                task.memory_validate(self.addr(), trap_type, false).await?;
             } else {
                 warn!(
                     "[translate_pa] block on addr {:#x} during syscall {:?}",
