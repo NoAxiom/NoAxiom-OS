@@ -22,7 +22,7 @@ impl<'a> Syscall<'a> {
         use SyscallID::*;
         match id {
             // fs
-            SYS_FCHMODAT =>         Self::empty_syscall("fchmodat", 0),
+            SYS_FCHMODAT =>         self.sys_fchmodat(args[0], args[1], args[2], args[3]),
             SYS_FCHOWNAT =>         Self::empty_syscall("fchownat", 0),
             SYS_UMASK =>            Self::empty_syscall("umask", 0x777),
             SYS_SYNC =>             Self::empty_syscall("sync", 0),
