@@ -49,4 +49,8 @@ impl Dentry for StatusDentry {
     async fn create(self: Arc<Self>, _name: &str, _mode: InodeMode) -> SysResult<Arc<dyn Dentry>> {
         unreachable!("status dentry should not create child");
     }
+
+    async fn symlink(self: Arc<Self>, name: &str, tar_name: &str) -> SysResult<()> {
+        unreachable!("status dentry should not create symlink: {name} -> {tar_name}");
+    }
 }

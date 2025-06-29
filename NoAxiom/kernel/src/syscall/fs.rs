@@ -98,10 +98,12 @@ impl Syscall<'_> {
         let path = get_string_from_ptr(&ptr);
         info!("[sys_chdir] path: {}", path);
 
-        let mut cwd_guard = self.task.cwd();
         if path.starts_with('/') {
-            *cwd_guard = Path::try_from(path)?;
+            let tar = Path::try_from(path)?;
+            let mut cwd_guard = self.task.cwd();
+            *cwd_guard = tar;
         } else {
+            let cwd_guard = self.task.cwd();
             let cwd = cwd_guard.clone();
             drop(cwd_guard);
             let new_cwd = cwd.from_cd(&path)?;

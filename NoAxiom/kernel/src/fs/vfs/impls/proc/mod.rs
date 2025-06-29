@@ -3,6 +3,7 @@ use alloc::sync::Arc;
 use exe::{dentry::ExeDentry, inode::ExeInode};
 use meminfo::{dentry::MemInfoDentry, inode::MemInfoInode};
 use mounts::{dentry::MountsDentry, inode::MountsInode};
+use status::{dentry::StatusDentry, inode::StatusInode};
 
 use crate::{
     fs::vfs::{
@@ -19,6 +20,7 @@ mod exe;
 pub mod filesystem;
 mod meminfo;
 mod mounts;
+mod status;
 mod superblock;
 
 pub async fn init(fs_root: Arc<dyn Dentry>) -> SysResult<()> {
@@ -80,6 +82,16 @@ pub async fn init(fs_root: Arc<dyn Dentry>) -> SysResult<()> {
     let exe_inode = Arc::new(ExeInode::new(fs_root.super_block()));
     exe_dentry.set_inode(exe_inode);
     self_dentry.add_child_directly(exe_dentry);
+
+    info!("[fs] create /proc/self/status");
+    let status_dentry = Arc::new(StatusDentry::new(
+        Some(fs_root.clone()),
+        "status",
+        fs_root.super_block(),
+    ));
+    let status_inode = Arc::new(StatusInode::new(fs_root.super_block()));
+    status_dentry.set_inode(status_inode);
+    self_dentry.add_child_directly(status_dentry);
 
     Ok(())
 }
