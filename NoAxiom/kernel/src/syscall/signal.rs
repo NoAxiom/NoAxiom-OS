@@ -48,13 +48,13 @@ impl Syscall<'_> {
         // when detect new sig action, register it into sigaction list
         if let Some(act) = act {
             let kaction = KSigAction::from_sa(act, signum);
-            if kaction.handler == SAHandlerType::Ignore {
-                println_debug!(
-                    "[sys_sigaction]: task{} IGNORE {:?}",
-                    self.task.tid(),
-                    SigNum::from(signo),
-                );
-            }
+            // if kaction.handler == SAHandlerType::Ignore {
+            //     println_debug!(
+            //         "[sys_sigaction]: task{} IGNORE {:?}",
+            //         self.task.tid(),
+            //         SigNum::from(signo),
+            //     );
+            // }
             sa.set_sigaction(signum as usize, kaction);
         }
         drop(sa);
