@@ -768,22 +768,6 @@ impl Syscall<'_> {
         out_file.write(&buf[..read_len]).await
     }
 
-    /// Check if a file exists
-    pub async fn sys_faccessat(
-        &self,
-        dirfd: isize,
-        path: usize,
-        mode: usize,
-        flag: usize,
-    ) -> SyscallResult {
-        info!(
-            "[sys_faccessat] faccessat file: {:?}, flag:{:?}, mode:{:?}, just check path",
-            path, flag, mode
-        );
-        get_path(self.task.clone(), path, dirfd, "sys_faccessat")?;
-        Ok(0)
-    }
-
     /// Modify timestamp of a file
     pub async fn sys_utimensat(
         &self,
@@ -1008,6 +992,48 @@ impl Syscall<'_> {
 
         let inode = path.dentry().inode()?;
         inode.set_privilege(mode);
+        Ok(0)
+    }
+
+    pub fn sys_faccessat(&self, fd: usize, path: usize, mode: i32, flag: i32) -> SyscallResult {
+        pub const AT_EACCESS: i32 = 0x200;
+        pub const AT_EMPTY_PATH: i32 = 0x1000;
+        pub const AT_SYMLINK_NOFOLLOW: i32 = 0x100;
+        pub const AT_SYMLINK_FOLLOW: i32 = 0x400;
+        pub const AT_NO_AUTOMOUNT: i32 = 0x800;
+        pub const AT_STATX_SYNC_TYPE: i32 = 0x6000;
+
+        pub const F_OK: i32 = 0;
+        pub const R_OK: i32 = 4;
+        pub const W_OK: i32 = 2;
+        pub const X_OK: i32 = 1;
+
+        if mode & !7 != 0 {
+            return Err(Errno::EINVAL);
+        }
+        if flag & !(AT_EACCESS | AT_SYMLINK_NOFOLLOW | AT_EMPTY_PATH | 0x60 | 0x2 | 0xfffe | 0x1)
+            != 0
+        {
+            return Err(Errno::EINVAL);
+        }
+        log::info!(
+            "[sys_faccessat] fd: {}, path: {:?}, mode: {}, flags: {}",
+            fd,
+            path,
+            mode,
+            flag
+        );
+        let path = get_path(self.task.clone(), path, fd as isize, "sys_faccessat")?;
+        if mode == 0 {
+            return Ok(0);
+        }
+        let pri = path.dentry().inode()?.privilege().bits();
+        if mode & R_OK != 0 && pri & 0o4 == 0
+            || mode & W_OK != 0 && pri & 0o2 == 0
+            || mode & X_OK != 0 && pri & 0o1 == 0
+        {
+            return Err(Errno::EACCES);
+        }
         Ok(0)
     }
 }
