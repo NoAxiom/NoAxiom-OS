@@ -15,7 +15,7 @@ use crate::{
         time::TimeSpec,
     },
     syscall::SysResult,
-    utils::global_alloc,
+    utils::{global_alloc, hack::is_ltp},
 };
 
 type Mutex<T> = SpinLock<T>;
@@ -49,7 +49,7 @@ impl InodeMeta {
         size: usize,
         cached: bool,
     ) -> Self {
-        let page_cache = if cached {
+        let page_cache = if cached && !is_ltp() {
             Some(AsyncMutex::new(PageCache::new()))
         } else {
             None
