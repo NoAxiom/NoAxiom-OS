@@ -344,7 +344,7 @@ impl UserPtr<u8> {
     pub fn get_cstr(&self) -> SysResult<String> {
         let slice = self.clone_as_vec_until(|&c: &u8| c as char == '\0')?;
         trace!("slice: {:?}", slice);
-        let res = String::from_utf8(Vec::from(slice)).map_err(|_| Errno::EINVAL)?;
+        let res = unsafe { String::from_utf8_unchecked(Vec::from(slice)) };
         Ok(res)
     }
 
@@ -379,7 +379,7 @@ impl UserPtr<u8> {
     pub fn get_string_from_ptr(&self) -> SysResult<String> {
         let checker = |&c: &u8| c == 0;
         let slice = self.clone_as_vec_until(checker)?;
-        let res = String::from_utf8(Vec::from(slice)).map_err(|_| Errno::EINVAL)?;
+        let res = unsafe { String::from_utf8_unchecked(Vec::from(slice)) };
         Ok(res)
     }
 }

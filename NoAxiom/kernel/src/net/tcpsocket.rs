@@ -22,7 +22,7 @@ use crate::{
     },
     sched::utils::yield_now,
     syscall::SysResult,
-    utils::crossover::intermit,
+    utils::{crossover::intermit, hack::is_ltp},
 };
 
 #[derive(PartialEq, Debug)]
@@ -434,7 +434,7 @@ impl Socket for TcpSocket {
             match local_socket.state() {
                 tcp::State::Closed => {
                     retry_cnt += 1;
-                    if retry_cnt > 100 {
+                    if retry_cnt > 100 && is_ltp() {
                         error!("[Tcp {}] connect loop: Closed and Refused", self.handles[0]);
                         return Err(Errno::ECONNREFUSED);
                     }

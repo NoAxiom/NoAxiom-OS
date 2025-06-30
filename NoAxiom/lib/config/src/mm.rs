@@ -11,7 +11,10 @@ pub const KERNEL_STACK_WIDTH: usize = 24;
 /// kernel stack size: 1024KB (*CPU_NUM = 2048KB)
 pub const KERNEL_STACK_SIZE: usize = 1 << KERNEL_STACK_WIDTH;
 /// kernel heap size: 128MB
+#[cfg(target_arch = "loongarch64")]
 pub const KERNEL_HEAP_SIZE: usize = 0x800_0000;
+#[cfg(target_arch = "riscv64")]
+pub const KERNEL_HEAP_SIZE: usize = 0x1000_0000;
 
 /// raw vpn & ppn width: 9
 pub const PAGE_NUM_WIDTH: usize = PAGE_WIDTH - 3;
