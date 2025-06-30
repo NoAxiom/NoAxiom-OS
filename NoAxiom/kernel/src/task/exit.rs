@@ -155,14 +155,10 @@ impl Drop for Task {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct ExitCode(i32);
-impl ExitCode {
-    pub fn new(code: i32) -> Self {
-        Self((code & 0xFF) << 8)
-    }
-    #[allow(unused)]
-    pub fn new_raw(code: i32) -> Self {
-        Self(code)
+pub struct ExitReason(i32); // exit code, signo
+impl ExitReason {
+    pub fn new(code: i32, signo: i32) -> Self {
+        Self(((code & 0xFF) << 8) + (signo & 0x7f))
     }
     pub fn to_raw(self) -> i32 {
         (self.0 >> 8) & 0xFF
@@ -171,7 +167,7 @@ impl ExitCode {
         self.0
     }
 }
-impl Default for ExitCode {
+impl Default for ExitReason {
     fn default() -> Self {
         Self(0)
     }

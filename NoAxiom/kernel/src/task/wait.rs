@@ -5,7 +5,7 @@ use core::{
     task::{Context, Poll},
 };
 
-use super::{exit::ExitCode, status::TaskStatus, Task};
+use super::{exit::ExitReason, status::TaskStatus, Task};
 use crate::{
     include::{
         process::{PidSel, WaitOption},
@@ -15,7 +15,7 @@ use crate::{
     syscall::SysResult,
 };
 
-type WaitChildOutput = (ExitCode, usize);
+type WaitChildOutput = (ExitReason, usize);
 
 pub struct WaitChildFuture<'a> {
     task: &'a Arc<Task>,
@@ -97,7 +97,7 @@ impl Future for WaitChildFuture<'_> {
             Poll::Pending => {
                 if self.wait_option.contains(WaitOption::WNOHANG) && res.is_pending() {
                     trace!("[sys_wait4] return nohang");
-                    Poll::Ready(Ok((ExitCode::new(0), 0)))
+                    Poll::Ready(Ok((ExitReason::new(0, 0), 0)))
                 } else {
                     trace!("[sys_wait4] suspend for child exit");
                     Poll::Pending

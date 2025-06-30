@@ -14,7 +14,7 @@ use crate::{
         sig_set::SigMask,
         sig_stack::{MContext, UContext},
     },
-    task::{exit::ExitCode, status::TaskStatus, Task},
+    task::{exit::ExitReason, status::TaskStatus, Task},
 };
 
 extern "C" {
@@ -64,7 +64,7 @@ impl Task {
             // start handle
             match action.handler {
                 SAHandlerType::Ignore => self.sig_default_ignore(),
-                SAHandlerType::Kill => self.sig_default_terminate(),
+                SAHandlerType::Kill => self.sig_default_terminate(si.errno, si.signo),
                 SAHandlerType::Stop => self.sig_default_stop(),
                 SAHandlerType::Continue => self.sig_default_continue(),
                 SAHandlerType::User { handler } => {
@@ -226,14 +226,14 @@ impl Task {
     }
 
     /// terminate the process
-    fn sig_default_terminate(&self) {
+    fn sig_default_terminate(&self, errno: i32, signo: i32) {
         warn!(
             "sig_default_terminate: terminate the process, tid: {}, during: {:?}",
             self.tid(),
             self.tcb().current_syscall
         );
         debug!("[sig_default_terminate] terminate the process");
-        self.terminate_group(ExitCode::default());
+        self.terminate_group(ExitReason::new(errno, signo));
         debug!("[sig_default_terminate] terminate the process done");
     }
     /// stop the process

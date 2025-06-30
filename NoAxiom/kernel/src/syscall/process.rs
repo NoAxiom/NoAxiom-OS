@@ -33,7 +33,7 @@ use crate::{
         sig_set::SigSet,
     },
     task::{
-        exit::ExitCode,
+        exit::ExitReason,
         futex::FutexFuture,
         manager::{PROCESS_GROUP_MANAGER, TASK_MANAGER},
     },
@@ -43,14 +43,14 @@ use crate::{
 impl Syscall<'_> {
     /// exit current task by marking it as zombie
     pub fn sys_exit(&self, exit_code: i32) -> SyscallResult {
-        self.task.terminate(ExitCode::new(exit_code));
+        self.task.terminate(ExitReason::new(exit_code, 0));
         Ok(0)
     }
 
     /// exit group
     pub fn sys_exit_group(&self, exit_code: i32) -> SyscallResult {
         let task = self.task;
-        let exit_code = ExitCode::new(exit_code);
+        let exit_code = ExitReason::new(exit_code, 0);
         task.terminate_group(exit_code);
         task.terminate(exit_code);
         Ok(0)

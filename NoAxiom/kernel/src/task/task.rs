@@ -16,7 +16,7 @@ use ksync::{
 
 use super::{
     context::TaskContext,
-    exit::ExitCode,
+    exit::ExitReason,
     manager::ThreadGroup,
     status::TaskStatus,
     taskid::{TidTracer, PGID, PID, TGID, TID},
@@ -90,7 +90,7 @@ type ThreadOnly<T> = SyncUnsafeCell<T>;
 pub struct PCB {
     // task status
     pub status: TaskStatus,  // task status
-    pub exit_code: ExitCode, // exit code
+    pub exit_code: ExitReason, // exit code
 
     // paternity
     // assertion: only when the task is group leader, it can have children
@@ -111,7 +111,7 @@ impl Default for PCB {
             children: Vec::new(),
             parent: None,
             status: TaskStatus::Normal,
-            exit_code: ExitCode::default(),
+            exit_code: ExitReason::default(),
             pending_sigs: SigPending::new(),
             sig_stack: None,
             robust_list: RobustList::default(),
@@ -181,10 +181,10 @@ impl PCB {
     }
 
     // exit code
-    pub fn exit_code(&self) -> ExitCode {
+    pub fn exit_code(&self) -> ExitReason {
         self.exit_code
     }
-    pub fn set_exit_code(&mut self, exit_code: ExitCode) {
+    pub fn set_exit_code(&mut self, exit_code: ExitReason) {
         self.exit_code = exit_code;
     }
 
@@ -409,7 +409,7 @@ impl Task {
 // process implementation
 impl Task {
     /// exit current task
-    pub fn terminate(&self, exit_code: ExitCode) {
+    pub fn terminate(&self, exit_code: ExitReason) {
         let mut pcb = self.pcb();
         if self.is_group_leader() {
             pcb.set_exit_code(exit_code);
@@ -418,7 +418,7 @@ impl Task {
     }
 
     /// terminate all tasks in current thread group
-    pub fn terminate_group(&self, exit_code: ExitCode) {
+    pub fn terminate_group(&self, exit_code: ExitReason) {
         let tg = self.thread_group();
         for (_id, t) in tg.0.iter() {
             let task = t.upgrade().unwrap();
@@ -433,7 +433,7 @@ impl Task {
         for (_id, t) in tg.0.iter() {
             let task = t.upgrade().unwrap();
             if !task.is_group_leader() {
-                task.terminate(ExitCode::default());
+                task.terminate(ExitReason::default());
             }
         }
     }
