@@ -165,13 +165,17 @@ impl MemorySet {
 
     /// push a map area into current memory set
     /// load data if provided
-    pub fn push_area(&mut self, mut map_area: MapArea, data_info: Option<MapAreaLoadDataInfo<'_>>) {
+    pub fn push_area(
+        &mut self,
+        mut map_area: MapArea,
+        data_info: Option<MapAreaLoadDataInfo<'_>>,
+    ) -> SysResult<()> {
         trace!(
             "push_area: [{:#X}, {:#X})",
             map_area.vpn_range().start().raw() << PAGE_WIDTH,
             map_area.vpn_range().end().raw() << PAGE_WIDTH
         );
-        map_area.map_each(self.page_table());
+        map_area.map_each(self.page_table())?;
         let pte = self
             .page_table()
             .find_pte(map_area.vpn_range().start())
@@ -186,6 +190,7 @@ impl MemorySet {
             map_area.load_data(self.page_table(), data_info);
         }
         self.areas.push(map_area); // bind life cycle
+        Ok(())
     }
 
     /// create kernel space, used in [`KERNEL_SPACE`] initialization
@@ -206,7 +211,7 @@ impl MemorySet {
                                 MapAreaType::KernelSpace,
                             ).unwrap(),
                             None,
-                        );
+                        ).unwrap();
                     )*
                 };
             }
@@ -406,7 +411,7 @@ impl MemorySet {
 
         // checks are done! now push areas into memory set
         for (area, info) in areas {
-            self.push_area(area, info);
+            self.push_area(area, info)?;
         }
 
         Ok(RawElfInfo {
@@ -440,7 +445,7 @@ impl MemorySet {
             user_stack_base.raw(),
             user_stack_base.raw() + USER_STACK_SIZE
         );
-        memory_set.lazy_alloc_stack(VirtPageNum::from(user_stack_top - PAGE_SIZE));
+        memory_set.lazy_alloc_stack(VirtPageNum::from(user_stack_top - PAGE_SIZE))?;
 
         // user heap
         let user_heap_base = user_stack_top + PAGE_SIZE;
@@ -650,14 +655,16 @@ impl MemorySet {
             .map(sig_vpn.into(), sig_ppn.into(), pte_flags!(R, X, U));
     }
 
-    pub fn lazy_alloc_stack(&mut self, vpn: VirtPageNum) {
-        self.stack.map_one(vpn, self.page_table.as_ref_mut());
+    pub fn lazy_alloc_stack(&mut self, vpn: VirtPageNum) -> SysResult<()> {
+        self.stack.map_one(vpn, self.page_table.as_ref_mut())?;
         Arch::tlb_flush();
+        Ok(())
     }
 
-    pub fn lazy_alloc_brk(&mut self, vpn: VirtPageNum) {
-        self.brk.area.map_one(vpn, self.page_table.as_ref_mut());
+    pub fn lazy_alloc_brk(&mut self, vpn: VirtPageNum) -> SysResult<()> {
+        self.brk.area.map_one(vpn, self.page_table.as_ref_mut())?;
         Arch::tlb_flush();
+        Ok(())
     }
 
     pub fn brk_grow(&mut self, new_end_vpn: VirtPageNum) -> SysResult<()> {

@@ -93,7 +93,8 @@ impl SigSet {
     pub fn disable(&mut self, signum: u32) {
         let signum = signum - 1;
         if signum >= MAX_SIGNUM {
-            panic!("[Kernel] invalid signum when disable signum {}", signum);
+            error!("[Kernel] invalid signum when disable signum {}", signum);
+            return;
         }
         *self -= SigSet::from_bits_truncate(1 << signum);
     }
@@ -104,10 +105,11 @@ impl SigSet {
     pub fn from_signum(signum: u32) -> Self {
         let signum = signum - 1;
         if signum >= MAX_SIGNUM {
-            panic!(
+            error!(
                 "[Kernel] invalid signum when create SigSet from signum {}",
                 signum
             );
+            return SigSet::empty();
         }
         SigSet::from_bits_truncate(1 << signum)
     }

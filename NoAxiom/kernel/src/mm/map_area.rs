@@ -3,6 +3,7 @@
 use alloc::collections::btree_map::BTreeMap;
 
 use arch::{Arch, ArchMemory, ArchPageTableEntry};
+use include::errno::Errno;
 
 use super::{
     address::{VirtAddr, VirtPageNum, VpnRange},
@@ -93,7 +94,7 @@ impl MapArea {
     }
 
     /// map one page at `vpn`
-    pub fn map_one(&mut self, vpn: VirtPageNum, page_table: &mut PageTable) {
+    pub fn map_one(&mut self, vpn: VirtPageNum, page_table: &mut PageTable) -> SysResult<()> {
         // trace!(
         //     "map_one: vpn = {:#x}, ppn = {:#x}, flags = {:?}",
         //     vpn.0, ppn.0, flags
@@ -107,7 +108,8 @@ impl MapArea {
                 let frame = frame_alloc().unwrap();
                 let ppn = frame.ppn();
                 if self.frame_map.contains_key(&vpn) {
-                    panic!("vm area overlap");
+                    error!("vm area overlap");
+                    return Err(Errno::EFAULT);
                 }
                 self.frame_map.insert(vpn, frame);
                 let flags = self.map_permission.into();
@@ -129,12 +131,13 @@ impl MapArea {
                 todo!("linear map");
             }
         }
+        Ok(())
     }
 
     /// for each vpn in the range, map the vpn to ppn
     /// pte will be saved into page_table
     /// and data frame will be saved by self
-    pub fn map_each(&mut self, page_table: &mut PageTable) {
+    pub fn map_each(&mut self, page_table: &mut PageTable) -> SysResult<()> {
         trace!(
             "map_each: va_range = {:?}, ppn_range = [{:#x},{:#x}), type: {:?}",
             self.vpn_range,
@@ -143,8 +146,9 @@ impl MapArea {
             self.map_type
         );
         for vpn in self.vpn_range.into_iter() {
-            self.map_one(vpn, page_table);
+            self.map_one(vpn, page_table)?;
         }
+        Ok(())
     }
 
     /// unmap one page at `vpn`

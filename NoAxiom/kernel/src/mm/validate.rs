@@ -65,7 +65,7 @@ pub async fn validate(
                 vpn.raw(),
                 task.trap_context()[arch::TrapArgs::EPC],
             );
-            ms.lazy_alloc_stack(vpn);
+            ms.lazy_alloc_stack(vpn)?;
             Ok(())
         } else if ms.brk.area.vpn_range.is_in_range(vpn) {
             trace!(
@@ -74,7 +74,7 @@ pub async fn validate(
                 vpn.raw(),
                 current_task().unwrap().trap_context()[arch::TrapArgs::EPC],
             );
-            ms.lazy_alloc_brk(vpn);
+            ms.lazy_alloc_brk(vpn)?;
             Ok(())
         } else if ms.mmap_manager.is_in_space(vpn) {
             trace!(
