@@ -29,7 +29,7 @@ use crate::{
         result::Errno,
     },
     syscall::{SysResult, SyscallResult},
-    utils::align_offset,
+    utils::{align_offset, hack::is_ltp},
 };
 
 pub struct FileMeta {
@@ -168,7 +168,7 @@ impl dyn File {
     /// return the exact num of bytes read
     pub async fn read_at(&self, offset: usize, buf: &mut [u8]) -> SyscallResult {
         let page_cache = self.page_cache().await;
-        if page_cache.is_none() {
+        if page_cache.is_none() || is_ltp() {
             drop(page_cache);
             assert_no_lock!();
             return self.base_read(offset, buf).await;
@@ -240,7 +240,7 @@ impl dyn File {
     /// return the exact num of bytes write
     pub async fn write_at(&self, offset: usize, buf: &[u8]) -> SyscallResult {
         let page_cache = self.page_cache().await;
-        if page_cache.is_none() {
+        if page_cache.is_none() || is_ltp() {
             drop(page_cache);
             assert_no_lock!();
             return self.base_write(offset, buf).await;
