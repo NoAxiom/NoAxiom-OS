@@ -50,10 +50,11 @@ impl InodeMeta {
         cached: bool,
     ) -> Self {
         let page_cache = if cached && !is_ltp() {
-            Some(AsyncMutex::new(PageCache::new()))
+            #[cold]
+            || { Some(AsyncMutex::new(PageCache::new())) }
         } else {
-            None
-        };
+            || { None }
+        }();
         Self {
             id: global_alloc() as usize,
             inner: Mutex::new(InodeMetaInner {

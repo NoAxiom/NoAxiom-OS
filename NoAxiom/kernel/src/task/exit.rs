@@ -82,6 +82,10 @@ impl Task {
             init_proc_exit_handler(self).await;
             unreachable!()
         }
+        // if tid == 4 {
+        //     #[cfg(feature = "debug_sig")]
+        //     memory::utils::print_mem_info();
+        // }
 
         // thread resources clean up
         self.fd_table().exit_files();
