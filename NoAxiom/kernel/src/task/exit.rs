@@ -17,6 +17,7 @@ use crate::{
         manager::{PROCESS_GROUP_MANAGER, TASK_MANAGER},
         status::TaskStatus,
     },
+    utils::hack::is_ltp,
 };
 
 pub async fn init_proc_exit_handler(task: &Arc<Task>) {
@@ -162,7 +163,11 @@ impl Drop for Task {
 pub struct ExitReason(i32); // exit code, signo
 impl ExitReason {
     pub fn new(code: i32, signo: i32) -> Self {
-        Self(((code & 0xFF) << 8) + (signo & 0x7f))
+        if !is_ltp() {
+            Self((code & 0xFF) << 8)
+        } else {
+            Self(((code & 0xFF) << 8) + (signo & 0x7f))
+        }
     }
     pub fn to_raw(self) -> i32 {
         (self.0 >> 8) & 0xFF
