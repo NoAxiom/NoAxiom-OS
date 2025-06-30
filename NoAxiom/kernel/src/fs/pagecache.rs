@@ -53,13 +53,15 @@ impl Drop for Page {
 
 /// Page cache for filesystem, which should be covered in [`Lock`]
 pub struct PageCache {
+    dont_use: bool,
     inner: HashMap<usize, Page>,
 }
 
 impl PageCache {
     /// Create a new page cache
-    pub fn new() -> Self {
+    pub fn new(dont_use: bool) -> Self {
         Self {
+            dont_use,
             inner: HashMap::new(),
         }
     }
@@ -81,6 +83,10 @@ impl PageCache {
     pub fn get_page_mut(&mut self, offset_align: usize) -> Option<&mut Page> {
         assert!(is_aligned(offset_align, PAGE_SIZE));
         self.inner.get_mut(&offset_align)
+    }
+
+    pub fn dont_use(&self) -> bool {
+        self.dont_use
     }
 
     pub fn sync(&self) {}

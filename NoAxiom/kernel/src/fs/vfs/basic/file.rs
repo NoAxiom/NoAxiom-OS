@@ -168,7 +168,7 @@ impl dyn File {
     /// return the exact num of bytes read
     pub async fn read_at(&self, offset: usize, buf: &mut [u8]) -> SyscallResult {
         let page_cache = self.page_cache().await;
-        if page_cache.is_none() || is_ltp() {
+        if page_cache.is_none() {
             drop(page_cache);
             assert_no_lock!();
             return self.base_read(offset, buf).await;
@@ -182,6 +182,12 @@ impl dyn File {
             return Ok(0);
         }
         let mut page_cache = page_cache.unwrap();
+
+        if page_cache.dont_use() {
+            drop(page_cache);
+            assert_no_lock!();
+            return self.base_read(offset, buf).await;
+        }
 
         let mut current_offset = offset;
         let mut buf = buf;
@@ -240,13 +246,19 @@ impl dyn File {
     /// return the exact num of bytes write
     pub async fn write_at(&self, offset: usize, buf: &[u8]) -> SyscallResult {
         let page_cache = self.page_cache().await;
-        if page_cache.is_none() || is_ltp() {
+        if page_cache.is_none() {
             drop(page_cache);
             assert_no_lock!();
             return self.base_write(offset, buf).await;
         }
         let size = self.size();
         let mut page_cache = page_cache.unwrap();
+
+        if page_cache.dont_use() {
+            drop(page_cache);
+            assert_no_lock!();
+            return self.base_write(offset, buf).await;
+        }
 
         let mut current_offset = offset;
         let mut buf = buf;
