@@ -30,7 +30,7 @@ use crate::{
         sig_detail::{SigDetail, SigKillDetail},
         sig_info::{SigCode, SigInfo},
         sig_set::SigSet,
-        signal::MAX_SIGNUM,
+        signal::{Signal, Signo},
     },
     task::{
         exit::ExitReason,
@@ -43,14 +43,15 @@ use crate::{
 impl Syscall<'_> {
     /// exit current task by marking it as zombie
     pub fn sys_exit(&self, exit_code: i32) -> SyscallResult {
-        self.task.terminate(ExitReason::new(exit_code, 0));
+        self.task
+            .terminate(ExitReason::new(exit_code, Signo::new(0)));
         Ok(0)
     }
 
     /// exit group
     pub fn sys_exit_group(&self, exit_code: i32) -> SyscallResult {
         let task = self.task;
-        let exit_code = ExitReason::new(exit_code, 0);
+        let exit_code = ExitReason::new(exit_code, Signo::new(0));
         task.terminate_group(exit_code);
         task.terminate(exit_code);
         Ok(0)
@@ -400,16 +401,22 @@ impl Syscall<'_> {
         // }
     }
 
-    pub fn sys_tkill(&self, tid: usize, signal: i32) -> SyscallResult {
-        if signal == 0 {
+    pub fn sys_tkill(&self, tid: usize, signo: i32) -> SyscallResult {
+        if signo == 0 {
+            error!("[sys_tkill] signo is 0, no signal to send");
             return Ok(0);
         }
-        trace!("[sys_tkill] tid: {}, signal num: {}", tid, signal);
+        let signal = Signal::try_from(Signo::new(signo))?;
+        self.__sys_tkill(tid, signal)
+    }
+
+    pub fn __sys_tkill(&self, tid: usize, signal: Signal) -> SyscallResult {
+        info!("[sys_tkill] tid: {}, signal: {:?}", tid, signal);
         let task = TASK_MANAGER.get(tid).ok_or(Errno::ESRCH)?;
         let pid = task.tgid() as _;
         task.recv_siginfo(
             SigInfo {
-                signo: signal,
+                signal,
                 code: SigCode::TKill,
                 errno: 0,
                 detail: SigDetail::Kill(SigKillDetail { pid }),
@@ -419,21 +426,19 @@ impl Syscall<'_> {
         Ok(0)
     }
 
-    pub fn sys_tgkill(&self, tgid: usize, tid: usize, signal: i32) -> SyscallResult {
-        if signal == 0 {
+    pub fn sys_tgkill(&self, tgid: usize, tid: usize, signo: i32) -> SyscallResult {
+        if signo == 0 {
             return Ok(0);
         }
-        if signal >= MAX_SIGNUM as i32 {
-            return Err(Errno::EINVAL);
-        }
+        let signal = Signal::try_from(Signo::new(signo))?;
         trace!(
-            "[sys_tgkill] tgid: {}, tid: {}, signal num: {}",
+            "[sys_tgkill] tgid: {}, tid: {}, signal: {:?}",
             tgid,
             tid,
             signal
         );
         match tgid as isize {
-            -1 => self.sys_tkill(tid, signal),
+            -1 => self.__sys_tkill(tid, signal),
             _ => {
                 let task = TASK_MANAGER.get(tid).ok_or(Errno::ESRCH)?;
                 if task.tgid() != tgid {
@@ -442,7 +447,7 @@ impl Syscall<'_> {
                 let cur_pid = self.task.tgid();
                 task.recv_siginfo(
                     SigInfo {
-                        signo: signal,
+                        signal,
                         code: SigCode::TKill,
                         errno: 0,
                         detail: SigDetail::Kill(SigKillDetail { pid: cur_pid }),

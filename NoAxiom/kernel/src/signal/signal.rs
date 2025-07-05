@@ -1,4 +1,10 @@
-pub const MAX_SIGNUM: u32 = 64;
+use include::errno::{Errno, SysResult};
+use strum::FromRepr;
+
+use super::{sig_action::SAIndex, sig_set::SigMask};
+use crate::return_errno;
+
+pub const NSIG: usize = 64;
 
 // The SIG_DFL and SIG_IGN macros expand into integral expressions that are not
 // equal to an address of any function. The macros define signal handling
@@ -6,16 +12,42 @@ pub const MAX_SIGNUM: u32 = 64;
 pub const SIG_DFL: usize = 0; // default signal handling
 pub const SIG_IGN: usize = 1; // signal is ignored
 
-pub type Signo = i32;
 pub type SigErrno = i32;
 
-#[derive(PartialEq, Eq, Copy, Clone, Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Signo(i32);
+impl Signo {
+    #[inline]
+    pub fn new(value: i32) -> Self {
+        Self(value)
+    }
+    #[inline]
+    pub fn raw_usize(self) -> usize {
+        self.0 as usize
+    }
+    #[inline]
+    pub fn raw_i32(self) -> i32 {
+        self.0
+    }
+    #[inline]
+    pub fn raw_isize(self) -> isize {
+        self.0 as isize
+    }
+    #[inline]
+    pub fn as_sa_index(self) -> SAIndex {
+        SAIndex::new(self.raw_usize())
+    }
+    /// convert to Signal enum index
+    #[inline]
+    pub fn into_signal_id(self) -> usize {
+        self.raw_usize() + 1
+    }
+}
+
+#[derive(PartialEq, Eq, Copy, Clone, Debug, FromRepr)]
 #[repr(usize)]
 #[allow(non_camel_case_types, unused)]
 pub enum Signal {
-    // empty signal, it means no signal
-    INVALID = 0,
-
     // non-rt signal
     SIGHUP = 1,
     SIGINT = 2,
@@ -84,41 +116,75 @@ pub enum Signal {
     SIGRT_29 = 61,
     SIGRT_30 = 62,
     SIGRT_31 = 63,
-
     SIGRTMAX = 64,
 }
 
-// signum <> usize
-impl From<usize> for Signal {
-    fn from(value: usize) -> Self {
-        if value < MAX_SIGNUM as usize {
-            let ret: Signal = unsafe { core::mem::transmute(value) };
-            return ret;
-        } else {
-            error!("[SIGNAL] Try to convert an invalid number to Signal");
-            return Signal::INVALID;
+impl Signal {
+    pub unsafe fn from_raw_signo_unchecked(raw: usize) -> Self {
+        Self::from_repr(raw + 1).unwrap()
+    }
+    #[inline]
+    pub fn into_signo(self) -> Signo {
+        self.into()
+    }
+    #[inline]
+    pub fn into_raw_signo(self) -> usize {
+        self.into_signo().raw_usize()
+    }
+    #[inline]
+    pub fn into_sigmask(self) -> SigMask {
+        self.into()
+    }
+    pub fn try_exclude_kill(self) -> SysResult<Self> {
+        match self {
+            Signal::SIGKILL | Signal::SIGSTOP => {
+                return_errno!(Errno::EINVAL, "Cannot register SIGKILL or SIGSTOP");
+            }
+            _ => Ok(self),
         }
     }
-}
-impl Into<usize> for Signal {
-    fn into(self) -> usize {
-        self as usize
+    #[inline]
+    pub fn as_sa_index(self) -> SAIndex {
+        SAIndex::new(self.into_raw_signo())
     }
 }
 
-// signum <> signo(i32)
-impl Into<Signo> for Signal {
-    fn into(self) -> Signo {
-        self as Signo
+impl TryFrom<Signo> for Signal {
+    type Error = Errno;
+
+    fn try_from(signo: Signo) -> SysResult<Self> {
+        if let Some(signal) = Self::from_repr(signo.into_signal_id()) {
+            Ok(signal)
+        } else {
+            return_errno!(
+                Errno::EINVAL,
+                "[SIGNAL] Try to convert an invalid number to Signal"
+            );
+        }
     }
 }
-impl From<Signo> for Signal {
-    fn from(value: Signo) -> Self {
-        if value < 0 {
-            error!("[SIGNAL] Try to convert an invalid number to Signal");
-            return Signal::INVALID;
-        } else {
-            return Self::from(value as usize);
+
+impl TryFrom<SAIndex> for Signal {
+    type Error = Errno;
+
+    fn try_from(index: SAIndex) -> SysResult<Self> {
+        Self::try_from(Signo::new(index.raw() as i32))
+    }
+}
+
+impl Into<SigMask> for Signal {
+    fn into(self) -> SigMask {
+        let signo = self.into_raw_signo();
+        if signo >= NSIG {
+            panic!("invalid signal number when converting to SigMask");
         }
+        SigMask::from_bits_truncate(1 << signo)
+    }
+}
+
+impl Into<Signo> for Signal {
+    #[inline]
+    fn into(self) -> Signo {
+        Signo::new(self as i32 - 1)
     }
 }

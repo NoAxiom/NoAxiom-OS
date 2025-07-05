@@ -27,13 +27,9 @@ impl SigPending {
         }
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.queue.is_empty()
-    }
-
     pub fn push(&mut self, sig_info: SigInfo) {
-        if !self.pending_set.contain_signum(sig_info.signo as u32) {
-            self.pending_set.enable(sig_info.signo as u32);
+        if !self.pending_set.contains_signal(sig_info.signal) {
+            self.pending_set.enable(sig_info.signal);
             self.queue.push_back(sig_info);
         }
     }
@@ -46,9 +42,16 @@ impl SigPending {
             return None;
         } else {
             for i in 0..self.queue.len() {
-                let signo = self.queue[i].signo;
-                if accept_set.contain_signum(signo as u32) {
-                    self.pending_set.disable(signo as u32);
+                if accept_set.contains_signal(self.queue[i].signal) {
+                    let _ = self
+                        .pending_set
+                        .disable(self.queue[i].signal)
+                        .inspect_err(|err| {
+                            error!(
+                                "disable signal failed, signal: {:?}, err: {:?}",
+                                self.queue[i].signal, err
+                            )
+                        });
                     return self.queue.remove(i);
                 }
             }
@@ -63,8 +66,7 @@ impl SigPending {
             return None;
         } else {
             for i in 0..self.queue.len() {
-                let signo = self.queue[i].signo;
-                if accept_set.contain_signum(signo as u32) {
+                if accept_set.contains_signal(self.queue[i].signal) {
                     return Some(&self.queue[i]);
                 }
             }

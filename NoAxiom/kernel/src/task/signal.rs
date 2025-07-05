@@ -38,18 +38,18 @@ impl Task {
         }
         let mut pending = Vec::new();
         while let Some(si) = pcb.pending_sigs.pop_with_mask(old_mask) {
-            trace!("[check_signal] find a signal {}", si.signo);
+            trace!("[check_signal] find a signal {:?}", si.signal);
             pending.push(si);
         }
         drop(pcb);
 
         let sa_list = self.sa_list();
         for si in pending {
-            let signum = Signal::from(si.signo);
-            let action = sa_list.get(signum).unwrap().clone();
+            let signal = si.signal;
+            let action = sa_list[signal].clone();
             info!(
                 "[check_signal] sig {:?}: start to handle, handler: {:?}",
-                signum, action.handler
+                signal, action.handler
             );
 
             // check interrpt syscall
@@ -64,18 +64,18 @@ impl Task {
             // start handle
             match action.handler {
                 SAHandlerType::Ignore => self.sig_default_ignore(),
-                SAHandlerType::Kill => self.sig_default_terminate(si.errno, si.signo),
+                SAHandlerType::Kill => self.sig_default_terminate(si.errno, si.signal),
                 SAHandlerType::Stop => self.sig_default_stop(),
                 SAHandlerType::Continue => self.sig_default_continue(),
                 SAHandlerType::User { handler } => {
                     drop(sa_list);
                     let mut pcb = self.pcb();
                     info!(
-                        "[handle_signal] start to handle user sigaction, signum: {}, handler: {:#x}, flags: {:?}",
-                        si.signo, handler, action.flags
+                        "[handle_signal] start to handle user sigaction, signal: {:?}, handler: {:#x}, flags: {:?}",
+                        si.signal, handler, action.flags
                     );
                     if !action.flags.contains(SAFlags::SA_NODEFER) {
-                        pcb.pending_sigs.sig_mask.enable(si.signo as u32);
+                        pcb.pending_sigs.sig_mask.enable(si.signal);
                     };
                     pcb.pending_sigs.sig_mask |= action.mask;
 
@@ -111,7 +111,7 @@ impl Task {
                         error!("[sigstack] write ucontext failed: {:?}", err);
                     });
                     *self.ucx_mut() = new_sp.into();
-                    cx[A0] = si.signo as usize;
+                    cx[A0] = si.signal.into_signo().raw_usize();
 
                     // write sig_info
                     if action.flags.contains(SAFlags::SA_SIGINFO) {
@@ -126,7 +126,7 @@ impl Task {
                             _align: [u64; 0],
                         }
                         let mut siginfo_v = LinuxSigInfo::default();
-                        siginfo_v.si_signo = si.signo;
+                        siginfo_v.si_signo = si.signal.into_signo().raw_i32();
                         siginfo_v.si_code = si.code as i32;
                         new_sp -= size_of::<LinuxSigInfo>();
                         let siginfo_ptr: UserPtr<LinuxSigInfo> = new_sp.into();
@@ -175,9 +175,9 @@ impl Task {
                 for it in tg.iter() {
                     let task = it.1.upgrade().unwrap();
                     trace!(
-                        "[recv_siginfo] tid: {}, might recv signal {}",
+                        "[recv_siginfo] tid: {}, might recv signal {:?}",
                         task.tid(),
-                        si.signo,
+                        si.signal,
                     );
                 }
                 let mut flag = false;
@@ -200,25 +200,25 @@ impl Task {
     /// a raw siginfo receiver without thread checked
     fn try_recv_siginfo_inner(self: &Arc<Task>, info: SigInfo, forced: bool) -> bool {
         let mut pcb = self.pcb();
-        if pcb.pending_sigs.sig_mask.contain_signum(info.signo as u32) && !forced {
+        if pcb.pending_sigs.sig_mask.contains_signal(info.signal) && !forced {
             return false;
         }
-        let signum = info.signo as u32;
+        let signal = info.signal;
         pcb.pending_sigs.push(info);
         warn!(
-            "[recv_siginfo_inner] tid: {}, push signal {} to pending during syscall {:?}",
+            "[recv_siginfo_inner] tid: {}, push signal {:?} to pending during syscall {:?}",
             self.tid(),
-            signum,
+            signal,
             self.tcb().current_syscall,
         );
-        if pcb.pending_sigs.should_wake.contain_signum(signum) {
+        if pcb.pending_sigs.should_wake.contains_signal(signal) {
             warn!("[recv_siginfo_inner] tid: {}, wake up task", self.tid());
             self.wake_unchecked();
         } else {
             warn!(
                 "[recv_siginfo_inner] wake task {} get blocked, signo: {:?}, mask: {:?}",
                 self.tid(),
-                info.signo,
+                info.signal,
                 pcb.sig_mask()
             )
         }
@@ -226,14 +226,14 @@ impl Task {
     }
 
     /// terminate the process
-    fn sig_default_terminate(&self, errno: i32, signo: i32) {
+    fn sig_default_terminate(&self, errno: i32, signal: Signal) {
         warn!(
             "sig_default_terminate: terminate the process, tid: {}, during: {:?}",
             self.tid(),
             self.tcb().current_syscall
         );
         debug!("[sig_default_terminate] terminate the process");
-        self.terminate_group(ExitReason::new(errno, signo));
+        self.terminate_group(ExitReason::new(errno, signal.into_signo()));
         debug!("[sig_default_terminate] terminate the process done");
     }
     /// stop the process

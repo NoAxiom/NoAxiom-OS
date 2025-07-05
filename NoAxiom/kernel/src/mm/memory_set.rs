@@ -30,7 +30,6 @@ use crate::{
         shm::SHM_MANAGER,
     },
     pte_flags, return_errno,
-    sched::utils::yield_now,
     syscall::SysResult,
     task::signal::user_sigreturn,
 };

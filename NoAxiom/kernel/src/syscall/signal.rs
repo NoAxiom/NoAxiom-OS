@@ -13,40 +13,31 @@ use crate::{
     config::task::INIT_PROCESS_ID,
     include::{result::Errno, time::TimeSpec},
     mm::user_ptr::UserPtr,
-    return_errno,
     sched::utils::suspend_now,
     signal::{
         sig_action::{KSigAction, USigAction},
         sig_detail::{SigDetail, SigKillDetail},
         sig_info::{RawSigInfo, SigCode, SigInfo},
         sig_set::SigSet,
-        signal::{Signal, Signo, MAX_SIGNUM},
+        signal::{Signal, Signo},
     },
     task::manager::{PROCESS_GROUP_MANAGER, TASK_MANAGER},
     time::timeout::TimeLimitedFuture,
 };
 
 impl Syscall<'_> {
-    pub async fn sys_sigaction(&self, signo: Signo, act: usize, old_act: usize) -> SyscallResult {
-        let signum = Signal::from(signo);
-        if signo >= MAX_SIGNUM as i32
-            || signum == Signal::SIGKILL
-            || signum == Signal::SIGSTOP
-            || signum == Signal::INVALID
-        {
-            return_errno!(Errno::EINVAL);
-        }
-
+    pub async fn sys_sigaction(&self, signo: i32, act: usize, old_act: usize) -> SyscallResult {
+        let signal = Signal::try_from(Signo::new(signo))?.try_exclude_kill()?;
         let act = UserPtr::<USigAction>::new(act);
         let old_act = UserPtr::<USigAction>::new(old_act);
         let task = self.task;
         let act = act.try_read().await?;
 
         let mut sa = task.sa_list();
-        let old = sa.get(signum).unwrap().into_sa();
+        let old = sa[signal].into_sa();
         // when detect new sig action, register it into sigaction list
         if let Some(act) = act {
-            let kaction = KSigAction::from_sa(act, signum);
+            let kaction = KSigAction::from_sa(act, signal);
             // if kaction.handler == SAHandlerType::Ignore {
             //     println_debug!(
             //         "[sys_sigaction]: task{} IGNORE {:?}",
@@ -54,7 +45,7 @@ impl Syscall<'_> {
             //         SigNum::from(signo),
             //     );
             // }
-            sa.set_sigaction(signum as usize, kaction);
+            sa.set_sigaction(signal, kaction);
         }
         drop(sa);
 
@@ -129,16 +120,12 @@ impl Syscall<'_> {
         if signo == 0 {
             return Ok(0);
         }
-        let sig = Signal::from(signo);
-        if sig == Signal::INVALID {
-            return Err(Errno::EINVAL);
-        }
+        let signal = Signal::try_from(Signo::new(signo))?;
         warn!(
-            "[sys_kill] from: {}, target: {}, signo: {}, sig_name: {:?}",
+            "[sys_kill] from: {}, target: {}, signal: {:?}",
             self.task.tid(),
             pid,
-            signo,
-            sig
+            signal,
         );
         match pid {
             0 => {
@@ -153,7 +140,7 @@ impl Syscall<'_> {
                 {
                     task.recv_siginfo(
                         SigInfo::new_detailed(
-                            signo,
+                            signal,
                             SigCode::User,
                             0,
                             SigDetail::Kill(SigKillDetail { pid: pgid }),
@@ -168,7 +155,7 @@ impl Syscall<'_> {
                     if task.tgid() != INIT_PROCESS_ID && task.is_group_leader() {
                         task.recv_siginfo(
                             SigInfo::new_detailed(
-                                signo,
+                                signal,
                                 SigCode::User,
                                 0,
                                 SigDetail::Kill(SigKillDetail { pid: task.tgid() }),
@@ -183,7 +170,7 @@ impl Syscall<'_> {
                     if task.is_group_leader() {
                         task.recv_siginfo(
                             SigInfo::new_detailed(
-                                signo,
+                                signal,
                                 SigCode::User,
                                 0,
                                 SigDetail::Kill(SigKillDetail { pid: task.tgid() }),
@@ -212,7 +199,7 @@ impl Syscall<'_> {
                     if task.tgid() == -pid as usize {
                         task.recv_siginfo(
                             SigInfo::new_detailed(
-                                signo,
+                                signal,
                                 SigCode::User,
                                 0,
                                 SigDetail::Kill(SigKillDetail { pid: pgid }),
@@ -296,7 +283,7 @@ impl Syscall<'_> {
         if let Some(si) = si {
             let raw_si = si.into_raw();
             info.try_write(raw_si).await?;
-            return Ok(si.signo as isize);
+            return Ok(si.signal.into_signo().raw_isize());
         } else {
             return Err(Errno::EAGAIN);
         }

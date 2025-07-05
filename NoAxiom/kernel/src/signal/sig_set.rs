@@ -1,6 +1,8 @@
 use bitflags::bitflags;
+use include::errno::{Errno, SysResult};
 
-use crate::signal::signal::MAX_SIGNUM;
+use super::signal::Signal;
+use crate::{return_errno, signal::signal::NSIG};
 
 pub type SigSetReprType = usize;
 
@@ -72,7 +74,9 @@ bitflags! {
         const SIGRT_29    = 1 << 60;
         const SIGRT_30    = 1 << 61;
         const SIGRT_31    = 1 << 62;
-        const SIGRTMAX    = 1 << MAX_SIGNUM - 1;
+        const SIGRTMAX    = 1 << NSIG - 1;
+
+        const BLOCKED = Self::SIGKILL.bits() | Self::SIGSTOP.bits();
     }
 }
 
@@ -80,37 +84,40 @@ pub type SigMask = SigSet;
 
 impl SigSet {
     pub fn without_kill(&self) -> Self {
-        *self - SigSet::SIGKILL - SigSet::SIGSTOP
+        *self - Self::BLOCKED
     }
-    pub fn enable(&mut self, signum: u32) {
-        let signum = signum - 1;
-        if signum >= MAX_SIGNUM {
-            error!("[Kernel] invalid signum when enable signum {}", signum);
-            return;
-        }
-        *self |= SigSet::from_bits_truncate(1 << signum);
+    pub fn enable(&mut self, signal: Signal) {
+        let _ = self.enable_checked(signal);
     }
-    pub fn disable(&mut self, signum: u32) {
-        let signum = signum - 1;
-        if signum >= MAX_SIGNUM {
-            error!("[Kernel] invalid signum when disable signum {}", signum);
-            return;
-        }
-        *self -= SigSet::from_bits_truncate(1 << signum);
-    }
-    pub fn contain_signum(&self, signum: u32) -> bool {
-        let signum = signum - 1;
-        self.contains(SigSet::from_bits_truncate(1 << signum))
-    }
-    pub fn from_signum(signum: u32) -> Self {
-        let signum = signum - 1;
-        if signum >= MAX_SIGNUM {
-            error!(
-                "[Kernel] invalid signum when create SigSet from signum {}",
-                signum
+    pub fn enable_checked(&mut self, signal: Signal) -> SysResult<()> {
+        let signo = signal.into_raw_signo();
+        if signo >= NSIG {
+            return_errno!(
+                Errno::EINVAL,
+                "invalid signum when enable signal {:?}",
+                signal,
             );
-            return SigSet::empty();
         }
-        SigSet::from_bits_truncate(1 << signum)
+        *self |= SigSet::from_bits_truncate(1 << signo);
+        Ok(())
+    }
+    pub fn disable(&mut self, signal: Signal) -> SysResult<()> {
+        let signo = signal.into_raw_signo();
+        if signo >= NSIG {
+            return_errno!(
+                Errno::EINVAL,
+                "invalid signum when disable signum {}",
+                signo
+            );
+        }
+        *self -= SigSet::from_bits_truncate(1 << signo);
+        Ok(())
+    }
+    pub fn contains_signal(&self, signal: Signal) -> bool {
+        let signo = signal.into_raw_signo();
+        self.contains(SigSet::from_bits_truncate(1 << signo))
+    }
+    pub unsafe fn from_raw_signo(index: usize) -> Self {
+        SigSet::from_bits_truncate(1 << index)
     }
 }

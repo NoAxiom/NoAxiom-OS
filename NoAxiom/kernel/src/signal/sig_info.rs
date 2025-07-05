@@ -1,6 +1,6 @@
 use super::{
     sig_detail::SigDetail,
-    signal::{SigErrno, Signo},
+    signal::{SigErrno, Signal},
 };
 
 /// signal code
@@ -27,6 +27,7 @@ pub enum SigCode {
     TKill = -6,
 }
 
+#[allow(unused)]
 pub struct RawSigInfo {
     pub signo: usize,
     pub code: i32,
@@ -35,7 +36,7 @@ pub struct RawSigInfo {
 #[derive(Clone, Copy, Debug)]
 pub struct SigInfo {
     /// signal number
-    pub signo: Signo,
+    pub signal: Signal,
 
     /// signal code
     pub code: SigCode,
@@ -48,17 +49,17 @@ pub struct SigInfo {
 }
 
 impl SigInfo {
-    pub fn new_simple(signo: Signo, code: SigCode) -> Self {
+    pub fn new_simple(signal: Signal, code: SigCode) -> Self {
         Self {
-            signo,
+            signal,
             code,
             errno: 0,
             detail: SigDetail::None,
         }
     }
-    pub fn new_detailed(signo: Signo, code: SigCode, errno: SigErrno, detail: SigDetail) -> Self {
+    pub fn new_detailed(signal: Signal, code: SigCode, errno: SigErrno, detail: SigDetail) -> Self {
         Self {
-            signo,
+            signal,
             code,
             errno,
             detail,
@@ -66,7 +67,7 @@ impl SigInfo {
     }
     pub fn into_raw(self) -> RawSigInfo {
         RawSigInfo {
-            signo: self.signo as usize,
+            signo: self.signal.into_raw_signo(),
             code: self.code as i32,
         }
     }

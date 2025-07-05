@@ -253,7 +253,7 @@ impl TimerEvent for ITimerReal {
             }
             task.recv_siginfo(
                 SigInfo {
-                    signo: Signal::SIGALRM.into(),
+                    signal: Signal::SIGALRM.into(),
                     code: SigCode::Kernel,
                     errno: 0,
                     detail: SigDetail::None,

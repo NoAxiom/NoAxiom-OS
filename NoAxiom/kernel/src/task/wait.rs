@@ -12,6 +12,7 @@ use crate::{
         result::Errno,
     },
     return_errno,
+    signal::signal::Signo,
     syscall::SysResult,
 };
 
@@ -97,7 +98,7 @@ impl Future for WaitChildFuture<'_> {
             Poll::Pending => {
                 if self.wait_option.contains(WaitOption::WNOHANG) && res.is_pending() {
                     trace!("[sys_wait4] return nohang");
-                    Poll::Ready(Ok((ExitReason::new(0, 0), 0)))
+                    Poll::Ready(Ok((ExitReason::new(0, Signo::new(0)), 0)))
                 } else {
                     trace!("[sys_wait4] suspend for child exit");
                     Poll::Pending

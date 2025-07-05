@@ -11,7 +11,7 @@ use crate::{
     signal::{
         sig_detail::{SigChildDetail, SigDetail},
         sig_info::{SigCode, SigInfo},
-        signal::Signal,
+        signal::{Signal, Signo},
     },
     task::{
         manager::{PROCESS_GROUP_MANAGER, TASK_MANAGER},
@@ -34,7 +34,7 @@ pub async fn init_proc_exit_handler(task: &Arc<Task>) {
             );
             i.recv_siginfo(
                 SigInfo {
-                    signo: Signal::SIGKILL.into(),
+                    signal: Signal::SIGKILL,
                     code: SigCode::Kernel,
                     errno: -1,
                     detail: SigDetail::None,
@@ -117,7 +117,7 @@ impl Task {
                 trace!("[exit_handler] parent tid: {}", parent.tid());
                 // send SIGCHLD
                 let siginfo = SigInfo::new_detailed(
-                    Signal::SIGCHLD.into(),
+                    Signal::SIGCHLD,
                     SigCode::User,
                     0,
                     SigDetail::Child(SigChildDetail {
@@ -162,7 +162,8 @@ impl Drop for Task {
 #[derive(Debug, Clone, Copy)]
 pub struct ExitReason(i32); // exit code, signo
 impl ExitReason {
-    pub fn new(code: i32, signo: i32) -> Self {
+    pub fn new(code: i32, signo: Signo) -> Self {
+        let signo = signo.raw_i32();
         if !is_ltp() {
             Self((code & 0xFF) << 8)
         } else {

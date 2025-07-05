@@ -1,11 +1,13 @@
+use core::ops::{Index, IndexMut};
+
 use array_init::array_init;
 use bitflags::bitflags;
 
 use super::{
     sig_set::{SigMask, SigSet},
-    signal::Signal,
+    signal::{Signal, Signo},
 };
-use crate::signal::signal::{MAX_SIGNUM, SIG_DFL, SIG_IGN};
+use crate::signal::signal::{NSIG, SIG_DFL, SIG_IGN};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum SAHandlerType {
@@ -17,8 +19,8 @@ pub enum SAHandlerType {
 }
 
 impl SAHandlerType {
-    pub const fn new_default(sig: Signal) -> Self {
-        match sig {
+    pub const fn new_default(signal: Signal) -> Self {
+        match signal {
             Signal::SIGCHLD | Signal::SIGURG | Signal::SIGWINCH => Self::Ignore,
             Signal::SIGSTOP | Signal::SIGTSTP | Signal::SIGTTIN | Signal::SIGTTOU => Self::Stop,
             Signal::SIGCONT => Self::Continue,
@@ -71,9 +73,9 @@ pub struct KSigAction {
 }
 
 impl KSigAction {
-    pub const fn new_default(sig: Signal) -> Self {
+    pub const fn new_default(signal: Signal) -> Self {
         Self {
-            handler: SAHandlerType::new_default(sig),
+            handler: SAHandlerType::new_default(signal),
             mask: SigMask::empty(),
             flags: SAFlags::empty(),
             restorer: 0,
@@ -119,53 +121,105 @@ impl KSigAction {
 /// signal action list of a task
 #[derive(Clone)]
 pub struct SigActionList {
-    pub actions: [KSigAction; MAX_SIGNUM as usize],
+    pub actions: [KSigAction; NSIG],
 }
 
 impl SigActionList {
     pub fn new() -> Self {
         Self {
-            actions: array_init(|signo| KSigAction::new_default(signo.into())),
+            actions: array_init(|signo| {
+                KSigAction::new_default(unsafe { Signal::from_raw_signo_unchecked(signo) })
+            }),
         }
     }
-    pub fn set_sigaction(&mut self, signum: usize, action: KSigAction) {
-        self.actions[signum] = action;
+    pub fn set_sigaction(&mut self, signal: Signal, action: KSigAction) {
+        self[signal] = action;
         debug!(
             "[SigActionList] set_sigaction: signum {:?}, action: {:?}, cur_bitmap: {:?}",
-            Signal::from(signum),
+            signal,
             action,
             self.get_user_bitmap()
         );
     }
-    pub fn get(&self, signum: Signal) -> Option<&KSigAction> {
-        self.actions.get(signum as usize)
-    }
     pub fn get_user_bitmap(&self) -> SigSet {
         let mut res = SigSet::empty();
-        for (i, sa) in self.actions.iter().enumerate() {
+        for (signo, sa) in self.actions.iter().enumerate() {
             if let SAHandlerType::User { handler: _ } = sa.handler {
-                res |= SigSet::from_signum(i as u32);
+                res |= unsafe { SigSet::from_raw_signo(signo) };
             }
         }
         res
     }
     pub fn get_ignored_bitmap(&self) -> SigSet {
         let mut res = SigSet::empty();
-        for (i, sa) in self.actions.iter().enumerate() {
+        for (signo, sa) in self.actions.iter().enumerate() {
             if sa.handler == SAHandlerType::Ignore {
-                res |= SigSet::from_signum(i as u32);
+                res |= unsafe { SigSet::from_raw_signo(signo) };
             }
         }
         res
     }
     pub fn reset(&mut self) {
-        for (num, action) in self.actions.iter_mut().enumerate() {
+        for (signo, action) in self.actions.iter_mut().enumerate() {
             match action.handler {
                 SAHandlerType::User { .. } => {
-                    action.handler = SAHandlerType::new_default(Signal::from((num + 1) as usize))
+                    let signal = unsafe { Signal::from_raw_signo_unchecked(signo) };
+                    action.handler = SAHandlerType::new_default(signal);
                 }
                 _ => {}
             }
         }
+    }
+}
+
+pub struct SAIndex(usize);
+impl SAIndex {
+    #[inline]
+    pub const fn new(index: usize) -> Self {
+        Self(index)
+    }
+    #[inline]
+    pub const fn raw(self) -> usize {
+        self.0
+    }
+    #[inline]
+    pub fn as_signo(self) -> Signo {
+        Signo::new(self.0 as i32)
+    }
+}
+
+impl Index<Signal> for SigActionList {
+    type Output = KSigAction;
+
+    fn index(&self, index: Signal) -> &Self::Output {
+        self.actions
+            .get(index.as_sa_index().raw())
+            .expect("SigActionList index out of bounds")
+    }
+}
+
+impl Index<Signo> for SigActionList {
+    type Output = KSigAction;
+
+    fn index(&self, index: Signo) -> &Self::Output {
+        self.actions
+            .get(index.as_sa_index().raw())
+            .expect("SigActionList index out of bounds")
+    }
+}
+
+impl IndexMut<Signal> for SigActionList {
+    fn index_mut(&mut self, index: Signal) -> &mut Self::Output {
+        self.actions
+            .get_mut(index.as_sa_index().raw())
+            .expect("SigActionList index out of bounds")
+    }
+}
+
+impl IndexMut<Signo> for SigActionList {
+    fn index_mut(&mut self, index: Signo) -> &mut Self::Output {
+        self.actions
+            .get_mut(index.as_sa_index().raw())
+            .expect("SigActionList index out of bounds")
     }
 }
