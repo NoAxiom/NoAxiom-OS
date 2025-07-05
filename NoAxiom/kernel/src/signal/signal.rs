@@ -1,7 +1,7 @@
 use include::errno::{Errno, SysResult};
 use strum::FromRepr;
 
-use super::{sig_action::SAIndex, sig_set::SigMask};
+use super::sig_set::SigMask;
 use crate::return_errno;
 
 pub const NSIG: usize = 64;
@@ -32,10 +32,6 @@ impl Signo {
     #[inline]
     pub fn raw_isize(self) -> isize {
         self.0 as isize
-    }
-    #[inline]
-    pub fn as_sa_index(self) -> SAIndex {
-        SAIndex::new(self.raw_usize())
     }
     /// convert to Signal enum index
     #[inline]
@@ -143,10 +139,6 @@ impl Signal {
             _ => Ok(self),
         }
     }
-    #[inline]
-    pub fn as_sa_index(self) -> SAIndex {
-        SAIndex::new(self.into_raw_signo())
-    }
 }
 
 impl TryFrom<Signo> for Signal {
@@ -161,14 +153,6 @@ impl TryFrom<Signo> for Signal {
                 "[SIGNAL] Try to convert an invalid number to Signal"
             );
         }
-    }
-}
-
-impl TryFrom<SAIndex> for Signal {
-    type Error = Errno;
-
-    fn try_from(index: SAIndex) -> SysResult<Self> {
-        Self::try_from(Signo::new(index.raw() as i32))
     }
 }
 

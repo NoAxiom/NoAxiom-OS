@@ -172,28 +172,12 @@ impl SigActionList {
     }
 }
 
-pub struct SAIndex(usize);
-impl SAIndex {
-    #[inline]
-    pub const fn new(index: usize) -> Self {
-        Self(index)
-    }
-    #[inline]
-    pub const fn raw(self) -> usize {
-        self.0
-    }
-    #[inline]
-    pub fn as_signo(self) -> Signo {
-        Signo::new(self.0 as i32)
-    }
-}
-
 impl Index<Signal> for SigActionList {
     type Output = KSigAction;
 
     fn index(&self, index: Signal) -> &Self::Output {
         self.actions
-            .get(index.as_sa_index().raw())
+            .get(index.into_raw_signo())
             .expect("SigActionList index out of bounds")
     }
 }
@@ -203,7 +187,7 @@ impl Index<Signo> for SigActionList {
 
     fn index(&self, index: Signo) -> &Self::Output {
         self.actions
-            .get(index.as_sa_index().raw())
+            .get(index.raw_usize())
             .expect("SigActionList index out of bounds")
     }
 }
@@ -211,7 +195,7 @@ impl Index<Signo> for SigActionList {
 impl IndexMut<Signal> for SigActionList {
     fn index_mut(&mut self, index: Signal) -> &mut Self::Output {
         self.actions
-            .get_mut(index.as_sa_index().raw())
+            .get_mut(index.into_raw_signo())
             .expect("SigActionList index out of bounds")
     }
 }
@@ -219,7 +203,7 @@ impl IndexMut<Signal> for SigActionList {
 impl IndexMut<Signo> for SigActionList {
     fn index_mut(&mut self, index: Signo) -> &mut Self::Output {
         self.actions
-            .get_mut(index.as_sa_index().raw())
+            .get_mut(index.raw_usize())
             .expect("SigActionList index out of bounds")
     }
 }
