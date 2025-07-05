@@ -10,9 +10,9 @@ use crate::{
     signal::{
         sig_action::{SAFlags, SAHandlerType},
         sig_info::SigInfo,
-        sig_num::SigNum,
         sig_set::SigMask,
         sig_stack::{MContext, UContext},
+        signal::SigNum,
     },
     task::{exit::ExitReason, status::TaskStatus, Task},
 };

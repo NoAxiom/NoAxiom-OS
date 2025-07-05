@@ -22,7 +22,7 @@ use crate::{
     signal::{
         sig_detail::SigDetail,
         sig_info::{SigCode, SigInfo},
-        sig_num::SigNum,
+        signal::SigNum,
     },
     task::Task,
 };

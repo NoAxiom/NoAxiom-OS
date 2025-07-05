@@ -19,7 +19,7 @@ use pin_project_lite::pin_project;
 use crate::{
     cpu::current_task,
     include::process::ThreadInfo,
-    signal::{sig_action::SAFlags, sig_num::SigNum, sig_set::SigMask},
+    signal::{sig_action::SAFlags, sig_set::SigMask, signal::SigNum},
     syscall::SysResult,
     task::Task,
 };

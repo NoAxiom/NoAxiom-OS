@@ -10,7 +10,7 @@ use crate::{
     sched::utils::block_on,
     signal::{
         sig_info::{SigCode, SigInfo},
-        sig_num::SigNum,
+        signal::SigNum,
     },
     syscall::utils::current_syscall,
     task::Task,

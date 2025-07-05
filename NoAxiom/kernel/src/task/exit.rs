@@ -11,7 +11,7 @@ use crate::{
     signal::{
         sig_detail::{SigChildDetail, SigDetail},
         sig_info::{SigCode, SigInfo},
-        sig_num::SigNum,
+        signal::SigNum,
     },
     task::{
         manager::{PROCESS_GROUP_MANAGER, TASK_MANAGER},
@@ -36,7 +36,7 @@ pub async fn init_proc_exit_handler(task: &Arc<Task>) {
                 SigInfo {
                     signo: SigNum::SIGKILL.into(),
                     code: SigCode::Kernel,
-                    errno: 0,
+                    errno: -1,
                     detail: SigDetail::None,
                 },
                 true,
@@ -168,9 +168,6 @@ impl ExitReason {
         } else {
             Self(((code & 0xFF) << 8) + (signo & 0x7f))
         }
-    }
-    pub fn to_raw(self) -> i32 {
-        (self.0 >> 8) & 0xFF
     }
     pub fn inner(&self) -> i32 {
         self.0

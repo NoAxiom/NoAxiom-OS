@@ -2,8 +2,8 @@ use array_init::array_init;
 use bitflags::bitflags;
 
 use super::{
-    sig_num::SigNum,
     sig_set::{SigMask, SigSet},
+    signal::SigNum,
 };
 use crate::constant::signal::{MAX_SIGNUM, SIG_DFL, SIG_IGN};
 

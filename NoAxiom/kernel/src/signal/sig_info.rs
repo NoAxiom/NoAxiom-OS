@@ -1,6 +1,6 @@
 use super::{
     sig_detail::SigDetail,
-    sig_num::{SigErrno, Signo},
+    signal::{SigErrno, Signo},
 };
 
 /// signal code
