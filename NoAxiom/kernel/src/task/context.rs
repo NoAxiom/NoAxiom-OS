@@ -1,22 +1,18 @@
 use arch::TrapContext;
-use ksync::cell::SyncUnsafeCell;
 
-pub struct TaskContext {
-    pub cx: SyncUnsafeCell<TrapContext>,
+pub struct TaskTrapContext {
+    pub cx: TrapContext,
     pub int_en: bool,
 }
 
-impl TaskContext {
+impl TaskTrapContext {
     pub fn new(cx: TrapContext, int_en: bool) -> Self {
-        Self {
-            cx: SyncUnsafeCell::new(cx),
-            int_en,
-        }
+        Self { cx, int_en }
     }
     pub fn cx(&self) -> &TrapContext {
-        self.cx.as_ref()
+        &self.cx
     }
-    pub fn cx_mut(&self) -> &mut TrapContext {
-        self.cx.as_ref_mut()
+    pub fn cx_mut(&mut self) -> &mut TrapContext {
+        &mut self.cx
     }
 }

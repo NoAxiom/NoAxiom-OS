@@ -7,7 +7,7 @@ use crate::{ArchTrapContext, ArchUserFloatContext, TrapArgs};
 /// Saved registers when a trap (interrupt or exception) occurs.
 #[repr(C)]
 #[repr(align(64))]
-#[derive(Default, Clone, Copy)]
+#[derive(Default, Clone)]
 pub struct TrapContext {
     /// [0~31]/[0~255]: General Registers
     pub(crate) x: [usize; 32],

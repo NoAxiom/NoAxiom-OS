@@ -1,25 +1,22 @@
 //! # Task
 
-use alloc::{
-    string::String,
-    sync::{Arc, Weak},
-    vec::Vec,
-};
+use alloc::{string::String, sync::Arc, vec::Vec};
 use core::{marker::PhantomData, ptr::null, sync::atomic::AtomicUsize, task::Waker};
 
-use arch::{Arch, ArchInfo, ArchInt, ArchMemory, ArchTrapContext, TrapArgs, TrapContext};
+use arch::{Arch, ArchInfo, ArchInt, ArchMemory, ArchTrapContext, TrapContext};
 use ksync::{
     cell::SyncUnsafeCell,
     mutex::{SpinLock, SpinLockGuard},
-    Once,
 };
 
 use super::{
-    context::TaskContext,
+    context::TaskTrapContext,
     exit::ExitReason,
     manager::ThreadGroup,
+    pcb::PCB,
     status::TaskStatus,
     taskid::{TidTracer, PGID, PID, TGID, TID},
+    tcb::TCB,
 };
 use crate::{
     fs::{fdtable::FdTable, path::Path},
@@ -27,11 +24,9 @@ use crate::{
         fs::InodeMode,
         process::{
             auxv::{AuxEntry, AT_NULL, AT_RANDOM},
-            robust_list::RobustList,
-            CloneFlags,
+            CloneFlags, ThreadInfo,
         },
         sched::CpuMask,
-        syscall_id::SyscallID,
     },
     mm::{
         memory_set::{ElfMemoryInfo, MemorySet},
@@ -42,10 +37,7 @@ use crate::{
         utils::take_waker,
     },
     signal::{
-        sig_action::SigActionList,
-        sig_pending::SigPending,
-        sig_set::{SigMask, SigSet},
-        sig_stack::{SigAltStack, UContext},
+        sig_action::SigActionList, sig_pending::SigPending, sig_set::SigSet, sig_stack::UContext,
     },
     syscall::SysResult,
     task::{
@@ -83,62 +75,6 @@ type Immutable<T> = T;
 /// SAFETY: these resources won't be shared with other threads
 type ThreadOnly<T> = SyncUnsafeCell<T>;
 
-/// task control block inner
-/// it is protected by a spinlock to assure its atomicity
-/// so there's no need to use any lock in this struct
-#[repr(align(64))]
-pub struct PCB {
-    // task status
-    pub status: TaskStatus,  // task status
-    pub exit_code: ExitReason, // exit code
-
-    // paternity
-    // assertion: only when the task is group leader, it can have children
-    pub children: Vec<Arc<Task>>,   // children tasks
-    pub parent: Option<Weak<Task>>, // parent task, weak ptr
-
-    // signal structs
-    pub pending_sigs: SigPending,       // pending signals
-    pub sig_stack: Option<SigAltStack>, // signal alternate stack
-
-    // futex & robust list
-    pub robust_list: RobustList,
-}
-
-impl Default for PCB {
-    fn default() -> Self {
-        Self {
-            children: Vec::new(),
-            parent: None,
-            status: TaskStatus::Normal,
-            exit_code: ExitReason::default(),
-            pending_sigs: SigPending::new(),
-            sig_stack: None,
-            robust_list: RobustList::default(),
-        }
-    }
-}
-
-pub struct TCB {
-    pub set_child_tid: Option<usize>,   // set tid address
-    pub clear_child_tid: Option<usize>, // clear tid address
-    pub current_syscall: SyscallID,     // only for debug, current syscall id
-    pub interrupted: bool,
-    pub is_in_sigacion: bool,
-}
-
-impl Default for TCB {
-    fn default() -> Self {
-        Self {
-            set_child_tid: None,
-            clear_child_tid: None,
-            current_syscall: SyscallID::NO_SYSCALL,
-            interrupted: false,
-            is_in_sigacion: false,
-        }
-    }
-}
-
 /// task control block for a coroutine,
 /// a.k.a thread in current project structure
 #[repr(C, align(64))]
@@ -148,15 +84,11 @@ pub struct Task {
 
     // thread only / once initialization
     tcb: ThreadOnly<TCB>,                  // thread control block
-    cx: ThreadOnly<TaskContext>,           // trap context
-    sched_entity: ThreadOnly<SchedEntity>, // sched entity for the task
-    waker: Once<Waker>,                    // waker for the task
-    ucx: ThreadOnly<UserPtr<UContext>>,    // ucontext for the task
+    sched_entity: ThreadOnly<SchedEntity>, // sched entity for the task, shared with scheduler
 
     // immutable
-    tid: Immutable<TidTracer>,              // task id, with lifetime holded
-    tgid: Immutable<TGID>,                  // task group id, aka pid
-    tg_leader: Immutable<Once<Weak<Task>>>, // thread group leader
+    tid: Immutable<TidTracer>, // task id, with lifetime holded
+    tgid: Immutable<TGID>,     // task group id, aka pid
 
     // shared
     fd_table: SharedMut<FdTable>,         // file descriptor table
@@ -167,50 +99,6 @@ pub struct Task {
     pgid: Arc<AtomicUsize>,               // process group id
     futex: SharedMut<FutexQueue>,         // futex wait queue
     itimer: SharedMut<ITimerManager>,     // interval timer
-}
-
-impl PCB {
-    // task status
-    #[inline(always)]
-    pub fn status(&self) -> TaskStatus {
-        self.status
-    }
-    #[inline(always)]
-    pub fn set_status(&mut self, status: TaskStatus) {
-        self.status = status;
-    }
-
-    // exit code
-    pub fn exit_code(&self) -> ExitReason {
-        self.exit_code
-    }
-    pub fn set_exit_code(&mut self, exit_code: ExitReason) {
-        self.exit_code = exit_code;
-    }
-
-    /// set wake signal
-    pub fn set_wake_signal(&mut self, sig: SigSet) {
-        self.pending_sigs.should_wake = sig;
-    }
-    /// signal mask
-    pub fn sig_mask(&self) -> SigMask {
-        self.pending_sigs.sig_mask
-    }
-    pub fn sig_mask_mut(&mut self) -> &mut SigMask {
-        &mut self.pending_sigs.sig_mask
-    }
-
-    /// find zombie children
-    pub fn pop_one_zombie_child(&mut self) -> Option<Arc<Task>> {
-        let mut res = None;
-        for i in 0..self.children.len() {
-            if self.children[i].pcb().status() == TaskStatus::Zombie {
-                res = Some(self.children.remove(i));
-                break;
-            }
-        }
-        res
-    }
 }
 
 /// user tasks
@@ -238,15 +126,6 @@ impl Task {
     }
     pub fn set_pgid(&self, pgid: usize) {
         self.pgid.store(pgid, core::sync::atomic::Ordering::SeqCst);
-    }
-    pub fn set_self_as_tg_leader(self: &Arc<Self>) {
-        self.tg_leader.call_once(|| Arc::downgrade(self));
-    }
-    pub fn set_tg_leader_weakly(&self, task: &Weak<Self>) {
-        self.tg_leader.call_once(|| task.clone());
-    }
-    pub fn get_tg_leader(&self) -> Arc<Task> {
-        self.tg_leader.get().unwrap().upgrade().unwrap()
     }
 
     /// check if the task is group leader
@@ -291,28 +170,24 @@ impl Task {
     /// trap context
     #[inline(always)]
     pub fn trap_context(&self) -> &TrapContext {
-        self.cx.as_ref().cx()
+        self.tcb().cx.cx()
     }
     #[inline(always)]
     pub fn trap_context_mut(&self) -> &mut TrapContext {
-        self.cx.as_ref().cx_mut()
+        self.tcb_mut().cx.cx_mut()
     }
     #[inline(always)]
     pub fn record_cx_int_en(&self) {
         let int_en = Arch::is_interrupt_enabled();
-        self.cx.as_ref_mut().int_en = int_en;
+        self.tcb_mut().cx.int_en = int_en;
     }
     #[inline(always)]
     pub fn restore_cx_int_en(&self) {
-        if self.cx.as_ref().int_en {
+        if self.tcb_mut().cx.int_en {
             Arch::enable_interrupt();
         } else {
             Arch::disable_interrupt();
         }
-    }
-    #[inline(always)]
-    pub fn cx_int_en(&self) -> bool {
-        self.cx.as_ref().int_en
     }
 
     /// signal info: sigaction list
@@ -320,17 +195,13 @@ impl Task {
         self.sa_list.lock()
     }
 
-    /// get waker
-    pub fn waker(&self) -> Option<Waker> {
-        self.waker.get().cloned()
-    }
     /// set waker
     pub fn set_waker(&self, waker: Waker) {
-        self.waker.call_once(|| waker);
+        self.tcb_mut().waker = Some(waker);
     }
     /// wake self up
     pub fn wake_unchecked(&self) {
-        if let Some(waker) = self.waker.get() {
+        if let Some(waker) = self.tcb().waker.as_ref() {
             waker.wake_by_ref();
         } else {
             warn!("[kernel] waker of task {} is None", self.tid());
@@ -353,33 +224,42 @@ impl Task {
         self.sched_entity.as_ref_mut()
     }
 
+    /// schedule
+    pub fn need_resched(&self) -> bool {
+        self.sched_entity().need_yield() || self.tcb().tif.contains(ThreadInfo::TIF_NEED_RESCHED)
+    }
+    pub fn clear_resched_flags(&self) {
+        self.sched_entity_mut().clear_pending_yield();
+        self.tcb_mut().tif.remove(ThreadInfo::TIF_NEED_RESCHED);
+    }
+
     /// time stat
     pub fn time_stat(&self) -> &TimeInfo {
-        &self.sched_entity.as_ref_mut().time_stat
+        &self.sched_entity().time_stat
     }
     pub fn time_stat_mut(&self) -> &mut TimeInfo {
-        &mut self.sched_entity.as_ref_mut().time_stat
+        &mut self.sched_entity_mut().time_stat
     }
 
     /// set prio: normal
     pub fn set_sched_prio_normal(&self) {
-        self.sched_entity.as_ref_mut().sched_prio = SchedPrio::Normal;
+        self.sched_entity_mut().sched_prio = SchedPrio::Normal;
     }
     /// set prio: realtime
     pub fn set_sched_prio_realtime(&self, prio: usize) {
-        self.sched_entity.as_ref_mut().sched_prio = SchedPrio::RealTime(prio);
+        self.sched_entity_mut().sched_prio = SchedPrio::RealTime(prio);
     }
     /// set prio: idle
     pub fn set_sched_prio_idle(&self) {
-        self.sched_entity.as_ref_mut().sched_prio = SchedPrio::IdlePrio;
+        self.sched_entity_mut().sched_prio = SchedPrio::IdlePrio;
     }
 
     /// cpu mask
     pub fn cpu_mask(&self) -> &CpuMask {
-        &self.sched_entity.as_ref_mut().cpu_mask
+        &self.sched_entity().cpu_mask
     }
     pub fn cpu_mask_mut(&self) -> &mut CpuMask {
-        &mut self.sched_entity.as_ref_mut().cpu_mask
+        &mut self.sched_entity_mut().cpu_mask
     }
 
     /// sched entity
@@ -394,10 +274,10 @@ impl Task {
 
     /// user context
     pub fn ucx(&self) -> &UserPtr<UContext> {
-        self.ucx.as_ref()
+        &self.tcb().ucx
     }
     pub fn ucx_mut(&self) -> &mut UserPtr<UContext> {
-        self.ucx.as_ref_mut()
+        &mut self.tcb_mut().ucx
     }
 
     /// interval timer manager
@@ -470,25 +350,18 @@ impl Task {
             }),
             thread_group: Shared::new(ThreadGroup::new()),
             memory_set: Shared::new(memory_set),
-            cx: ThreadOnly::new(TaskContext::new(
-                TrapContext::app_init_cx(elf_entry, user_sp),
-                true,
-            )),
             sched_entity: ThreadOnly::new(SchedEntity::default()),
             fd_table: Shared::new(FdTable::new()),
             cwd: Shared::new(path),
             sa_list: Shared::new(SigActionList::new()),
-            waker: Once::new(),
-            tg_leader: Once::new(),
             tcb: ThreadOnly::new(TCB {
+                cx: TaskTrapContext::new(TrapContext::app_init_cx(elf_entry, user_sp), true),
                 ..Default::default()
             }),
             futex: Shared::new(FutexQueue::new()),
-            ucx: ThreadOnly::new(UserPtr::new_null()),
             itimer: Shared::new(ITimerManager::new()),
         });
         task.thread_group().insert(&task);
-        task.set_self_as_tg_leader();
         TASK_MANAGER.insert(&task);
         PROCESS_GROUP_MANAGER.lock().insert(&task);
         info!("[spawn] new task spawn complete, tid {}", task.tid.0);
@@ -642,21 +515,17 @@ impl Task {
                     ..Default::default()
                 }),
                 memory_set,
-                cx: ThreadOnly::new(TaskContext::new(self.trap_context().clone(), true)),
                 sched_entity: ThreadOnly::new(SchedEntity::default()),
                 fd_table,
                 cwd: self.cwd.clone(),
                 sa_list,
-                waker: Once::new(),
-                tg_leader: Once::new(),
                 tcb: ThreadOnly::new(TCB {
+                    cx: TaskTrapContext::new(self.trap_context().clone(), true),
                     ..Default::default()
                 }),
                 futex: self.futex.clone(),
-                ucx: ThreadOnly::new(UserPtr::new_null()),
                 itimer: self.itimer.clone(),
             });
-            new_thread.set_tg_leader_weakly(self.tg_leader.get().unwrap());
             new_thread.thread_group.lock().insert(&new_thread);
             TASK_MANAGER.insert(&new_thread);
             new_thread
@@ -676,22 +545,18 @@ impl Task {
                     ..Default::default()
                 }),
                 memory_set,
-                cx: ThreadOnly::new(TaskContext::new(self.trap_context().clone(), true)),
                 sched_entity: ThreadOnly::new(SchedEntity::default()),
                 fd_table,
                 cwd: Shared::new(self.cwd().clone()),
                 sa_list,
-                waker: Once::new(),
-                tg_leader: Once::new(),
                 tcb: ThreadOnly::new(TCB {
+                    cx: TaskTrapContext::new(self.trap_context().clone(), true),
                     ..Default::default()
                 }),
                 futex: Shared::new(FutexQueue::new()),
-                ucx: ThreadOnly::new(UserPtr::new_null()),
                 itimer: Shared::new(ITimerManager::new()),
             });
             new_process.thread_group().insert(&new_process);
-            new_process.set_self_as_tg_leader();
             self.pcb().children.push(new_process.clone());
             TASK_MANAGER.insert(&new_process);
             PROCESS_GROUP_MANAGER.lock().insert(&new_process);

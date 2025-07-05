@@ -17,7 +17,7 @@ use crate::{
     return_errno,
     sched::utils::suspend_now,
     signal::{
-        sig_action::{KSigAction, SAHandlerType, USigAction},
+        sig_action::{KSigAction, USigAction},
         sig_detail::{SigDetail, SigKillDetail},
         sig_info::{RawSigInfo, SigCode, SigInfo},
         sig_num::{SigNum, Signo},
@@ -81,8 +81,6 @@ impl Syscall<'_> {
         *cx.gprs_mut() = ucontext.uc_mcontext.gprs();
         info!("[sys_sigreturn] cx: {:#x?}", cx);
         drop(pcb);
-
-        self.task.tcb_mut().is_in_sigacion = false;
         Ok(cx[RES] as isize)
     }
 

@@ -238,3 +238,19 @@ pub struct CloneArgs {
     pub set_tid_size: u64, /* Number of elements in set_tid (since Linux 5.5) */
     pub cgroup: u64,       /* File descriptor for target cgroupof child (since Linux 5.7) */
 }
+
+bitflags! {
+    /// Thread flags defined to check the state of a thread asynchronously.
+    pub struct ThreadInfo: usize {
+        /// restore sig mask in do_signal()
+        const TIF_RESTORE_SIGMASK = 1 << 0;
+        /// resumption notification requested
+        const TIF_NOTIFY_RESUME   = 1 << 1;
+        /// signal pending
+        const TIF_SIGPENDING      = 1 << 2;
+        /// rescheduling necessary
+        const TIF_NEED_RESCHED    = 1 << 3;
+        /// signal notifications exist
+        const TIF_NOTIFY_SIGNAL   = 1 << 5;
+    }
+}

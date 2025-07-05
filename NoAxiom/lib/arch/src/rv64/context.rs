@@ -119,7 +119,7 @@ impl MySstatus {
 /// we don't expect this to derive Clone
 #[repr(C)]
 #[repr(align(64))]
-#[derive(Clone)]
+#[derive(Default, Clone)]
 pub struct TrapContext {
     /// [0~31]/[0~255]: user registers, saved by caller
     x: [usize; 32],
@@ -293,7 +293,7 @@ impl ArchTrapContext for TrapContext {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug, Default)]
 #[repr(C)]
 pub struct UserFloatContext {
     pub user_fx: [f64; 32], // 50 - 81

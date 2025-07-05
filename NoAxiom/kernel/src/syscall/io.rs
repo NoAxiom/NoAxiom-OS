@@ -15,7 +15,7 @@ use crate::{
         pselect::PselectFuture,
     },
     mm::user_ptr::UserPtr,
-    sched::utils::intable,
+    sched::utils::abortable,
     signal::sig_set::SigSet,
     time::timeout::{TimeLimitedFuture, TimeLimitedType},
 };
@@ -77,7 +77,7 @@ impl Syscall<'_> {
 
         assert_no_lock!();
         let fut = TimeLimitedFuture::new(PpollFuture::new(poll_items), timeout);
-        let intable = intable(self.task, fut, None);
+        let intable = abortable(self.task, fut, None);
         let res = match intable.await? {
             TimeLimitedType::Ok(res) => res,
             TimeLimitedType::TimeOut => {
@@ -186,7 +186,7 @@ impl Syscall<'_> {
 
         assert_no_lock!();
         let fut = TimeLimitedFuture::new(PselectFuture::new(poll_items), timeout);
-        let intable = intable(self.task, fut, None);
+        let intable = abortable(self.task, fut, None);
         let res = match intable.await? {
             TimeLimitedType::Ok(res) => Some(res),
             TimeLimitedType::TimeOut => None,

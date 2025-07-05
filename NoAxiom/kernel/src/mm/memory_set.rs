@@ -3,7 +3,7 @@ use alloc::{string::String, sync::Arc, vec::Vec};
 use arch::{Arch, ArchInt, ArchMemory, ArchPageTableEntry, ArchTime, MappingFlags, PageTableEntry};
 use config::mm::{DL_INTERP_OFFSET, SIG_TRAMPOLINE, USER_HEAP_SIZE};
 use include::errno::Errno;
-use ksync::{cell::SyncUnsafeCell, mutex::SpinLock};
+use ksync::cell::SyncUnsafeCell;
 use memory::frame::can_frame_alloc_loosely;
 use spin::Once;
 use xmas_elf::ElfFile;
@@ -32,7 +32,7 @@ use crate::{
     pte_flags, return_errno,
     sched::utils::yield_now,
     syscall::SysResult,
-    task::impl_signal::user_sigreturn,
+    task::signal::user_sigreturn,
 };
 
 #[allow(unused)]
@@ -195,6 +195,7 @@ impl MemorySet {
 
     /// create kernel space, used in [`KERNEL_SPACE`] initialization
     pub fn init_kernel_space() -> Self {
+        #[allow(unused_mut)]
         let mut memory_set = MemorySet::new_allocated();
         #[cfg(target_arch = "riscv64")]
         {

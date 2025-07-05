@@ -25,7 +25,7 @@ use crate::{
     return_errno,
     sched::{
         spawn::spawn_utask,
-        utils::{intable, yield_now},
+        utils::{abortable, yield_now},
     },
     signal::{
         sig_detail::{SigDetail, SigKillDetail},
@@ -184,7 +184,7 @@ impl Syscall<'_> {
         };
 
         // wait for child exit
-        let (exit_code, tid) = intable(
+        let (exit_code, tid) = abortable(
             self.task,
             self.task.wait_child(pid_type, wait_option),
             Some(SigSet::SIGCHLD),

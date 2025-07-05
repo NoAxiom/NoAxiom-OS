@@ -17,7 +17,11 @@ use ksync::assert_no_lock;
 use pin_project_lite::pin_project;
 
 use crate::{
-    cpu::current_task, gen_errno, signal::{sig_action::SAFlags, sig_num::SigNum, sig_set::SigMask}, syscall::SysResult, task::Task,
+    cpu::current_task,
+    include::process::ThreadInfo,
+    signal::{sig_action::SAFlags, sig_num::SigNum, sig_set::SigMask},
+    syscall::SysResult,
+    task::Task,
 };
 
 impl Task {
@@ -27,7 +31,7 @@ impl Task {
     #[inline(always)]
     pub async fn yield_now(&self) {
         self.set_sched_prio_idle();
-        self.sched_entity_mut().clear_pending_yield();
+        self.clear_resched_flags();
         YieldFuture::new().await;
         self.set_sched_prio_normal();
     }
@@ -95,7 +99,7 @@ where
     }
 }
 
-pub async fn intable<T>(
+pub async fn abortable<T>(
     task: &Arc<Task>,
     fut: impl Future<Output = T>,
     block_sig: Option<SigMask>,

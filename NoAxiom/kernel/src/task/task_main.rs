@@ -2,7 +2,6 @@ use alloc::sync::Arc;
 use core::{
     future::Future,
     pin::Pin,
-    sync::atomic::{fence, Ordering},
     task::{Context, Poll},
 };
 
@@ -40,17 +39,16 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
             task.time_stat_mut().record_switch_in();
             current_cpu().set_task(task);
             task.memory_activate();
-            fence(Ordering::AcqRel);
         });
         task.restore_cx_int_en();
         let ret = unsafe { Pin::new_unchecked(future).poll(cx) };
         task.record_cx_int_en();
+        // todo: switch to kernel only when memory space drops
         with_interrupt_off!({
             task.time_stat_mut().record_switch_out();
             task.trap_context_mut().freg_mut().yield_task();
             current_cpu().clear_task();
             kernel_space_activate();
-            fence(Ordering::AcqRel);
         });
         ret
     }

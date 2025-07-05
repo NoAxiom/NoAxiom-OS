@@ -53,13 +53,13 @@ impl Task {
             );
 
             // check interrpt syscall
-            let tcb = self.tcb_mut();
-            if tcb.interrupted && action.flags.contains(SAFlags::SA_RESTART) {
-                self.trap_context_mut()[TrapArgs::EPC] -= 4;
-                self.clear_syscall_result();
-                tcb.interrupted = false;
-                println_debug!("restart!!!");
-            }
+            // let tcb = self.tcb_mut();
+            // if tcb.interrupted && action.flags.contains(SAFlags::SA_RESTART) {
+            //     self.trap_context_mut()[TrapArgs::EPC] -= 4;
+            //     self.clear_syscall_result();
+            //     tcb.interrupted = false;
+            //     println_debug!("restart!!!");
+            // }
 
             // start handle
             match action.handler {

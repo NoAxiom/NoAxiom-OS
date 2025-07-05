@@ -14,7 +14,7 @@ use crate::{
     },
     mm::user_ptr::UserPtr,
     net::socketfile::{Sock, SocketFile},
-    sched::utils::intable,
+    sched::utils::abortable,
     syscall::Syscall,
 };
 
@@ -117,7 +117,7 @@ impl Syscall<'_> {
         drop(fd_table);
 
         let mut socket = socket_file.socket().await;
-        let (new_tcp_socket, endpoint) = intable(self.task, socket.accept(), None).await??;
+        let (new_tcp_socket, endpoint) = abortable(self.task, socket.accept(), None).await??;
 
         let sockaddr = SockAddr::from_endpoint(endpoint);
         let user_ptr = UserPtr::<SockAddr>::new(addr);
@@ -321,7 +321,7 @@ impl Syscall<'_> {
         let mut socket = socket_file.socket().await;
         let buf_ptr = UserPtr::<u8>::new(buf);
         let buf_slice = buf_ptr.as_slice_mut_checked(len).await?;
-        let (n, endpoint) = intable(self.task, socket.read(buf_slice), None).await?;
+        let (n, endpoint) = abortable(self.task, socket.read(buf_slice), None).await?;
         drop(socket);
 
         let n = n?;
@@ -374,7 +374,7 @@ impl Syscall<'_> {
         } else {
             Some(SockAddr::new(addr, addr_len)?.get_endpoint())
         };
-        let n = intable(self.task, socket.write(buf_slice, remote_endpoint), None).await??;
+        let n = abortable(self.task, socket.write(buf_slice, remote_endpoint), None).await??;
         drop(socket);
 
         Ok(n as isize)

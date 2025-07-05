@@ -3,7 +3,6 @@
 use alloc::sync::Arc;
 
 use arch::{consts::KERNEL_ADDR_OFFSET, Arch, ArchInt, ArchTrap, TrapArgs, TrapType};
-use include::errno::SyscallResult;
 
 use super::{ext_int::ext_int_handler, ipi::ipi_handler};
 use crate::{
@@ -74,7 +73,7 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
     trace!("[trap_handler] call trap handler");
 
     // check if need schedule
-    if task.sched_entity().need_yield() {
+    if task.need_resched() {
         trace!(
             "task {} time_stat timeup by time = {:?}",
             task.tid(),

@@ -18,7 +18,7 @@ use crate::{
         time::TimeSpec,
     },
     mm::user_ptr::UserPtr,
-    sched::utils::intable,
+    sched::utils::abortable,
     task::Task,
     time::gettime::get_time_duration,
     utils::hack::{switch_into_ltp, switch_outof_ltp},
@@ -195,7 +195,7 @@ impl Syscall<'_> {
             return Err(Errno::EINVAL);
         }
 
-        intable(self.task, file.read(buf_slice), None).await?
+        abortable(self.task, file.read(buf_slice), None).await?
     }
 
     /// Read the file associated with the file descriptor fd to iovcnt buffers
@@ -265,7 +265,7 @@ impl Syscall<'_> {
             return Err(Errno::EINVAL);
         }
 
-        intable(self.task, file.write(buf_slice), None).await?
+        abortable(self.task, file.write(buf_slice), None).await?
     }
 
     /// Write iovcnt buffers of data described by iov to the file associated
