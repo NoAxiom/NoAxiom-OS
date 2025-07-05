@@ -11,7 +11,7 @@ use crate::{
     signal::{
         sig_detail::{SigChildDetail, SigDetail},
         sig_info::{SigCode, SigInfo},
-        signal::SigNum,
+        signal::Signal,
     },
     task::{
         manager::{PROCESS_GROUP_MANAGER, TASK_MANAGER},
@@ -34,7 +34,7 @@ pub async fn init_proc_exit_handler(task: &Arc<Task>) {
             );
             i.recv_siginfo(
                 SigInfo {
-                    signo: SigNum::SIGKILL.into(),
+                    signo: Signal::SIGKILL.into(),
                     code: SigCode::Kernel,
                     errno: -1,
                     detail: SigDetail::None,
@@ -117,7 +117,7 @@ impl Task {
                 trace!("[exit_handler] parent tid: {}", parent.tid());
                 // send SIGCHLD
                 let siginfo = SigInfo::new_detailed(
-                    SigNum::SIGCHLD.into(),
+                    Signal::SIGCHLD.into(),
                     SigCode::User,
                     0,
                     SigDetail::Child(SigChildDetail {

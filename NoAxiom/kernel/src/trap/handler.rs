@@ -10,7 +10,7 @@ use crate::{
     sched::utils::block_on,
     signal::{
         sig_info::{SigCode, SigInfo},
-        signal::SigNum,
+        signal::Signal,
     },
     syscall::utils::current_syscall,
     task::Task,
@@ -131,7 +131,7 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
                     //     addr,
                     // );
                     task.recv_siginfo(
-                        SigInfo::new_simple(SigNum::SIGSEGV.into(), SigCode::Kernel),
+                        SigInfo::new_simple(Signal::SIGSEGV.into(), SigCode::Kernel),
                         false,
                     );
                     // panic!();

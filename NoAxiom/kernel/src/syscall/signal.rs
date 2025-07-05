@@ -11,7 +11,6 @@ use arch::{ArchTrapContext, TrapArgs};
 use super::{Syscall, SyscallResult};
 use crate::{
     config::task::INIT_PROCESS_ID,
-    constant::signal::MAX_SIGNUM,
     include::{result::Errno, time::TimeSpec},
     mm::user_ptr::UserPtr,
     return_errno,
@@ -21,7 +20,7 @@ use crate::{
         sig_detail::{SigDetail, SigKillDetail},
         sig_info::{RawSigInfo, SigCode, SigInfo},
         sig_set::SigSet,
-        signal::{SigNum, Signo},
+        signal::{Signal, Signo, MAX_SIGNUM},
     },
     task::manager::{PROCESS_GROUP_MANAGER, TASK_MANAGER},
     time::timeout::TimeLimitedFuture,
@@ -29,11 +28,11 @@ use crate::{
 
 impl Syscall<'_> {
     pub async fn sys_sigaction(&self, signo: Signo, act: usize, old_act: usize) -> SyscallResult {
-        let signum = SigNum::from(signo);
+        let signum = Signal::from(signo);
         if signo >= MAX_SIGNUM as i32
-            || signum == SigNum::SIGKILL
-            || signum == SigNum::SIGSTOP
-            || signum == SigNum::INVALID
+            || signum == Signal::SIGKILL
+            || signum == Signal::SIGSTOP
+            || signum == Signal::INVALID
         {
             return_errno!(Errno::EINVAL);
         }
@@ -130,8 +129,8 @@ impl Syscall<'_> {
         if signo == 0 {
             return Ok(0);
         }
-        let sig = SigNum::from(signo);
-        if sig == SigNum::INVALID {
+        let sig = Signal::from(signo);
+        if sig == Signal::INVALID {
             return Err(Errno::EINVAL);
         }
         warn!(

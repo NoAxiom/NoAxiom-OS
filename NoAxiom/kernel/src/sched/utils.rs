@@ -19,7 +19,7 @@ use pin_project_lite::pin_project;
 use crate::{
     cpu::current_task,
     include::process::ThreadInfo,
-    signal::{sig_action::SAFlags, sig_set::SigMask, signal::SigNum},
+    signal::{sig_action::SAFlags, sig_set::SigMask, signal::Signal},
     syscall::SysResult,
     task::Task,
 };
@@ -84,7 +84,7 @@ where
                 // let info = task.peek_get_pending_signal(mask);
                 if let Some(info) = task.pcb().pending_sigs.peek_with_mask(&mask) {
                     let sa_list = task.sa_list();
-                    if let Some(sa) = sa_list.get(SigNum::from(info.signo)) {
+                    if let Some(sa) = sa_list.get(Signal::from(info.signo)) {
                         if sa.flags.contains(SAFlags::SA_RESTART) {
                             return Poll::Pending;
                         }

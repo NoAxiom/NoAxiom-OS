@@ -1,6 +1,6 @@
 use bitflags::bitflags;
 
-use crate::constant::signal::MAX_SIGNUM;
+use crate::signal::signal::MAX_SIGNUM;
 
 pub type SigSetReprType = usize;
 

@@ -6,7 +6,6 @@ use config::task::BUSYBOX;
 
 use super::{Syscall, SyscallResult};
 use crate::{
-    constant::signal::MAX_SIGNUM,
     fs::path::Path,
     include::{
         futex::{
@@ -31,6 +30,7 @@ use crate::{
         sig_detail::{SigDetail, SigKillDetail},
         sig_info::{SigCode, SigInfo},
         sig_set::SigSet,
+        signal::MAX_SIGNUM,
     },
     task::{
         exit::ExitReason,

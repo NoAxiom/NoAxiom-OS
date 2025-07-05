@@ -22,7 +22,7 @@ use crate::{
     signal::{
         sig_detail::SigDetail,
         sig_info::{SigCode, SigInfo},
-        signal::SigNum,
+        signal::Signal,
     },
     task::Task,
 };
@@ -253,7 +253,7 @@ impl TimerEvent for ITimerReal {
             }
             task.recv_siginfo(
                 SigInfo {
-                    signo: SigNum::SIGALRM.into(),
+                    signo: Signal::SIGALRM.into(),
                     code: SigCode::Kernel,
                     errno: 0,
                     detail: SigDetail::None,

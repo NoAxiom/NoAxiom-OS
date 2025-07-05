@@ -3,9 +3,9 @@ use bitflags::bitflags;
 
 use super::{
     sig_set::{SigMask, SigSet},
-    signal::SigNum,
+    signal::Signal,
 };
-use crate::constant::signal::{MAX_SIGNUM, SIG_DFL, SIG_IGN};
+use crate::signal::signal::{MAX_SIGNUM, SIG_DFL, SIG_IGN};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum SAHandlerType {
@@ -17,11 +17,11 @@ pub enum SAHandlerType {
 }
 
 impl SAHandlerType {
-    pub const fn new_default(sig: SigNum) -> Self {
+    pub const fn new_default(sig: Signal) -> Self {
         match sig {
-            SigNum::SIGCHLD | SigNum::SIGURG | SigNum::SIGWINCH => Self::Ignore,
-            SigNum::SIGSTOP | SigNum::SIGTSTP | SigNum::SIGTTIN | SigNum::SIGTTOU => Self::Stop,
-            SigNum::SIGCONT => Self::Continue,
+            Signal::SIGCHLD | Signal::SIGURG | Signal::SIGWINCH => Self::Ignore,
+            Signal::SIGSTOP | Signal::SIGTSTP | Signal::SIGTTIN | Signal::SIGTTOU => Self::Stop,
+            Signal::SIGCONT => Self::Continue,
             _ => Self::Kill,
         }
     }
@@ -71,7 +71,7 @@ pub struct KSigAction {
 }
 
 impl KSigAction {
-    pub const fn new_default(sig: SigNum) -> Self {
+    pub const fn new_default(sig: Signal) -> Self {
         Self {
             handler: SAHandlerType::new_default(sig),
             mask: SigMask::empty(),
@@ -82,7 +82,7 @@ impl KSigAction {
 }
 
 impl KSigAction {
-    pub fn from_sa(sa: USigAction, signum: SigNum) -> Self {
+    pub fn from_sa(sa: USigAction, signum: Signal) -> Self {
         match sa.handler {
             SIG_DFL => KSigAction::new_default(signum),
             SIG_IGN => Self {
@@ -132,12 +132,12 @@ impl SigActionList {
         self.actions[signum] = action;
         debug!(
             "[SigActionList] set_sigaction: signum {:?}, action: {:?}, cur_bitmap: {:?}",
-            SigNum::from(signum),
+            Signal::from(signum),
             action,
             self.get_user_bitmap()
         );
     }
-    pub fn get(&self, signum: SigNum) -> Option<&KSigAction> {
+    pub fn get(&self, signum: Signal) -> Option<&KSigAction> {
         self.actions.get(signum as usize)
     }
     pub fn get_user_bitmap(&self) -> SigSet {
@@ -162,7 +162,7 @@ impl SigActionList {
         for (num, action) in self.actions.iter_mut().enumerate() {
             match action.handler {
                 SAHandlerType::User { .. } => {
-                    action.handler = SAHandlerType::new_default(SigNum::from((num + 1) as usize))
+                    action.handler = SAHandlerType::new_default(Signal::from((num + 1) as usize))
                 }
                 _ => {}
             }

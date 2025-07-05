@@ -12,7 +12,7 @@ use crate::{
         sig_info::SigInfo,
         sig_set::SigMask,
         sig_stack::{MContext, UContext},
-        signal::SigNum,
+        signal::Signal,
     },
     task::{exit::ExitReason, status::TaskStatus, Task},
 };
@@ -45,7 +45,7 @@ impl Task {
 
         let sa_list = self.sa_list();
         for si in pending {
-            let signum = SigNum::from(si.signo);
+            let signum = Signal::from(si.signo);
             let action = sa_list.get(signum).unwrap().clone();
             info!(
                 "[check_signal] sig {:?}: start to handle, handler: {:?}",

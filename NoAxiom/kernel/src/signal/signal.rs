@@ -1,4 +1,10 @@
-use crate::constant::signal::MAX_SIGNUM;
+pub const MAX_SIGNUM: u32 = 64;
+
+// The SIG_DFL and SIG_IGN macros expand into integral expressions that are not
+// equal to an address of any function. The macros define signal handling
+// strategies for signal() function.
+pub const SIG_DFL: usize = 0; // default signal handling
+pub const SIG_IGN: usize = 1; // signal is ignored
 
 pub type Signo = i32;
 pub type SigErrno = i32;
@@ -6,7 +12,7 @@ pub type SigErrno = i32;
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]
 #[repr(usize)]
 #[allow(non_camel_case_types, unused)]
-pub enum SigNum {
+pub enum Signal {
     // empty signal, it means no signal
     INVALID = 0,
 
@@ -83,34 +89,34 @@ pub enum SigNum {
 }
 
 // signum <> usize
-impl From<usize> for SigNum {
+impl From<usize> for Signal {
     fn from(value: usize) -> Self {
         if value < MAX_SIGNUM as usize {
-            let ret: SigNum = unsafe { core::mem::transmute(value) };
+            let ret: Signal = unsafe { core::mem::transmute(value) };
             return ret;
         } else {
             error!("[SIGNAL] Try to convert an invalid number to Signal");
-            return SigNum::INVALID;
+            return Signal::INVALID;
         }
     }
 }
-impl Into<usize> for SigNum {
+impl Into<usize> for Signal {
     fn into(self) -> usize {
         self as usize
     }
 }
 
 // signum <> signo(i32)
-impl Into<Signo> for SigNum {
+impl Into<Signo> for Signal {
     fn into(self) -> Signo {
         self as Signo
     }
 }
-impl From<Signo> for SigNum {
+impl From<Signo> for Signal {
     fn from(value: Signo) -> Self {
         if value < 0 {
             error!("[SIGNAL] Try to convert an invalid number to Signal");
-            return SigNum::INVALID;
+            return Signal::INVALID;
         } else {
             return Self::from(value as usize);
         }
