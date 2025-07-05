@@ -127,8 +127,11 @@ impl Syscall<'_> {
         Ok(0)
     }
 
-    pub async fn sys_clock_getres(&self, _clockid: usize, res: usize) -> SyscallResult {
+    pub async fn sys_clock_getres(&self, clockid: isize, res: usize) -> SyscallResult {
         let res = UserPtr::<TimeSpec>::new(res);
+        if clockid < 0 {
+            return Err(Errno::EINVAL);
+        }
         if res.is_null() {
             return Ok(0);
         }

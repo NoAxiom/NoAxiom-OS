@@ -5,8 +5,7 @@ use arch::{ArchTrapContext, TrapArgs, TrapContext};
 use super::{utils::clear_current_syscall, SyscallResult};
 use crate::{
     include::{result::Errno, syscall_id::SyscallID},
-    return_errno,
-    syscall::utils::{current_syscall, update_current_syscall},
+    syscall::utils::update_current_syscall,
     task::Task,
 };
 
@@ -159,7 +158,7 @@ impl<'a> Syscall<'a> {
             SYS_NANOSLEEP =>        self.sys_nanosleep(args[0], args[1]).await,
             SYS_CLOCK_GETTIME =>    self.sys_clock_gettime(args[0], args[1]).await,
             SYS_CLOCK_NANOSLEEP =>  self.sys_clock_nanosleep(args[0], args[1], args[2], args[3]).await,
-            SYS_CLOCK_GETRES =>     self.sys_clock_getres(args[0], args[1]).await,
+            SYS_CLOCK_GETRES =>     self.sys_clock_getres(args[0] as _, args[1]).await,
             SYS_SETITIMER =>        self.sys_setitimer(args[0] as _, args[1] as _, args[2] as _).await,
             SYS_GETITIMER =>        self.sys_getitimer(args[0] as _, args[1] as _).await,
 
