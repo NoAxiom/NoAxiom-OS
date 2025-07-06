@@ -5,14 +5,14 @@ use core::num::NonZeroUsize;
 
 use async_trait::async_trait;
 use driver::devices::impls::device::{BlockDevice, DevResult};
-use ksync::{assert_no_lock, cell::SyncUnsafeCell};
+use ksync::{assert_no_lock, async_mutex::AsyncMutex, cell::SyncUnsafeCell};
 use lru::LruCache;
 
 use crate::config::fs::{BLOCK_SIZE, MAX_LRU_CACHE_SIZE};
 
 lazy_static::lazy_static! {
     pub static ref BLOCK_CACHE: SyncUnsafeCell<AsyncBlockCache> = SyncUnsafeCell::new(AsyncBlockCache {
-        cache: SyncUnsafeCell::new(LruCache::new(
+        cache: AsyncMutex::new(LruCache::new(
             NonZeroUsize::new(MAX_LRU_CACHE_SIZE).unwrap(),
         )),
         block_device: driver::get_blk_dev(),
@@ -26,8 +26,8 @@ pub fn get_block_cache() -> Arc<&'static dyn BlockDevice> {
 
 /// async block cache with LRU strategy  
 pub struct AsyncBlockCache {
-    cache: SyncUnsafeCell<LruCache<usize, Arc<[u8; BLOCK_SIZE]>>>, /* todo: use async_mutex, or
-                                                                    * doesn't need */
+    cache: AsyncMutex<LruCache<usize, Arc<[u8; BLOCK_SIZE]>>>, /* todo: use async_mutex, or
+                                                                * doesn't need */
     block_device: Arc<&'static dyn BlockDevice>,
 }
 
@@ -43,7 +43,7 @@ impl AsyncBlockCache {
     /// read a block from the cache or block device  
     /// mind that `sector` == `block`
     pub async fn read_sector(&self, sector: usize) -> Arc<[u8; BLOCK_SIZE]> {
-        let cache_guard = self.cache.as_ref_mut();
+        let mut cache_guard = self.cache.lock().await;
         if let Some(data) = cache_guard.get(&sector) {
             // if the data is in the cache, return immediately
             return data.clone();
@@ -57,7 +57,6 @@ impl AsyncBlockCache {
             .await
             .expect("read error");
         let data = Arc::new(data);
-        let cache_guard = self.cache.as_ref_mut();
 
         // The key cannot exist in the cache
         let write_back = cache_guard.push(sector, data.clone());
@@ -72,7 +71,7 @@ impl AsyncBlockCache {
     /// write a block to the cache and block device
     /// mind that `sector` == `block`
     pub async fn write_sector(&self, sector: usize, data: &[u8; BLOCK_SIZE]) {
-        let cache_guard = self.cache.as_ref_mut();
+        let mut cache_guard = self.cache.lock().await;
         let cache_data = cache_guard.get_mut(&sector);
         let data = Arc::new(*data);
         if let Some(cache_data) = cache_data {
@@ -87,12 +86,13 @@ impl AsyncBlockCache {
             assert_no_lock!();
             let _ = self.block_device.write(key, &*value).await;
         }
+        drop(cache_guard);
     }
 
     /// flush all dirty data in the cache to the block device
     pub async fn sync_all(&self) {
         trace!("[AsyncBlockCache] cache sync all begin");
-        let cache_guard = self.cache.as_ref_mut();
+        let cache_guard = self.cache.lock().await;
         let mut dirty_data = Vec::new();
         for (sector, cache) in cache_guard.iter() {
             dirty_data.push((*sector, cache.clone()));
