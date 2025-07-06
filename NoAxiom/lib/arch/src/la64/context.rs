@@ -174,14 +174,14 @@ impl ArchUserFloatContext for UserFloatContext {
             return;
         }
         self.need_save = 0;
-        // unsafe { __save_freg(self) };
+        unsafe { __save_freg(self) };
     }
     fn restore(&mut self) {
         if self.need_restore == 0 {
             return;
         }
         self.need_restore = 0;
-        // unsafe { __load_freg(self) };
+        unsafe { __load_freg(self) };
     }
     fn yield_task(&mut self) {
         self.save();

@@ -176,6 +176,7 @@
     slli.w    $t0, $t0, 1
     movcf2gr  $t0, $fcc0
     st.b      $t0, $a0, FP_END*8+4     # offset: 32*freg+1*fcsr
+    ret
 
 # load float registers
     __load_freg:
@@ -206,6 +207,7 @@
     movgr2cf  $fcc6, $t0
     srli.w    $t0, $t0, 1
     movgr2cf  $fcc7, $t0
+    ret
 
     .section  .text.signal
     .globl    user_sigreturn
