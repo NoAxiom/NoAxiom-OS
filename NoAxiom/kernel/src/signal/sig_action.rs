@@ -84,9 +84,9 @@ impl KSigAction {
 }
 
 impl KSigAction {
-    pub fn from_sa(sa: USigAction, signum: Signal) -> Self {
+    pub fn from_sa(sa: USigAction, signal: Signal) -> Self {
         match sa.handler {
-            SIG_DFL => KSigAction::new_default(signum),
+            SIG_DFL => KSigAction::new_default(signal),
             SIG_IGN => Self {
                 handler: SAHandlerType::Ignore,
                 flags: sa.flags,

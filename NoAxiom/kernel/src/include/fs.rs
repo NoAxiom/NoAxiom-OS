@@ -586,8 +586,8 @@ pub enum RtcIoctlCmd {
 #[repr(usize)]
 pub enum NoAxiomIoctlCmd {
     /// ONLY FOR TESTS
-    INTOTESTCASE = 0x114514,
-    OUTOFTESTCASE = 0x1919810,
+    TESTCASE = 0x114514,
+    LOG = 0x1919810,
 }
 
 #[derive(Debug)]

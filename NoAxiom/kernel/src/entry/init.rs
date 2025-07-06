@@ -6,7 +6,7 @@ use crate::{
     config::cpu::CPU_NUM,
     constant::banner::NOAXIOM_BANNER,
     cpu::get_hartid,
-    driver,
+    driver::{driver_init, log::log_init},
     entry::init_proc::schedule_spawn_with_path,
     mm::{
         bss::bss_init,
@@ -58,7 +58,7 @@ pub extern "C" fn _boot_hart_init(_hartid: usize, dtb: usize) -> ! {
 
     // log init
     Arch::arch_init();
-    driver::log_init();
+    log_init();
 
     // print basic info
     #[cfg(feature = "multicore")]
@@ -81,7 +81,7 @@ pub extern "C" fn _boot_hart_init(_hartid: usize, dtb: usize) -> ! {
     kernel_space_init();
 
     // device init
-    driver::init(platform::get_dtb(dtb));
+    driver_init(platform::get_dtb(dtb));
 
     // fs init
     Arch::enable_interrupt();

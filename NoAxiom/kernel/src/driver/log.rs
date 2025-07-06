@@ -1,6 +1,6 @@
 // ! log
 
-use core::sync::atomic::{AtomicBool, Ordering};
+use core::sync::atomic::{fence, AtomicBool, Ordering};
 
 use log::{self, Level, LevelFilter, Log, Metadata, Record};
 
@@ -9,7 +9,25 @@ use crate::{
     time::gettime::get_time_ms,
 };
 
-pub static mut LOG_BOOTED: AtomicBool = AtomicBool::new(false);
+static mut LOG_BOOTED: bool = false;
+static mut LOG_ENABLED: AtomicBool = AtomicBool::new(false);
+
+pub fn set_log_booted() {
+    unsafe { LOG_BOOTED = true };
+    fence(Ordering::SeqCst);
+}
+pub fn switch_log_on() {
+    unsafe { LOG_ENABLED.store(true, Ordering::SeqCst) }
+}
+pub fn switch_log_off() {
+    unsafe { LOG_ENABLED.store(false, Ordering::SeqCst) }
+}
+pub fn is_log_enabled() -> bool {
+    unsafe { LOG_ENABLED.load(Ordering::SeqCst) }
+}
+pub fn is_log_booted() -> bool {
+    unsafe { LOG_BOOTED }
+}
 
 struct SimpleLogger;
 
@@ -18,7 +36,7 @@ impl Log for SimpleLogger {
         true
     }
     fn log(&self, record: &Record) {
-        if !unsafe { LOG_BOOTED.load(Ordering::SeqCst) } {
+        if !is_log_enabled() || !is_log_booted() {
             return;
         }
         if !self.enabled(record.metadata()) {
@@ -58,6 +76,7 @@ pub fn log_init() {
         Some("TRACE") => LevelFilter::Trace,
         _ => LevelFilter::Off,
     });
-    unsafe { LOG_BOOTED.store(true, Ordering::SeqCst) };
+    set_log_booted();
+    switch_log_on();
     info!("[init] log init success");
 }

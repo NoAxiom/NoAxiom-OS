@@ -6,6 +6,7 @@ use ksync::assert_no_lock;
 use super::{SysResult, Syscall, SyscallResult};
 use crate::{
     constant::fs::{AT_FDCWD, UTIME_NOW, UTIME_OMIT},
+    driver::log::{switch_log_off, switch_log_on},
     fs::{fdtable::RLimit, manager::FS_MANAGER, path::Path, pipe::PipeFile, vfs::root_dentry},
     include::{
         fs::{
@@ -18,6 +19,7 @@ use crate::{
         time::TimeSpec,
     },
     mm::user_ptr::UserPtr,
+    return_errno,
     sched::utils::abortable,
     task::Task,
     time::gettime::get_time_duration,
@@ -457,15 +459,39 @@ impl Syscall<'_> {
                 }
             },
             IoctlCmd::Other(x) => match x {
-                NoAxiomIoctlCmd::INTOTESTCASE => match arg {
-                    _ => {
-                        switch_into_ltp();
-                        println!("[sys_ioctl] into testcase")
+                NoAxiomIoctlCmd::TESTCASE => {
+                    const IOCTL_SWITCH_INTO_LTP: usize = 0;
+                    const IOCTL_SWITCH_OUTOF_LTP: usize = 1;
+                    match arg {
+                        IOCTL_SWITCH_INTO_LTP => {
+                            switch_into_ltp();
+                            println_debug!("[kernel] into testcase")
+                        }
+                        IOCTL_SWITCH_OUTOF_LTP => {
+                            switch_outof_ltp();
+                            println_debug!("[kernel] out of testcase");
+                        }
+                        _ => {
+                            return_errno!(Errno::EINVAL, "arg {} is not supported", arg);
+                        }
                     }
-                },
-                NoAxiomIoctlCmd::OUTOFTESTCASE => {
-                    switch_outof_ltp();
-                    println!("[sys_ioctl] outof testcase");
+                }
+                NoAxiomIoctlCmd::LOG => {
+                    const IOCTL_LOG_OFF: usize = 0;
+                    const IOCTL_LOG_ON: usize = 1;
+                    match arg {
+                        IOCTL_LOG_OFF => {
+                            println_debug!("[kernel] log off");
+                            switch_log_off();
+                        }
+                        IOCTL_LOG_ON => {
+                            switch_log_on();
+                            println_debug!("[kernel] log on");
+                        }
+                        _ => {
+                            return_errno!(Errno::EINVAL, "arg {} is not supported", arg);
+                        }
+                    }
                 }
             },
         }

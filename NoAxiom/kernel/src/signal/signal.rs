@@ -15,6 +15,7 @@ pub const SIG_IGN: usize = 1; // signal is ignored
 pub type SigErrno = i32;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(C)]
 pub struct Signo(i32);
 impl Signo {
     #[inline]

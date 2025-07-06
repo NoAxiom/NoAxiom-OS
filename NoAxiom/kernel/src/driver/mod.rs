@@ -1,9 +1,5 @@
-mod log;
+pub mod log;
 
-pub fn log_init() {
-    log::log_init();
-}
-
-pub fn init(dtb: usize) {
+pub fn driver_init(dtb: usize) {
     driver::init(dtb);
 }
