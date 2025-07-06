@@ -33,9 +33,7 @@ impl SigManager {
     }
 
     pub fn pop_with_mask(&mut self, mask: SigMask) -> Option<SigInfo> {
-        // kill / stop signal cannot be blocked
-        // other signals can be blocked by sigmask
-        let accept_set = self.pending_set & mask.with_kill();
+        let accept_set = self.pending_set & !mask;
         if accept_set.is_empty() {
             return None;
         } else {
@@ -58,8 +56,8 @@ impl SigManager {
         }
     }
 
-    pub fn peek_with_mask(&self, mask: &SigMask) -> Option<&SigInfo> {
-        let accept_set = self.pending_set & mask.with_kill();
+    pub fn peek_with_mask(&self, mask: SigMask) -> Option<&SigInfo> {
+        let accept_set = self.pending_set & !mask;
         if accept_set.is_empty() {
             return None;
         } else {
@@ -73,12 +71,8 @@ impl SigManager {
         }
     }
 
-    pub fn has_expect_signals(&self, expect: SigSet) -> bool {
-        !((expect & self.pending_set).is_empty())
-    }
-
-    pub fn get_pending_signals_with_expect(&self, expect: SigSet) -> SigSet {
-        expect & self.pending_set
+    pub fn has_pending_signals(&self, mask: SigMask) -> bool {
+        !((!mask & self.pending_set).is_empty())
     }
 }
 

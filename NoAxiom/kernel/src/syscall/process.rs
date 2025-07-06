@@ -27,7 +27,7 @@ use crate::{
         interruptable::interruptable,
         sig_detail::{SigDetail, SigKillDetail},
         sig_info::{SigCode, SigInfo},
-        sig_set::SigSet,
+        sig_set::SigMask,
         signal::{Signal, Signo},
     },
     task::{
@@ -183,8 +183,12 @@ impl Syscall<'_> {
         };
 
         // wait for child exit
-        let (exit_code, tid) =
-            interruptable(self.task, self.task.wait_child(pid_type, wait_option), None).await??;
+        let (exit_code, tid) = interruptable(
+            self.task,
+            self.task.wait_child(pid_type, wait_option),
+            Some(self.task.sig_mask() | SigMask::SIGCHLD),
+        )
+        .await??;
         if status.is_non_null() {
             trace!(
                 "[sys_wait4]: write exit_code at status_addr = {:#x}, value: ",

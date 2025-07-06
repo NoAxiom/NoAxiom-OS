@@ -33,7 +33,7 @@ impl Task {
             self.tid(),
             old_mask
         );
-        if !pcb.signals.has_expect_signals(!old_mask) {
+        if !pcb.signals.has_pending_signals(old_mask) {
             return;
         }
         let mut pending = Vec::new();

@@ -214,13 +214,13 @@ impl<'a> Syscall<'a> {
             let cx = self.task.trap_context();
             use arch::TrapArgs::*;
             info!(
-                "[syscall] id: {:?}, tid: {}, sp: {:#x}, pc: {:#x}, ra: {:#x}, args: {:X?}",
+                "[syscall] id: {:?}, tid: {}, args: {:X?}, sp: {:#x}, pc: {:#x}, ra: {:#x}",
                 id,
                 self.task.tid(),
+                args,
                 cx[SP],
                 cx[EPC],
-                cx[RA],
-                args
+                cx[RA]
             );
         }
         let res = self.syscall_inner(id, args).await;

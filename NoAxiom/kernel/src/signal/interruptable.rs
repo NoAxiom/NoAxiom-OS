@@ -38,12 +38,18 @@ where
             Poll::Pending => {
                 // start to handle signal
                 let mask = this.mask;
-                if let Some(info) = task.pcb().signals.peek_with_mask(&mask) {
+                if let Some(info) = task.pcb().signals.peek_with_mask(*mask) {
                     let sa_list = task.sa_list();
                     if sa_list[info.signal].flags.contains(SAFlags::SA_RESTART) {
                         return Poll::Pending;
                     }
                     // task.tcb_mut().interrupted = true;
+                    debug!(
+                        "[intable] TID{} interrupted by signal {:?}, mask {:?}",
+                        task.tid(),
+                        info.signal,
+                        mask,
+                    );
                     Poll::Ready(Err(Errno::EINTR))
                 } else {
                     Poll::Pending
@@ -74,7 +80,11 @@ pub async fn interruptable<T>(
     task.pcb().set_wake_signal(!mask);
 
     // suspend now!
-    debug!("[intable] TID{} wait with wake set: {:?}", task.tid(), !mask);
+    debug!(
+        "[intable] TID{} wait with wake set: {:?}",
+        task.tid(),
+        !mask
+    );
     let res = IntableFuture { task, fut, mask }.await;
 
     // restore old mask
