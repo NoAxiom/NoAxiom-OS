@@ -1,4 +1,5 @@
 use alloc::{collections::vec_deque::VecDeque, sync::Arc};
+use core::time::Duration;
 
 use arch::{Arch, ArchInt};
 use async_task::{Builder, Runnable, WithInfo};
@@ -32,7 +33,12 @@ impl Runtime<Info> for MultiLevelRuntime {
     }
     fn run(&self) {
         #[cfg(feature = "debug_sig")]
-        crate::utils::crossover::intermit(10000000, || memory::utils::print_mem_info());
+        {
+            use crate::utils::crossover::intermit;
+            intermit(Some(10000000), Some(Duration::from_secs(1)), || {
+                memory::utils::print_mem_info()
+            });
+        }
 
         let runnable = self.scheduler.lock().pop();
         if let Some(runnable) = runnable {
