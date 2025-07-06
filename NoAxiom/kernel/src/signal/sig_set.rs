@@ -83,8 +83,11 @@ bitflags! {
 pub type SigMask = SigSet;
 
 impl SigSet {
-    pub fn without_kill(&self) -> Self {
-        *self - Self::BLOCKED
+    pub fn without_kill(self) -> Self {
+        self - Self::BLOCKED
+    }
+    pub fn with_kill(self) -> Self {
+        self | Self::BLOCKED
     }
     pub fn enable(&mut self, signal: Signal) {
         let _ = self.enable_checked(signal);

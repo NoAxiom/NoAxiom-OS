@@ -22,11 +22,9 @@ use crate::{
     },
     mm::user_ptr::UserPtr,
     return_errno,
-    sched::{
-        spawn::spawn_utask,
-        utils::{abortable, yield_now},
-    },
+    sched::{spawn::spawn_utask, utils::yield_now},
     signal::{
+        interruptable::interruptable,
         sig_detail::{SigDetail, SigKillDetail},
         sig_info::{SigCode, SigInfo},
         sig_set::SigSet,
@@ -185,12 +183,8 @@ impl Syscall<'_> {
         };
 
         // wait for child exit
-        let (exit_code, tid) = abortable(
-            self.task,
-            self.task.wait_child(pid_type, wait_option),
-            Some(SigSet::SIGCHLD),
-        )
-        .await??;
+        let (exit_code, tid) =
+            interruptable(self.task, self.task.wait_child(pid_type, wait_option), None).await??;
         if status.is_non_null() {
             trace!(
                 "[sys_wait4]: write exit_code at status_addr = {:#x}, value: ",

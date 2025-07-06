@@ -4,7 +4,7 @@
 //! sys_sigreturn
 //! sys_sigsuspend
 
-use core::time::Duration;
+use core::{future::pending, time::Duration};
 
 use arch::{ArchTrapContext, TrapArgs};
 
@@ -13,8 +13,8 @@ use crate::{
     config::task::INIT_PROCESS_ID,
     include::{result::Errno, time::TimeSpec},
     mm::user_ptr::UserPtr,
-    sched::utils::suspend_now,
     signal::{
+        interruptable::interruptable,
         sig_action::{KSigAction, USigAction},
         sig_detail::{SigDetail, SigKillDetail},
         sig_info::{RawSigInfo, SigCode, SigInfo},
@@ -65,7 +65,7 @@ impl Syscall<'_> {
         let cx = task.trap_context_mut();
 
         let mut pcb = task.pcb();
-        *pcb.sig_mask_mut() = ucontext.uc_sigmask;
+        *task.sig_mask_mut() = ucontext.uc_sigmask;
         pcb.sig_stack = (ucontext.uc_stack.ss_size != 0).then_some(ucontext.uc_stack);
         cx[EPC] = ucontext.uc_mcontext.epc();
         *cx.gprs_mut() = ucontext.uc_mcontext.gprs();
@@ -99,19 +99,17 @@ impl Syscall<'_> {
             set_value,
         );
 
-        let mut pcb = task.pcb();
-        let old_sigmask = pcb.sig_mask();
+        let old_sigmask = task.sig_mask();
         if let Some(mut set) = set_value {
             // sigmask shouldn't contain SIGKILL and SIGCONT
             set.remove(SigSet::SIGKILL | SigSet::SIGCONT);
             match how {
-                SIGBLOCK => *pcb.sig_mask_mut() |= set,
-                SIGUNBLOCK => *pcb.sig_mask_mut() &= !set,
-                SIGSETMASK => *pcb.sig_mask_mut() = set,
+                SIGBLOCK => *task.sig_mask_mut() |= set,
+                SIGUNBLOCK => *task.sig_mask_mut() &= !set,
+                SIGSETMASK => *task.sig_mask_mut() = set,
                 _ => return Err(Errno::EINVAL),
             };
         }
-        drop(pcb);
         old_set.try_write(old_sigmask).await?;
         Ok(0)
     }
@@ -217,49 +215,14 @@ impl Syscall<'_> {
 
     pub async fn sys_sigsuspend(&self, mask: usize) -> SyscallResult {
         let mask = UserPtr::<SigSet>::from(mask).read().await?;
-        // FIXME: we add restore_mask_when_return to provide a temporary compatibility,
-        // in old unixbench test, restoring mask will cause non-waker deadlock
-        self.__sys_sigsuspend(mask, false).await
+        self.__sys_sigsuspend(mask).await
     }
 
-    async fn __sys_sigsuspend(
-        &self,
-        mut mask: SigSet,
-        restore_mask_when_return: bool,
-    ) -> SyscallResult {
+    async fn __sys_sigsuspend(&self, mask: SigSet) -> SyscallResult {
         let task = self.task;
-        mask.remove(SigSet::SIGKILL | SigSet::SIGSTOP);
-        let invoke_signal = task.sa_list().get_user_bitmap();
-        debug!(
-            "[sys_sigsuspend] tid: {}, new_mask: {:?}, invoke_signal: {:?}",
-            task.tid(),
-            mask,
-            invoke_signal
-        );
-        let mut pcb = task.pcb();
-        let mut old_mask = core::mem::replace(&mut pcb.sig_mask(), mask);
-        old_mask.remove(SigSet::SIGKILL | SigSet::SIGSTOP);
-        let expect = mask | invoke_signal;
-        if pcb.pending_sigs.has_expect_signals(expect) {
-            return Err(Errno::EINTR);
-        } else {
-            *pcb.sig_mask_mut() = !expect;
-            pcb.pending_sigs.should_wake = expect;
-        }
-        debug!(
-            "[sys_sigsuspend] tid: {}, suspend with mask: {:?}, old mask: {:?}, invoke_signal: {:?}",
-            task.tid(),
-            pcb.sig_mask(),
-            old_mask,
-            invoke_signal,
-        );
-        drop(pcb);
-        assert_no_lock!();
-        suspend_now().await;
-        // fixme: the signal mask is not restored correctly
-        if restore_mask_when_return {
-            *task.pcb().sig_mask_mut() = old_mask;
-        }
+        let mask = mask.without_kill();
+        debug!("[sys_sigsuspend] tid: {}, new_mask: {:?}", task.tid(), mask);
+        let _ = interruptable(task, pending::<()>(), Some(mask)).await;
         Err(Errno::EINTR)
     }
 
@@ -278,8 +241,8 @@ impl Syscall<'_> {
     ) -> SyscallResult {
         mask.remove(SigSet::SIGKILL | SigSet::SIGSTOP);
         let timeout = Duration::from(timeout);
-        TimeLimitedFuture::new(self.__sys_sigsuspend(mask, true), Some(timeout));
-        let si = self.task.pcb().pending_sigs.pop_with_mask(mask);
+        TimeLimitedFuture::new(self.__sys_sigsuspend(mask), Some(timeout));
+        let si = self.task.pcb().signals.pop_with_mask(mask);
         if let Some(si) = si {
             let raw_si = si.into_raw();
             info.try_write(raw_si).await?;

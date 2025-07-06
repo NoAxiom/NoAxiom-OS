@@ -33,12 +33,9 @@ struct SimpleLogger;
 
 impl Log for SimpleLogger {
     fn enabled(&self, _metadata: &Metadata) -> bool {
-        true
+        is_log_booted() && is_log_enabled()
     }
     fn log(&self, record: &Record) {
-        if !is_log_enabled() || !is_log_booted() {
-            return;
-        }
         if !self.enabled(record.metadata()) {
             return;
         }

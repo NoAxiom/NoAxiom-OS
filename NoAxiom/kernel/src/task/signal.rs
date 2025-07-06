@@ -27,17 +27,17 @@ extern "C" {
 impl Task {
     pub async fn check_signal(self: &Arc<Self>) {
         let mut pcb = self.pcb();
-        let old_mask = pcb.pending_sigs.sig_mask.clone();
+        let old_mask = self.sig_mask();
         trace!(
             "[check_signal] tid: {}, check pending signals, old_mask: {:?}",
             self.tid(),
             old_mask
         );
-        if !pcb.pending_sigs.has_expect_signals(!old_mask) {
+        if !pcb.signals.has_expect_signals(!old_mask) {
             return;
         }
         let mut pending = Vec::new();
-        while let Some(si) = pcb.pending_sigs.pop_with_mask(old_mask) {
+        while let Some(si) = pcb.signals.pop_with_mask(old_mask) {
             trace!("[check_signal] find a signal {:?}", si.signal);
             pending.push(si);
         }
@@ -75,9 +75,9 @@ impl Task {
                         si.signal, handler, action.flags
                     );
                     if !action.flags.contains(SAFlags::SA_NODEFER) {
-                        pcb.pending_sigs.sig_mask.enable(si.signal);
+                        self.sig_mask_mut().enable(si.signal);
                     };
-                    pcb.pending_sigs.sig_mask |= action.mask;
+                    *self.sig_mask_mut() |= action.mask;
 
                     use TrapArgs::*;
                     let cx = self.trap_context_mut();
@@ -155,11 +155,11 @@ impl Task {
     }
 
     /// siginfo receiver with thread checked
-    pub fn recv_siginfo(self: &Arc<Self>, si: SigInfo, thread_only: bool) {
+    pub fn recv_siginfo(self: &Arc<Self>, si: SigInfo, thread_only: bool) -> bool {
         match thread_only {
             true => {
                 // is thread
-                self.try_recv_siginfo_inner(si, true);
+                self.try_recv_siginfo_inner(si, true)
             }
             false => {
                 // is process (send signal to thread group)
@@ -180,19 +180,14 @@ impl Task {
                         si.signal,
                     );
                 }
-                let mut flag = false;
-
                 for task in tg.iter() {
                     let task = task.1.upgrade().unwrap();
                     if task.try_recv_siginfo_inner(si, false) {
-                        flag = true;
-                        break;
+                        return true;
                     }
                 }
-                if !flag {
-                    let task = tg.iter().next().unwrap().1.upgrade().unwrap();
-                    task.try_recv_siginfo_inner(si, true);
-                }
+                let task = tg.iter().next().unwrap().1.upgrade().unwrap();
+                task.try_recv_siginfo_inner(si, true)
             }
         }
     }
@@ -200,26 +195,26 @@ impl Task {
     /// a raw siginfo receiver without thread checked
     fn try_recv_siginfo_inner(self: &Arc<Task>, info: SigInfo, forced: bool) -> bool {
         let mut pcb = self.pcb();
-        if pcb.pending_sigs.sig_mask.contains_signal(info.signal) && !forced {
+        if self.sig_mask().contains_signal(info.signal) && !forced {
             return false;
         }
         let signal = info.signal;
-        pcb.pending_sigs.push(info);
+        pcb.signals.push(info);
         warn!(
             "[recv_siginfo_inner] tid: {}, push signal {:?} to pending during syscall {:?}",
             self.tid(),
             signal,
             self.tcb().current_syscall,
         );
-        if pcb.pending_sigs.should_wake.contains_signal(signal) {
+        if pcb.signals.should_wake.contains_signal(signal) {
             warn!("[recv_siginfo_inner] tid: {}, wake up task", self.tid());
             self.wake_unchecked();
         } else {
             warn!(
-                "[recv_siginfo_inner] wake task {} get blocked, signo: {:?}, mask: {:?}",
+                "[recv_siginfo_inner] wake task {} get blocked, signal: {:?}, mask: {:?}",
                 self.tid(),
                 info.signal,
-                pcb.sig_mask()
+                self.sig_mask()
             )
         }
         return true;

@@ -3,14 +3,12 @@ use alloc::{
     vec::Vec,
 };
 
+use bitflags::Flags;
+
 use super::{exit::ExitReason, status::TaskStatus, Task};
 use crate::{
     include::process::robust_list::RobustList,
-    signal::{
-        sig_pending::SigPending,
-        sig_set::{SigMask, SigSet},
-        sig_stack::SigAltStack,
-    },
+    signal::{sig_pending::SigManager, sig_set::SigSet, sig_stack::SigAltStack},
 };
 
 /// task control block inner
@@ -28,7 +26,7 @@ pub struct PCB {
     pub parent: Option<Weak<Task>>, // parent task, weak ptr
 
     // signal structs
-    pub pending_sigs: SigPending,       // pending signals
+    pub signals: SigManager,            // pending signals
     pub sig_stack: Option<SigAltStack>, // signal alternate stack
 
     // futex & robust list
@@ -42,7 +40,7 @@ impl Default for PCB {
             parent: None,
             status: TaskStatus::Normal,
             exit_code: ExitReason::default(),
-            pending_sigs: SigPending::new(),
+            signals: SigManager::new(),
             sig_stack: None,
             robust_list: RobustList::default(),
         }
@@ -69,15 +67,11 @@ impl PCB {
     }
 
     /// set wake signal
-    pub fn set_wake_signal(&mut self, sig: SigSet) {
-        self.pending_sigs.should_wake = sig;
+    pub fn set_wake_signal(&mut self, set: SigSet) {
+        self.signals.should_wake = set;
     }
-    /// signal mask
-    pub fn sig_mask(&self) -> SigMask {
-        self.pending_sigs.sig_mask
-    }
-    pub fn sig_mask_mut(&mut self) -> &mut SigMask {
-        &mut self.pending_sigs.sig_mask
+    pub fn clear_wake_signal(&mut self) {
+        self.signals.should_wake.clear();
     }
 
     /// find zombie children

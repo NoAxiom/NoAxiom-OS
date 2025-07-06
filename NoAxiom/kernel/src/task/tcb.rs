@@ -6,11 +6,12 @@ use super::context::TaskTrapContext;
 use crate::{
     include::{process::ThreadInfo, syscall_id::SyscallID},
     mm::user_ptr::UserPtr,
-    signal::sig_stack::UContext,
+    signal::{sig_set::SigMask, sig_stack::UContext},
 };
 
 pub struct TCB {
     pub tif: ThreadInfo,                // thread flags
+    pub sig_mask: SigMask,              // signal mask of the task
     pub waker: Option<Waker>,           // waker for the task
     pub cx: TaskTrapContext,            // trap context
     pub ucx: UserPtr<UContext>,         // ucontext for the task
@@ -23,6 +24,7 @@ impl Default for TCB {
     fn default() -> Self {
         Self {
             tif: ThreadInfo::empty(),
+            sig_mask: SigMask::empty(),
             waker: None,
             cx: TaskTrapContext::new(TrapContext::default(), true),
             ucx: UserPtr::new_null(),

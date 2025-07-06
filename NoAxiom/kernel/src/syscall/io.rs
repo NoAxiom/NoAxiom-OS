@@ -15,8 +15,7 @@ use crate::{
         pselect::PselectFuture,
     },
     mm::user_ptr::UserPtr,
-    sched::utils::abortable,
-    signal::sig_set::SigSet,
+    signal::{interruptable::interruptable, sig_set::SigSet},
     time::timeout::{TimeLimitedFuture, TimeLimitedType},
 };
 
@@ -28,12 +27,12 @@ impl Syscall<'_> {
         timeout_ptr: usize,
         sigmask_ptr: usize,
     ) -> SyscallResult {
-        let sigmask = UserPtr::<SigSet>::new(sigmask_ptr);
-        let sigmask = sigmask.get_ref().await?;
+        let task = self.task;
+        let sigmask = UserPtr::<SigSet>::new(sigmask_ptr).try_read().await?;
         let timeout = UserPtr::<TimeSpec>::new(timeout_ptr)
-            .get_ref()
+            .try_read()
             .await?
-            .map(|x| Duration::from(*x));
+            .map(|x| Duration::from(x));
 
         let mut poll_fds = Vec::new();
         let mut fd_ptrs = Vec::new();
@@ -49,7 +48,7 @@ impl Syscall<'_> {
             fds_ptr, nfds, timeout, sigmask
         );
 
-        let fd_table = self.task.fd_table();
+        let fd_table = task.fd_table();
         let mut poll_items = Vec::new();
         let mut fds = Vec::new();
         for i in 0..nfds {
@@ -62,22 +61,9 @@ impl Syscall<'_> {
         }
         drop(fd_table);
 
-        let mut pcb = self.task.pcb();
-        let old_mask = if let Some(mask) = sigmask {
-            Some(core::mem::replace(pcb.sig_mask_mut(), *mask))
-        } else {
-            None
-        };
-        let sig_mask = pcb.sig_mask();
-        pcb.set_wake_signal(!sig_mask);
-        drop(pcb);
-
-        // we can't hold pcb lock than call .await, but we should ensure the pcb's
-        // sig_mask will not changed
-
         assert_no_lock!();
         let fut = TimeLimitedFuture::new(PpollFuture::new(poll_items), timeout);
-        let intable = abortable(self.task, fut, None);
+        let intable = interruptable(self.task, fut, sigmask);
         let res = match intable.await? {
             TimeLimitedType::Ok(res) => res,
             TimeLimitedType::TimeOut => {
@@ -95,12 +81,6 @@ impl Syscall<'_> {
                 "[sys_ppoll]: after poll: poll_fd {:#x?}",
                 fds[id].0.try_read().await?
             );
-        }
-
-        let mut pcb = self.task.pcb();
-        assert_eq!(sig_mask, pcb.sig_mask(), "sig_mask not equal");
-        if let Some(old_mask) = old_mask {
-            *pcb.sig_mask_mut() = old_mask;
         }
         Ok(res_len as isize)
     }
@@ -125,9 +105,9 @@ impl Syscall<'_> {
         }
 
         let timeout = UserPtr::<TimeSpec>::new(timeout_ptr)
-            .get_ref()
+            .try_read()
             .await?
-            .map(|x| Duration::from(*x));
+            .map(|x| Duration::from(x));
         let read_fds = UserPtr::<FdSet>::new(readfds_ptr);
         let mut read_fds = read_fds.get_ref_mut().await?;
         let write_fds = UserPtr::<FdSet>::new(writefds_ptr);
@@ -135,7 +115,7 @@ impl Syscall<'_> {
         let except_fds = UserPtr::<FdSet>::new(exceptfds_ptr);
         let mut except_fds = except_fds.get_ref_mut().await?;
         let sigmask = UserPtr::<SigSet>::new(sigmask_ptr);
-        let sigmask = sigmask.get_ref().await?;
+        let sigmask = sigmask.try_read().await?;
 
         info!(
             "[sys_pselect6]: read_fds {:?}, write_fds {:?}, except_fds {:?}, timeout:{:?}, sigmask:{:?}",
@@ -174,19 +154,9 @@ impl Syscall<'_> {
         }
         drop(fd_table);
 
-        let mut pcb = self.task.pcb();
-        let old_mask = if let Some(mask) = sigmask {
-            Some(core::mem::replace(pcb.sig_mask_mut(), *mask))
-        } else {
-            None
-        };
-        let sig_mask = pcb.sig_mask();
-        pcb.set_wake_signal(!sig_mask);
-        drop(pcb);
-
         assert_no_lock!();
         let fut = TimeLimitedFuture::new(PselectFuture::new(poll_items), timeout);
-        let intable = abortable(self.task, fut, None);
+        let intable = interruptable(self.task, fut, sigmask);
         let res = match intable.await? {
             TimeLimitedType::Ok(res) => Some(res),
             TimeLimitedType::TimeOut => None,
@@ -195,12 +165,6 @@ impl Syscall<'_> {
         read_fds.as_mut().map(|fds| fds.clear());
         write_fds.as_mut().map(|fds| fds.clear());
         except_fds.as_mut().map(|fds| fds.clear());
-
-        let mut pcb = self.task.pcb();
-        assert_eq!(sig_mask, pcb.sig_mask(), "sig_mask not equal");
-        if let Some(old_mask) = old_mask {
-            *pcb.sig_mask_mut() = old_mask;
-        }
 
         if res.is_none() {
             debug!("[sys_pselect6]: timeout return Ok(0)");

@@ -83,7 +83,7 @@ impl File for StatusFile {
                              // let threads = self.op_thread_group(|tg| tg.len());
         let threads = 0;
         let sigq = 1; // 信号队列大小（fake）
-        let sigpnd = task.pcb().sig_mask(); // 信号掩码
+        let sigpnd = task.sig_mask(); // 信号掩码
         let shdpnd = 0; // 共享信号掩码（fake）
         let sigblk = 0; // 阻塞的信号掩码（fake）
         let sigign = 0; // 忽略的信号掩码（fake）

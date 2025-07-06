@@ -104,6 +104,7 @@ impl<T> UserPtr<T> {
         Self::ptr_will_cross_page(self.addr())
     }
 
+    #[deprecated(note = "use `try_read()` instead")]
     pub async fn get_ref(&self) -> SysResult<Option<&T>> {
         match unsafe { self.ptr().as_ref() } {
             Some(ptr) => {

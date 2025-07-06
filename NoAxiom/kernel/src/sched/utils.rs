@@ -4,24 +4,13 @@
 //! - use [`suspend_now`] to suspend current task (without immediate wake)
 
 use alloc::sync::Arc;
-use core::{
-    future::Future,
-    pin::Pin,
-    task::{Context, Poll, Waker},
-};
+use core::{future::Future, task::Waker};
 
-use include::errno::Errno;
 pub use kfuture::block::block_on;
 use kfuture::{suspend::SuspendFuture, take_waker::TakeWakerFuture, yield_fut::YieldFuture};
 use ksync::assert_no_lock;
-use pin_project_lite::pin_project;
 
-use crate::{
-    cpu::current_task,
-    signal::{sig_action::SAFlags, sig_set::SigMask},
-    syscall::SysResult,
-    task::Task,
-};
+use crate::{cpu::current_task, task::Task};
 
 impl Task {
     /// yield current task by awaiting this future,
@@ -55,56 +44,6 @@ pub async fn take_waker() -> Waker {
 pub async fn suspend_now() {
     assert_no_lock!();
     SuspendFuture::new().await;
-}
-
-pin_project! {
-    #[must_use = "futures do nothing unless you `.await` or poll them"]
-    pub struct IntableFuture<'a, F> {
-        task: &'a Arc<Task>,
-        #[pin]
-        fut: F,
-        mask: SigMask,
-    }
-}
-
-impl<F, T> Future for IntableFuture<'_, F>
-where
-    F: Future<Output = T>,
-{
-    type Output = SysResult<T>;
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let this = self.project();
-        let task = this.task;
-        match this.fut.poll(cx) {
-            Poll::Ready(res) => Poll::Ready(Ok(res)),
-            Poll::Pending => {
-                // start to handle signal
-                let mask = this.mask;
-                // let info = task.peek_get_pending_signal(mask);
-                if let Some(info) = task.pcb().pending_sigs.peek_with_mask(&mask) {
-                    let sa_list = task.sa_list();
-                    if sa_list[info.signal].flags.contains(SAFlags::SA_RESTART) {
-                        return Poll::Pending;
-                    }
-                    // task.tcb_mut().interrupted = true;
-                    Poll::Ready(Err(Errno::EINTR))
-                } else {
-                    Poll::Pending
-                }
-            }
-        }
-    }
-}
-
-pub async fn abortable<T>(
-    task: &Arc<Task>,
-    fut: impl Future<Output = T>,
-    block_sig: Option<SigMask>,
-) -> SysResult<T> {
-    let addition = task.sa_list().get_ignored_bitmap();
-    let mask = (block_sig.unwrap_or(SigMask::empty()) | addition).without_kill();
-    debug!("[intable] task{} wait with mask: {:?}", task.tid(), mask);
-    IntableFuture { task, fut, mask }.await
 }
 
 pub async fn realtime<T>(task: &Arc<Task>, fut: impl Future<Output = T>) -> T {

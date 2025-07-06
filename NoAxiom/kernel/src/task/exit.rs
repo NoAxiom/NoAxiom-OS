@@ -30,7 +30,7 @@ pub async fn init_proc_exit_handler(task: &Arc<Task>) {
                 "[exit_handler] child tid: {}, during syscall: {:?}, sigmask: {:?}",
                 i.tid(),
                 i.tcb().current_syscall,
-                i.pcb().sig_mask(),
+                i.sig_mask(),
             );
             i.recv_siginfo(
                 SigInfo {
@@ -112,7 +112,7 @@ impl Task {
         let mut pcb = self.pcb();
         pcb.set_status(TaskStatus::Zombie);
         if self.is_group_leader() {
-            if let Some(process) = pcb.parent.clone() {
+            if let Some(process) = pcb.parent.as_ref() {
                 let parent = process.upgrade().unwrap();
                 trace!("[exit_handler] parent tid: {}", parent.tid());
                 // send SIGCHLD
@@ -128,6 +128,7 @@ impl Task {
                     }),
                 );
                 parent.recv_siginfo(siginfo, false);
+                parent.wake_unchecked();
             } else {
                 error!("[exit_handler] parent not found");
             }

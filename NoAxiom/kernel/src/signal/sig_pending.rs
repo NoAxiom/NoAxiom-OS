@@ -10,20 +10,18 @@ use super::{
 /// note that: even if the signal is masked,
 /// it will still be stored in the pending signals,
 /// and will be handled when the signal is unmasked
-pub struct SigPending {
-    pub sig_mask: SigMask,        // signal mask of the task
+pub struct SigManager {
     pub queue: VecDeque<SigInfo>, // pending signal queue that should be handled
     pub pending_set: SigSet,      // current pending signal set, used to avoid duplicate signals
-    pub should_wake: SigSet,      // signals that should wake the task
+    pub should_wake: SigSet,      // additional signals that should wake the task
 }
 
-impl SigPending {
+impl SigManager {
     pub fn new() -> Self {
         Self {
-            sig_mask: SigMask::empty(),
             queue: VecDeque::new(),
             pending_set: SigSet::empty(),
-            should_wake: SigSet::all(),
+            should_wake: SigSet::empty(),
         }
     }
 
@@ -37,7 +35,7 @@ impl SigPending {
     pub fn pop_with_mask(&mut self, mask: SigMask) -> Option<SigInfo> {
         // kill / stop signal cannot be blocked
         // other signals can be blocked by sigmask
-        let accept_set = self.pending_set & !mask.without_kill();
+        let accept_set = self.pending_set & mask.with_kill();
         if accept_set.is_empty() {
             return None;
         } else {
@@ -61,7 +59,7 @@ impl SigPending {
     }
 
     pub fn peek_with_mask(&self, mask: &SigMask) -> Option<&SigInfo> {
-        let accept_set = self.pending_set & !mask.without_kill();
+        let accept_set = self.pending_set & mask.with_kill();
         if accept_set.is_empty() {
             return None;
         } else {
@@ -84,7 +82,7 @@ impl SigPending {
     }
 }
 
-impl Default for SigPending {
+impl Default for SigManager {
     fn default() -> Self {
         Self::new()
     }

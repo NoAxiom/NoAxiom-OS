@@ -37,7 +37,10 @@ use crate::{
         utils::take_waker,
     },
     signal::{
-        sig_action::SigActionList, sig_pending::SigPending, sig_set::SigSet, sig_stack::UContext,
+        sig_action::SigActionList,
+        sig_pending::SigManager,
+        sig_set::{SigMask, SigSet},
+        sig_stack::UContext,
     },
     syscall::SysResult,
     task::{
@@ -216,6 +219,17 @@ impl Task {
         self.tcb.as_ref_mut()
     }
 
+    /// signal mask
+    pub fn sig_mask(&self) -> SigMask {
+        self.tcb().sig_mask
+    }
+    pub fn sig_mask_mut(&self) -> &mut SigMask {
+        &mut self.tcb_mut().sig_mask
+    }
+    pub fn set_sig_mask(&self, mask: SigMask) {
+        *self.sig_mask_mut() = mask;
+    }
+
     /// sched entity
     pub fn sched_entity(&self) -> &SchedEntity {
         self.sched_entity.as_ref()
@@ -342,10 +356,7 @@ impl Task {
             tgid,
             pgid: Shared::new_atomic(tgid),
             pcb: Mutable::new(PCB {
-                pending_sigs: SigPending {
-                    sig_mask: SigSet::all() - SigSet::SIGCHLD,
-                    ..Default::default()
-                },
+                signals: SigManager::default(),
                 ..Default::default()
             }),
             thread_group: Shared::new(ThreadGroup::new()),
@@ -356,6 +367,7 @@ impl Task {
             sa_list: Shared::new(SigActionList::new()),
             tcb: ThreadOnly::new(TCB {
                 cx: TaskTrapContext::new(TrapContext::app_init_cx(elf_entry, user_sp), true),
+                sig_mask: SigSet::all() - SigSet::SIGCHLD,
                 ..Default::default()
             }),
             futex: Shared::new(FutexQueue::new()),
