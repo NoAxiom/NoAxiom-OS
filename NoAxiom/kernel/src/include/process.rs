@@ -252,5 +252,9 @@ bitflags! {
         const TIF_NEED_RESCHED    = 1 << 3;
         /// signal notifications exist
         const TIF_NOTIFY_SIGNAL   = 1 << 5;
+
+        // ====== local definition ======
+        /// status changed
+        const TIF_STATUS_CHANGED = 1 << 6;
     }
 }

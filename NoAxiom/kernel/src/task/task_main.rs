@@ -59,7 +59,22 @@ impl<F: Future + Send + 'static> Future for UserTaskFuture<F> {
 pub async fn stop_now(task: &Arc<Task>) {
     assert_no_lock!();
     suspend_now().await;
-    task.pcb().set_status(TaskStatus::Normal);
+    task.pcb().set_status(TaskStatus::Normal, task.tif_mut());
+}
+
+// check TaskStatus::Terminated and TaskStatus::Stopped
+macro_rules! check_status {
+    ($task:expr) => {
+        assert_no_lock!();
+        if let Some(status) = $task.try_get_status() {
+            match status {
+                TaskStatus::Terminated => break,
+                TaskStatus::Stopped => stop_now(&$task).await,
+                _ => {}
+            }
+        }
+        assert_no_lock!();
+    };
 }
 
 /// user task main
@@ -69,53 +84,23 @@ pub async fn task_main(task: Arc<Task>) {
     assert_no_lock!();
     loop {
         // kernel -> user
-        trace!("[task_main] trap_restore, cx: {:#x?}", task.trap_context());
         task.time_stat_mut().record_trap_in();
         let cx = task.trap_context_mut();
         Arch::trap_restore(cx); // restore context and return to user mode
         let trap_type = Arch::read_trap_type(Some(cx));
         task.time_stat_mut().record_trap_out();
-
-        // check sigmask and status
-        assert_no_lock!();
-        let status = task.pcb().status();
-        match status {
-            TaskStatus::Terminated => break,
-            TaskStatus::Stopped => stop_now(&task).await,
-            _ => {}
-        }
-        assert_no_lock!();
+        check_status!(task);
 
         // user -> kernel, enter the handler
-        trace!(
-            "[task_main] user_trap_handler, cx: {:#x?}",
-            task.trap_context()
-        );
         Arch::disable_interrupt();
         assert_no_lock!();
         user_trap_handler(&task, trap_type).await;
         Arch::enable_interrupt();
 
-        // check status
-        let status = task.pcb().status();
-        match status {
-            TaskStatus::Terminated => break,
-            TaskStatus::Stopped => stop_now(&task).await,
-            _ => {}
-        }
-        assert_no_lock!();
-
         // check signal before return to user
-        trace!("[task_main] check_signal");
+        check_status!(task);
         task.check_signal().await;
-        assert_no_lock!();
-        let status = task.pcb().status();
-        match status {
-            TaskStatus::Terminated => break,
-            TaskStatus::Stopped => stop_now(&task).await,
-            _ => {}
-        }
-        assert_no_lock!();
+        check_status!(task);
     }
     assert_no_lock!();
     task.exit_handler().await;

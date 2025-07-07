@@ -319,13 +319,22 @@ impl Task {
 
 // process implementation
 impl Task {
+    pub fn try_get_status(&self) -> Option<TaskStatus> {
+        if !self.tif().contains(TaskFlags::TIF_STATUS_CHANGED) {
+            None
+        } else {
+            self.tif_mut().remove(TaskFlags::TIF_STATUS_CHANGED);
+            Some(self.pcb().status())
+        }
+    }
+
     /// exit current task
     pub fn terminate(&self, exit_code: ExitReason) {
         let mut pcb = self.pcb();
         if self.is_group_leader() {
             pcb.set_exit_code(exit_code);
         }
-        pcb.set_status(TaskStatus::Terminated);
+        pcb.set_status(TaskStatus::Terminated, self.tif_mut());
     }
 
     /// terminate all tasks in current thread group

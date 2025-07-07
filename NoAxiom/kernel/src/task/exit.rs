@@ -110,7 +110,7 @@ impl Task {
 
         // send SIGCHLD to parent
         let mut pcb = self.pcb();
-        pcb.set_status(TaskStatus::Zombie);
+        pcb.set_status(TaskStatus::Zombie, self.tif_mut());
         if self.is_group_leader() {
             if let Some(process) = pcb.parent.as_ref() {
                 let parent = process.upgrade().unwrap();

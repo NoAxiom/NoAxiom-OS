@@ -274,7 +274,7 @@ impl Task {
         let tg = self.thread_group();
         for (_, t) in tg.0.iter() {
             let task = t.upgrade().unwrap();
-            task.pcb().set_status(TaskStatus::Stopped);
+            task.pcb().set_status(TaskStatus::Stopped, task.tif_mut());
         }
     }
     /// continue the process

@@ -12,7 +12,7 @@ use crate::{
 pub struct TCB {
     pub flags: TaskFlags,               // thread flags
     pub sig_mask: SigMask,              // signal mask of the task
-    pub old_mask: Option<SigMask>,              // old signal mask
+    pub old_mask: Option<SigMask>,      // old signal mask
     pub waker: Option<Waker>,           // waker for the task
     pub cx: TaskTrapContext,            // trap context
     pub ucx: UserPtr<UContext>,         // ucontext for the task

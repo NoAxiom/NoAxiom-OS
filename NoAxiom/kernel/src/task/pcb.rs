@@ -7,7 +7,7 @@ use bitflags::Flags;
 
 use super::{exit::ExitReason, status::TaskStatus, Task};
 use crate::{
-    include::process::robust_list::RobustList,
+    include::process::{robust_list::RobustList, TaskFlags},
     signal::{sig_pending::SigManager, sig_set::SigSet, sig_stack::SigAltStack},
 };
 
@@ -54,7 +54,8 @@ impl PCB {
         self.status
     }
     #[inline(always)]
-    pub fn set_status(&mut self, status: TaskStatus) {
+    pub fn set_status(&mut self, status: TaskStatus, tif: &mut TaskFlags) {
+        tif.insert(TaskFlags::TIF_STATUS_CHANGED);
         self.status = status;
     }
 
