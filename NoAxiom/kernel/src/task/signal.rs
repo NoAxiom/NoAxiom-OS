@@ -6,6 +6,7 @@ use config::mm::SIG_TRAMPOLINE;
 use ksync::assert_no_lock;
 
 use crate::{
+    include::process::TaskFlags,
     mm::user_ptr::UserPtr,
     signal::{
         sig_action::{SAFlags, SAHandlerType},
@@ -26,23 +27,37 @@ extern "C" {
 
 impl Task {
     pub async fn check_signal(self: &Arc<Self>) {
+        // check tif first
+        if !self.tif().contains(TaskFlags::TIF_NOTIFY_SIGNAL) {
+            return;
+        }
+
+        // check pendingn signal
         let mut pcb = self.pcb();
-        let old_mask = self.sig_mask();
-        trace!(
-            "[check_signal] tid: {}, check pending signals, old_mask: {:?}",
-            self.tid(),
-            old_mask
-        );
-        if !pcb.signals.has_pending_signals(old_mask) {
+        let sig_mask = self.sig_mask();
+        if !pcb.signals.has_pending_signals(sig_mask) {
             return;
         }
         let mut pending = Vec::new();
-        while let Some(si) = pcb.signals.pop_with_mask(old_mask) {
-            trace!("[check_signal] find a signal {:?}", si.signal);
+        while let Some(si) = pcb.signals.pop_with_mask(sig_mask) {
             pending.push(si);
         }
         drop(pcb);
 
+        // restore sigmask
+        if self.tif().contains(TaskFlags::TIF_RESTORE_SIGMASK) {
+            if let Some(mask) = self.take_old_mask() {
+                info!(
+                    "[check_signal] restore old sigmask: {}",
+                    mask.debug_info_short()
+                );
+                self.set_sig_mask(mask);
+            } else {
+                warn!("[check_signal] no old sigmask to restore while TIF_RESTORE_SIGMASK is set");
+            }
+        }
+
+        // handle each signal
         let sa_list = self.sa_list();
         for si in pending {
             let signal = si.signal;
@@ -53,13 +68,19 @@ impl Task {
             );
 
             // check interrpt syscall
-            // let tcb = self.tcb_mut();
-            // if tcb.interrupted && action.flags.contains(SAFlags::SA_RESTART) {
-            //     self.trap_context_mut()[TrapArgs::EPC] -= 4;
-            //     self.clear_syscall_result();
-            //     tcb.interrupted = false;
-            //     println_debug!("restart!!!");
-            // }
+            let tcb = self.tcb_mut();
+            if action.flags.contains(SAFlags::SA_RESTART)
+                && tcb.flags.contains(TaskFlags::TIF_SIGPENDING)
+            {
+                self.trap_context_mut()[TrapArgs::EPC] -= 4;
+                self.clear_syscall_result();
+                tcb.flags -= TaskFlags::TIF_SIGPENDING;
+                println_debug!(
+                    "TID{} restart syscall after signal: {:?}",
+                    self.tid(),
+                    signal
+                );
+            }
 
             // start handle
             match action.handler {
@@ -102,7 +123,7 @@ impl Task {
                         uc_link: 0,
                         // fixme: always returns default here
                         uc_stack,
-                        uc_sigmask: old_mask,
+                        uc_sigmask: sig_mask,
                         __unused: [0; 1024 / 8 - core::mem::size_of::<SigMask>()],
                         uc_mcontext: MContext::from_cx(&cx),
                     };
@@ -172,6 +193,10 @@ impl Task {
                 }
                 let mut guard = self.thread_group();
                 let tg = &mut guard.0;
+                if tg.is_empty() {
+                    error!("[recv_siginfo] thread group is empty, tid: {}", self.tid());
+                    return false;
+                }
                 for it in tg.iter() {
                     let task = it.1.upgrade().unwrap();
                     trace!(
@@ -181,13 +206,18 @@ impl Task {
                     );
                 }
                 for task in tg.iter() {
-                    let task = task.1.upgrade().unwrap();
-                    if task.try_recv_siginfo_inner(si, false) {
-                        return true;
+                    if let Some(task) = task.1.upgrade() {
+                        if task.try_recv_siginfo_inner(si, false) {
+                            return true;
+                        }
                     }
                 }
-                let task = tg.iter().next().unwrap().1.upgrade().unwrap();
-                task.try_recv_siginfo_inner(si, true)
+                if let Some((_, task)) = tg.iter().next() {
+                    if let Some(task) = task.upgrade() {
+                        return task.try_recv_siginfo_inner(si, true);
+                    }
+                }
+                false
             }
         }
     }
@@ -210,13 +240,16 @@ impl Task {
             warn!("[recv_siginfo_inner] tid: {}, wake up task", self.tid());
             self.wake_unchecked();
         } else {
-            warn!(
-                "[recv_siginfo_inner] wake task {} get blocked, signal: {:?}, mask: {:?}",
+            println_debug!(
+                "[recv_siginfo_inner] wake for task {} get blocked, signal: {:?}, mask: {}, wakeset: {}",
                 self.tid(),
                 info.signal,
-                self.sig_mask()
+                self.sig_mask().debug_info_short(),
+                pcb.signals.should_wake.debug_info_short(),
             )
         }
+        // notify the task to check signal
+        self.tif_mut().insert(TaskFlags::TIF_NOTIFY_SIGNAL);
         return true;
     }
 

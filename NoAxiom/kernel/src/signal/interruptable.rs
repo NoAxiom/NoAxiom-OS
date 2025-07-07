@@ -10,9 +10,7 @@ use ksync::assert_no_lock;
 use pin_project_lite::pin_project;
 
 use crate::{
-    signal::{sig_action::SAFlags, sig_set::SigMask},
-    syscall::SysResult,
-    task::Task,
+    include::process::TaskFlags, signal::sig_set::SigMask, syscall::SysResult, task::Task,
 };
 
 pin_project! {
@@ -39,17 +37,13 @@ where
                 // start to handle signal
                 let mask = this.mask;
                 if let Some(info) = task.pcb().signals.peek_with_mask(*mask) {
-                    let sa_list = task.sa_list();
-                    if sa_list[info.signal].flags.contains(SAFlags::SA_RESTART) {
-                        return Poll::Pending;
-                    }
-                    // task.tcb_mut().interrupted = true;
-                    debug!(
-                        "[intable] TID{} interrupted by signal {:?}, mask {:?}",
+                    warn!(
+                        "[intable] TID{} get interrupted by signal {:?}, mask {:?}",
                         task.tid(),
                         info.signal,
                         mask,
                     );
+                    task.tcb_mut().flags |= TaskFlags::TIF_SIGPENDING;
                     Poll::Ready(Err(Errno::EINTR))
                 } else {
                     Poll::Pending
@@ -67,16 +61,14 @@ pub async fn interruptable<T>(
     // ensure the task is not holding any spinlocks
     assert_no_lock!();
 
-    // replace old mask
-    let old_mask = task.sig_mask();
-    if let Some(mask) = new_mask {
-        task.set_sig_mask(mask);
-    }
-    let sig_mask = task.sig_mask();
-
     // set wake signal
-    let ignored_set = task.sa_list().get_ignored_bitmap();
-    let mask = (sig_mask | ignored_set).without_kill();
+    // fixme: should we skip ignored sigset?
+    let sig_mask = new_mask.unwrap_or(task.sig_mask());
+    // let ignored_set = task.sa_list().get_ignored_bitmap();
+    // let mask = (sig_mask | ignored_set).without_kill();
+    let mask = sig_mask.without_kill();
+    task.swap_in_sigmask(mask);
+    task.tif_mut().insert(TaskFlags::TIF_RESTORE_SIGMASK);
     task.pcb().set_wake_signal(!mask);
 
     // suspend now!
@@ -89,7 +81,5 @@ pub async fn interruptable<T>(
 
     // restore old mask
     task.pcb().clear_wake_signal();
-    task.set_sig_mask(old_mask);
-
     res
 }

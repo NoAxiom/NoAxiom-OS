@@ -24,7 +24,7 @@ use crate::{
         fs::InodeMode,
         process::{
             auxv::{AuxEntry, AT_NULL, AT_RANDOM},
-            CloneFlags, ThreadInfo,
+            CloneFlags, TaskFlags,
         },
         sched::CpuMask,
     },
@@ -229,6 +229,23 @@ impl Task {
     pub fn set_sig_mask(&self, mask: SigMask) {
         *self.sig_mask_mut() = mask;
     }
+    pub fn set_old_mask(&self, mask: SigMask) {
+        self.tcb_mut().old_mask = Some(mask);
+    }
+    pub fn take_old_mask(&self) -> Option<SigMask> {
+        self.tcb_mut().old_mask.take()
+    }
+    pub fn swap_in_sigmask(&self, new_mask: SigMask) {
+        self.set_old_mask(core::mem::replace(self.sig_mask_mut(), new_mask));
+    }
+
+    // tif
+    pub fn tif(&self) -> &TaskFlags {
+        &self.tcb().flags
+    }
+    pub fn tif_mut(&self) -> &mut TaskFlags {
+        &mut self.tcb_mut().flags
+    }
 
     /// sched entity
     pub fn sched_entity(&self) -> &SchedEntity {
@@ -240,11 +257,11 @@ impl Task {
 
     /// schedule
     pub fn need_resched(&self) -> bool {
-        self.sched_entity().need_yield() || self.tcb().tif.contains(ThreadInfo::TIF_NEED_RESCHED)
+        self.sched_entity().need_yield() || self.tcb().flags.contains(TaskFlags::TIF_NEED_RESCHED)
     }
     pub fn clear_resched_flags(&self) {
         self.sched_entity_mut().clear_pending_yield();
-        self.tcb_mut().tif.remove(ThreadInfo::TIF_NEED_RESCHED);
+        self.tcb_mut().flags.remove(TaskFlags::TIF_NEED_RESCHED);
     }
 
     /// time stat

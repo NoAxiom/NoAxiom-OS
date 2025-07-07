@@ -241,7 +241,7 @@ pub struct CloneArgs {
 
 bitflags! {
     /// Thread flags defined to check the state of a thread asynchronously.
-    pub struct ThreadInfo: usize {
+    pub struct TaskFlags: usize {
         /// restore sig mask in do_signal()
         const TIF_RESTORE_SIGMASK = 1 << 0;
         /// resumption notification requested

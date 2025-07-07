@@ -1,3 +1,5 @@
+use alloc::string::String;
+
 use bitflags::bitflags;
 use include::errno::{Errno, SysResult};
 
@@ -122,5 +124,19 @@ impl SigSet {
     }
     pub unsafe fn from_raw_signo(index: usize) -> Self {
         SigSet::from_bits_truncate(1 << index)
+    }
+    pub fn debug_info_short(&self) -> String {
+        let mask_size = self.bits().count_ones();
+        let rev = !*self;
+        let rev_size = rev.bits().count_ones();
+        if mask_size == 0 {
+            String::from("Empty")
+        } else if rev_size == 0 {
+            String::from("Full")
+        } else if mask_size < rev_size {
+            format!("{:?}", *self)
+        } else {
+            format!("Skip[{:?}]", rev)
+        }
     }
 }

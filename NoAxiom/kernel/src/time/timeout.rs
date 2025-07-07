@@ -6,9 +6,13 @@ use core::{
     time::Duration,
 };
 
-use crate::time::{
-    gettime::get_time_duration,
-    timer::{Timer, TIMER_MANAGER},
+use crate::{
+    cpu::current_task,
+    signal::interruptable::interruptable,
+    time::{
+        gettime::get_time_duration,
+        timer::{Timer, TIMER_MANAGER},
+    },
 };
 
 pub enum TimeLimitedType<T> {
@@ -93,15 +97,19 @@ pub async fn sleep_now(interval: Duration) -> Duration {
         busy_wait_timeout(interval);
         return Duration::ZERO;
     } else {
-        sleep_now_no_int(interval).await
+        sleep_now_interruptable(interval).await
     }
 }
 
-pub async fn sleep_now_no_int(interval: Duration) -> Duration {
+pub async fn sleep_now_interruptable(interval: Duration) -> Duration {
     let expire = get_time_duration() + interval;
     // todo add block sleep if the interval is too short
     info!("[sleep] expire: {:?} interval: {:?}", expire, interval);
-    TimeLimitedFuture::new(pending::<()>(), Some(interval)).await;
+    TimeLimitedFuture::new(
+        interruptable(current_task().unwrap(), pending::<()>(), None),
+        Some(interval),
+    )
+    .await;
     let now = get_time_duration();
     if expire > now {
         expire - now
