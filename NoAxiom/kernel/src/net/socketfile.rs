@@ -210,6 +210,9 @@ impl File for SocketFile {
     fn meta(&self) -> &FileMeta {
         &self.meta
     }
+    fn is_interruptable(&self) -> bool {
+        true
+    }
     async fn base_read(&self, _offset: usize, buf: &mut [u8]) -> SyscallResult {
         let mut sock = self.socket().await;
         let res;

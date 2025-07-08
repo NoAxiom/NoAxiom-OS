@@ -115,26 +115,18 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
             match task.memory_validate(addr, trap_type, false).await {
                 Ok(_) => trace!("[memory_validate] success in user_trap_handler"),
                 Err(_) => {
-                    error!(
-                        "[user_trap] page fault at hart: {}, tid: {}, trap_type: {:x?}, epc = {:#x}, user_sp = {:#x}, ra = {:#x}",
-                        get_hartid(),
+                    warn!(
+                        "[user_trap] page fault, tid: {}, trap_type: {:x?}, epc = {:#x}, user_sp = {:#x}, ra = {:#x}",
                         task.tid(),
                         trap_type,
                         cx[TrapArgs::EPC],
                         cx[TrapArgs::SP],
                         cx[TrapArgs::RA],
                     );
-                    // println!(
-                    //     "[kernel] task {} trigger SIGSEGV at pc={:#x}, addr={:#x}",
-                    //     task.tid(),
-                    //     cx[TrapArgs::EPC],
-                    //     addr,
-                    // );
                     task.recv_siginfo(
                         SigInfo::new_simple(Signal::SIGSEGV.into(), SigCode::Kernel),
-                        false,
+                        true,
                     );
-                    // panic!();
                 }
             }
         }

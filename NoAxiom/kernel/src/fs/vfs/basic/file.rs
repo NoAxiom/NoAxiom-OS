@@ -87,6 +87,10 @@ pub trait File: Send + Sync + DowncastSync {
     fn dentry(&self) -> Arc<dyn Dentry> {
         self.meta().dentry.clone()
     }
+    /// Can be interrupted by signal? Default is false.
+    fn is_interruptable(&self) -> bool {
+        false
+    }
     /// Get the meta of the file
     fn meta(&self) -> &FileMeta;
     /// Read data from file at `offset` to `buf`, not for kernel other modules

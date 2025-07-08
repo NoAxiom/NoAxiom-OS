@@ -197,7 +197,12 @@ impl Syscall<'_> {
             return Err(Errno::EINVAL);
         }
 
-        interruptable(self.task, file.read(buf_slice), None, None).await?
+        let read_fut = file.read(buf_slice);
+        if file.is_interruptable() {
+            interruptable(self.task, read_fut, None, None).await?
+        } else {
+            read_fut.await
+        }
     }
 
     /// Read the file associated with the file descriptor fd to iovcnt buffers
@@ -267,7 +272,12 @@ impl Syscall<'_> {
             return Err(Errno::EINVAL);
         }
 
-        interruptable(self.task, file.write(buf_slice), None, None).await?
+        let write_fut = file.write(buf_slice);
+        if file.is_interruptable() {
+            interruptable(self.task, write_fut, None, None).await?
+        } else {
+            write_fut.await
+        }
     }
 
     /// Write iovcnt buffers of data described by iov to the file associated

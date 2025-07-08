@@ -372,6 +372,9 @@ impl File for PipeFile {
     fn meta(&self) -> &FileMeta {
         &self.meta
     }
+    fn is_interruptable(&self) -> bool {
+        true
+    }
     async fn base_read(&self, _offset: usize, buf: &mut [u8]) -> SyscallResult {
         assert!(self.is_read_end());
         debug!("[pipe] {} read, {}", self.meta.dentry().name(), buf.len());
