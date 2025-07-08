@@ -38,13 +38,6 @@ impl Syscall<'_> {
         // when detect new sig action, register it into sigaction list
         if let Some(act) = act {
             let kaction = KSigAction::from_sa(act, signal);
-            // if kaction.handler == SAHandlerType::Ignore {
-            //     println_debug!(
-            //         "[sys_sigaction]: task{} IGNORE {:?}",
-            //         self.task.tid(),
-            //         SigNum::from(signo),
-            //     );
-            // }
             sa.set_sigaction(signal, kaction);
         }
         drop(sa);
@@ -222,7 +215,7 @@ impl Syscall<'_> {
         let task = self.task;
         let mask = mask.without_kill();
         debug!("[sys_sigsuspend] tid: {}, new_mask: {:?}", task.tid(), mask);
-        let _ = interruptable(task, pending::<()>(), Some(mask)).await;
+        let _ = interruptable(task, pending::<()>(), Some(mask), None).await;
         Err(Errno::EINTR)
     }
 

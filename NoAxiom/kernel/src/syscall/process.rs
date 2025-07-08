@@ -186,7 +186,8 @@ impl Syscall<'_> {
         let (exit_code, tid) = interruptable(
             self.task,
             self.task.wait_child(pid_type, wait_option),
-            Some(self.task.sig_mask() | SigMask::SIGCHLD),
+            None,
+            Some(SigMask::SIGCHLD),
         )
         .await??;
         if status.is_non_null() {

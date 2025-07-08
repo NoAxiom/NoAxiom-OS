@@ -49,11 +49,9 @@ impl Default for PCB {
 
 impl PCB {
     // task status
-    #[inline(always)]
     pub fn status(&self) -> TaskStatus {
         self.status
     }
-    #[inline(always)]
     pub fn set_status(&mut self, status: TaskStatus, tif: &mut TaskFlags) {
         tif.insert(TaskFlags::TIF_STATUS_CHANGED);
         self.status = status;

@@ -393,7 +393,7 @@ impl Task {
             sa_list: Shared::new(SigActionList::new()),
             tcb: ThreadOnly::new(TCB {
                 cx: TaskTrapContext::new(TrapContext::app_init_cx(elf_entry, user_sp), true),
-                sig_mask: SigSet::all() - SigSet::SIGCHLD,
+                sig_mask: SigSet::all(),
                 ..Default::default()
             }),
             futex: Shared::new(FutexQueue::new()),

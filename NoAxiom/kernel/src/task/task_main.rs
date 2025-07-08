@@ -81,26 +81,24 @@ macro_rules! check_status {
 /// called by [`UserTaskFuture`]
 pub async fn task_main(task: Arc<Task>) {
     task.thread_init().await;
-    assert_no_lock!();
     loop {
         // kernel -> user
+        check_status!(task);
         task.time_stat_mut().record_trap_in();
         let cx = task.trap_context_mut();
         Arch::trap_restore(cx); // restore context and return to user mode
         let trap_type = Arch::read_trap_type(Some(cx));
         task.time_stat_mut().record_trap_out();
-        check_status!(task);
 
         // user -> kernel, enter the handler
+        check_status!(task);
         Arch::disable_interrupt();
-        assert_no_lock!();
         user_trap_handler(&task, trap_type).await;
         Arch::enable_interrupt();
 
         // check signal before return to user
         check_status!(task);
         task.check_signal().await;
-        check_status!(task);
     }
     assert_no_lock!();
     task.exit_handler().await;

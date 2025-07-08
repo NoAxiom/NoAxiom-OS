@@ -63,7 +63,7 @@ impl Syscall<'_> {
 
         assert_no_lock!();
         let fut = TimeLimitedFuture::new(PpollFuture::new(poll_items), timeout);
-        let intable = interruptable(self.task, fut, sigmask);
+        let intable = interruptable(self.task, fut, sigmask, None);
         let res = match intable.await? {
             TimeLimitedType::Ok(res) => res,
             TimeLimitedType::TimeOut => {
@@ -156,7 +156,7 @@ impl Syscall<'_> {
 
         assert_no_lock!();
         let fut = TimeLimitedFuture::new(PselectFuture::new(poll_items), timeout);
-        let intable = interruptable(self.task, fut, sigmask);
+        let intable = interruptable(self.task, fut, sigmask, None);
         let res = match intable.await? {
             TimeLimitedType::Ok(res) => Some(res),
             TimeLimitedType::TimeOut => None,

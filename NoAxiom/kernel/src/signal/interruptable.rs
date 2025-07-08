@@ -9,6 +9,7 @@ use include::errno::Errno;
 use ksync::assert_no_lock;
 use pin_project_lite::pin_project;
 
+use super::sig_set::SigSet;
 use crate::{
     include::process::TaskFlags, signal::sig_set::SigMask, syscall::SysResult, task::Task,
 };
@@ -53,23 +54,36 @@ where
     }
 }
 
+/// ## Interruptable Future
+///
+/// This future wrapper provides pending signal check
+/// when the inner future returns Pending.
+///
+/// - `task`: The task that is waiting for the future.
+/// - `fut`: The future to be executed.
+/// - `new_mask`: The new signal mask to be set for the task, which will be
+///   restored in [Task::check_signal].
+/// - `wake_set`: The *additional* signal set that will wake the task.
 pub async fn interruptable<T>(
     task: &Arc<Task>,
     fut: impl Future<Output = T>,
     new_mask: Option<SigMask>,
+    wake_set: Option<SigSet>,
 ) -> SysResult<T> {
     // ensure the task is not holding any spinlocks
     assert_no_lock!();
 
-    // set wake signal
-    // fixme: should we skip ignored sigset?
-    let sig_mask = new_mask.unwrap_or(task.sig_mask());
-    // let ignored_set = task.sa_list().get_ignored_bitmap();
-    // let mask = (sig_mask | ignored_set).without_kill();
-    let mask = sig_mask.without_kill();
-    task.swap_in_sigmask(mask);
-    task.tif_mut().insert(TaskFlags::TIF_RESTORE_SIGMASK);
-    task.pcb().set_wake_signal(!mask);
+    // set new mask
+    if let Some(new_mask) = new_mask {
+        task.swap_in_sigmask(new_mask.without_kill());
+        task.tif_mut().insert(TaskFlags::TIF_RESTORE_SIGMASK);
+    }
+    let mask = task.sig_mask();
+
+    // set wake signal: forbid masked and ignored signals
+    let wake_set = wake_set.unwrap_or(SigSet::empty());
+    let ignored_set = task.sa_list().get_ignored_bitmap();
+    task.pcb().set_wake_signal(!(mask | ignored_set) | wake_set);
 
     // suspend now!
     debug!(

@@ -10,6 +10,7 @@ use crate::{
     mm::user_ptr::UserPtr,
     signal::{
         sig_action::{SAFlags, SAHandlerType},
+        sig_detail::SigDetail,
         sig_info::SigInfo,
         sig_set::SigMask,
         sig_stack::{MContext, UContext},
@@ -75,7 +76,7 @@ impl Task {
                 self.trap_context_mut()[TrapArgs::EPC] -= 4;
                 self.clear_syscall_result();
                 tcb.flags -= TaskFlags::TIF_SIGPENDING;
-                println_debug!(
+                warn!(
                     "TID{} restart syscall after signal: {:?}",
                     self.tid(),
                     signal
@@ -240,13 +241,16 @@ impl Task {
             warn!("[recv_siginfo_inner] tid: {}, wake up task", self.tid());
             self.wake_unchecked();
         } else {
-            println_debug!(
+            warn!(
                 "[recv_siginfo_inner] wake for task {} get blocked, signal: {:?}, mask: {}, wakeset: {}",
                 self.tid(),
                 info.signal,
                 self.sig_mask().debug_info_short(),
                 pcb.signals.should_wake.debug_info_short(),
-            )
+            );
+            if let SigDetail::Kill(x) = info.detail {
+                warn!("[recv_siginfo_inner] kill sender: {}", x.pid);
+            };
         }
         // notify the task to check signal
         self.tif_mut().insert(TaskFlags::TIF_NOTIFY_SIGNAL);

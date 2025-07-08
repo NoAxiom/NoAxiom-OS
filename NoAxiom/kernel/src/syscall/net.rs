@@ -117,7 +117,8 @@ impl Syscall<'_> {
         drop(fd_table);
 
         let mut socket = socket_file.socket().await;
-        let (new_tcp_socket, endpoint) = interruptable(self.task, socket.accept(), None).await??;
+        let (new_tcp_socket, endpoint) =
+            interruptable(self.task, socket.accept(), None, None).await??;
 
         let sockaddr = SockAddr::from_endpoint(endpoint);
         let user_ptr = UserPtr::<SockAddr>::new(addr);
@@ -321,7 +322,7 @@ impl Syscall<'_> {
         let mut socket = socket_file.socket().await;
         let buf_ptr = UserPtr::<u8>::new(buf);
         let buf_slice = buf_ptr.as_slice_mut_checked(len).await?;
-        let (n, endpoint) = interruptable(self.task, socket.read(buf_slice), None).await?;
+        let (n, endpoint) = interruptable(self.task, socket.read(buf_slice), None, None).await?;
         drop(socket);
 
         let n = n?;
@@ -374,7 +375,13 @@ impl Syscall<'_> {
         } else {
             Some(SockAddr::new(addr, addr_len)?.get_endpoint())
         };
-        let n = interruptable(self.task, socket.write(buf_slice, remote_endpoint), None).await??;
+        let n = interruptable(
+            self.task,
+            socket.write(buf_slice, remote_endpoint),
+            None,
+            None,
+        )
+        .await??;
         drop(socket);
 
         Ok(n as isize)
