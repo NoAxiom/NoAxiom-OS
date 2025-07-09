@@ -124,13 +124,13 @@ impl<'a> Syscall<'a> {
             
             // signal
             SYS_SIGTIMEDWAIT => self.sys_sigtimedwait(args[0], args[1], args[2]).await,
-            SYS_SIGACTION =>    self.sys_sigaction(args[0] as i32, args[1], args[2]).await,
+            SYS_SIGACTION =>    self.sys_sigaction(args[0], args[1], args[2]).await,
             SYS_SIGRETURN =>    self.sys_sigreturn().await,
-            SYS_KILL =>         self.sys_kill(args[0] as isize, args[1] as i32),
-            SYS_TKILL =>        self.sys_tkill(args[0], args[1] as i32),
+            SYS_KILL =>         self.sys_kill(args[0] as isize, args[1]),
+            SYS_TKILL =>        self.sys_tkill(args[0], args[1]),
             SYS_SIGPROCMASK =>  self.sys_sigprocmask(args[0], args[1], args[2], args[3]).await,
             SYS_SIGSUSPEND =>   self.sys_sigsuspend(args[0]).await,
-            SYS_TGKILL =>       self.sys_tgkill(args[0], args[1], args[2] as _),
+            SYS_TGKILL =>       self.sys_tgkill(args[0], args[1], args[2]),
 
             // mm
             SYS_MEMBARRIER =>   Self::empty_syscall("membarrier", 0), // fixme: should impl this in multicore

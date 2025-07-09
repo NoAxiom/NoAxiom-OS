@@ -11,7 +11,7 @@ use crate::{
     signal::{
         sig_detail::{SigChildDetail, SigDetail},
         sig_info::{SigCode, SigInfo},
-        signal::{Signal, Signo},
+        signal::Signal,
     },
     task::{
         manager::{PROCESS_GROUP_MANAGER, TASK_MANAGER},
@@ -158,8 +158,8 @@ impl Drop for Task {
 #[derive(Debug, Clone, Copy)]
 pub struct ExitReason(i32); // exit code, signo
 impl ExitReason {
-    pub fn new(code: i32, signo: Signo) -> Self {
-        let signo = signo.raw_i32();
+    pub fn new(code: i32, signo: usize) -> Self {
+        let signo = signo as i32;
         if !is_ltp() {
             Self((code & 0xFF) << 8)
         } else {

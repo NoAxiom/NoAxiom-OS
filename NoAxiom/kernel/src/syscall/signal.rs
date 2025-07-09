@@ -19,15 +19,17 @@ use crate::{
         sig_detail::{SigDetail, SigKillDetail},
         sig_info::{RawSigInfo, SigCode, SigInfo},
         sig_set::SigSet,
-        signal::{Signal, Signo},
+        signal::Signal,
     },
     task::manager::{PROCESS_GROUP_MANAGER, TASK_MANAGER},
     time::timeout::TimeLimitedFuture,
 };
 
 impl Syscall<'_> {
-    pub async fn sys_sigaction(&self, signo: i32, act: usize, old_act: usize) -> SyscallResult {
-        let signal = Signal::try_from(Signo::new(signo))?.try_exclude_kill()?;
+    pub async fn sys_sigaction(&self, signum: usize, act: usize, old_act: usize) -> SyscallResult {
+        let signal = Signal::from_repr(signum)
+            .ok_or(Errno::EINVAL)?
+            .try_exclude_kill()?;
         let act = UserPtr::<USigAction>::new(act);
         let old_act = UserPtr::<USigAction>::new(old_act);
         let task = self.task;
@@ -62,7 +64,7 @@ impl Syscall<'_> {
         pcb.sig_stack = (ucontext.uc_stack.ss_size != 0).then_some(ucontext.uc_stack);
         cx[EPC] = ucontext.uc_mcontext.epc();
         *cx.gprs_mut() = ucontext.uc_mcontext.gprs();
-        info!("[sys_sigreturn] cx: {:#x?}", cx);
+        trace!("[sys_sigreturn] cx: {:#x?}", cx);
         drop(pcb);
         Ok(cx[RES] as isize)
     }
@@ -107,11 +109,8 @@ impl Syscall<'_> {
         Ok(0)
     }
 
-    pub fn sys_kill(&self, pid: isize, signo: i32) -> SyscallResult {
-        if signo == 0 {
-            return Ok(0);
-        }
-        let signal = Signal::try_from(Signo::new(signo))?;
+    pub fn sys_kill(&self, pid: isize, signo: usize) -> SyscallResult {
+        let signal = Signal::try_from(signo)?;
         warn!(
             "[sys_kill] from: {}, target: {}, signal: {:?}",
             self.task.tid(),
@@ -239,7 +238,7 @@ impl Syscall<'_> {
         if let Some(si) = si {
             let raw_si = si.into_raw();
             info.try_write(raw_si).await?;
-            return Ok(si.signal.into_signo().raw_isize());
+            return Ok(si.signal.raw() as isize);
         } else {
             return Err(Errno::EAGAIN);
         }

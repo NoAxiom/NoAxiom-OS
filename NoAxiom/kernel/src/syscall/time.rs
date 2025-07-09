@@ -178,6 +178,10 @@ impl Syscall<'_> {
         let old_itimer = manager.get(which);
         match itimer_type {
             ITimerType::Real => {
+                debug!(
+                    "[sys_setitimer] set ITIMER_REAL, new_value: {:?}",
+                    new_value
+                );
                 let old = old_itimer.into_itimer_val();
                 let new_itimer = ITimer::register(&new_value);
                 let timer_id = new_itimer.timer_id;

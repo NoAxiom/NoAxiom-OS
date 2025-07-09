@@ -5,7 +5,7 @@ use bitflags::bitflags;
 
 use super::{
     sig_set::{SigMask, SigSet},
-    signal::{Signal, Signo},
+    signal::Signal,
 };
 use crate::signal::signal::{NSIG, SIG_DFL, SIG_IGN};
 
@@ -127,8 +127,8 @@ pub struct SigActionList {
 impl SigActionList {
     pub fn new() -> Self {
         Self {
-            actions: array_init(|signo| {
-                KSigAction::new_default(unsafe { Signal::from_raw_signo_unchecked(signo) })
+            actions: array_init(|i| {
+                KSigAction::new_default(unsafe { Signal::from_raw_signo_unchecked(i + 1) })
             }),
         }
     }
@@ -143,18 +143,18 @@ impl SigActionList {
     }
     pub fn get_user_bitmap(&self) -> SigSet {
         let mut res = SigSet::empty();
-        for (signo, sa) in self.actions.iter().enumerate() {
+        for (i, sa) in self.actions.iter().enumerate() {
             if let SAHandlerType::User { handler: _ } = sa.handler {
-                res |= unsafe { SigSet::from_raw_signo(signo) };
+                res |= unsafe { SigSet::from_raw_signal(i) };
             }
         }
         res
     }
     pub fn get_ignored_bitmap(&self) -> SigSet {
         let mut res = SigSet::empty();
-        for (signo, sa) in self.actions.iter().enumerate() {
+        for (i, sa) in self.actions.iter().enumerate() {
             if sa.handler == SAHandlerType::Ignore {
-                res |= unsafe { SigSet::from_raw_signo(signo) };
+                res |= unsafe { SigSet::from_raw_signal(i) };
             }
         }
         res
@@ -177,17 +177,7 @@ impl Index<Signal> for SigActionList {
 
     fn index(&self, index: Signal) -> &Self::Output {
         self.actions
-            .get(index.into_raw_signo())
-            .expect("SigActionList index out of bounds")
-    }
-}
-
-impl Index<Signo> for SigActionList {
-    type Output = KSigAction;
-
-    fn index(&self, index: Signo) -> &Self::Output {
-        self.actions
-            .get(index.raw_usize())
+            .get(index.into_sigaction_index())
             .expect("SigActionList index out of bounds")
     }
 }
@@ -195,15 +185,7 @@ impl Index<Signo> for SigActionList {
 impl IndexMut<Signal> for SigActionList {
     fn index_mut(&mut self, index: Signal) -> &mut Self::Output {
         self.actions
-            .get_mut(index.into_raw_signo())
-            .expect("SigActionList index out of bounds")
-    }
-}
-
-impl IndexMut<Signo> for SigActionList {
-    fn index_mut(&mut self, index: Signo) -> &mut Self::Output {
-        self.actions
-            .get_mut(index.raw_usize())
+            .get_mut(index.into_sigaction_index())
             .expect("SigActionList index out of bounds")
     }
 }

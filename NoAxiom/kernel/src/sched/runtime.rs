@@ -32,41 +32,6 @@ impl Runtime<Info> for MultiLevelRuntime {
         }
     }
     fn run(&self) {
-        #[cfg(feature = "debug_sig")]
-        {
-            // use crate::utils::crossover::intermit;
-            // intermit(Some(10000000), Some(Duration::from_secs(1)), || {
-            //     memory::utils::print_mem_info();
-            //     if let Some(manager) =
-            //     crate::task::manager::TASK_MANAGER.0.try_lock() {
-            //         for (id, task) in manager.iter() {
-            //             if let Some(task) = task.upgrade() {
-            //                 assert!(task.tid() == *id);
-            //                 let pcb = task.pcb();
-            //                 println!(
-            //                     "[main] tid{} in {:?}, pending_sig: {:?},
-            //     pending_set: {}, should_wake: {}, mask: {}",
-            //                     task.tid(),
-            //                     task.tcb().current_syscall,
-            //                     pcb.signals
-            //                         .queue
-            //                         .iter()
-            //                         .map(|s| s.signal)
-            //                         .collect::<alloc::vec::Vec<_>>(),
-            //                     pcb.signals.pending_set.debug_info_short(),
-            //                     pcb.signals.should_wake.debug_info_short(),
-            //                     task.sig_mask().debug_info_short(),
-            //                 );
-            //             } else {
-            //                 println!("[main] tid{} NOT FOUND!!!", id);
-            //             }
-            //         }
-            //     } else {
-            //         panic!("[main] task manager got locked!");
-            //     }
-            // });
-        }
-
         let runnable = self.scheduler.lock().pop();
         if let Some(runnable) = runnable {
             set_next_trigger(None);
@@ -120,6 +85,38 @@ pub fn run_tasks() -> ! {
     loop {
         timer_handler();
         Arch::enable_interrupt();
+        #[cfg(feature = "debug_sig")]
+        {
+            use crate::utils::crossover::intermit;
+            intermit(Some(10000000), Some(Duration::from_secs(1)), || {
+                memory::utils::print_mem_info();
+                if let Some(manager) = crate::task::manager::TASK_MANAGER.0.try_lock() {
+                    for (id, task) in manager.iter() {
+                        if let Some(task) = task.upgrade() {
+                            assert!(task.tid() == *id);
+                            let pcb = task.pcb();
+                            warn!(
+                                "[main] tid{} in {:?}, pending_sig: {:?}, pending_set: {}, should_wake: {}, mask: {}",
+                                task.tid(),
+                                task.tcb().current_syscall,
+                                pcb.signals
+                                    .queue
+                                    .iter()
+                                    .map(|s| s.signal)
+                                    .collect::<alloc::vec::Vec<_>>(),
+                                pcb.signals.pending_set.debug_info_short(),
+                                pcb.signals.should_wake.debug_info_short(),
+                                task.sig_mask().debug_info_short(),
+                            );
+                        } else {
+                            error!("[main] tid{} NOT FOUND!!!", id);
+                        }
+                    }
+                } else {
+                    error!("[main] task manager got locked!");
+                }
+            });
+        }
         RUNTIME.run();
     }
 }

@@ -1,10 +1,10 @@
 use alloc::string::String;
 
 use bitflags::bitflags;
-use include::errno::{Errno, SysResult};
+use include::errno::SysResult;
 
 use super::signal::Signal;
-use crate::{return_errno, signal::signal::NSIG};
+use crate::signal::signal::NSIG;
 
 pub type SigSetReprType = usize;
 
@@ -95,35 +95,20 @@ impl SigSet {
         let _ = self.enable_checked(signal);
     }
     pub fn enable_checked(&mut self, signal: Signal) -> SysResult<()> {
-        let signo = signal.into_raw_signo();
-        if signo >= NSIG {
-            return_errno!(
-                Errno::EINVAL,
-                "invalid signum when enable signal {:?}",
-                signal,
-            );
-        }
-        *self |= SigSet::from_bits_truncate(1 << signo);
+        let mask = signal.try_into()?;
+        *self |= mask;
         Ok(())
     }
     pub fn disable(&mut self, signal: Signal) -> SysResult<()> {
-        let signo = signal.into_raw_signo();
-        if signo >= NSIG {
-            return_errno!(
-                Errno::EINVAL,
-                "invalid signum when disable signum {}",
-                signo
-            );
-        }
-        *self -= SigSet::from_bits_truncate(1 << signo);
+        let mask = signal.try_into()?;
+        *self -= mask;
         Ok(())
     }
     pub fn contains_signal(&self, signal: Signal) -> bool {
-        let signo = signal.into_raw_signo();
-        self.contains(SigSet::from_bits_truncate(1 << signo))
+        signal.try_into().map(|x| self.contains(x)).unwrap_or(false)
     }
-    pub unsafe fn from_raw_signo(index: usize) -> Self {
-        SigSet::from_bits_truncate(1 << index)
+    pub unsafe fn from_raw_signal(signo: usize) -> Self {
+        Self::from_bits_truncate(1 << (signo - 1))
     }
     pub fn debug_info_short(&self) -> String {
         let mask_size = self.bits().count_ones();

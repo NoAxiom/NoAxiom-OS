@@ -115,7 +115,7 @@ impl TimerManager {
     }
 
     pub fn add_timer(&self, timer: Timer) {
-        trace!("add new timer, next expiration {:?}", timer.expire);
+        debug!("add new timer, next expiration {:?}", timer.expire);
         self.timers.lock().push(Reverse(timer));
     }
 
@@ -125,10 +125,9 @@ impl TimerManager {
             let current_time = get_time_duration();
             if current_time >= timer.0.expire {
                 trace!("timers len {}", timers.len());
-                trace!(
+                debug!(
                     "[Timer Manager] there is a timer expired, current:{:?}, expire:{:?}",
-                    current_time,
-                    timer.0.expire
+                    current_time, timer.0.expire
                 );
                 let timer = timers.pop().unwrap().0;
                 if let Some(new_timer) = timer.callback() {
@@ -251,7 +250,7 @@ impl TimerEvent for ITimerReal {
                 // current timer is old
                 return None;
             }
-            task.recv_siginfo(
+            if !task.recv_siginfo(
                 SigInfo {
                     signal: Signal::SIGALRM.into(),
                     code: SigCode::Kernel,
@@ -259,7 +258,14 @@ impl TimerEvent for ITimerReal {
                     detail: SigDetail::None,
                 },
                 false,
-            );
+            ) {
+                error!(
+                    "[ITimerReal] recv_siginfo failed, task: {}, timer_id: {}",
+                    task.tid(),
+                    self.timer_id
+                );
+                return None;
+            }
             if real.interval == Duration::ZERO {
                 // current timer should only be triggered once
                 return None;

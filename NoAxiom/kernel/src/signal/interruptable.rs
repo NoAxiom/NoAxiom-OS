@@ -37,12 +37,12 @@ where
             Poll::Pending => {
                 // start to handle signal
                 let mask = this.mask;
-                if let Some(info) = task.pcb().signals.peek_with_mask(*mask) {
+                if task.pcb().signals.has_pending_signals(*mask) {
                     warn!(
-                        "[intable] TID{} get interrupted by signal {:?}, mask {:?}",
+                        "[intable] TID{} get interrupted, mask {:?}, pending {:?}",
                         task.tid(),
-                        info.signal,
-                        mask,
+                        mask.debug_info_short(),
+                        task.pcb().signals.pending_set.debug_info_short()
                     );
                     task.tcb_mut().flags |= TaskFlags::TIF_SIGPENDING;
                     Poll::Ready(Err(Errno::EINTR))

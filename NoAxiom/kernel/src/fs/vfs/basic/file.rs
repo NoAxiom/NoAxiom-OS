@@ -29,7 +29,7 @@ use crate::{
         result::Errno,
     },
     syscall::{SysResult, SyscallResult},
-    utils::{align_offset, hack::is_ltp},
+    utils::align_offset,
 };
 
 pub struct FileMeta {

@@ -28,7 +28,7 @@ use crate::{
         sig_detail::{SigDetail, SigKillDetail},
         sig_info::{SigCode, SigInfo},
         sig_set::SigMask,
-        signal::{Signal, Signo},
+        signal::Signal,
     },
     task::{
         exit::ExitReason,
@@ -41,15 +41,14 @@ use crate::{
 impl Syscall<'_> {
     /// exit current task by marking it as zombie
     pub fn sys_exit(&self, exit_code: i32) -> SyscallResult {
-        self.task
-            .terminate(ExitReason::new(exit_code, Signo::new(0)));
+        self.task.terminate(ExitReason::new(exit_code, 0));
         Ok(0)
     }
 
     /// exit group
     pub fn sys_exit_group(&self, exit_code: i32) -> SyscallResult {
         let task = self.task;
-        let exit_code = ExitReason::new(exit_code, Signo::new(0));
+        let exit_code = ExitReason::new(exit_code, 0);
         task.terminate_group(exit_code);
         task.terminate(exit_code);
         Ok(0)
@@ -400,12 +399,12 @@ impl Syscall<'_> {
         // }
     }
 
-    pub fn sys_tkill(&self, tid: usize, signo: i32) -> SyscallResult {
+    pub fn sys_tkill(&self, tid: usize, signo: usize) -> SyscallResult {
         if signo == 0 {
             error!("[sys_tkill] signo is 0, no signal to send");
             return Ok(0);
         }
-        let signal = Signal::try_from(Signo::new(signo))?;
+        let signal = Signal::try_from(signo)?;
         self.__sys_tkill(tid, signal)
     }
 
@@ -425,11 +424,12 @@ impl Syscall<'_> {
         Ok(0)
     }
 
-    pub fn sys_tgkill(&self, tgid: usize, tid: usize, signo: i32) -> SyscallResult {
+    pub fn sys_tgkill(&self, tgid: usize, tid: usize, signo: usize) -> SyscallResult {
         if signo == 0 {
+            error!("[sys_tkill] signo is 0, no signal to send");
             return Ok(0);
         }
-        let signal = Signal::try_from(Signo::new(signo))?;
+        let signal = Signal::try_from(signo)?;
         trace!(
             "[sys_tgkill] tgid: {}, tid: {}, signal: {:?}",
             tgid,

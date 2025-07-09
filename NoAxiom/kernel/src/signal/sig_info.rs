@@ -67,7 +67,7 @@ impl SigInfo {
     }
     pub fn into_raw(self) -> RawSigInfo {
         RawSigInfo {
-            signo: self.signal.into_raw_signo(),
+            signo: self.signal.raw(),
             code: self.code as i32,
         }
     }

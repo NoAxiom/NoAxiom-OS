@@ -133,7 +133,7 @@ impl Task {
                         error!("[sigstack] write ucontext failed: {:?}", err);
                     });
                     *self.ucx_mut() = new_sp.into();
-                    cx[A0] = si.signal.into_signo().raw_usize();
+                    cx[A0] = si.signal.raw();
 
                     // write sig_info
                     if action.flags.contains(SAFlags::SA_SIGINFO) {
@@ -148,7 +148,7 @@ impl Task {
                             _align: [u64; 0],
                         }
                         let mut siginfo_v = LinuxSigInfo::default();
-                        siginfo_v.si_signo = si.signal.into_signo().raw_i32();
+                        siginfo_v.si_signo = si.signal.raw() as i32;
                         siginfo_v.si_code = si.code as i32;
                         new_sp -= size_of::<LinuxSigInfo>();
                         let siginfo_ptr: UserPtr<LinuxSigInfo> = new_sp.into();
@@ -265,7 +265,7 @@ impl Task {
             self.tcb().current_syscall
         );
         debug!("[sig_default_terminate] terminate the process");
-        self.terminate_group(ExitReason::new(errno, signal.into_signo()));
+        self.terminate_group(ExitReason::new(errno, signal.raw()));
         debug!("[sig_default_terminate] terminate the process done");
     }
     /// stop the process
