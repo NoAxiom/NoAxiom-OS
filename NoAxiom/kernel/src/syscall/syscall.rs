@@ -253,8 +253,8 @@ impl Task {
     pub fn update_syscall_result(self: &Arc<Self>, res: SyscallResult) {
         self.trap_context_mut()[TrapArgs::RES] = get_syscall_result(res) as usize;
     }
-    pub fn clear_syscall_result(self: &Arc<Self>) {
-        self.trap_context_mut()[TrapArgs::RES] = 0;
+    pub fn revert_syscall_result(self: &Arc<Self>) {
+        self.trap_context_mut()[TrapArgs::RES] = self.tcb().cx.res_tmp;
     }
 }
 

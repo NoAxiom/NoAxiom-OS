@@ -5,7 +5,10 @@ use include::errno::Errno;
 
 use super::{Syscall, SyscallResult};
 use crate::{
-    include::time::{ITimerType, ITimerVal, TimeSpec, TimeVal, ITIMER_COUNT, TMS},
+    include::{
+        process::TaskFlags,
+        time::{ITimerType, ITimerVal, TimeSpec, TimeVal, ITIMER_COUNT, TMS},
+    },
     mm::user_ptr::UserPtr,
     return_errno,
     sched::utils::realtime,
@@ -49,6 +52,7 @@ impl Syscall<'_> {
                     "[sys_nanosleep] sleep interrupted, remain time: {:?}",
                     remain_time
                 );
+                self.task.tcb_mut().flags.remove(TaskFlags::TIF_SIGPENDING);
                 return Err(Errno::EINTR);
             } else {
                 return Ok(0);
@@ -122,6 +126,7 @@ impl Syscall<'_> {
             }
         })
         .await;
+        self.task.tcb_mut().flags.remove(TaskFlags::TIF_SIGPENDING);
         if !remain.is_null() {
             remain.write(remain_time.into()).await?;
         }

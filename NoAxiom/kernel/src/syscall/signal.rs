@@ -11,7 +11,7 @@ use arch::{ArchTrapContext, TrapArgs};
 use super::{Syscall, SyscallResult};
 use crate::{
     config::task::INIT_PROCESS_ID,
-    include::{result::Errno, time::TimeSpec},
+    include::{process::TaskFlags, result::Errno, time::TimeSpec},
     mm::user_ptr::UserPtr,
     signal::{
         interruptable::interruptable,
@@ -64,8 +64,7 @@ impl Syscall<'_> {
         pcb.sig_stack = (ucontext.uc_stack.ss_size != 0).then_some(ucontext.uc_stack);
         cx[EPC] = ucontext.uc_mcontext.epc();
         *cx.gprs_mut() = ucontext.uc_mcontext.gprs();
-        trace!("[sys_sigreturn] cx: {:#x?}", cx);
-        drop(pcb);
+        task.tcb_mut().flags.remove(TaskFlags::TIF_IN_SIGACTION);
         Ok(cx[RES] as isize)
     }
 

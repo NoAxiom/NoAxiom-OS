@@ -30,7 +30,9 @@ extern "C" {
 impl Task {
     pub async fn check_signal(self: &Arc<Self>) {
         // check tif first
-        if !self.tif().contains(TaskFlags::TIF_NOTIFY_SIGNAL) {
+        if !self.tif().contains(TaskFlags::TIF_NOTIFY_SIGNAL)
+            || self.tcb().flags.contains(TaskFlags::TIF_IN_SIGACTION)
+        {
             return;
         }
 
@@ -60,6 +62,8 @@ impl Task {
         }
 
         // handle each signal
+        let is_interrupted = self.tcb().flags.contains(TaskFlags::TIF_SIGPENDING);
+        self.tcb_mut().flags.remove(TaskFlags::TIF_SIGPENDING);
         let sa_list = self.sa_list();
         for si in pending {
             let signal = si.signal;
@@ -70,10 +74,7 @@ impl Task {
             );
 
             // check interrpt syscall
-            let tcb = self.tcb_mut();
-            if action.flags.contains(SAFlags::SA_RESTART)
-                && tcb.flags.contains(TaskFlags::TIF_SIGPENDING)
-            {
+            if action.flags.contains(SAFlags::SA_RESTART) && is_interrupted {
                 warn!(
                     "TID{} restart syscall {:?} after signal: {:?}",
                     self.tid(),
@@ -81,10 +82,8 @@ impl Task {
                     signal
                 );
                 self.trap_context_mut()[TrapArgs::EPC] -= 4;
-                self.clear_syscall_result();
+                self.revert_syscall_result();
                 clear_current_syscall();
-                tcb.flags -= TaskFlags::TIF_SIGPENDING;
-                // todo: current syscall might be incorrect after sigreturn
             }
 
             // start handle
@@ -174,6 +173,7 @@ impl Task {
                         SIG_TRAMPOLINE
                     };
                     cx[SP] = new_sp;
+                    self.tcb_mut().flags.insert(TaskFlags::TIF_IN_SIGACTION);
                     return;
                 }
             }

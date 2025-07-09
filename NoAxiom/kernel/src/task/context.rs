@@ -1,16 +1,21 @@
-use arch::{Arch, ArchTrap, TrapContext, TrapType};
+use arch::{Arch, ArchTrap, TrapArgs, TrapContext, TrapType};
 
 use super::Task;
 use crate::syscall::utils::clear_current_syscall;
 
 pub struct TaskTrapContext {
     pub cx: TrapContext,
+    pub res_tmp: usize, // for restart
     pub int_en: bool,
 }
 
 impl TaskTrapContext {
     pub fn new(cx: TrapContext, int_en: bool) -> Self {
-        Self { cx, int_en }
+        Self {
+            cx,
+            res_tmp: 0,
+            int_en,
+        }
     }
     pub fn cx(&self) -> &TrapContext {
         &self.cx
@@ -30,5 +35,8 @@ impl Task {
         let trap_type = Arch::read_trap_type(Some(cx));
         task.time_stat_mut().record_trap_out();
         trap_type
+    }
+    pub fn record_current_result_reg(&self) {
+        self.tcb_mut().cx.res_tmp = self.trap_context_mut()[TrapArgs::RES];
     }
 }

@@ -256,5 +256,7 @@ bitflags! {
         // ====== local definition ======
         /// status changed
         const TIF_STATUS_CHANGED = 1 << 6;
+        /// in sigaction handling
+        const TIF_IN_SIGACTION   = 1 << 7;
     }
 }
