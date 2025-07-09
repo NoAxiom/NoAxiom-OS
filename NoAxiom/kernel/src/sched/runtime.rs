@@ -58,6 +58,8 @@ impl Runtime<Info> for MultiLevelRuntime {
 }
 
 impl MultiLevelRuntime {
+    #[deprecated(note = "use RUNTIME.run() instead")]
+    #[allow(dead_code)]
     pub fn handle_realtime(&self) {
         let mut sched = self.scheduler.lock();
         let mut tasks = VecDeque::new();

@@ -1,4 +1,7 @@
-use arch::TrapContext;
+use arch::{Arch, ArchTrap, TrapContext, TrapType};
+
+use super::Task;
+use crate::syscall::utils::clear_current_syscall;
 
 pub struct TaskTrapContext {
     pub cx: TrapContext,
@@ -14,5 +17,18 @@ impl TaskTrapContext {
     }
     pub fn cx_mut(&mut self) -> &mut TrapContext {
         &mut self.cx
+    }
+}
+
+impl Task {
+    pub fn trap_restore(&self) -> TrapType {
+        let task = self;
+        clear_current_syscall();
+        task.time_stat_mut().record_trap_in();
+        let cx = task.trap_context_mut();
+        Arch::trap_restore(cx); // restore context and return to user mode
+        let trap_type = Arch::read_trap_type(Some(cx));
+        task.time_stat_mut().record_trap_out();
+        trap_type
     }
 }

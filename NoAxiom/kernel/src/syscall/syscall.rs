@@ -2,7 +2,7 @@ use alloc::sync::Arc;
 
 use arch::{ArchTrapContext, TrapArgs, TrapContext};
 
-use super::{utils::clear_current_syscall, SyscallResult};
+use super::SyscallResult;
 use crate::{
     include::{result::Errno, syscall_id::SyscallID},
     syscall::utils::update_current_syscall,
@@ -234,7 +234,6 @@ impl<'a> Syscall<'a> {
         //         FRAME_ALLOCS.load(core::sync::atomic::Ordering::SeqCst)
         //     )
         // });
-        clear_current_syscall();
         res
     }
     fn empty_syscall(name: &str, res: isize) -> SyscallResult {

@@ -16,6 +16,7 @@ use crate::{
         sig_stack::{MContext, UContext},
         signal::Signal,
     },
+    syscall::utils::clear_current_syscall,
     task::{exit::ExitReason, status::TaskStatus, Task},
 };
 
@@ -73,14 +74,17 @@ impl Task {
             if action.flags.contains(SAFlags::SA_RESTART)
                 && tcb.flags.contains(TaskFlags::TIF_SIGPENDING)
             {
-                self.trap_context_mut()[TrapArgs::EPC] -= 4;
-                self.clear_syscall_result();
-                tcb.flags -= TaskFlags::TIF_SIGPENDING;
                 warn!(
-                    "TID{} restart syscall after signal: {:?}",
+                    "TID{} restart syscall {:?} after signal: {:?}",
                     self.tid(),
+                    self.tcb().current_syscall,
                     signal
                 );
+                self.trap_context_mut()[TrapArgs::EPC] -= 4;
+                self.clear_syscall_result();
+                clear_current_syscall();
+                tcb.flags -= TaskFlags::TIF_SIGPENDING;
+                // todo: current syscall might be incorrect after sigreturn
             }
 
             // start handle

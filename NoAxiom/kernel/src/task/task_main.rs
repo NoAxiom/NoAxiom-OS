@@ -5,7 +5,7 @@ use core::{
     task::{Context, Poll},
 };
 
-use arch::{Arch, ArchInt, ArchTrap, ArchTrapContext, ArchUserFloatContext};
+use arch::{Arch, ArchInt, ArchTrapContext, ArchUserFloatContext};
 use ksync::assert_no_lock;
 
 use crate::{
@@ -84,15 +84,10 @@ pub async fn task_main(task: Arc<Task>) {
     loop {
         // kernel -> user
         check_status!(task);
-        task.time_stat_mut().record_trap_in();
-        let cx = task.trap_context_mut();
-        Arch::trap_restore(cx); // restore context and return to user mode
-        let trap_type = Arch::read_trap_type(Some(cx));
-        task.time_stat_mut().record_trap_out();
+        let trap_type = task.trap_restore();
 
         // user -> kernel, enter the handler
         check_status!(task);
-        Arch::disable_interrupt();
         user_trap_handler(&task, trap_type).await;
         Arch::enable_interrupt();
 

@@ -69,7 +69,7 @@ fn kernel_trap_handler() {
 /// user trap handler
 #[no_mangle]
 pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
-    assert!(!arch::Arch::is_interrupt_enabled());
+    Arch::disable_interrupt();
     trace!("[trap_handler] call trap handler");
 
     // check if need schedule
