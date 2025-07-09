@@ -37,42 +37,48 @@ where
             Poll::Pending => {
                 // fixme: by using this code, we can pass netperf
                 // start to handle signal
-                // let mask = this.mask;
-                // let pcb = task.pcb();
-                // if pcb.signals.has_pending_signals(*mask) {
-                //     let si = pcb.signals.peek_with_mask(*mask);
-                //     if let Some(si) = si {
-                //         let sa = task.sa_list()[si.signal];
-                //         if sa.flags.contains(crate::signal::sig_action::SAFlags::SA_RESTART)
-                // {             return Poll::Pending;
-                //         }
-                //     }
-                //     warn!(
-                //         "[intable] TID{} get interrupted, mask {:?}, pending {:?}",
-                //         task.tid(),
-                //         mask.debug_info_short(),
-                //         pcb.signals.pending_set.debug_info_short()
-                //     );
-                //     // task.tcb_mut().flags |= TaskFlags::TIF_SIGPENDING;
-                //     Poll::Ready(Err(Errno::EINTR))
-                // } else {
-                //     Poll::Pending
-                // }
 
+                // === pass ver ===
                 let mask = this.mask;
                 let pcb = task.pcb();
                 if pcb.signals.has_pending_signals(*mask) {
+                    let si = pcb.signals.peek_with_mask(*mask);
+                    if let Some(si) = si {
+                        let sa = task.sa_list()[si.signal];
+                        if sa
+                            .flags
+                            .contains(crate::signal::sig_action::SAFlags::SA_RESTART)
+                        {
+                            return Poll::Pending;
+                        }
+                    }
                     warn!(
                         "[intable] TID{} get interrupted, mask {:?}, pending {:?}",
                         task.tid(),
                         mask.debug_info_short(),
                         pcb.signals.pending_set.debug_info_short()
                     );
-                    task.tcb_mut().flags |= TaskFlags::TIF_SIGPENDING;
+                    // task.tcb_mut().flags |= TaskFlags::TIF_SIGPENDING;
                     Poll::Ready(Err(Errno::EINTR))
                 } else {
                     Poll::Pending
                 }
+
+                // === deadlock ver ===
+                // let mask = this.mask;
+                // let pcb = task.pcb();
+                // if pcb.signals.has_pending_signals(*mask) {
+                //     warn!(
+                //         "[intable] TID{} get interrupted, mask {:?}, pending
+                // {:?}",         task.tid(),
+                //         mask.debug_info_short(),
+                //         pcb.signals.pending_set.debug_info_short()
+                //     );
+                //     task.tcb_mut().flags |= TaskFlags::TIF_SIGPENDING;
+                //     Poll::Ready(Err(Errno::EINTR))
+                // } else {
+                //     Poll::Pending
+                // }
             }
         }
     }
