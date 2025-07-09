@@ -35,14 +35,38 @@ where
         match this.fut.poll(cx) {
             Poll::Ready(res) => Poll::Ready(Ok(res)),
             Poll::Pending => {
+                // fixme: by using this code, we can pass netperf
                 // start to handle signal
+                // let mask = this.mask;
+                // let pcb = task.pcb();
+                // if pcb.signals.has_pending_signals(*mask) {
+                //     let si = pcb.signals.peek_with_mask(*mask);
+                //     if let Some(si) = si {
+                //         let sa = task.sa_list()[si.signal];
+                //         if sa.flags.contains(crate::signal::sig_action::SAFlags::SA_RESTART)
+                // {             return Poll::Pending;
+                //         }
+                //     }
+                //     warn!(
+                //         "[intable] TID{} get interrupted, mask {:?}, pending {:?}",
+                //         task.tid(),
+                //         mask.debug_info_short(),
+                //         pcb.signals.pending_set.debug_info_short()
+                //     );
+                //     // task.tcb_mut().flags |= TaskFlags::TIF_SIGPENDING;
+                //     Poll::Ready(Err(Errno::EINTR))
+                // } else {
+                //     Poll::Pending
+                // }
+
                 let mask = this.mask;
-                if task.pcb().signals.has_pending_signals(*mask) {
+                let pcb = task.pcb();
+                if pcb.signals.has_pending_signals(*mask) {
                     warn!(
                         "[intable] TID{} get interrupted, mask {:?}, pending {:?}",
                         task.tid(),
                         mask.debug_info_short(),
-                        task.pcb().signals.pending_set.debug_info_short()
+                        pcb.signals.pending_set.debug_info_short()
                     );
                     task.tcb_mut().flags |= TaskFlags::TIF_SIGPENDING;
                     Poll::Ready(Err(Errno::EINTR))
@@ -83,13 +107,15 @@ pub async fn interruptable<T>(
     // set wake signal: forbid masked and ignored signals
     let wake_set = wake_set.unwrap_or(SigSet::empty());
     let ignored_set = task.sa_list().get_ignored_bitmap();
-    task.pcb().set_wake_signal(!(mask | ignored_set) | wake_set);
+    let wake_set = !(mask | ignored_set) | wake_set;
+    task.pcb().set_wake_signal(wake_set);
 
     // suspend now!
     debug!(
-        "[intable] TID{} wait with wake set: {:?}",
+        "[intable] TID{} wait with wake set: {}, mask: {}",
         task.tid(),
-        !mask
+        wake_set.debug_info_short(),
+        mask.debug_info_short(),
     );
     let res = IntableFuture { task, fut, mask }.await;
 
