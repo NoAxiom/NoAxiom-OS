@@ -11,8 +11,7 @@ use pin_project_lite::pin_project;
 
 use super::sig_set::SigSet;
 use crate::{
-    cpu::current_task, include::process::TaskFlags, signal::sig_set::SigMask, syscall::SysResult,
-    task::Task,
+    include::process::TaskFlags, signal::sig_set::SigMask, syscall::SysResult, task::Task,
 };
 
 pin_project! {

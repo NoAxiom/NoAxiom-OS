@@ -104,21 +104,10 @@ impl<T> UserPtr<T> {
         Self::ptr_will_cross_page(self.addr())
     }
 
-    #[deprecated(note = "use `try_read()` instead")]
-    pub async fn get_ref(&self) -> SysResult<Option<&T>> {
-        match unsafe { self.ptr().as_ref() } {
-            Some(ptr) => {
-                self.validate(false).await?;
-                Ok(Some(ptr))
-            }
-            None => Ok(None),
-        }
-    }
-
     pub async fn get_ref_mut(&self) -> SysResult<Option<&mut T>> {
         match unsafe { self.ptr().as_mut() } {
             Some(ptr) => {
-                self.validate(true).await?;
+                self.check_write().await?;
                 Ok(Some(ptr))
             }
             None => Ok(None),
@@ -132,17 +121,13 @@ impl<T> UserPtr<T> {
         unsafe { *self.ptr() }
     }
 
-    #[inline(always)]
-    pub async fn read(&self) -> SysResult<T>
-    where
-        T: Copy,
-    {
+    pub async fn check_read(&self) -> SysResult<()> {
         if self.is_null() {
             warn!("[read] read null pointer");
             return Err(Errno::EFAULT);
         }
         match Arch::check_read(self.addr()) {
-            Ok(()) => Ok(unsafe { self.read_unchecked() }),
+            Ok(()) => Ok(()),
             Err(trap_type) => match trap_type {
                 TrapType::LoadPageFault(addr) | TrapType::StorePageFault(addr) => {
                     warn!(
@@ -161,7 +146,7 @@ impl<T> UserPtr<T> {
                         );
                         block_on(task.memory_validate(addr, trap_type, true))?;
                     }
-                    Ok(unsafe { self.read_unchecked() })
+                    Ok(())
                 }
                 _ => {
                     return_errno!(
@@ -174,7 +159,14 @@ impl<T> UserPtr<T> {
         }
     }
 
-    #[inline(always)]
+    pub async fn read(&self) -> SysResult<T>
+    where
+        T: Copy,
+    {
+        self.check_read().await?;
+        Ok(unsafe { self.read_unchecked() })
+    }
+
     pub async fn try_read(&self) -> SysResult<Option<T>>
     where
         T: Copy,
@@ -199,16 +191,13 @@ impl<T> UserPtr<T> {
         unsafe { *self.ptr() = value }
     }
 
-    pub async fn write(&self, value: T) -> SysResult<()> {
+    pub async fn check_write(&self) -> SysResult<()> {
         if self.is_null() {
             warn!("[write] write null pointer");
             return Err(Errno::EFAULT);
         }
         match Arch::check_write(self.addr()) {
-            Ok(()) => {
-                unsafe { self.write_unchecked(value) };
-                Ok(())
-            }
+            Ok(()) => Ok(()),
             Err(trap_type) => match trap_type {
                 TrapType::LoadPageFault(addr) | TrapType::StorePageFault(addr) => {
                     warn!(
@@ -227,7 +216,6 @@ impl<T> UserPtr<T> {
                         );
                         block_on(task.memory_validate(addr, trap_type, true))?;
                     }
-                    unsafe { self.write_unchecked(value) };
                     Ok(())
                 }
                 _ => {
@@ -238,6 +226,11 @@ impl<T> UserPtr<T> {
                 }
             },
         }
+    }
+
+    pub async fn write(&self, value: T) -> SysResult<()> {
+        self.check_write().await?;
+        Ok(unsafe { self.write_unchecked(value) })
     }
 
     pub async fn try_write(&self, value: T) -> SysResult<Option<()>> {
@@ -301,6 +294,8 @@ impl<T> UserPtr<T> {
     /// validate the user pointer
     /// this will check the page table and allocate valid map areas
     /// or it will return EFAULT
+    #[deprecated(note = "use check_read / check_write instead")]
+    #[allow(dead_code)]
     pub async fn validate(&self, is_write: bool) -> SysResult<()> {
         if check_no_lock() {
             self.raw_validate(is_write).await?;
