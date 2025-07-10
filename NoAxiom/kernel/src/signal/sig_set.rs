@@ -110,6 +110,9 @@ impl SigSet {
     pub unsafe fn from_raw_signal(signo: usize) -> Self {
         Self::from_bits_truncate(1 << (signo - 1))
     }
+    pub unsafe fn from_raw_sa_index(index: usize) -> Self {
+        Self::from_bits_truncate(1 << index)
+    }
     pub fn debug_info_short(&self) -> String {
         let mask_size = self.bits().count_ones();
         let rev = !*self;

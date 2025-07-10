@@ -127,43 +127,40 @@ pub struct SigActionList {
 impl SigActionList {
     pub fn new() -> Self {
         Self {
-            actions: array_init(|i| {
-                KSigAction::new_default(unsafe { Signal::from_raw_signo_unchecked(i + 1) })
+            actions: array_init(|index| {
+                let signal = unsafe { Signal::from_raw_sa_index(index) };
+                let res = KSigAction::new_default(signal);
+                println!(
+                    "[SigActionList] init sigaction: signum {:?}, action: {:?}",
+                    index + 1,
+                    res
+                );
+                res
             }),
         }
     }
     pub fn set_sigaction(&mut self, signal: Signal, action: KSigAction) {
         self[signal] = action;
         debug!(
-            "[SigActionList] set_sigaction: signum {:?}, action: {:?}, cur_bitmap: {:?}",
-            signal,
-            action,
-            self.get_user_bitmap()
+            "[SigActionList] set_sigaction: signum {:?}, action: {:?}",
+            signal, action
         );
-    }
-    pub fn get_user_bitmap(&self) -> SigSet {
-        let mut res = SigSet::empty();
-        for (i, sa) in self.actions.iter().enumerate() {
-            if let SAHandlerType::User { handler: _ } = sa.handler {
-                res |= unsafe { SigSet::from_raw_signal(i) };
-            }
-        }
-        res
     }
     pub fn get_ignored_bitmap(&self) -> SigSet {
         let mut res = SigSet::empty();
-        for (i, sa) in self.actions.iter().enumerate() {
+        for (index, sa) in self.actions.iter().enumerate() {
             if sa.handler == SAHandlerType::Ignore {
-                res |= unsafe { SigSet::from_raw_signal(i) };
+                let sigset = unsafe { SigSet::from_raw_sa_index(index) };
+                res |= sigset;
             }
         }
         res
     }
     pub fn reset(&mut self) {
-        for (signo, action) in self.actions.iter_mut().enumerate() {
+        for (index, action) in self.actions.iter_mut().enumerate() {
             match action.handler {
                 SAHandlerType::User { .. } => {
-                    let signal = unsafe { Signal::from_raw_signo_unchecked(signo) };
+                    let signal = unsafe { Signal::from_raw_sa_index(index) };
                     action.handler = SAHandlerType::new_default(signal);
                 }
                 _ => {}

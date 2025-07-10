@@ -90,8 +90,8 @@ pub enum Signal {
 }
 
 impl Signal {
-    pub unsafe fn from_raw_signo_unchecked(raw: usize) -> Self {
-        Self::from_repr(raw).unwrap()
+    pub unsafe fn from_raw_sa_index(index: usize) -> Self {
+        Self::from_repr(index + 1).unwrap()
     }
     #[inline]
     pub fn raw(self) -> usize {
