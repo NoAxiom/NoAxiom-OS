@@ -1,4 +1,5 @@
 use alloc::sync::Arc;
+use core::time::Duration;
 
 use ksync::assert_no_lock;
 
@@ -6,8 +7,12 @@ use super::Task;
 use crate::{
     config::task::INIT_PROCESS_ID,
     cpu::current_cpu,
-    include::futex::FUTEX_BITSET_MATCH_ANY,
+    include::{
+        futex::FUTEX_BITSET_MATCH_ANY,
+        process::{PidSel, WaitOption},
+    },
     mm::user_ptr::UserPtr,
+    sched::utils::yield_now,
     signal::{
         sig_detail::{SigChildDetail, SigDetail},
         sig_info::{SigCode, SigInfo},
@@ -17,22 +22,23 @@ use crate::{
         manager::{PROCESS_GROUP_MANAGER, TASK_MANAGER},
         status::TaskStatus,
     },
+    time::gettime::get_time_duration,
     utils::hack::is_ltp,
 };
 
 pub async fn init_proc_exit_handler(task: &Arc<Task>) {
     task.fd_table().exit_files();
-    let inner = task.pcb();
-    if !inner.children.is_empty() {
-        error!("[exit_handler] ERROR: init_proc try to exited before its children!!!");
-        for i in inner.children.iter() {
-            error!(
+    let pcb = task.pcb();
+    if !pcb.children.is_empty() {
+        warn!("[exit_handler] init_proc is trying to exited before its children!!!");
+        for child in pcb.children.iter() {
+            warn!(
                 "[exit_handler] child tid: {}, during syscall: {:?}, sigmask: {:?}",
-                i.tid(),
-                i.tcb().current_syscall,
-                i.sig_mask(),
+                child.tid(),
+                child.tcb().current_syscall,
+                child.sig_mask(),
             );
-            i.recv_siginfo(
+            child.recv_siginfo(
                 SigInfo {
                     signal: Signal::SIGKILL,
                     code: SigCode::Kernel,
@@ -41,25 +47,34 @@ pub async fn init_proc_exit_handler(task: &Arc<Task>) {
                 },
                 true,
             );
+            child.wake_unchecked();
         }
-        error!("[exit_handler] forced shutdown");
-        // let mut cnt = 0;
-        // while !inner.children.is_empty() {
-        //     let pid = task
-        //         .wait_child(PidSel::Task(None), WaitOption::WNOHANG)
-        //         .await;
-        //     yield_now().await;
-        //     if let Ok(pid) = pid {
-        //         info!("[exit_handler] child finally exited: {:?}", pid);
-        //     }
-        //     cnt += 1;
-        //     if cnt > 10000000 {
-        //         error!("[exit_handler] init_proc exit handler timeout, force
-        // shutdown");         break;
-        //     }
-        // }
+        drop(pcb);
+        warn!("[exit_handler] trying to wait for children to exit...");
+        let mut cnt = 0;
+        let begin_time = get_time_duration();
+        loop {
+            let pid = task
+                .wait_child(PidSel::Task(None), WaitOption::WNOHANG)
+                .await;
+            if task.pcb().children.is_empty() {
+                warn!("[exit_handler] all children exited");
+                break;
+            }
+            yield_now().await;
+            if let Ok(pid) = pid {
+                warn!("[exit_handler] child got forced exit: {:?}", pid);
+            }
+            cnt += 1;
+            if cnt > 10000
+                || get_time_duration().saturating_sub(begin_time) > Duration::from_secs(5)
+            {
+                error!("[exit_handler] init_proc exit handler timeout, forced shutdown");
+                break;
+            }
+        }
     }
-    let exit_code = inner.exit_code();
+    let exit_code = task.pcb().exit_code();
     // !PAY ATTENTION!! Now we don't sync_all the dirty data.
     // root_dentry().super_block().sync_all().await;
     match exit_code.inner() {
