@@ -130,11 +130,6 @@ impl SigActionList {
             actions: array_init(|index| {
                 let signal = unsafe { Signal::from_raw_sa_index(index) };
                 let res = KSigAction::new_default(signal);
-                println!(
-                    "[SigActionList] init sigaction: signum {:?}, action: {:?}",
-                    index + 1,
-                    res
-                );
                 res
             }),
         }

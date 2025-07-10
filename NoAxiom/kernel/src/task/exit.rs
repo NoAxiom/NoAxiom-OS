@@ -25,48 +25,16 @@ pub async fn init_proc_exit_handler(task: &Arc<Task>) {
     let pcb = task.pcb();
     if !pcb.children.is_empty() {
         warn!("[exit_handler] init_proc is trying to exited before its children!!!");
-        // for child in pcb.children.iter() {
-        //     warn!(
-        //         "[exit_handler] child tid: {}, during syscall: {:?}, sigmask:
-        // {:?}",         child.tid(),
-        //         child.tcb().current_syscall,
-        //         child.sig_mask(),
-        //     );
-        //     child.recv_siginfo(
-        //         SigInfo {
-        //             signal: Signal::SIGKILL,
-        //             code: SigCode::Kernel,
-        //             errno: -1,
-        //             detail: SigDetail::None,
-        //         },
-        //         true,
-        //     );
-        //     child.wake_unchecked();
-        // }
-        // drop(pcb);
-        // warn!("[exit_handler] trying to wait for children to exit...");
-        // let mut cnt = 0;
-        // let begin_time = get_time_duration();
-        // loop {
-        //     let pid = task
-        //         .wait_child(PidSel::Task(None), WaitOption::WNOHANG)
-        //         .await;
-        //     if task.pcb().children.is_empty() {
-        //         warn!("[exit_handler] all children exited");
-        //         break;
-        //     }
-        //     yield_now().await;
-        //     if let Ok(pid) = pid {
-        //         warn!("[exit_handler] child got forced exit: {:?}", pid);
-        //     }
-        //     cnt += 1;
-        //     if cnt > 10000
-        //         || get_time_duration().saturating_sub(begin_time) > Duration::from_secs(5)
-        //     {
-        //         error!("[exit_handler] init_proc exit handler timeout, forced
-        // shutdown");         break;
-        //     }
-        // }
+        for child in pcb.children.iter() {
+            let child_pcb = child.pcb();
+            warn!(
+                "[exit_handler] child tid: {}, during syscall: {:?}, pending: {} sigmask: {:?}",
+                child.tid(),
+                child.tcb().current_syscall,
+                child_pcb.signals.pending_set.debug_info_short(),
+                child.sig_mask(),
+            );
+        }
     }
     let exit_code = pcb.exit_code();
     // !PAY ATTENTION!! Now we don't sync_all the dirty data.
@@ -76,7 +44,7 @@ pub async fn init_proc_exit_handler(task: &Arc<Task>) {
             "[exit_handler] init_proc exited successfully, exit_code: {}",
             exit_code.inner()
         ),
-        _ => println!(
+        _ => warn!(
             "[kernel] init_proc exited unexpectedly, exit_code: {}",
             exit_code.inner(),
         ),
@@ -94,7 +62,7 @@ impl Task {
         }
 
         // thread resources clean up
-        self.fd_table().exit_files();
+        self.put_fd_table();
         self.delete_children();
         self.thread_group().remove(tid);
         TASK_MANAGER.remove(tid);

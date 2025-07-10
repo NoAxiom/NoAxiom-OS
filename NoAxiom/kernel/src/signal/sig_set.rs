@@ -88,9 +88,6 @@ impl SigSet {
     pub fn without_kill(self) -> Self {
         self - Self::BLOCKED
     }
-    pub fn with_kill(self) -> Self {
-        self | Self::BLOCKED
-    }
     pub fn enable(&mut self, signal: Signal) {
         let _ = self.enable_checked(signal);
     }
@@ -106,9 +103,6 @@ impl SigSet {
     }
     pub fn contains_signal(&self, signal: Signal) -> bool {
         signal.try_into().map(|x| self.contains(x)).unwrap_or(false)
-    }
-    pub unsafe fn from_raw_signal(signo: usize) -> Self {
-        Self::from_bits_truncate(1 << (signo - 1))
     }
     pub unsafe fn from_raw_sa_index(index: usize) -> Self {
         Self::from_bits_truncate(1 << index)

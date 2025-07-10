@@ -3,6 +3,7 @@ use core::time::Duration;
 
 use arch::{Arch, ArchInt};
 use async_task::{Builder, Runnable, WithInfo};
+use config::task::INIT_PROCESS_ID;
 use ksync::mutex::SpinLock;
 use lazy_static::lazy_static;
 
@@ -90,7 +91,7 @@ pub fn run_tasks() -> ! {
         #[cfg(feature = "debug_sig")]
         {
             use crate::utils::crossover::intermit;
-            intermit(Some(10000000), Some(Duration::from_secs(1)), || {
+            intermit(Some(10000000), Some(Duration::from_millis(500)), || {
                 memory::utils::print_mem_info();
                 if let Some(manager) = crate::task::manager::TASK_MANAGER.0.try_lock() {
                     for (id, task) in manager.iter() {
@@ -116,6 +117,9 @@ pub fn run_tasks() -> ! {
                     }
                 } else {
                     error!("[main] task manager got locked!");
+                }
+                if let Some(init_proc) = crate::task::manager::TASK_MANAGER.get(INIT_PROCESS_ID) {
+                    init_proc.print_child_tree();
                 }
             });
         }

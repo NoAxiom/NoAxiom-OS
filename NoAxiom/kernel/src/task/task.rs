@@ -112,6 +112,10 @@ impl Task {
     pub fn pcb(&self) -> SpinLockGuard<PCB> {
         self.pcb.lock()
     }
+    #[allow(dead_code)]
+    pub fn try_lock_pcb(&self) -> Option<SpinLockGuard<PCB>> {
+        self.pcb.try_lock()
+    }
 
     /// tid
     #[inline(always)]
@@ -162,6 +166,13 @@ impl Task {
     #[inline(always)]
     pub fn fd_table(&self) -> SpinLockGuard<FdTable> {
         self.fd_table.lock()
+    }
+    pub fn put_fd_table(&self) {
+        if Arc::strong_count(&self.fd_table) == 1 {
+            // only one strong reference, we can safely drop it
+            info!("[kernel] clear fd_table for task {}", self.tid());
+            self.fd_table.lock().exit_files();
+        }
     }
 
     /// get cwd
@@ -644,7 +655,7 @@ impl Task {
     }
 
     #[allow(unused)]
-    fn print_child_tree_dfs(&self, fmt_offset: usize) {
+    fn print_child_tree_dfs(&self, fmt_offset: usize) -> usize {
         let mut fmt_proc = String::new();
         for _ in 0..fmt_offset {
             fmt_proc += "|---";
@@ -654,14 +665,30 @@ impl Task {
             fmt_thread += "|   ";
         }
         let pcb = self.pcb();
-        debug!("{fmt_proc}process {}", self.tid());
+        let par_tid = pcb
+            .parent
+            .as_ref()
+            .map(|x| x.upgrade())
+            .flatten()
+            .map(|x| x.tid())
+            .unwrap_or(0);
+        if self.is_group_leader() {
+            warn!("{fmt_proc}process {}", self.tid());
+        } else {
+            warn!("{fmt_proc}thread {}", self.tid());
+        }
         for thread in self.thread_group().0.iter() {
             let thread = thread.1.upgrade().unwrap();
-            debug!("{fmt_thread}thread {}", thread.tid());
+            if thread.tid() == self.tid() {
+                continue;
+            }
+            warn!("{fmt_thread}thread {}", thread.tid());
         }
         for child in &pcb.children {
-            child.print_child_tree_dfs(fmt_offset + 1);
+            let tid = child.print_child_tree_dfs(fmt_offset + 1);
+            assert!(tid == self.tid());
         }
+        par_tid
     }
 
     /// only for debug, print current child tree
