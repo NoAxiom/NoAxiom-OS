@@ -38,7 +38,7 @@ use crate::{
     },
     signal::{
         sig_action::SigActionList,
-        sig_pending::SigManager,
+        sig_manager::SigManager,
         sig_set::{SigMask, SigSet},
         sig_stack::UContext,
     },

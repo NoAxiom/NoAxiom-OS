@@ -8,7 +8,7 @@ use bitflags::Flags;
 use super::{exit::ExitReason, status::TaskStatus, Task};
 use crate::{
     include::process::{robust_list::RobustList, TaskFlags},
-    signal::{sig_pending::SigManager, sig_set::SigSet, sig_stack::SigAltStack},
+    signal::{sig_manager::SigManager, sig_set::SigSet, sig_stack::SigAltStack},
 };
 
 /// task control block inner
