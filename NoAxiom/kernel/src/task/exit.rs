@@ -68,7 +68,7 @@ pub async fn init_proc_exit_handler(task: &Arc<Task>) {
         //     }
         // }
     }
-    let exit_code = task.pcb().exit_code();
+    let exit_code = pcb.exit_code();
     // !PAY ATTENTION!! Now we don't sync_all the dirty data.
     // root_dentry().super_block().sync_all().await;
     match exit_code.inner() {
