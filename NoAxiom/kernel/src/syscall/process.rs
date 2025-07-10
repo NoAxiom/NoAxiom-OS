@@ -189,6 +189,7 @@ impl Syscall<'_> {
             Some(SigMask::SIGCHLD),
         )
         .await??;
+        self.task.pcb().signals.remove_sigchld();
         if status.is_non_null() {
             trace!(
                 "[sys_wait4]: write exit_code at status_addr = {:#x}, value: ",

@@ -3,6 +3,7 @@ use alloc::collections::vec_deque::VecDeque;
 use super::{
     sig_info::SigInfo,
     sig_set::{SigMask, SigSet},
+    signal::Signal,
 };
 
 /// pending signals of a task
@@ -56,6 +57,8 @@ impl SigManager {
         }
     }
 
+    #[allow(dead_code)]
+    // only for debug
     pub fn peek_with_mask(&self, mask: SigMask) -> Option<&SigInfo> {
         let accept_set = self.pending_set & !mask;
         if accept_set.is_empty() {
@@ -73,6 +76,15 @@ impl SigManager {
 
     pub fn has_pending_signals(&self, mask: SigMask) -> bool {
         !((!mask & self.pending_set).is_empty())
+    }
+
+    /// remove all SIGCHLD signals from the pending set
+    /// used for wait4 syscall
+    pub fn remove_sigchld(&mut self) {
+        if self.pending_set.contains(SigSet::SIGCHLD) {
+            self.pending_set.remove(SigSet::SIGCHLD);
+            self.queue.retain(|si| si.signal != Signal::SIGCHLD);
+        }
     }
 }
 
