@@ -97,10 +97,11 @@ impl Page {
     }
 }
 
-static mut PAGE_CACHE_CAPACITY: usize = 0;
+const PAGE_CACHE_CAPACITY_UNINITIALIZED: usize = 0;
+static mut PAGE_CACHE_CAPACITY: usize = PAGE_CACHE_CAPACITY_UNINITIALIZED;
 fn get_page_cache_capacity() -> usize {
     unsafe {
-        if unlikely(PAGE_CACHE_CAPACITY == 0) {
+        if unlikely(PAGE_CACHE_CAPACITY == PAGE_CACHE_CAPACITY_UNINITIALIZED) {
             PAGE_CACHE_CAPACITY = FRAME_ALLOCATOR.lock().stat_total() / PAGE_CACHE_PROPORTION;
             core::sync::atomic::fence(core::sync::atomic::Ordering::SeqCst);
             println_debug!(
@@ -145,9 +146,10 @@ pub struct PageCacheManager {
 
 impl PageCacheManager {
     pub fn new() -> Self {
-        let mut data = Vec::with_capacity(get_page_cache_capacity());
-        let mut free_page = VecDeque::with_capacity(get_page_cache_capacity());
-        for i in 0..get_page_cache_capacity() {
+        let capacity = get_page_cache_capacity();
+        let mut data = Vec::with_capacity(capacity);
+        let mut free_page = VecDeque::with_capacity(capacity);
+        for i in 0..capacity {
             let new_page = Page::new(root_dentry().clone(), 0, PageState::Invalid);
             data.push(PageWrapper::new(new_page));
             free_page.push_back(i);
