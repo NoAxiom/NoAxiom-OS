@@ -91,7 +91,7 @@ impl<'a> Syscall<'a> {
             SYS_GETEGID =>              Self::empty_syscall("getegid", 0),
             SYS_EXIT =>                 self.sys_exit(args[0] as i32),
             SYS_EXIT_GROUP =>           self.sys_exit_group(args[0] as i32),
-            SYS_CLONE =>                self.sys_clone(args[0], args[1], args[2], args[3], args[4]).await,
+            SYS_CLONE =>                self.sys_clone(&args).await,
             SYS_CLONE3 =>               self.sys_clone3(args[0], args[1]).await,
             SYS_EXECVE =>               self.sys_execve(args[0], args[1], args[2]).await,
             SYS_WAIT4 =>                self.sys_wait4(args[0] as isize, args[1], args[2]).await,

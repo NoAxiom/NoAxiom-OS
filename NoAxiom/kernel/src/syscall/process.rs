@@ -54,25 +54,7 @@ impl Syscall<'_> {
         Ok(0)
     }
 
-    pub async fn sys_clone(
-        &self,
-        a0: usize,
-        a1: usize,
-        a2: usize,
-        a3: usize,
-        a4: usize,
-    ) -> SyscallResult {
-        self.__sys_clone_arch(a0, a1, a2, a3, a4).await
-    }
-
-    async fn __sys_clone_arch(
-        &self,
-        a0: usize,
-        a1: usize,
-        a2: usize,
-        a3: usize,
-        a4: usize,
-    ) -> SyscallResult {
+    pub async fn sys_clone(&self, args: &[usize; 6]) -> SyscallResult {
         /*
          * On x86-32, and several other common architectures (including
          * score, ARM, ARM 64, PA-RISC, arc, Power PC, xtensa, and MIPS), the
@@ -84,9 +66,13 @@ impl Syscall<'_> {
          * u64 tls)
          */
         #[cfg(target_arch = "loongarch64")]
-        let x = self.__sys_clone(a0, a1, a2, /* here */ a4, a3).await;
+        let x = self
+            .__sys_clone(args[0], args[1], args[2], /* here */ args[4], args[3])
+            .await;
         #[cfg(target_arch = "riscv64")]
-        let x = self.__sys_clone(a0, a1, a2, a3, a4).await;
+        let x = self
+            .__sys_clone(args[0], args[1], args[2], args[3], args[4])
+            .await;
         x
     }
 
@@ -146,7 +132,7 @@ impl Syscall<'_> {
         let ptid = cl_args.parent_tid as usize;
         let ctid = cl_args.child_tid as usize;
         let tls = cl_args.tls as usize;
-        self.sys_clone(flags, stack, ptid, tls, ctid).await
+        self.__sys_clone(flags, stack, ptid, tls, ctid).await
     }
 
     /// execve syscall impl
