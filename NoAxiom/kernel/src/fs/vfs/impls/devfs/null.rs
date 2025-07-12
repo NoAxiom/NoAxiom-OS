@@ -2,12 +2,25 @@ use alloc::sync::Arc;
 
 use crate::{
     config::fs::BLOCK_SIZE,
+    dentry_default, file_default,
     fs::vfs::basic::{
         inode::{Inode, InodeMeta},
         superblock::SuperBlock,
     },
     include::fs::{InodeMode, Stat},
 };
+
+file_default!(
+    NullFile,
+    async fn base_read(&self, _offset: usize, buf: &mut [u8]) -> SyscallResult {
+        Ok(0)
+    },
+    async fn base_write(&self, _offset: usize, buf: &[u8]) -> SyscallResult {
+        Ok(buf.len() as isize)
+    }
+);
+
+dentry_default!(NullDentry, NullFile);
 
 pub struct NullInode {
     meta: InodeMeta,
