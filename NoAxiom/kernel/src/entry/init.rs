@@ -1,6 +1,4 @@
-use arch::{
-    Arch, ArchBoot, ArchInt, ArchSbi, _entry_other_hart, consts::KERNEL_ADDR_OFFSET, ArchInfo,
-};
+use arch::{Arch, ArchBoot, ArchInt, _entry_other_hart, consts::KERNEL_ADDR_OFFSET, ArchInfo};
 
 use crate::{
     config::cpu::CPU_NUM,

@@ -4,6 +4,7 @@ use config::{
     cpu::CPU_NUM,
     mm::{KERNEL_STACK_SIZE, KERNEL_STACK_WIDTH, PAGE_SIZE},
 };
+use sbi_rt::hart_start;
 
 use super::{context::freg_init, trap::trap_init, RV64};
 use crate::{rv64::memory::KERNEL_ADDR_OFFSET, ArchBoot};
@@ -131,5 +132,12 @@ impl ArchBoot for RV64 {
     fn arch_init() {
         trap_init();
         freg_init();
+    }
+    // hart start
+    fn hart_start(hartid: usize, start_addr: usize) {
+        let x = hart_start(hartid, start_addr, 0);
+        if x.is_err() {
+            panic!("hart_start failed");
+        }
     }
 }

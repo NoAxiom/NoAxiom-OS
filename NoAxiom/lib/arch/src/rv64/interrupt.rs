@@ -3,6 +3,7 @@
 use alloc::borrow::ToOwned;
 
 use riscv::{asm::sfence_vma_all, register::satp};
+use sbi_rt::{legacy::clear_ipi, HartMask};
 
 use super::RV64;
 use crate::ArchInt;
@@ -140,5 +141,13 @@ impl ArchInt for RV64 {
     #[inline(always)]
     fn disable_user_memory_access() {
         disable_user_memory_access();
+    }
+
+    // ipi
+    fn send_ipi(hartid: usize) {
+        sbi_rt::send_ipi(HartMask::from_mask_base(0b1, hartid));
+    }
+    fn clear_ipi() {
+        clear_ipi();
     }
 }

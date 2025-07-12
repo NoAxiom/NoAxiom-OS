@@ -4,7 +4,6 @@ mod context;
 mod info;
 mod interrupt;
 mod memory;
-mod sbi;
 mod time;
 mod tlb;
 mod trap;

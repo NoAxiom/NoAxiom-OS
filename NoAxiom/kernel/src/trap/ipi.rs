@@ -3,7 +3,7 @@
 use alloc::sync::Arc;
 use core::mem::swap;
 
-use arch::{Arch, ArchMemory, ArchSbi};
+use arch::{Arch, ArchInt, ArchMemory};
 use array_init::array_init;
 use ksync::mutex::SpinLock;
 use lazy_static::lazy_static;

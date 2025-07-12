@@ -1,7 +1,4 @@
-use super::{ArchAsm, ArchBoot, ArchInfo, ArchInt, ArchSbi, ArchTime, ArchTrap};
+use super::{ArchAsm, ArchBoot, ArchInfo, ArchInt, ArchTime, ArchTrap};
 
 /// full arch trait
-pub trait ArchFull:
-    ArchInt + ArchAsm + ArchSbi + ArchTrap + ArchTime + ArchBoot + ArchInfo
-{
-}
+pub trait ArchFull: ArchInt + ArchAsm + ArchTrap + ArchTime + ArchBoot + ArchInfo {}

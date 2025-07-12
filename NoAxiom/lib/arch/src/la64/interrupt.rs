@@ -1,6 +1,9 @@
-use loongArch64::register::{
-    crmd,
-    ecfg::{self, LineBasedInterrupt},
+use loongArch64::{
+    ipi::send_ipi_single,
+    register::{
+        crmd,
+        ecfg::{self, LineBasedInterrupt},
+    },
 };
 
 use super::LA64;
@@ -77,4 +80,11 @@ impl ArchInt for LA64 {
     // user memory access is riscv specific
     fn enable_user_memory_access() {}
     fn disable_user_memory_access() {}
+    // ipi
+    fn send_ipi(hartid: usize) {
+        send_ipi_single(hartid, 1);
+    }
+    fn clear_ipi() {
+        unimplemented!()
+    }
 }

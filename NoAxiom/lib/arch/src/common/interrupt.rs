@@ -17,4 +17,8 @@ pub trait ArchInt {
     // user memory access
     fn enable_user_memory_access();
     fn disable_user_memory_access();
+
+    // ipi
+    fn send_ipi(hartid: usize);
+    fn clear_ipi();
 }
