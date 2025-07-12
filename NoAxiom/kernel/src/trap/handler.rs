@@ -1,6 +1,7 @@
 //! trap handler
 
 use alloc::sync::Arc;
+use core::intrinsics::unlikely;
 
 use arch::{consts::KERNEL_ADDR_OFFSET, Arch, ArchInt, ArchTrap, TrapArgs, TrapType};
 
@@ -73,7 +74,7 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
     trace!("[trap_handler] call trap handler");
 
     // check if need schedule
-    if task.need_resched() {
+    if unlikely(task.need_resched()) {
         trace!(
             "task {} time_stat timeup by time = {:?}",
             task.tid(),

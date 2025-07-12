@@ -12,7 +12,6 @@ use crate::{
     mm::user_ptr::UserPtr,
     return_errno,
     sched::utils::realtime,
-    signal::interruptable::interruptable,
     time::{
         clock::{ClockId, CLOCK_MANAGER},
         gettime::{get_time_duration, get_time_ms, get_timeval},

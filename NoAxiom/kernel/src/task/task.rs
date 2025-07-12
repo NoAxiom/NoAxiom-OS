@@ -1,7 +1,13 @@
 //! # Task
 
 use alloc::{string::String, sync::Arc, vec::Vec};
-use core::{marker::PhantomData, ptr::null, sync::atomic::AtomicUsize, task::Waker};
+use core::{
+    intrinsics::{likely, unlikely},
+    marker::PhantomData,
+    ptr::null,
+    sync::atomic::AtomicUsize,
+    task::Waker,
+};
 
 use arch::{Arch, ArchInfo, ArchInt, ArchMemory, ArchTrapContext, TrapContext};
 use ksync::{
@@ -268,7 +274,8 @@ impl Task {
 
     /// schedule
     pub fn need_resched(&self) -> bool {
-        self.sched_entity().need_yield() || self.tcb().flags.contains(TaskFlags::TIF_NEED_RESCHED)
+        self.sched_entity().need_yield()
+            || unlikely(self.tcb().flags.contains(TaskFlags::TIF_NEED_RESCHED))
     }
     pub fn clear_resched_flags(&self) {
         self.sched_entity_mut().clear_pending_yield();
@@ -331,7 +338,7 @@ impl Task {
 // process implementation
 impl Task {
     pub fn try_get_status(&self) -> Option<TaskStatus> {
-        if !self.tif().contains(TaskFlags::TIF_STATUS_CHANGED) {
+        if likely(!self.tif().contains(TaskFlags::TIF_STATUS_CHANGED)) {
             None
         } else {
             self.tif_mut().remove(TaskFlags::TIF_STATUS_CHANGED);

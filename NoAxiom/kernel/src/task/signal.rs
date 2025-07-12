@@ -1,5 +1,8 @@
 use alloc::{sync::Arc, vec::Vec};
-use core::mem::size_of;
+use core::{
+    intrinsics::{likely, unlikely},
+    mem::size_of,
+};
 
 use arch::{ArchTrapContext, ArchUserFloatContext, TrapArgs};
 use config::mm::SIG_TRAMPOLINE;
@@ -30,8 +33,8 @@ extern "C" {
 impl Task {
     pub async fn check_signal(self: &Arc<Self>) {
         // check tif first
-        if !self.tif().contains(TaskFlags::TIF_NOTIFY_SIGNAL)
-            || self.tcb().flags.contains(TaskFlags::TIF_IN_SIGACTION)
+        if likely(!self.tif().contains(TaskFlags::TIF_NOTIFY_SIGNAL))
+            || unlikely(self.tcb().flags.contains(TaskFlags::TIF_IN_SIGACTION))
         {
             return;
         }
