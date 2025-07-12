@@ -20,7 +20,10 @@ use super::{
     superblock::{EmptySuperBlock, SuperBlock},
 };
 use crate::{
-    fs::{path::Path, vfs::basic::inode::InodeState},
+    fs::{
+        path::Path,
+        vfs::basic::{file::FileMeta, inode::InodeState},
+    },
     include::{
         fs::{InodeMode, RenameFlags},
         result::Errno,
@@ -471,4 +474,58 @@ impl Dentry for EmptyDentry {
     async fn symlink(self: Arc<Self>, _name: &str, _tar_name: &str) -> SysResult<()> {
         unreachable!()
     }
+}
+
+#[macro_export]
+macro_rules! dentry_default {
+    ($dentry_struct:ident, $file_struct:ident) => {
+        pub struct $dentry_struct {
+            meta: DentryMeta,
+        }
+
+        impl $dentry_struct {
+            pub fn new(
+                parent: Option<Arc<dyn Dentry>>,
+                name: &str,
+                super_block: Arc<dyn SuperBlock>,
+            ) -> Self {
+                Self {
+                    meta: DentryMeta::new(parent, name, super_block),
+                }
+            }
+        }
+
+        #[async_trait]
+        impl Dentry for $dentry_struct {
+            fn meta(&self) -> &DentryMeta {
+                &self.meta
+            }
+
+            fn from_name(self: Arc<Self>, _name: &str) -> Arc<dyn Dentry> {
+                unreachable!(
+                    "{} dentry should not have child",
+                    stringify!($dentry_struct)
+                );
+            }
+
+            fn open(self: Arc<Self>) -> SysResult<Arc<dyn File>> {
+                Ok(Arc::new($file_struct::new(FileMeta::new(
+                    self.clone(),
+                    self.inode()?,
+                ))))
+            }
+
+            async fn create(
+                self: Arc<Self>,
+                _name: &str,
+                _mode: InodeMode,
+            ) -> SysResult<Arc<dyn Dentry>> {
+                unreachable!("{} should not create child", stringify!($dentry_struct));
+            }
+
+            async fn symlink(self: Arc<Self>, _name: &str, _tar_name: &str) -> SysResult<()> {
+                unreachable!("{} should not create symlink", stringify!($dentry_struct));
+            }
+        }
+    };
 }
