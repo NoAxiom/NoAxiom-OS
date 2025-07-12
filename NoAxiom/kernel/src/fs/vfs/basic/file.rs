@@ -22,7 +22,10 @@ use super::{
 };
 use crate::{
     constant::fs::LEN_BEFORE_NAME,
-    fs::pagecache::{Page, PageCache},
+    fs::{
+        pagecache::{Page, PageCache, PageState},
+        vfs::basic::inode::InodeState,
+    },
     include::{
         fs::{FileFlags, LinuxDirent64, SeekFrom},
         io::PollEvent,
@@ -154,7 +157,7 @@ impl dyn File {
         self.meta().pos.store(res_pos, Ordering::Release);
         Ok(res_pos as isize)
     }
-    #[allow(unused)]
+
     pub async fn read_all(&self) -> SysResult<Vec<u8>> {
         let len = self.meta().inode.size();
         let mut buf = vec![0; len];
@@ -186,12 +189,7 @@ impl dyn File {
             return Ok(0);
         }
         let mut page_cache = page_cache.unwrap();
-
-        if page_cache.dont_use() {
-            drop(page_cache);
-            assert_no_lock!();
-            return self.base_read(offset, buf).await;
-        }
+        let cache_id = page_cache.id;
 
         let mut current_offset = offset;
         let mut buf = buf;
@@ -200,34 +198,43 @@ impl dyn File {
         // if the buf is run out
         loop {
             let (offset_align, offset_in) = align_offset(current_offset, PAGE_SIZE);
-            if let Some(page) = page_cache.get_page(offset_align) {
-                // maybe it is the las page, the exact len is equal to `size` - `current_offset`
-                // or the rest of the page
-                let page_len = (PAGE_SIZE - offset_in).min(size - current_offset);
-                // maybe the buf is not enough
-                let len = buf.len().min(page_len);
+            // maybe it is the last page, the exact len is equal to `size` -
+            // `current_offset` or the rest of the page
+            let page_len = (PAGE_SIZE - offset_in).min(size - current_offset);
+            // maybe the buf is not enough
+            let len = buf.len().min(page_len);
 
-                unsafe {
-                    core::ptr::copy_nonoverlapping(
-                        page.as_mut_bytes_array().as_ptr().add(offset_in),
-                        buf.as_mut_ptr(),
-                        len,
-                    );
+            if let Some((r_lock, page_id)) = page_cache.get_page(offset_align) {
+                if let Some(page) = r_lock.get_page(page_id, cache_id) {
+                    unsafe {
+                        core::ptr::copy_nonoverlapping(
+                            page.as_mut_bytes_array().as_ptr().add(offset_in),
+                            buf.as_mut_ptr(),
+                            len,
+                        );
+                    }
+
+                    buf = &mut buf[len..];
+                    current_offset += len;
+
+                    if buf.is_empty() || current_offset == size {
+                        break;
+                    }
+
+                    continue;
                 }
-
-                buf = &mut buf[len..];
-                current_offset += len;
-
-                if buf.is_empty() || current_offset == size {
-                    break;
-                }
-            } else {
-                let new_page = Page::new();
-                // metion that no matter the result of base_read, we can just continue the loop
-                self.base_read(offset_align, new_page.as_mut_bytes_array())
-                    .await?;
-                page_cache.fill_page(offset_align, new_page);
             }
+
+            let page_state = if self.inode().state() == InodeState::Deleted {
+                PageState::Deleted
+            } else {
+                PageState::Shared
+            };
+            let new_page = Page::new(self.dentry(), offset_align, page_state);
+            // metion that no matter the result of base_read, we can just continue the loop
+            self.base_read(offset_align, new_page.as_mut_bytes_array())
+                .await?;
+            page_cache.fill_page(offset_align, new_page);
         }
 
         Ok((current_offset - offset) as isize)
@@ -257,12 +264,7 @@ impl dyn File {
         }
         let size = self.size();
         let mut page_cache = page_cache.unwrap();
-
-        if page_cache.dont_use() {
-            drop(page_cache);
-            assert_no_lock!();
-            return self.base_write(offset, buf).await;
-        }
+        let cache_id = page_cache.id;
 
         let mut current_offset = offset;
         let mut buf = buf;
@@ -272,33 +274,45 @@ impl dyn File {
         // if the buf is run out
         loop {
             let (offset_align, offset_in) = align_offset(current_offset, PAGE_SIZE);
-            if let Some(page) = page_cache.get_page_mut(offset_align) {
-                // maybe it is the las page, the exact len is equal to `size` - `current_offset`
-                // mention that write can expand the file, so the file size is not useful
-                let page_len = PAGE_SIZE - offset_in;
-                // maybe the buf is not enough
-                let len = buf.len().min(page_len);
+            // maybe it is the last page, the exact len is equal to `size` -
+            // `current_offset` mention that write can expand the file, so the
+            // file size is not useful
+            let page_len = PAGE_SIZE - offset_in;
+            // maybe the buf is not enough
+            let len = buf.len().min(page_len);
+            if let Some((mut w_lock, page_id)) = page_cache.get_page_mut(offset_align) {
+                if let Some(page) = w_lock.get_page_mut(page_id, cache_id) {
+                    unsafe {
+                        core::ptr::copy_nonoverlapping(
+                            buf.as_ptr(),
+                            page.as_mut_bytes_array().as_mut_ptr().add(offset_in),
+                            len,
+                        );
+                    }
 
-                unsafe {
-                    core::ptr::copy_nonoverlapping(
-                        buf.as_ptr(),
-                        page.as_mut_bytes_array().as_mut_ptr().add(offset_in),
-                        len,
-                    );
+                    page.mark_dirty();
+
+                    buf = &buf[len..];
+                    current_offset += len;
+
+                    if buf.is_empty() {
+                        break;
+                    }
+
+                    continue;
                 }
-
-                page.mark_dirty();
-
-                buf = &buf[len..];
-                current_offset += len;
-
-                if buf.is_empty() {
-                    break;
-                }
-            } else {
-                let new_page = Page::new();
-                page_cache.fill_page(offset_align, new_page);
             }
+
+            let page_state = if self.inode().state() == InodeState::Deleted {
+                PageState::Deleted
+            } else {
+                PageState::Shared
+            };
+            // TODO: get Arc<dyn File> !!!
+            let new_page = Page::new(self.dentry(), offset_align, page_state);
+            self.base_read(offset_align, new_page.as_mut_bytes_array())
+                .await?;
+            page_cache.fill_page(offset_align, new_page);
         }
 
         if current_offset > size {

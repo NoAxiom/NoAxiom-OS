@@ -9,6 +9,8 @@ pub type SpinLock<T> = kernel_sync::spin::SpinMutex<T, NoIrqLockAction>;
 pub type SpinLockGuard<'a, T> = kernel_sync::spin::SpinMutexGuard<'a, T, NoIrqLockAction>;
 pub type TicketLock<T> = kernel_sync::ticket::TicketMutex<T, NoIrqLockAction>;
 pub type RwLock<T> = kernel_sync::rwlock::RwLock<T, NoIrqLockAction>;
+pub type RwLockReadGuard<'a, T> = kernel_sync::rwlock::RwLockReadGuard<'a, T, NoIrqLockAction>;
+pub type RwLockWriteGuard<'a, T> = kernel_sync::rwlock::RwLockWriteGuard<'a, T, NoIrqLockAction>;
 
 pub type RawSpinLock<T, L> = kernel_sync::spin::SpinMutex<T, L>;
 pub type RawSpinLockGuard<'a, T, L> = kernel_sync::spin::SpinMutexGuard<'a, T, L>;

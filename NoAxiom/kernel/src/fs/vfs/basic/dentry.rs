@@ -365,8 +365,8 @@ impl dyn Dentry {
             if parent.inode()?.file_type() != InodeMode::DIR {
                 return Err(Errno::ENOTDIR);
             }
-            self.set_inode_none();
-            inode.set_state(InodeState::Deleted);
+            // self.set_inode_none();
+            inode.set_state(InodeState::Deleted).await;
             // parent.remove_child(&self.name()).unwrap();
             parent.open().unwrap().delete_child(&self.name()).await?;
         }

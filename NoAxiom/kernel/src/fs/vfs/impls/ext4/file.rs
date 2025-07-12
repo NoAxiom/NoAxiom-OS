@@ -11,7 +11,7 @@ use crate::{
     fs::vfs::{
         basic::{
             file::{File, FileMeta},
-            inode::Inode,
+            inode::{Inode, InodeState},
         },
         impls::ext4::{fs_err, inode::Ext4DirInode},
     },
@@ -85,6 +85,9 @@ impl File for Ext4File {
         assert_no_lock!();
         assert!(Arch::is_interrupt_enabled());
         let inode = &self.meta.inode;
+        if inode.state() == InodeState::Deleted {
+            return Ok(0);
+        }
         let super_block = self.meta.dentry().super_block();
         trace!("[ext4file] write try to get lock");
         let ext4 = super_block

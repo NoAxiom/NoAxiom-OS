@@ -11,6 +11,8 @@ pub const FAT32_BYTES_PER_CLUSTER_ID: usize = 4;
 
 /// The max LruCache size
 pub const MAX_LRU_CACHE_SIZE: usize = 2 * PAGE_SIZE;
+/// The max PageCache size
+pub const PAGE_CACHE_SIZE: usize = 32 * 1024 * 1024; // 32MB
 
 pub const IS_DELETED: u8 = 0xe5;
 pub const SPACE: u8 = 0x20;

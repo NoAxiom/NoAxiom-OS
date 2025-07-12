@@ -15,11 +15,12 @@ use crate::{
         time::TimeSpec,
     },
     syscall::SysResult,
-    utils::{global_alloc, hack::is_ltp},
+    utils::global_alloc,
 };
 
 type Mutex<T> = SpinLock<T>;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InodeState {
     UnInit,
     Normal,
@@ -50,11 +51,10 @@ impl InodeMeta {
         cached: bool,
     ) -> Self {
         let page_cache = if cached {
-            #[cold]
-            || Some(AsyncMutex::new(PageCache::new(is_ltp())))
+            Some(AsyncMutex::new(PageCache::new()))
         } else {
-            || None
-        }();
+            None
+        };
         Self {
             id: global_alloc() as usize,
             inner: Mutex::new(InodeMetaInner {
@@ -111,6 +111,9 @@ impl dyn Inode {
     }
     pub fn size(&self) -> usize {
         self.meta().inner.lock().size
+    }
+    pub fn state(&self) -> InodeState {
+        self.meta().inner.lock().state
     }
     pub fn file_type(&self) -> InodeMode {
         self.meta().inode_mode
@@ -169,8 +172,16 @@ impl dyn Inode {
             inner.ctime_nsec = ctime.tv_nsec;
         }
     }
-    pub fn set_state(&self, state: InodeState) {
+    pub async fn set_state(&self, state: InodeState) {
         let mut inner = self.meta().inner.lock();
+        match state {
+            InodeState::Deleted => {
+                if let Some(mut page_cache) = self.page_cache().await {
+                    page_cache.mark_deleted();
+                }
+            }
+            _ => {}
+        }
         match inner.state {
             InodeState::Deleted => {}
             _ => {

@@ -6,7 +6,7 @@ FEATURES :=
 
 QEMU := 1
 ifeq ($(ARCH_NAME),riscv64)
-INTERRUPTABLE_ASYNC := 1
+ASYNC := 1
 else ifeq ($(ARCH_NAME),loongarch64)
 ASYNC := 1
 endif
