@@ -263,12 +263,25 @@ pub fn frame_alloc() -> Option<FrameTracker> {
     })
 }
 
-pub fn frame_alloc_some(size: usize) -> Option<Vec<FrameTracker>> {
+pub fn frame_alloc_some_zero_inited(size: usize) -> Option<Vec<FrameTracker>> {
     let mut guard = FRAME_ALLOCATOR.lock();
     guard.alloc_some(size).map(|ppns: Vec<PhysPageNum>| {
         ppns.into_iter()
             .map(|ppn| {
                 let frame = FrameTrackerRaw::new(ppn).zero_inited();
+                guard.frame_map.insert(ppn.0, Arc::downgrade(&frame.inner));
+                frame
+            })
+            .collect()
+    })
+}
+
+pub fn frame_alloc_some_uninited(size: usize) -> Option<Vec<FrameTracker>> {
+    let mut guard = FRAME_ALLOCATOR.lock();
+    guard.alloc_some(size).map(|ppns: Vec<PhysPageNum>| {
+        ppns.into_iter()
+            .map(|ppn| {
+                let frame = unsafe { FrameTrackerRaw::new(ppn).keep_uninited() };
                 guard.frame_map.insert(ppn.0, Arc::downgrade(&frame.inner));
                 frame
             })
