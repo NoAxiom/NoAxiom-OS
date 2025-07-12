@@ -1,8 +1,4 @@
-use alloc::{
-    collections::vec_deque::VecDeque,
-    sync::{Arc, Weak},
-    vec::Vec,
-};
+use alloc::{collections::vec_deque::VecDeque, sync::Arc, vec::Vec};
 use core::intrinsics::unlikely;
 
 use arch::{Arch, ArchInt};
@@ -137,7 +133,7 @@ impl PageWrapper {
 }
 
 pub struct PageCacheManager {
-    data: Vec<PageWrapper>, // (Page, valid) // todo: (Page, valid, old)
+    data: Vec<PageWrapper>,
     free_page: VecDeque<usize>,
 }
 
@@ -155,8 +151,12 @@ impl PageCacheManager {
     }
 
     // todo: use more efficient strategy to clean
-    fn clean(&mut self) {
-        error!("PageCacheManager::clean");
+    fn clean(&mut self, thresold: usize) {
+        warn!("PageCacheManager::clean");
+        assert!(
+            thresold <= self.free_page.len(),
+            "[PageCacheManager::clean] thresold should be less than free_page.len()"
+        );
         let mut size = 0;
         for i in 0..self.data.len() {
             if self.data[i].valid {
@@ -165,12 +165,12 @@ impl PageCacheManager {
                 self.data[i].valid = false;
                 size += 1;
             }
-            if size >= get_page_cache_capacity_clean_threshold() {
+            if size == thresold {
                 break;
             }
         }
         assert!(
-            size == PAGE_CACHE_CLEAN_THRESHOLD,
+            size == thresold,
             "[PageCacheManager::clean] clean size should be less than PAGE_CACHE_CLEAN_THRESHOLD"
         );
     }
@@ -181,8 +181,20 @@ impl PageCacheManager {
             return page;
         }
 
+        let sys_capacity = get_page_cache_capacity();
+        let sys_thresold = get_page_cache_capacity_clean_threshold();
+        let cur_capacity = self.data.len();
+        if cur_capacity < sys_capacity {
+            for _ in cur_capacity..sys_capacity {
+                let new_page = Page::new(root_dentry().clone(), 0, PageState::Invalid);
+                self.data.push(PageWrapper::new(new_page));
+                self.free_page.push_back(self.data.len() - 1);
+            }
+            return self.alloc();
+        }
+
         // if full, do clean
-        self.clean();
+        self.clean(sys_thresold);
         self.alloc()
     }
 
