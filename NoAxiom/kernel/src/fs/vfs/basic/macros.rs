@@ -94,7 +94,6 @@ macro_rules! file_default {
             }
 
             #[async_trait::async_trait]
-            #[allow(unused)]
             impl File for $file_struct {
                 fn meta(&self) -> &FileMeta {
                     &self.meta
