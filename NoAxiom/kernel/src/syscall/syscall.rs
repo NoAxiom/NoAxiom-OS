@@ -91,22 +91,7 @@ impl<'a> Syscall<'a> {
             SYS_GETEGID =>              Self::empty_syscall("getegid", 0),
             SYS_EXIT =>                 self.sys_exit(args[0] as i32),
             SYS_EXIT_GROUP =>           self.sys_exit_group(args[0] as i32),
-            SYS_CLONE => {
-                /*
-                 * On x86-32, and several other common architectures (including
-                 * score, ARM, ARM 64, PA-RISC, arc, Power PC, xtensa, and MIPS), the
-                 * order of the last two arguments is reversed.
-                 * And so on loongarch64.
-                 * ref1: https://www.man7.org/linux/man-pages/man2/clone.2.html#VERSIONS
-                 * ref2: https://inbox.vuxu.org/musl/1a5a097f.12d7.1794a6de3a8.Coremail.zhaixiaojuan%40loongson.cn/t/
-                 * sys_clone(u64 flags, u64 ustack_base, u64 parent_tidptr, u64 child_tidptr, u64 tls)
-                 */
-                #[cfg(target_arch = "loongarch64")]
-                let x = self.sys_clone(args[0], args[1], args[2], /* here */ args[4], args[3]).await;
-                #[cfg(target_arch = "riscv64")]
-                let x = self.sys_clone(args[0], args[1], args[2], args[3], args[4]).await;
-                x
-            }
+            SYS_CLONE =>                self.sys_clone(args[0], args[1], args[2], args[3], args[4]).await,
             SYS_CLONE3 =>               self.sys_clone3(args[0], args[1]).await,
             SYS_EXECVE =>               self.sys_execve(args[0], args[1], args[2]).await,
             SYS_WAIT4 =>                self.sys_wait4(args[0] as isize, args[1], args[2]).await,
@@ -189,11 +174,6 @@ impl<'a> Syscall<'a> {
                     );
                 }
                 return Ok(0);
-                // return_errno!(
-                //     Errno::ENOSYS,
-                //     "[kernel] unsupported syscall id: {:?}, tid: {}, args: {:x?}",
-                //     id, self.task.tid(), args
-                // )
             }
         }
     }

@@ -54,8 +54,44 @@ impl Syscall<'_> {
         Ok(0)
     }
 
-    /// clone current task
     pub async fn sys_clone(
+        &self,
+        a0: usize,
+        a1: usize,
+        a2: usize,
+        a3: usize,
+        a4: usize,
+    ) -> SyscallResult {
+        self.__sys_clone_arch(a0, a1, a2, a3, a4).await
+    }
+
+    pub async fn __sys_clone_arch(
+        &self,
+        a0: usize,
+        a1: usize,
+        a2: usize,
+        a3: usize,
+        a4: usize,
+    ) -> SyscallResult {
+        /*
+         * On x86-32, and several other common architectures (including
+         * score, ARM, ARM 64, PA-RISC, arc, Power PC, xtensa, and MIPS), the
+         * order of the last two arguments is reversed.
+         * And so on loongarch64.
+         * ref1: https://www.man7.org/linux/man-pages/man2/clone.2.html#VERSIONS
+         * ref2: https://inbox.vuxu.org/musl/1a5a097f.12d7.1794a6de3a8.Coremail.zhaixiaojuan%40loongson.cn/t/
+         * sys_clone(u64 flags, u64 ustack_base, u64 parent_tidptr, u64 child_tidptr,
+         * u64 tls)
+         */
+        #[cfg(target_arch = "loongarch64")]
+        let x = self.__sys_clone(a0, a1, a2, /* here */ a4, a3).await;
+        #[cfg(target_arch = "riscv64")]
+        let x = self.__sys_clone(a0, a1, a2, a3, a4).await;
+        x
+    }
+
+    /// clone current task
+    pub async fn __sys_clone(
         &self,
         flags: usize,
         stack: usize,
