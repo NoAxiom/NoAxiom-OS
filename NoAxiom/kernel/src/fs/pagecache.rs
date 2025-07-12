@@ -15,11 +15,7 @@ use spin::{RwLock, RwLockReadGuard, RwLockWriteGuard}; // FIXME: use ksync::mute
 
 use crate::{
     fs::vfs::{
-        basic::{
-            dentry::{Dentry, EmptyDentry},
-            file::File,
-            inode::InodeState,
-        },
+        basic::{dentry::Dentry, file::File},
         root_dentry,
     },
     utils::{global_alloc, is_aligned},
@@ -79,9 +75,10 @@ impl Page {
             PageState::Modified => {
                 self.state = PageState::Shared;
                 // debug!(
-                //     "[Page::sync] sync page: {}, offset: {}",
+                //     "[Page::sync] sync page: {}, offset: {}, content: {:?}",
                 //     self.file.name(),
-                //     self.offset_align
+                //     self.offset_align,
+                //     &self.as_mut_bytes_array()[..10]
                 // );
                 assert_ne!(self.file.name(), "ForPageCacheManager");
                 let file = self.file.clone();
@@ -172,6 +169,10 @@ impl PageCacheManager {
                 break;
             }
         }
+        assert!(
+            size == PAGE_CACHE_CLEAN_THRESHOLD,
+            "[PageCacheManager::clean] clean size should be less than PAGE_CACHE_CLEAN_THRESHOLD"
+        );
     }
 
     fn alloc(&mut self) -> usize {
@@ -191,12 +192,25 @@ impl PageCacheManager {
             self.data[page_id].valid, false,
             "[PageCache::alloc] Page should not be valid"
         );
+        // debug!(
+        //     "[PageCacheManager::alloc_fill] alloc page: {}, offset: {}, content:
+        // {:?}",     page.file.name(),
+        //     page.offset_align,
+        //     &page.as_mut_bytes_array()[..10]
+        // );
         self.data[page_id] = PageWrapper::from(page, cache_id);
+        assert_eq!(
+            self.data[page_id].valid, true,
+            "[PageCache::alloc_fill] Page should be valid after alloc_fill"
+        );
         page_id
     }
 
-    pub fn get_page(&self, page_id: usize, cache_id: usize) -> Option<&Page> {
-        if self.data[page_id].valid && self.data[page_id].cache_id == cache_id {
+    pub fn get_page(&self, page_id: usize, cache_id: usize, offset_align: usize) -> Option<&Page> {
+        if self.data[page_id].valid
+            && self.data[page_id].cache_id == cache_id
+            && self.data[page_id].page.offset_align == offset_align
+        {
             // debug!(
             //     "[PageCacheManager::get_page] get page: {}, offset: {}, content: {:?}",
             //     self.data[page_id].page.file.name(),
@@ -209,14 +223,23 @@ impl PageCacheManager {
         }
     }
 
-    pub fn get_page_mut(&mut self, page_id: usize, cache_id: usize) -> Option<&mut Page> {
-        if self.data[page_id].valid && self.data[page_id].cache_id == cache_id {
-            // debug!(
-            //     "[PageCacheManager::get_page_mut] get page: {}, offset: {}, content:
-            // {:?}",     self.data[page_id].page.file.name(),
-            //     self.data[page_id].page.offset_align,
-            //     &self.data[page_id].page.as_mut_bytes_array()[..10]
-            // );
+    pub fn get_page_mut(
+        &mut self,
+        page_id: usize,
+        cache_id: usize,
+        offset_align: usize,
+    ) -> Option<&mut Page> {
+        if self.data[page_id].valid
+            && self.data[page_id].cache_id == cache_id
+            && self.data[page_id].page.offset_align == offset_align
+        {
+            debug!(
+                "[PageCacheManager::get_page_mut] get page: {}, offset: {}, content:
+            {:?}",
+                self.data[page_id].page.file.name(),
+                self.data[page_id].page.offset_align,
+                &self.data[page_id].page.as_mut_bytes_array()[..10]
+            );
             Some(&mut self.data[page_id].page)
         } else {
             None
@@ -273,8 +296,12 @@ impl PageCache {
 
     pub fn mark_deleted(&mut self) {
         // mark all pages as deleted
-        for (_, page_id) in self.inner.iter() {
-            if let Some(page) = PAGE_CACHE_MANAGER.write().get_page_mut(*page_id, self.id) {
+        for (offset_align, page_id) in self.inner.iter() {
+            if let Some(page) =
+                PAGE_CACHE_MANAGER
+                    .write()
+                    .get_page_mut(*page_id, self.id, *offset_align)
+            {
                 page.mark_deleted();
             }
         }
