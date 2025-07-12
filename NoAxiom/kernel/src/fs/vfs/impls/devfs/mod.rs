@@ -2,7 +2,6 @@ use alloc::sync::Arc;
 
 use cpu_dma_latency::{dentry::CpuDmaLatencyDentry, inode::CpuDmaLatencyInode};
 use ksync::Once;
-use null::{dentry::NullDentry, inode::NullInode};
 use rtc::{dentry::RtcDentry, inode::RtcInode};
 use tty::{dentry::TtyDentry, inode::TtyInode};
 use urandom::{dentry::UrandomDentry, inode::UrandomInode};
@@ -10,7 +9,10 @@ use urandom::{dentry::UrandomDentry, inode::UrandomInode};
 use crate::{
     fs::vfs::{
         basic::{dentry::Dentry, file::File},
-        impls::ramfs::{dentry::RamFsDentry, inode::RamFsDirInode},
+        impls::{
+            devfs::null::{NullDentry, NullInode},
+            ramfs::{dentry::RamFsDentry, inode::RamFsDirInode},
+        },
     },
     include::fs::FileFlags,
     syscall::SysResult,

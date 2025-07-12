@@ -7,4 +7,8 @@ pub mod superblock;
 /// all the file system should implement this trait
 pub mod filesystem;
 
+/// basic vfs macros
+#[macro_use]
+pub mod macros;
+
 // todo: check all the WEAK or ARC pointers

@@ -20,7 +20,10 @@ use super::{
     superblock::{EmptySuperBlock, SuperBlock},
 };
 use crate::{
-    fs::{path::Path, vfs::basic::inode::InodeState},
+    fs::{
+        path::Path,
+        vfs::basic::{file::FileMeta, inode::InodeState},
+    },
     include::{
         fs::{InodeMode, RenameFlags},
         result::Errno,
