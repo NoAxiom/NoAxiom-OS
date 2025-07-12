@@ -205,7 +205,7 @@ impl dyn File {
             let len = buf.len().min(page_len);
 
             if let Some((r_lock, page_id)) = page_cache.get_page(offset_align) {
-                if let Some(page) = r_lock.get_page(page_id, cache_id) {
+                if let Some(page) = r_lock.get_page(page_id, cache_id, offset_align) {
                     unsafe {
                         core::ptr::copy_nonoverlapping(
                             page.as_mut_bytes_array().as_ptr().add(offset_in),
@@ -281,7 +281,16 @@ impl dyn File {
             // maybe the buf is not enough
             let len = buf.len().min(page_len);
             if let Some((mut w_lock, page_id)) = page_cache.get_page_mut(offset_align) {
-                if let Some(page) = w_lock.get_page_mut(page_id, cache_id) {
+                if let Some(page) = w_lock.get_page_mut(page_id, cache_id, offset_align) {
+                    debug!(
+                        "[write_at] {} write to page: {}, offset: {}, len: {}, content: {:?}",
+                        self.meta().dentry.name(),
+                        page_id,
+                        offset_align,
+                        len,
+                        &buf[..core::cmp::min(len, 10)]
+                    );
+
                     unsafe {
                         core::ptr::copy_nonoverlapping(
                             buf.as_ptr(),
@@ -289,7 +298,6 @@ impl dyn File {
                             len,
                         );
                     }
-
                     page.mark_dirty();
 
                     buf = &buf[len..];
