@@ -65,7 +65,7 @@ impl Syscall<'_> {
         self.__sys_clone_arch(a0, a1, a2, a3, a4).await
     }
 
-    pub async fn __sys_clone_arch(
+    async fn __sys_clone_arch(
         &self,
         a0: usize,
         a1: usize,
@@ -91,7 +91,7 @@ impl Syscall<'_> {
     }
 
     /// clone current task
-    pub async fn __sys_clone(
+    async fn __sys_clone(
         &self,
         flags: usize,
         stack: usize,
