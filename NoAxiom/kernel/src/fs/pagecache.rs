@@ -3,13 +3,14 @@ use alloc::{
     sync::{Arc, Weak},
     vec::Vec,
 };
+use core::intrinsics::unlikely;
 
 use arch::{Arch, ArchInt};
-use config::{fs::PAGE_CACHE_SIZE, mm::PAGE_SIZE};
+use config::{fs::PAGE_CACHE_PROPORTION, mm::PAGE_SIZE};
 use hashbrown::HashMap;
 use kfuture::block::block_on;
 use lazy_static::lazy_static;
-use memory::frame::{frame_alloc, FrameTracker};
+use memory::frame::{frame_alloc, FrameTracker, FRAME_ALLOCATOR};
 use spin::{RwLock, RwLockReadGuard, RwLockWriteGuard}; // FIXME: use ksync::mutex
 
 use crate::{
@@ -96,8 +97,23 @@ impl Page {
     }
 }
 
-const PAGE_CACHE_CAPACITY: usize = PAGE_CACHE_SIZE / PAGE_SIZE;
-const PAGE_CACHE_CLEAN_THRESHOLD: usize = PAGE_CACHE_CAPACITY / 2;
+static mut PAGE_CACHE_CAPACITY: usize = 0;
+fn get_page_cache_capacity() -> usize {
+    unsafe {
+        if unlikely(PAGE_CACHE_CAPACITY == 0) {
+            PAGE_CACHE_CAPACITY = FRAME_ALLOCATOR.lock().stat_total() / PAGE_CACHE_PROPORTION;
+            core::sync::atomic::fence(core::sync::atomic::Ordering::SeqCst);
+            println_debug!(
+                "[kernel] PAGECACHE: init {} physical frames",
+                PAGE_CACHE_CAPACITY
+            );
+        }
+        PAGE_CACHE_CAPACITY
+    }
+}
+fn get_page_cache_capacity_clean_threshold() -> usize {
+    get_page_cache_capacity() / 2
+}
 
 struct PageWrapper {
     valid: bool,
@@ -129,9 +145,9 @@ pub struct PageCacheManager {
 
 impl PageCacheManager {
     pub fn new() -> Self {
-        let mut data = Vec::with_capacity(PAGE_CACHE_CAPACITY);
-        let mut free_page = VecDeque::with_capacity(PAGE_CACHE_CAPACITY);
-        for i in 0..PAGE_CACHE_CAPACITY {
+        let mut data = Vec::with_capacity(get_page_cache_capacity());
+        let mut free_page = VecDeque::with_capacity(get_page_cache_capacity());
+        for i in 0..get_page_cache_capacity() {
             let new_page = Page::new(root_dentry().clone(), 0, PageState::Invalid);
             data.push(PageWrapper::new(new_page));
             free_page.push_back(i);
@@ -150,7 +166,7 @@ impl PageCacheManager {
                 self.data[i].valid = false;
                 size += 1;
             }
-            if size >= PAGE_CACHE_CLEAN_THRESHOLD {
+            if size >= get_page_cache_capacity_clean_threshold() {
                 break;
             }
         }
