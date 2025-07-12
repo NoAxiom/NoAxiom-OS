@@ -92,8 +92,9 @@ impl FrameTrackerRaw {
 
 trait FrameAllocator {
     fn new() -> Self;
-    fn alloc(&mut self) -> Option<PhysPageNum>;
-    fn dealloc(&mut self, ppn: PhysPageNum);
+    fn alloc_one(&mut self) -> Option<PhysPageNum>;
+    fn dealloc_one(&mut self, ppn: PhysPageNum);
+    fn alloc_some(&mut self, size: usize) -> Option<Vec<PhysPageNum>>;
 }
 pub struct StackFrameAllocator {
     start: usize,
@@ -125,7 +126,7 @@ impl FrameAllocator for StackFrameAllocator {
             frame_map: BTreeMap::new(),
         }
     }
-    fn alloc(&mut self) -> Option<PhysPageNum> {
+    fn alloc_one(&mut self) -> Option<PhysPageNum> {
         if let Some(ppn) = self.recycled.pop() {
             // trace!("[frame] recycled use: frame ppn={:#x}", self.current);
             Some(ppn.into())
@@ -144,7 +145,7 @@ impl FrameAllocator for StackFrameAllocator {
     /// corrisponding frame, so the processor can run on a deallocated
     /// page, which can possibly cause pagefault after the page being
     /// allocated again.
-    fn dealloc(&mut self, ppn: PhysPageNum) {
+    fn dealloc_one(&mut self, ppn: PhysPageNum) {
         let ppn = ppn.0;
         // validity check
         // FIXME: only for debug, remove it in release
@@ -153,6 +154,23 @@ impl FrameAllocator for StackFrameAllocator {
         // }
         // recycle
         self.recycled.push(ppn);
+    }
+    fn alloc_some(&mut self, size: usize) -> Option<Vec<PhysPageNum>> {
+        let mut frames = Vec::with_capacity(size);
+        for _ in 0..size {
+            if let Some(ppn) = self.alloc_one() {
+                frames.push(ppn);
+            } else {
+                break;
+            }
+        }
+        if frames.len() != size {
+            for ppn in frames {
+                self.dealloc_one(ppn);
+            }
+            return None;
+        }
+        Some(frames)
     }
 }
 
@@ -238,17 +256,43 @@ pub fn can_frame_alloc_loosely(req_num: usize) -> bool {
 
 pub fn frame_alloc() -> Option<FrameTracker> {
     let mut guard = FRAME_ALLOCATOR.lock();
-    guard.alloc().map(|ppn| {
+    guard.alloc_one().map(|ppn| {
         let frame = FrameTrackerRaw::new(ppn).zero_inited();
         guard.frame_map.insert(ppn.0, Arc::downgrade(&frame.inner));
         frame
     })
 }
 
+pub fn frame_alloc_some_zero_inited(size: usize) -> Option<Vec<FrameTracker>> {
+    let mut guard = FRAME_ALLOCATOR.lock();
+    guard.alloc_some(size).map(|ppns: Vec<PhysPageNum>| {
+        ppns.into_iter()
+            .map(|ppn| {
+                let frame = FrameTrackerRaw::new(ppn).zero_inited();
+                guard.frame_map.insert(ppn.0, Arc::downgrade(&frame.inner));
+                frame
+            })
+            .collect()
+    })
+}
+
+pub fn frame_alloc_some_uninited(size: usize) -> Option<Vec<FrameTracker>> {
+    let mut guard = FRAME_ALLOCATOR.lock();
+    guard.alloc_some(size).map(|ppns: Vec<PhysPageNum>| {
+        ppns.into_iter()
+            .map(|ppn| {
+                let frame = unsafe { FrameTrackerRaw::new(ppn).keep_uninited() };
+                guard.frame_map.insert(ppn.0, Arc::downgrade(&frame.inner));
+                frame
+            })
+            .collect()
+    })
+}
+
 #[allow(unused)]
 pub fn frame_alloc_raw() -> FrameTrackerRaw {
     let mut guard = FRAME_ALLOCATOR.lock();
-    let ppn = guard.alloc().unwrap();
+    let ppn = guard.alloc_one().unwrap();
     let frame = FrameTrackerRaw::new(ppn);
     guard
         .frame_map
@@ -258,7 +302,7 @@ pub fn frame_alloc_raw() -> FrameTrackerRaw {
 
 pub fn frame_dealloc(ppn: PhysPageNum) {
     let mut guard = FRAME_ALLOCATOR.lock();
-    guard.dealloc(ppn);
+    guard.dealloc_one(ppn);
     // FIXME: only for debug, remove it in release
     // assert!(guard.frame_map.contains_key(&ppn.0));
     guard.frame_map.remove(&ppn.0);
