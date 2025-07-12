@@ -12,7 +12,7 @@ use crate::{
 
 file_default!(
     NullFile,
-    async fn base_read(&self, _offset: usize, buf: &mut [u8]) -> SyscallResult {
+    async fn base_read(&self, _offset: usize, _buf: &mut [u8]) -> SyscallResult {
         Ok(0)
     },
     async fn base_write(&self, _offset: usize, buf: &[u8]) -> SyscallResult {
