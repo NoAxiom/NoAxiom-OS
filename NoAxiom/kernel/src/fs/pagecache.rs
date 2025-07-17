@@ -223,5 +223,6 @@ pub fn get_pagecache_rguard() -> RwLockReadGuard<'static, PageCacheManager> {
 
 #[inline(always)]
 pub fn get_pagecache_wguard() -> RwLockWriteGuard<'static, PageCacheManager> {
+    // FIXME: has deadlock risk !!
     PAGE_CACHE_MANAGER.write()
 }
