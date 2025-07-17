@@ -1,5 +1,8 @@
 //! File System configuration
 
+/// The frames for dma
+pub const VIRTIO_FRAMES: usize = 1000;
+
 /// Block size in bytes
 pub const BLOCK_SIZE: usize = 512;
 
@@ -13,7 +16,7 @@ pub const FAT32_BYTES_PER_CLUSTER_ID: usize = 4;
 pub const MAX_LRU_CACHE_SIZE: usize = 2 * PAGE_SIZE;
 /// The proportion of pagecache frames in the frame allocator
 /// PAGE_CACHE_SIZE = frame_total / PAGE_CACHE_PROPORTION
-pub const PAGE_CACHE_PROPORTION: usize = 3;
+pub const PAGE_CACHE_PROPORTION: usize = 5;
 
 pub const IS_DELETED: u8 = 0xe5;
 pub const SPACE: u8 = 0x20;
