@@ -33,7 +33,7 @@ else
 endif
 
 ifneq ($(FULL_FUNC), )
-	FEATURES += interruptable_async
+	FEATURES += full_func
 endif
 
 ifneq ($(LOG_PRINT), )
