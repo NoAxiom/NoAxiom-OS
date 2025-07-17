@@ -6,7 +6,7 @@ use ksync::Once;
 pub struct DtbInfo {
     #[cfg(target_arch = "riscv64")]
     pub plic: usize,
-    pub virtio_mmio_regions: Vec<(usize, usize)>,
+    pub virtio_mmio_regions: Vec<(usize, usize)>, // start_addr, size
     pub pci_ecam_base: usize,
 }
 
@@ -29,10 +29,7 @@ pub fn init(dtb: usize) {
         } else if node.name.starts_with(platform::VIRTIO_MMIO_NAME) {
             let reg = node.reg().unwrap();
             reg.for_each(|x| {
-                virtio_mmio_regions.push((
-                    x.starting_address as usize,
-                    x.starting_address as usize + x.size.unwrap(),
-                ));
+                virtio_mmio_regions.push((x.starting_address as usize, x.size.unwrap()));
             });
         } else if node.name.starts_with(platform::PCI_NAME) {
             let reg = node.reg().unwrap();

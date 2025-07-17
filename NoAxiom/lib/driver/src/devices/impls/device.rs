@@ -11,6 +11,14 @@ pub trait BlockDevice: Send + Sync {
     fn handle_interrupt(&self) -> DevResult<()> {
         unimplemented!("{} not implement handle_interrupt!", self.device_name())
     }
+    fn sync_read(&self, id: usize, buf: &mut [u8]) -> DevResult<usize> {
+        // the buf'len is multiple of BLOCK_SIZE
+        unimplemented!("{} not implement read!", self.device_name())
+    }
+    fn sync_write(&self, id: usize, buf: &[u8]) -> DevResult<usize> {
+        // the buf'len is multiple of BLOCK_SIZE
+        unimplemented!("{} not implement write!", self.device_name())
+    }
     async fn read(&self, id: usize, buf: &mut [u8]) -> DevResult<usize> {
         // the buf'len is multiple of BLOCK_SIZE
         unimplemented!("{} not implement read!", self.device_name())

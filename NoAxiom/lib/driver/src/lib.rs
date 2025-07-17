@@ -1,5 +1,6 @@
 #![no_std]
 #![allow(deprecated)]
+#![feature(core_intrinsics)]
 
 use alloc::sync::Arc;
 
@@ -7,6 +8,7 @@ use devices::{
     impls::{device::BlockDevice, net::NetWorkDev},
     ALL_DEVICES,
 };
+use ksync::assert_no_lock;
 
 mod bus;
 pub mod devices;
@@ -43,7 +45,7 @@ pub fn get_display_dev() -> Arc<&'static devices::impls::DisplayDevice> {
 }
 
 pub fn handle_irq() {
-    #[cfg(feature = "interruptable_async")]
+    #[cfg(any(feature = "interruptable_async", feature = "full_func"))]
     {
         use arch::{Arch, ArchInt};
         assert!(!Arch::is_interrupt_enabled());
@@ -72,6 +74,7 @@ pub async fn blk_dev_test(start: usize, len: usize) -> ! {
 
     log::debug!("[driver] test block device");
     let write_buf = vec![0x41 as u8; 512];
+    assert_no_lock!();
     for sector in start..start + len {
         device.write(sector, &write_buf).await.unwrap();
     }
