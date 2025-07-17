@@ -1,6 +1,5 @@
 use alloc::boxed::Box;
 
-use config::fs::BLOCK_SIZE;
 use ksync::cell::SyncUnsafeCell;
 use virtio_drivers_async::{
     device::blk::VirtIOBlk,
