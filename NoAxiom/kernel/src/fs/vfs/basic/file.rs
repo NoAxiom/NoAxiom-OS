@@ -2,6 +2,7 @@
 
 use alloc::{boxed::Box, string::String, sync::Arc, vec::Vec};
 use core::{
+    hash::{Hash, Hasher},
     sync::atomic::{AtomicUsize, Ordering},
     task::Waker,
 };
@@ -9,10 +10,7 @@ use core::{
 use async_trait::async_trait;
 use config::mm::PAGE_SIZE;
 use downcast_rs::{impl_downcast, DowncastSync};
-use ksync::{
-    async_mutex::AsyncMutexGuard,
-    mutex::{SpinLock, SpinLockGuard},
-};
+use ksync::mutex::{SpinLock, SpinLockGuard};
 type Mutex<T> = SpinLock<T>;
 type MutexGuard<'a, T> = SpinLockGuard<'a, T>;
 
@@ -23,7 +21,7 @@ use super::{
 use crate::{
     constant::fs::LEN_BEFORE_NAME,
     fs::{
-        pagecache::{Page, PageCache, PageState},
+        pagecache::{get_pagecache_rguard, get_pagecache_wguard, PageState},
         vfs::basic::inode::InodeState,
     },
     include::{
@@ -83,8 +81,8 @@ pub trait File: Send + Sync + DowncastSync {
     fn size(&self) -> usize {
         self.meta().inode.size()
     }
-    async fn page_cache(&self) -> Option<AsyncMutexGuard<'_, PageCache>> {
-        self.meta().inode.page_cache().await
+    fn page_cache(&self) -> Option<()> {
+        self.meta().inode.page_cache()
     }
     /// Get the dentry of the file
     fn dentry(&self) -> Arc<dyn Dentry> {
@@ -158,7 +156,7 @@ impl dyn File {
         Ok(res_pos as isize)
     }
 
-    pub async fn read_all(&self) -> SysResult<Vec<u8>> {
+    pub async fn read_all(self: &Arc<dyn File>) -> SysResult<Vec<u8>> {
         let len = self.meta().inode.size();
         let mut buf = vec![0; len];
         self.read_at(0, &mut buf).await?;
@@ -173,10 +171,9 @@ impl dyn File {
     /// page cache
     ///
     /// return the exact num of bytes read
-    pub async fn read_at(&self, offset: usize, buf: &mut [u8]) -> SyscallResult {
-        let page_cache = self.page_cache().await;
+    pub async fn read_at(self: &Arc<dyn File>, offset: usize, buf: &mut [u8]) -> SyscallResult {
+        let page_cache = self.page_cache();
         if page_cache.is_none() {
-            drop(page_cache);
             assert_no_lock!();
             return self.base_read(offset, buf).await;
         }
@@ -188,8 +185,6 @@ impl dyn File {
             );
             return Ok(0);
         }
-        let mut page_cache = page_cache.unwrap();
-        let cache_id = page_cache.id;
 
         let mut current_offset = offset;
         let mut buf = buf;
@@ -204,43 +199,55 @@ impl dyn File {
             // maybe the buf is not enough
             let len = buf.len().min(page_len);
 
-            if let Some((r_lock, page_id)) = page_cache.get_page(offset_align) {
-                if let Some(page) = r_lock.get_page(page_id, cache_id, offset_align) {
-                    unsafe {
-                        core::ptr::copy_nonoverlapping(
-                            page.as_mut_bytes_array().as_ptr().add(offset_in),
-                            buf.as_mut_ptr(),
-                            len,
-                        );
-                    }
-
-                    buf = &mut buf[len..];
-                    current_offset += len;
-
-                    if buf.is_empty() || current_offset == size {
-                        break;
-                    }
-
-                    continue;
+            let r_guard = get_pagecache_rguard();
+            if let Some(page) = r_guard.get_page(&self.clone(), offset_align) {
+                unsafe {
+                    core::ptr::copy_nonoverlapping(
+                        page.as_mut_bytes_array().as_ptr().add(offset_in),
+                        buf.as_mut_ptr(),
+                        len,
+                    );
                 }
-            }
+                // debug!(
+                //     "[read_at] {} at {offset_align}, file_ino: {}, file_size: {}, content:
+                // {:?}",     self.name(),
+                //     self.meta().inode.id(),
+                //     size,
+                //     &page.as_mut_bytes_array()[..10],
+                // );
 
+                buf = &mut buf[len..];
+                current_offset += len;
+
+                if buf.is_empty() || current_offset == size {
+                    break;
+                }
+
+                continue;
+            }
+            drop(r_guard);
             let page_state = if self.inode().state() == InodeState::Deleted {
                 PageState::Deleted
             } else {
                 PageState::Shared
             };
-            let new_page = Page::new(self.dentry(), offset_align, page_state);
-            // metion that no matter the result of base_read, we can just continue the loop
+            let mut w_guard = get_pagecache_wguard();
+            let new_page = w_guard.alloc_page_mut(&self.clone(), offset_align, page_state);
             self.base_read(offset_align, new_page.as_mut_bytes_array())
                 .await?;
-            page_cache.fill_page(offset_align, new_page);
+            // debug!(
+            //     "[read_at] {} at {offset_align}, file_ino: {}, file_size: {},
+            // content: {:?}",     self.name(),
+            //     self.meta().inode.id(),
+            //     size,
+            //     &new_page.as_mut_bytes_array()[..10]
+            // );
         }
 
         Ok((current_offset - offset) as isize)
     }
 
-    pub async fn read(&self, buf: &mut [u8]) -> SyscallResult {
+    pub async fn read(self: &Arc<dyn File>, buf: &mut [u8]) -> SyscallResult {
         let offset = self.meta().pos.load(Ordering::Acquire);
         let len = self.read_at(offset, buf).await?;
         self.meta().pos.fetch_add(len as usize, Ordering::Release);
@@ -255,20 +262,28 @@ impl dyn File {
     /// page cache
     ///
     /// return the exact num of bytes write
-    pub async fn write_at(&self, offset: usize, buf: &[u8]) -> SyscallResult {
-        let page_cache = self.page_cache().await;
+    pub async fn write_at(self: &Arc<dyn File>, offset: usize, buf: &[u8]) -> SyscallResult {
+        let page_cache = self.page_cache();
         if page_cache.is_none() {
-            drop(page_cache);
             assert_no_lock!();
             return self.base_write(offset, buf).await;
         }
         let size = self.size();
-        let mut page_cache = page_cache.unwrap();
-        let cache_id = page_cache.id;
 
         let mut current_offset = offset;
         let mut buf = buf;
         let ret = buf.len();
+
+        let end_size = offset + ret;
+        if end_size > size {
+            trace!(
+                "[write_at] {} expand size to {end_size}",
+                self.meta().dentry.name(),
+            );
+            self.inode().set_size(end_size);
+        }
+
+        let mut w_guard = get_pagecache_wguard();
 
         // if the last page is not full,
         // if the buf is run out
@@ -280,35 +295,31 @@ impl dyn File {
             let page_len = PAGE_SIZE - offset_in;
             // maybe the buf is not enough
             let len = buf.len().min(page_len);
-            if let Some((mut w_lock, page_id)) = page_cache.get_page_mut(offset_align) {
-                if let Some(page) = w_lock.get_page_mut(page_id, cache_id, offset_align) {
-                    debug!(
-                        "[write_at] {} write to page: {}, offset: {}, len: {}, content: {:?}",
-                        self.meta().dentry.name(),
-                        page_id,
-                        offset_align,
+            if let Some(page) = w_guard.get_page_mut(&self.clone(), offset_align) {
+                unsafe {
+                    core::ptr::copy_nonoverlapping(
+                        buf.as_ptr(),
+                        page.as_mut_bytes_array().as_mut_ptr().add(offset_in),
                         len,
-                        &buf[..core::cmp::min(len, 10)]
                     );
-
-                    unsafe {
-                        core::ptr::copy_nonoverlapping(
-                            buf.as_ptr(),
-                            page.as_mut_bytes_array().as_mut_ptr().add(offset_in),
-                            len,
-                        );
-                    }
-                    page.mark_dirty();
-
-                    buf = &buf[len..];
-                    current_offset += len;
-
-                    if buf.is_empty() {
-                        break;
-                    }
-
-                    continue;
                 }
+                page.mark_dirty();
+                // debug!(
+                //     "[write_at] {} at {offset_align}, file_ino: {}, file_size: {}, content:
+                // {:?}",     self.name(),
+                //     self.meta().inode.id(),
+                //     size,
+                //     &page.as_mut_bytes_array()[..10],
+                // );
+
+                buf = &buf[len..];
+                current_offset += len;
+
+                if buf.is_empty() {
+                    break;
+                }
+
+                continue;
             }
 
             let page_state = if self.inode().state() == InodeState::Deleted {
@@ -316,25 +327,16 @@ impl dyn File {
             } else {
                 PageState::Shared
             };
-            // TODO: get Arc<dyn File> !!!
-            let new_page = Page::new(self.dentry(), offset_align, page_state);
+            let new_page = w_guard.alloc_page_mut(&self.clone(), offset_align, page_state);
+            // todo: maybe can not read !!
             self.base_read(offset_align, new_page.as_mut_bytes_array())
                 .await?;
-            page_cache.fill_page(offset_align, new_page);
-        }
-
-        if current_offset > size {
-            trace!(
-                "[write_at] {} expand size to {current_offset}",
-                self.meta().dentry.name(),
-            );
-            self.inode().set_size(current_offset);
         }
 
         Ok(ret as isize)
     }
 
-    pub async fn write(&self, buf: &[u8]) -> SyscallResult {
+    pub async fn write(self: &Arc<dyn File>, buf: &[u8]) -> SyscallResult {
         let offset = self.meta().pos.load(Ordering::Acquire);
         let len = self.write_at(offset, buf).await?;
         self.meta().pos.fetch_add(len as usize, Ordering::Release);
@@ -399,6 +401,18 @@ impl dyn File {
         Ok(writen_len as isize)
     }
 }
+
+impl Hash for dyn File {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.meta().inode.id().hash(state);
+    }
+}
+impl PartialEq for dyn File {
+    fn eq(&self, other: &Self) -> bool {
+        self.meta().inode.id() == other.meta().inode.id()
+    }
+}
+impl Eq for dyn File {}
 
 pub struct EmptyFile {
     meta: FileMeta,

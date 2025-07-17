@@ -6,7 +6,7 @@ FEATURES :=
 
 QEMU := 1
 ifeq ($(ARCH_NAME),riscv64)
-ASYNC := 1
+FULL_FUNC := 1
 else ifeq ($(ARCH_NAME),loongarch64)
 ASYNC := 1
 endif
@@ -32,7 +32,7 @@ else
 	$(error "Invalid INIT_PROC value: $(INIT_PROC)")
 endif
 
-ifneq ($(INTERRUPTABLE_ASYNC), )
+ifneq ($(FULL_FUNC), )
 	FEATURES += interruptable_async
 endif
 

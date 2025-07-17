@@ -1,5 +1,5 @@
 pub fn ext_int_handler() {
-    #[cfg(feature = "interruptable_async")]
+    #[cfg(any(feature = "interruptable_async", feature = "full_func"))]
     {
         driver::handle_irq();
     }

@@ -2,14 +2,10 @@ use alloc::{boxed::Box, sync::Arc};
 
 use async_trait::async_trait;
 use downcast_rs::{impl_downcast, DowncastSync};
-use ksync::{
-    async_mutex::{AsyncMutex, AsyncMutexGuard},
-    mutex::SpinLock,
-};
+use ksync::mutex::SpinLock;
 
 use super::superblock::{EmptySuperBlock, SuperBlock};
 use crate::{
-    fs::pagecache::PageCache,
     include::{
         fs::{InodeMode, Stat, Statx, StatxTimestamp},
         time::TimeSpec,
@@ -38,7 +34,7 @@ pub struct InodeMeta {
     /// The super block of the inode
     pub super_block: Arc<dyn SuperBlock>,
     /// The page cache of the file, managed by the `Inode`
-    pub page_cache: Option<AsyncMutex<PageCache>>,
+    pub page_cache: Option<()>,
 }
 
 // todo: Drop for the InodeMeta, sync the page cache according to the state
@@ -50,11 +46,7 @@ impl InodeMeta {
         size: usize,
         cached: bool,
     ) -> Self {
-        let page_cache = if cached {
-            Some(AsyncMutex::new(PageCache::new()))
-        } else {
-            None
-        };
+        let page_cache = if cached { Some(()) } else { None };
         Self {
             id: global_alloc() as usize,
             inner: Mutex::new(InodeMetaInner {
@@ -106,6 +98,7 @@ pub trait Inode: Send + Sync + DowncastSync {
 }
 
 impl dyn Inode {
+    #[inline(always)]
     pub fn id(&self) -> usize {
         self.meta().id
     }
@@ -127,12 +120,8 @@ impl dyn Inode {
     pub fn set_privilege(&self, mode: InodeMode) {
         self.meta().inner.lock().privilege = mode;
     }
-    pub async fn page_cache(&self) -> Option<AsyncMutexGuard<'_, PageCache>> {
-        if let Some(page_cache) = &self.meta().page_cache {
-            Some(page_cache.lock().await)
-        } else {
-            None
-        }
+    pub fn page_cache(&self) -> Option<()> {
+        self.meta().page_cache
     }
     pub fn statx(&self, mask: u32) -> SysResult<Statx> {
         let stat = self.stat()?;
@@ -174,14 +163,6 @@ impl dyn Inode {
     }
     pub async fn set_state(&self, state: InodeState) {
         let mut inner = self.meta().inner.lock();
-        match state {
-            InodeState::Deleted => {
-                if let Some(mut page_cache) = self.page_cache().await {
-                    page_cache.mark_deleted();
-                }
-            }
-            _ => {}
-        }
         match inner.state {
             InodeState::Deleted => {}
             _ => {

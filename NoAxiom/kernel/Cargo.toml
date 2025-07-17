@@ -10,7 +10,8 @@ runtests = []
 qemu = ["platform/qemu"]
 interruptable_async = ["driver/interruptable_async"]
 async = ["driver/async"]
-debug_sig = [] #["console/debug_sig"]
+full_func = ["driver/full_func"]
+debug_sig = []                                       #["console/debug_sig"]
 log_print = ["debug_sig"]
 
 [dependencies]
@@ -18,7 +19,6 @@ log_print = ["debug_sig"]
 log = { workspace = true }
 bitflags = { workspace = true }
 xmas-elf = "0.10.0"
-virtio-drivers = "0.7.5"
 crate_interface = "0.1"
 hashbrown = "0.14"
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
