@@ -10,6 +10,20 @@ use crate::dtb::dtb_info;
 
 pub static PLIC: Once<PLIC<CPU_NUM>> = Once::new();
 
+pub fn disable_blk_irq() {
+    let plic = PLIC.get().unwrap();
+    let irq = 1;
+    let hart = Arch::get_hartid();
+    plic.disable(hart as u32, Mode::Supervisor, irq);
+}
+
+pub fn enable_blk_irq() {
+    let plic = PLIC.get().unwrap();
+    let irq = 1;
+    let hart = Arch::get_hartid();
+    plic.enable(hart as u32, Mode::Supervisor, irq);
+}
+
 pub fn claim() -> u32 {
     let plic = PLIC.get().unwrap();
     let hart = Arch::get_hartid();
@@ -30,8 +44,8 @@ pub fn init() {
     PLIC.call_once(|| plic);
 
     let priority = match () {
-        #[cfg(feature = "interruptable_async")]
-        () => 1,
+        #[cfg(any(feature = "interruptable_async", feature = "full_func"))]
+        () => 0,
         #[cfg(feature = "async")]
         () => 0,
     };

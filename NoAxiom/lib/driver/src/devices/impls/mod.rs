@@ -8,6 +8,9 @@ cfg_if::cfg_if! {
     if #[cfg(feature = "interruptable_async")] {
         use crate::devices::impls::block::async_virtio_driver::virtio_mm::async_blk::VirtIOAsyncBlock;
         pub type BlkDevice = VirtIOAsyncBlock;
+    } else if #[cfg(feature = "full_func")] {
+        use crate::devices::impls::block::virtio_driver_wapper::VirtioBlockDevice;
+        pub type BlkDevice = VirtioBlockDevice;
     } else {
         use block::virtio_block::VirtioBlockType;
         pub type BlkDevice = VirtioBlockType;

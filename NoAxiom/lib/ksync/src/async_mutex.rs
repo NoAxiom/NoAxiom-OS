@@ -67,6 +67,16 @@ impl<T> AsyncMutex<T> {
             }
         }
     }
+
+    pub fn spin_lock(&self) -> AsyncMutexGuard<'_, T> {
+        loop {
+            if let Some(guard) = self.try_lock() {
+                return guard;
+            }
+            // Spin until we can get the lock
+            while self.locked.load(Ordering::Relaxed) {}
+        }
+    }
 }
 
 pub struct AsyncMutexGuard<'a, T> {

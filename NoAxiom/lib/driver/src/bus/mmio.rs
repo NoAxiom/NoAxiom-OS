@@ -6,8 +6,29 @@ use crate::{
 impl Devices {
     pub fn probe_mmiobus_devices(&mut self) -> DevResult<()> {
         let mut registered: [bool; Self::DEVICES] = [false; Self::DEVICES];
-        for (addr, _size) in &dtb_info().virtio_mmio_regions {
+        for (addr, size) in &dtb_info().virtio_mmio_regions {
             if !registered[0] {
+                #[cfg(feature = "full_func")]
+                {
+                    log::debug!("[driver] probe virtio wrapper at {:#x}", addr);
+                    use core::ptr::NonNull;
+
+                    use include::errno::Errno;
+                    use virtio_drivers::transport::mmio::{MmioTransport, VirtIOHeader};
+
+                    use crate::devices::impls::BlkDevice;
+
+                    let addr = *addr | arch::consts::KERNEL_ADDR_OFFSET;
+
+                    let transport = unsafe {
+                        MmioTransport::new(NonNull::new(addr as *mut VirtIOHeader).unwrap(), *size)
+                            .map_err(|_| Errno::EINVAL)?
+                    };
+
+                    let blk_dev = BlkDevice::new(transport);
+
+                    self.add_blk_device(blk_dev);
+                }
                 #[cfg(feature = "async")]
                 {
                     log::debug!("[driver] probe driver at {:#x}", addr);
@@ -23,6 +44,7 @@ impl Devices {
                     use crate::devices::impls::{virtio::dev_err, BlkDevice};
 
                     let addr = *addr | arch::consts::KERNEL_ADDR_OFFSET;
+                    let _ = size;
 
                     let transport = unsafe {
                         MmioTransport::new(NonNull::new(addr as *mut VirtIOHeader).unwrap())
@@ -40,6 +62,7 @@ impl Devices {
                     log::debug!("[driver] probe async driver");
                     use crate::devices::impls::block::async_virtio_driver::virtio_mm::async_blk::VirtIOAsyncBlock;
                     let _ = addr;
+                    let _ = size;
                     let blk_dev = VirtIOAsyncBlock::new();
                     self.add_blk_device(blk_dev);
                 }
