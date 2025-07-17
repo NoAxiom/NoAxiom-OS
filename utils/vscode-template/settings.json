@@ -3,11 +3,11 @@
   "rust-analyzer.check.allTargets": false,
   "rust-analyzer.cargo.features": [
     "multicore",
-    "async",
     "qemu",
     "busybox",
     "log_print",
-    "debug_sig"
+    "debug_sig",
+    "full_func"
   ],
   "rust-analyzer.linkedProjects": [
     "${workspaceFolder}/NoAxiom/Cargo.toml"

@@ -20,10 +20,7 @@ use super::{
     superblock::{EmptySuperBlock, SuperBlock},
 };
 use crate::{
-    fs::{
-        path::Path,
-        vfs::basic::{file::FileMeta, inode::InodeState},
-    },
+    fs::{path::Path, vfs::basic::inode::InodeState},
     include::{
         fs::{InodeMode, RenameFlags},
         result::Errno,
@@ -368,7 +365,10 @@ impl dyn Dentry {
             if parent.inode()?.file_type() != InodeMode::DIR {
                 return Err(Errno::ENOTDIR);
             }
-            // self.set_inode_none();
+            let mut w_guard = crate::fs::pagecache::get_pagecache_wguard();
+            let file = self.clone().open()?;
+            w_guard.mark_deleted(&file);
+            self.set_inode_none();
             inode.set_state(InodeState::Deleted).await;
             // parent.remove_child(&self.name()).unwrap();
             parent.open().unwrap().delete_child(&self.name()).await?;

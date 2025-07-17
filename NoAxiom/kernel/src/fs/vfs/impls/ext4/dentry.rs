@@ -43,6 +43,7 @@ impl Ext4Dentry {
 
 #[async_trait]
 impl Dentry for Ext4Dentry {
+    #[inline(always)]
     fn meta(&self) -> &DentryMeta {
         &self.meta
     }

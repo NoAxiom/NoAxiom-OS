@@ -36,6 +36,7 @@ impl Ext4FileInode {
 
 #[async_trait]
 impl Inode for Ext4FileInode {
+    #[inline(always)]
     fn meta(&self) -> &InodeMeta {
         &self.meta
     }
