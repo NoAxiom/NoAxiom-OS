@@ -51,6 +51,7 @@ use crate::{
     syscall::SysResult,
     task::{
         futex::FutexQueue,
+        int_record::InterruptRecorder,
         manager::{PROCESS_GROUP_MANAGER, TASK_MANAGER},
         taskid::tid_alloc,
     },
@@ -327,6 +328,11 @@ impl Task {
     }
     pub fn ucx_mut(&self) -> &mut UserPtr<UContext> {
         &mut self.tcb_mut().ucx
+    }
+
+    /// interrupt recorder
+    pub fn record_int(&self, idx: usize) {
+        self.tcb_mut().int_record.inc(idx);
     }
 
     /// interval timer manager

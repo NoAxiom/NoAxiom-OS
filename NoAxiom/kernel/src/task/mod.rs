@@ -11,5 +11,6 @@ pub mod task_main;
 pub mod taskid;
 pub mod tcb;
 pub mod wait;
+pub mod int_record;
 
 pub use task::Task;
