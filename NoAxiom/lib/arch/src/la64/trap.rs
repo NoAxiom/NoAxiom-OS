@@ -18,7 +18,7 @@ use super::{
 };
 use crate::{
     la64::interrupt::is_interrupt_enabled, ArchAsm, ArchInt, ArchTrap, ArchTrapContext,
-    ArchUserFloatContext, TrapType, UserPtrResult,
+    ArchUserFloatContext, InterruptNumber, TrapType, UserPtrResult,
 };
 
 global_asm!(include_str!("./trap.S"));
@@ -97,6 +97,24 @@ pub unsafe extern "C" fn kernel_user_ptr_handler() {
     USER_PTR_TRAP_TYPE[hartid] = Wrapper(get_trap_type(None));
 }
 
+pub fn get_interrupt_number(int: &Interrupt) -> InterruptNumber {
+    match int {
+        Interrupt::SWI0 => 0,
+        Interrupt::SWI1 => 1,
+        Interrupt::HWI0 => 2,
+        Interrupt::HWI1 => 3,
+        Interrupt::HWI2 => 4,
+        Interrupt::HWI3 => 5,
+        Interrupt::HWI4 => 6,
+        Interrupt::HWI5 => 7,
+        Interrupt::HWI6 => 8,
+        Interrupt::HWI7 => 9,
+        Interrupt::PMI => 10,
+        Interrupt::Timer => 11,
+        Interrupt::IPI => 12,
+    }
+}
+
 fn get_trap_type(tf: Option<&mut TrapContext>) -> TrapType {
     let estat = estat::read();
     let badv = badv::read().vaddr();
@@ -151,28 +169,33 @@ fn get_trap_type(tf: Option<&mut TrapContext>) -> TrapType {
                 }
             }
         }
-        Trap::Interrupt(int) => match int {
-            Interrupt::Timer => TrapType::Timer,
-            Interrupt::HWI0
-            | Interrupt::HWI1
-            | Interrupt::HWI2
-            | Interrupt::HWI3
-            | Interrupt::HWI4
-            | Interrupt::HWI5
-            | Interrupt::HWI6
-            | Interrupt::HWI7 => TrapType::SupervisorExternal,
-            Interrupt::SWI0 | Interrupt::SWI1 | Interrupt::IPI => TrapType::SupervisorSoft,
-            _ => {
-                error!(
-                    "[get_trap_type] unhandled interrupt: {:?}, pc = {:#x}, BADV = {:#x}",
-                    int,
-                    era::read().pc(),
-                    badv,
-                );
-                // error!("[get_trap_type] trap_cx: {:#x?}", tf);
-                TrapType::Unknown
+        Trap::Interrupt(int) => {
+            let int_num = get_interrupt_number(&int);
+            match int {
+                Interrupt::Timer => TrapType::Timer(int_num),
+                Interrupt::HWI0
+                | Interrupt::HWI1
+                | Interrupt::HWI2
+                | Interrupt::HWI3
+                | Interrupt::HWI4
+                | Interrupt::HWI5
+                | Interrupt::HWI6
+                | Interrupt::HWI7 => TrapType::SupervisorExternal(int_num),
+                Interrupt::SWI0 | Interrupt::SWI1 | Interrupt::IPI => {
+                    TrapType::SupervisorSoft(int_num)
+                }
+                _ => {
+                    error!(
+                        "[get_trap_type] unhandled interrupt: {:?}, pc = {:#x}, BADV = {:#x}",
+                        int,
+                        era::read().pc(),
+                        badv,
+                    );
+                    // error!("[get_trap_type] trap_cx: {:#x?}", tf);
+                    TrapType::Unknown
+                }
             }
-        },
+        }
         _ => {
             error!(
                 "[get_trap_type] unhandled trap type: {:?}, pc = {:#x}, BADV = {:#x}, raw_ecode = {:#x}, esubcode = {:#x}, badi: {:#x}, is = {}",

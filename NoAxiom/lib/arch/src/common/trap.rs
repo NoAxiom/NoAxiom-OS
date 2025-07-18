@@ -1,17 +1,20 @@
 use core::ops::{Index, IndexMut};
 
+pub type PageFaultAddr = usize;
+pub type InterruptNumber = usize;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TrapType {
     Breakpoint,
     SysCall,
-    Timer,
+    Timer(InterruptNumber),
     Unknown,
-    SupervisorExternal,
-    SupervisorSoft,
-    StorePageFault(usize),
-    LoadPageFault(usize),
-    InstructionPageFault(usize),
-    IllegalInstruction(usize),
+    SupervisorExternal(InterruptNumber),
+    SupervisorSoft(InterruptNumber),
+    StorePageFault(PageFaultAddr),
+    LoadPageFault(PageFaultAddr),
+    InstructionPageFault(PageFaultAddr),
+    IllegalInstruction(PageFaultAddr),
     None,
 }
 
