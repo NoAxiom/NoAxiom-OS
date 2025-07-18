@@ -1,6 +1,6 @@
 use bitflags::bitflags;
 
-use crate::{utils::macros::bit, ExceptionType};
+use crate::utils::macros::bit;
 
 // VURWXADG Device Cache Cow
 bitflags! {
