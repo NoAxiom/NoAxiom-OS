@@ -51,8 +51,8 @@ fn kernel_trap_handler() {
                 kernel_panic("page fault without task running");
             }
         }
-        TrapType::SupervisorExternal => ext_int_handler(),
-        TrapType::Timer => {
+        TrapType::SupervisorExternal(id) => ext_int_handler(),
+        TrapType::Timer(id) => {
             trace!(
                 "[kernel_trap] SupervisorTimer trap at hart: {}, epc: {:#x}",
                 get_hartid(),
@@ -60,7 +60,7 @@ fn kernel_trap_handler() {
             );
             kernel_timer_trap_handler();
         }
-        TrapType::SupervisorSoft => ipi_handler(),
+        TrapType::SupervisorSoft(id) => ipi_handler(),
         TrapType::None => {}
         _ => kernel_panic("unsupported trap type"),
     }
@@ -132,7 +132,7 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
             }
         }
         // interrupt
-        TrapType::Timer => {
+        TrapType::Timer(id) => {
             trace!(
                 "[SupervisorTimer] hart: {}, tid: {}",
                 get_hartid(),
@@ -141,7 +141,7 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
             set_next_trigger(None);
             task.yield_now().await;
         }
-        TrapType::SupervisorExternal => {
+        TrapType::SupervisorExternal(id) => {
             trace!(
                 "[SupervisorExternal] interrupted at hart: {}, tid: {}",
                 get_hartid(),
@@ -149,7 +149,7 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
             );
             ext_int_handler();
         }
-        TrapType::SupervisorSoft => {
+        TrapType::SupervisorSoft(id) => {
             trace!(
                 "[SupervisorSoft] interrupted at hart: {}, tid: {}",
                 get_hartid(),
