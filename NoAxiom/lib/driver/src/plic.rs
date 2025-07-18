@@ -43,13 +43,7 @@ pub fn init() {
     let plic = PLIC::new(plic_addr, privileges);
     PLIC.call_once(|| plic);
 
-    let priority = match () {
-        #[cfg(any(feature = "interruptable_async", feature = "full_func"))]
-        () => 0,
-        #[cfg(feature = "async")]
-        () => 0,
-    };
-
+    let priority = 1;
     let irq = 1;
     let plic = PLIC.get().unwrap();
     plic.set_priority(irq, priority);

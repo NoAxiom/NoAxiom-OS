@@ -5,11 +5,6 @@ endif
 FEATURES :=
 
 QEMU := 1
-ifeq ($(ARCH_NAME),riscv64)
-FULL_FUNC := 1
-else ifeq ($(ARCH_NAME),loongarch64)
-ASYNC := 1
-endif
 LOG_PRINT := 
 
 ifneq ($(RELEASE),true)
@@ -32,20 +27,12 @@ else
 	$(error "Invalid INIT_PROC value: $(INIT_PROC)")
 endif
 
-ifneq ($(FULL_FUNC), )
-	FEATURES += full_func
-endif
-
 ifneq ($(LOG_PRINT), )
 	FEATURES += log_print
 endif
 
 ifneq ($(DEBUG_SIG), )
 	FEATURES += debug_sig
-endif
-
-ifneq ($(ASYNC), )
-	FEATURES += async
 endif
 
 ifneq ($(FEATURES), )

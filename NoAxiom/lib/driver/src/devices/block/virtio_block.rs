@@ -1,29 +1,29 @@
-mod hal;
 use alloc::boxed::Box;
-use core::{intrinsics::likely, task::Waker};
+use core::task::Waker;
 
 use arch::{Arch, ArchInt};
 use async_trait::async_trait;
 use kfuture::{suspend::SuspendFuture, take_waker::TakeWakerFuture};
 use ksync::{async_mutex::AsyncMutex, cell::SyncUnsafeCell};
-use log::debug;
 use virtio_drivers::{
     device::blk::{BlkReq, BlkResp, RespStatus, VirtIOBlk},
-    transport::mmio::MmioTransport,
+    transport::Transport,
 };
 
 use crate::{
-    devices::impls::{
-        block::virtio_driver_wapper::hal::{dev_err, VirtioHalImpl},
-        device::{BlockDevice, DevResult},
+    devices::{
+        block::BlockDevice,
+        hal::{dev_err, VirtioHalImpl},
+        DevResult,
     },
     plic::{disable_blk_irq, enable_blk_irq},
 };
-struct VirioBlkInner {
-    blk: VirtIOBlk<VirtioHalImpl, MmioTransport>,
+
+struct VirioBlkInner<T: Transport> {
+    blk: VirtIOBlk<VirtioHalImpl, T>,
 }
 
-impl VirioBlkInner {
+impl<T: Transport> VirioBlkInner<T> {
     fn sync_read(&mut self, id: usize, buf: &mut [u8]) -> DevResult<usize> {
         self.blk.read_blocks(id, buf).map_err(dev_err)?;
         Ok(buf.len())
@@ -82,15 +82,15 @@ impl VirioBlkInner {
     }
 }
 
-pub struct VirtioBlockDevice {
-    inner: AsyncMutex<VirioBlkInner>,
+pub struct VirtioBlockDevice<T: Transport> {
+    inner: AsyncMutex<VirioBlkInner<T>>,
     waker: SyncUnsafeCell<Option<Waker>>,
     irq: SyncUnsafeCell<bool>,
 }
 
-impl VirtioBlockDevice {
+impl<T: Transport> VirtioBlockDevice<T> {
     /// Initializes the VirtIO block device.
-    pub fn new(transport: MmioTransport) -> Self {
+    pub fn new(transport: T) -> Self {
         Self {
             inner: AsyncMutex::new(VirioBlkInner {
                 blk: VirtIOBlk::new(transport).expect("Failed to create VirtIOBlk"),
@@ -126,7 +126,7 @@ impl VirtioBlockDevice {
 }
 
 #[async_trait]
-impl BlockDevice for VirtioBlockDevice {
+impl<T: Transport + Send> BlockDevice for VirtioBlockDevice<T> {
     fn device_name(&self) -> &'static str {
         "VirtIOBlockWrapper"
     }
@@ -149,8 +149,7 @@ impl BlockDevice for VirtioBlockDevice {
         res
     }
     async fn read(&self, id: usize, buf: &mut [u8]) -> DevResult<usize> {
-        if likely(buf.len() <= 2048) {
-            // debug!("[blk]  read at {}: {} bytes", id, buf.len());
+        if buf.len() <= 2048 {
             return Ok(self.sync_read(id, buf).unwrap());
         }
         let mut inner = self.inner.lock().await;
@@ -170,8 +169,7 @@ impl BlockDevice for VirtioBlockDevice {
         Ok(buf.len())
     }
     async fn write(&self, id: usize, buf: &[u8]) -> DevResult<usize> {
-        if likely(buf.len() <= 2048) {
-            // debug!("[blk] write at {}: {} bytes", id, buf.len());
+        if buf.len() <= 2048 {
             return Ok(self.sync_write(id, buf).unwrap());
         }
         let mut inner = self.inner.lock().await;

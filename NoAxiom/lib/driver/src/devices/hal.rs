@@ -6,27 +6,26 @@ use include::errno::Errno;
 use ksync::cell::SyncUnsafeCell;
 use memory::{
     address::{PhysAddr, PhysPageNum, StepOne},
-    frame::{frame_alloc, frame_dealloc, FrameTracker},
+    frame::{frame_alloc_some_zero_inited, frame_dealloc, FrameTracker},
 };
-use virtio_drivers_async::{BufferDirection, Hal, PhysAddr as VirtioPhysAddr};
+use virtio_drivers::{
+    BufferDirection,
+    Error::{self, *},
+    Hal, PhysAddr as VirtioPhysAddr,
+};
 
 lazy_static::lazy_static! {
-    pub static ref QUEUE_FRAMES: SyncUnsafeCell<Vec<FrameTracker>> = SyncUnsafeCell::new(Vec::new());
+    pub static ref FRAMES: SyncUnsafeCell<Vec<FrameTracker>> = SyncUnsafeCell::new(Vec::new());
 }
 
 pub struct VirtioHalImpl;
 
 unsafe impl Hal for VirtioHalImpl {
+    // now we only support one device, so direction is ignored
     fn dma_alloc(pages: usize, _direction: BufferDirection) -> (VirtioPhysAddr, NonNull<u8>) {
-        let mut ppn_base = PhysPageNum::from(0);
-        for i in 0..pages {
-            let frame = frame_alloc().unwrap();
-            if i == 0 {
-                ppn_base = frame.ppn();
-            }
-            assert_eq!(frame.ppn().raw(), ppn_base.raw() + i);
-            QUEUE_FRAMES.as_ref_mut().push(frame);
-        }
+        let pages = frame_alloc_some_zero_inited(pages).unwrap();
+        FRAMES.as_ref_mut().extend(pages.iter().cloned());
+        let ppn_base = pages[0].ppn();
         let paddr = PhysAddr::from(PhysPageNum::from(ppn_base));
         let vaddr = NonNull::new((paddr.raw() | KERNEL_ADDR_OFFSET) as *mut u8).unwrap();
         (paddr.raw(), vaddr)
@@ -48,7 +47,7 @@ unsafe impl Hal for VirtioHalImpl {
     // #[no_mangle]
     unsafe fn share(buffer: NonNull<[u8]>, _direction: BufferDirection) -> VirtioPhysAddr {
         // Nothing to do, as the host already has access to all memory.
-        let phys = buffer.as_ptr() as *mut u8 as usize - KERNEL_ADDR_OFFSET;
+        let phys = (buffer.as_ptr() as *mut u8 as usize) & (!KERNEL_ADDR_OFFSET);
         VirtioPhysAddr::from(phys)
     }
     #[inline]
@@ -58,12 +57,11 @@ unsafe impl Hal for VirtioHalImpl {
 }
 
 #[allow(dead_code)]
-pub const fn dev_err(err: virtio_drivers_async::Error) -> Errno {
-    use virtio_drivers_async::Error::*;
+pub const fn dev_err(err: Error) -> Errno {
     match err {
         QueueFull => Errno::EAGAIN,
         NotReady => Errno::EAGAIN,
-        WrongToken => Errno::EADDRINUSE, // this
+        WrongToken => Errno::EINVAL,
         InvalidParam => Errno::EINVAL,
         IoError => Errno::EIO,
         Unsupported => Errno::ENOSYS,

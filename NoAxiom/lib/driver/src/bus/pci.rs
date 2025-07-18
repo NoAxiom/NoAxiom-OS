@@ -1,11 +1,12 @@
 use arch::ArchMemory;
 use include::errno::Errno;
+use ksync::Lazy;
 use platform::{PCI_BUS_END, PCI_RANGE};
-use virtio_drivers_async::transport::{
+use virtio_drivers::transport::{
     pci::{
         bus::{
             BarInfo, Cam, Command, DeviceFunction, DeviceFunctionInfo, HeaderType, MemoryBarType,
-            PciRoot,
+            MmioCam, PciRoot,
         },
         PciTransport,
     },
@@ -14,73 +15,55 @@ use virtio_drivers_async::transport::{
 
 use super::pci_driver::PciRangeAllocator;
 use crate::{
-    devices::{
-        impls::{device::DevResult, virtio::VirtioHalImpl},
-        Devices,
-    },
+    devices::{block::virtio_block::VirtioBlockDevice, hal::VirtioHalImpl, DevResult},
     dtb::dtb_info,
 };
 
-impl Devices {
-    pub(crate) fn probe_pcibus_devices(&mut self) -> DevResult<()> {
-        let base_vaddr = dtb_info().pci_ecam_base | arch::Arch::KERNEL_ADDR_OFFSET;
-        let mut root = unsafe { PciRoot::new(base_vaddr as *mut u8, Cam::Ecam) };
+pub fn probe_pcibus_devices() -> Option<&'static VirtioBlockDevice<PciTransport>> {
+    PCI_BLOCK_DEVICE.as_ref()
+}
 
-        // PCI 32-bit MMIO space
-        let mut allocator = Some(PciRangeAllocator::new(
-            PCI_RANGE.0 as u64,
-            PCI_RANGE.1 as u64,
-        ));
+static PCI_BLOCK_DEVICE: Lazy<Option<VirtioBlockDevice<PciTransport>>> = Lazy::new(|| {
+    let base_vaddr = dtb_info().pci_ecam_base | arch::Arch::KERNEL_ADDR_OFFSET;
+    let mut root = unsafe { PciRoot::new(MmioCam::new(base_vaddr as *mut u8, Cam::Ecam)) };
 
-        for bus in 0..=PCI_BUS_END as u8 {
-            for (bdf, dev_info) in root.enumerate_bus(bus) {
-                log::debug!("PCI {}: {}", bdf, dev_info);
-                if dev_info.header_type != HeaderType::Standard {
-                    continue;
-                }
-                match config_pci_device(&mut root, bdf, &mut allocator) {
-                    Ok(_) => {
-                        #[cfg(feature = "interruptable_async")]
-                        {
-                            log::warn!("pci_dev for interruptable_async is not supported");
-                        }
-                        #[cfg(feature = "async")]
-                        if let Some(transport) =
-                            probe_pci(&mut root, bdf, DeviceType::Block, &dev_info)
-                        {
-                            use ksync::cell::SyncUnsafeCell;
-                            use virtio_drivers_async::device::blk::VirtIOBlk;
+    // PCI 32-bit MMIO space
+    let mut allocator = Some(PciRangeAllocator::new(
+        PCI_RANGE.0 as u64,
+        PCI_RANGE.1 as u64,
+    ));
 
-                            use crate::devices::impls::{
-                                block::virtio_block::VirtioBlockType, virtio::dev_err,
-                            };
-                            log::info!(
-                                "registered a new {:?} device at {}",
-                                DeviceType::Block,
-                                bdf,
-                            );
-                            let blk_dev = VirtIOBlk::new(transport).map_err(dev_err)?;
-                            let blk_dev = VirtioBlockType::Pci(SyncUnsafeCell::new(blk_dev));
-                            self.add_blk_device(blk_dev);
-                        }
+    for bus in 0..=PCI_BUS_END as u8 {
+        for (bdf, dev_info) in root.enumerate_bus(bus) {
+            log::debug!("PCI {}: {}", bdf, dev_info);
+            if dev_info.header_type != HeaderType::Standard {
+                continue;
+            }
+            match config_pci_device(&mut root, bdf, &mut allocator) {
+                Ok(_) => {
+                    if let Some(transport) = probe_pci(&mut root, bdf, DeviceType::Block, &dev_info)
+                    {
+                        log::info!("registered a new {:?} device at {}", DeviceType::Block, bdf);
+                        let blk_dev = VirtioBlockDevice::new(transport);
+                        return Some(blk_dev);
                     }
-                    Err(e) => log::warn!(
-                        "failed to enable PCI device at {}({}): {:?}",
-                        bdf,
-                        dev_info,
-                        e
-                    ),
                 }
+                Err(e) => log::warn!(
+                    "failed to enable PCI device at {}({}): {:?}",
+                    bdf,
+                    dev_info,
+                    e
+                ),
             }
         }
-        Ok(())
     }
-}
+    None
+});
 
 const PCI_BAR_NUM: u8 = 6;
 
 fn config_pci_device(
-    root: &mut PciRoot,
+    root: &mut PciRoot<MmioCam>,
     bdf: DeviceFunction,
     allocator: &mut Option<PciRangeAllocator>,
 ) -> DevResult<()> {
@@ -157,7 +140,7 @@ fn config_pci_device(
 
 #[allow(unused)]
 fn probe_pci(
-    root: &mut PciRoot,
+    root: &mut PciRoot<MmioCam>,
     bdf: DeviceFunction,
     dev_type: DeviceType,
     dev_info: &DeviceFunctionInfo,
@@ -171,5 +154,7 @@ fn probe_pci(
         (DeviceType::GPU, 0x1050) => {}
         _ => return None,
     }
-    PciTransport::new::<VirtioHalImpl>(root, bdf).ok()
+
+    log::info!("Found a PCI device at {}: {:?}", bdf, dev_info);
+    PciTransport::new::<VirtioHalImpl, MmioCam>(root, bdf).ok()
 }

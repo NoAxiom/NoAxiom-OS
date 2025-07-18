@@ -1,16 +1,32 @@
-use log::debug;
+use alloc::sync::Arc;
 
-use crate::devices::{impls::net::loopback::LoopBackDev, ALL_DEVICES};
+use ksync::Lazy;
+
+use crate::{
+    bus::{mmio::probe_mmiobus_devices, pci::probe_pcibus_devices},
+    devices::{
+        block::BlockDevice,
+        net::{loopback::LoopBackDev, NetWorkDevice},
+    },
+    BLK_DEV, NET_DEV,
+};
 
 mod mmio;
 mod pci;
 mod pci_driver;
 
 pub fn probe_bus() {
-    debug!("[driver] probe mmio bus");
-    ALL_DEVICES.as_ref_mut().probe_mmiobus_devices().ok();
-    debug!("[driver] probe pci bus");
-    ALL_DEVICES.as_ref_mut().probe_pcibus_devices().ok();
-    ALL_DEVICES.as_ref_mut().add_net_device(LoopBackDev::new());
-    debug!("[driver] probe succeed");
+    probe_mmiobus_devices().map(|dev| {
+        log::debug!("[driver] probe mmio bus");
+        BLK_DEV.call_once(|| Arc::new(&*dev as &'static dyn BlockDevice));
+    });
+    probe_pcibus_devices().map(|dev| {
+        log::debug!("[driver] probe pci bus");
+        BLK_DEV.call_once(|| Arc::new(&*dev as &'static dyn BlockDevice));
+    });
+    NET_DEV.call_once(|| {
+        static LOOPBACK: Lazy<LoopBackDev> = Lazy::new(|| LoopBackDev::new());
+        Arc::new(&*LOOPBACK as &'static dyn NetWorkDevice)
+    });
+    log::debug!("[driver] probe succeed");
 }

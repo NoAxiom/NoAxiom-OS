@@ -1,74 +1,25 @@
-use crate::{
-    devices::{impls::device::DevResult, Devices},
-    dtb::dtb_info,
-};
+use core::ptr::NonNull;
 
-impl Devices {
-    pub fn probe_mmiobus_devices(&mut self) -> DevResult<()> {
-        let mut registered: [bool; Self::DEVICES] = [false; Self::DEVICES];
-        for (addr, size) in &dtb_info().virtio_mmio_regions {
-            if !registered[0] {
-                #[cfg(feature = "full_func")]
-                {
-                    log::debug!("[driver] probe virtio wrapper at {:#x}", addr);
-                    use core::ptr::NonNull;
+use ksync::Lazy;
+use virtio_drivers::transport::mmio::{MmioTransport, VirtIOHeader};
 
-                    use include::errno::Errno;
-                    use virtio_drivers::transport::mmio::{MmioTransport, VirtIOHeader};
+use crate::{devices::block::virtio_block::VirtioBlockDevice, dtb::dtb_info};
 
-                    use crate::devices::impls::BlkDevice;
-
-                    let addr = *addr | arch::consts::KERNEL_ADDR_OFFSET;
-
-                    let transport = unsafe {
-                        MmioTransport::new(NonNull::new(addr as *mut VirtIOHeader).unwrap(), *size)
-                            .map_err(|_| Errno::EINVAL)?
-                    };
-
-                    let blk_dev = BlkDevice::new(transport);
-
-                    self.add_blk_device(blk_dev);
-                }
-                #[cfg(feature = "async")]
-                {
-                    log::debug!("[driver] probe driver at {:#x}", addr);
-                    use core::ptr::NonNull;
-
-                    use include::errno::Errno;
-                    use ksync::cell::SyncUnsafeCell;
-                    use virtio_drivers_async::{
-                        device::blk::VirtIOBlk,
-                        transport::mmio::{MmioTransport, VirtIOHeader},
-                    };
-
-                    use crate::devices::impls::{virtio::dev_err, BlkDevice};
-
-                    let addr = *addr | arch::consts::KERNEL_ADDR_OFFSET;
-                    let _ = size;
-
-                    let transport = unsafe {
-                        MmioTransport::new(NonNull::new(addr as *mut VirtIOHeader).unwrap())
-                            .map_err(|_| Errno::EINVAL)?
-                    };
-
-                    let blk_dev = BlkDevice::Mmio(SyncUnsafeCell::new(
-                        VirtIOBlk::new(transport).map_err(dev_err)?,
-                    ));
-
-                    self.add_blk_device(blk_dev);
-                }
-                #[cfg(feature = "interruptable_async")]
-                {
-                    log::debug!("[driver] probe async driver");
-                    use crate::devices::impls::block::async_virtio_driver::virtio_mm::async_blk::VirtIOAsyncBlock;
-                    let _ = addr;
-                    let _ = size;
-                    let blk_dev = VirtIOAsyncBlock::new();
-                    self.add_blk_device(blk_dev);
-                }
-                registered[0] = true;
-            }
-        }
-        Ok(())
+static MMIO_BLOCK_DEVICE: Lazy<Option<VirtioBlockDevice<MmioTransport>>> = Lazy::new(|| {
+    let dtb_info = dtb_info();
+    if dtb_info.virtio_mmio_regions.is_empty() {
+        return None;
     }
+
+    let (addr, size) = dtb_info.virtio_mmio_regions[0];
+    log::info!("[driver] probe virtio wrapper at {:#x}", addr);
+    let addr = addr | arch::consts::KERNEL_ADDR_OFFSET;
+    let header = NonNull::new(addr as *mut VirtIOHeader).unwrap();
+    let transport = unsafe { MmioTransport::new(header, size).unwrap() };
+
+    Some(VirtioBlockDevice::new(transport))
+});
+
+pub fn probe_mmiobus_devices() -> Option<&'static VirtioBlockDevice<MmioTransport>> {
+    MMIO_BLOCK_DEVICE.as_ref()
 }
