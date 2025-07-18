@@ -128,7 +128,6 @@ impl Task {
                     let ucontext = UContext {
                         uc_flags: 0,
                         uc_link: 0,
-                        // fixme: always returns default here
                         uc_stack,
                         uc_sigmask: sig_mask,
                         __unused: [0; 1024 / 8 - core::mem::size_of::<SigMask>()],

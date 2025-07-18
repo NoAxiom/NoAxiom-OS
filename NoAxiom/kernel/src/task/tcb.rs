@@ -7,6 +7,7 @@ use crate::{
     include::{process::TaskFlags, syscall_id::SyscallID},
     mm::user_ptr::UserPtr,
     signal::{sig_set::SigMask, sig_stack::UContext},
+    task::int_record::InterruptRecorder,
 };
 
 pub struct TCB {
@@ -19,6 +20,7 @@ pub struct TCB {
     pub set_child_tid: Option<usize>,   // set tid address
     pub clear_child_tid: Option<usize>, // clear tid address
     pub current_syscall: SyscallID,     // current syscall id
+    pub int_record: InterruptRecorder,  // interrupt count recorder
 }
 
 impl Default for TCB {
@@ -33,6 +35,7 @@ impl Default for TCB {
             set_child_tid: None,
             clear_child_tid: None,
             current_syscall: SyscallID::NO_SYSCALL,
+            int_record: InterruptRecorder::new(),
         }
     }
 }
