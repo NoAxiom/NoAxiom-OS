@@ -1,8 +1,7 @@
+pub mod virtio_block;
 use alloc::boxed::Box;
 
-use include::errno::Errno;
-
-pub type DevResult<T> = Result<T, Errno>;
+use crate::devices::DevResult;
 
 #[async_trait::async_trait]
 #[allow(unused_variables)]

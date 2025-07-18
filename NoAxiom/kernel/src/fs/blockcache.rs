@@ -4,7 +4,7 @@ use alloc::{boxed::Box, sync::Arc, vec::Vec};
 use core::num::NonZeroUsize;
 
 use async_trait::async_trait;
-use driver::devices::impls::device::{BlockDevice, DevResult};
+use driver::devices::{block::BlockDevice, DevResult};
 use ksync::{assert_no_lock, async_mutex::AsyncMutex, cell::SyncUnsafeCell};
 use lru::LruCache;
 

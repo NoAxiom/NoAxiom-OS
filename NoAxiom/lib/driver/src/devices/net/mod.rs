@@ -6,11 +6,11 @@ use smoltcp::{
     wire::EthernetAddress,
 };
 
-use super::device::DevResult;
+use crate::devices::DevResult;
 
 pub mod loopback;
 
-pub trait NetWorkDev: Send + Sync {
+pub trait NetWorkDevice: Send + Sync {
     /// get the MAC address of the network card
     fn mac(&self) -> EthernetAddress;
 

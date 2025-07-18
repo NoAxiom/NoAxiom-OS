@@ -3,12 +3,6 @@ name = "driver"
 version = "0.1.0"
 edition = "2021"
 
-[features]
-# the following features can only choose one !!
-interruptable_async = []
-async = []
-full_func = []
-
 [dependencies]
 include = { workspace = true }
 arch = { workspace = true }

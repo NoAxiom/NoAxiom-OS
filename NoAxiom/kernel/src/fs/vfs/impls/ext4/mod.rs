@@ -28,7 +28,7 @@ pub const fn fs_err(err: Ext4Error) -> Errno {
 
 use alloc::sync::Arc;
 
-use driver::devices::impls::device::BlockDevice;
+use driver::devices::block::BlockDevice;
 #[allow(dead_code, unused_variables)]
 pub fn ext4_rs_test(device: Arc<&'static dyn BlockDevice>) {
     use ext4_rs::ext4_defs::*;

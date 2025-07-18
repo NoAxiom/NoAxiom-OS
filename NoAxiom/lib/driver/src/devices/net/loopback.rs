@@ -11,8 +11,8 @@ use smoltcp::{
     wire::{EthernetAddress, IpAddress, IpCidr},
 };
 
-use super::NetWorkDev;
-use crate::devices::impls::device::DevResult;
+use super::NetWorkDevice;
+use crate::devices::DevResult;
 
 pub struct LoopBackDev {
     // todo: use one lock
@@ -58,7 +58,7 @@ impl LoopBackDev {
     }
 }
 
-impl NetWorkDev for LoopBackDev {
+impl NetWorkDevice for LoopBackDev {
     fn mac(&self) -> EthernetAddress {
         EthernetAddress([0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
     }

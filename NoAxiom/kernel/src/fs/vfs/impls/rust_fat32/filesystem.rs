@@ -1,7 +1,7 @@
 use alloc::{boxed::Box, sync::Arc};
 
 use async_trait::async_trait;
-use driver::devices::impls::device::BlockDevice;
+use driver::devices::block::BlockDevice;
 
 use super::{dentry::Fat32Dentry, inode::Fat32DirInode, superblock::Fat32SuperBlock, IFatFs};
 use crate::{

@@ -1,14 +1,12 @@
 #![no_std]
 #![allow(deprecated)]
-#![feature(core_intrinsics)]
+#![feature(impl_trait_in_assoc_type)]
 
 use alloc::sync::Arc;
 
-use devices::{
-    impls::{device::BlockDevice, net::NetWorkDev},
-    ALL_DEVICES,
-};
-use ksync::assert_no_lock;
+use ksync::{assert_no_lock, Once};
+
+use crate::devices::{block::BlockDevice, gpu::DisplayDevice, net::NetWorkDevice};
 
 mod bus;
 pub mod devices;
@@ -26,44 +24,43 @@ pub fn init(dtb: usize) {
 
     // the plic is used only for riscv64 arch
     #[cfg(target_arch = "riscv64")]
-    plic::init();
+    {
+        plic::init();
+        plic::disable_blk_irq();
+    }
+}
+
+lazy_static::lazy_static! {
+    pub static ref BLK_DEV: Once<Arc<&'static dyn BlockDevice>> = Once::new();
+    pub static ref NET_DEV: Once<Arc<&'static dyn NetWorkDevice>> = Once::new();
+    pub static ref DISPLAY_DEV: Once<Arc<&'static dyn DisplayDevice>> = Once::new();
 }
 
 pub fn get_blk_dev() -> Arc<&'static dyn BlockDevice> {
-    let blk = ALL_DEVICES.as_ref().get_blk_device().unwrap();
-    Arc::new(blk)
+    Arc::clone(BLK_DEV.get().unwrap())
 }
 
-pub fn get_net_dev() -> Arc<&'static dyn NetWorkDev> {
-    let net = ALL_DEVICES.as_ref().get_net_device().unwrap();
-    Arc::new(net)
+pub fn get_net_dev() -> Arc<&'static dyn NetWorkDevice> {
+    Arc::clone(NET_DEV.get().unwrap())
 }
 
-pub fn get_display_dev() -> Arc<&'static devices::impls::DisplayDevice> {
-    let display = ALL_DEVICES.as_ref().get_display_device().unwrap();
-    Arc::new(display)
+pub fn get_display_dev() -> Arc<&'static dyn DisplayDevice> {
+    Arc::clone(DISPLAY_DEV.get().unwrap())
 }
 
 pub fn handle_irq() {
-    #[cfg(any(feature = "interruptable_async", feature = "full_func"))]
-    {
-        use arch::{Arch, ArchInt};
-        assert!(!Arch::is_interrupt_enabled());
-        let irq = plic::claim();
-        if irq == 1 {
-            get_blk_dev()
-                .handle_interrupt()
-                .expect("handle interrupt error");
-        } else {
-            log::error!("[driver] unhandled irq: {}", irq);
-        }
-        plic::complete(irq);
-        assert!(!Arch::is_interrupt_enabled());
+    use arch::{Arch, ArchInt};
+    assert!(!Arch::is_interrupt_enabled());
+    let irq = plic::claim();
+    if irq == 1 {
+        get_blk_dev()
+            .handle_interrupt()
+            .expect("handle interrupt error");
+    } else {
+        log::error!("[driver] unhandled irq: {}", irq);
     }
-    #[cfg(feature = "async")]
-    {
-        unreachable!("sync fs shouldn't accept interrupt!");
-    }
+    plic::complete(irq);
+    assert!(!Arch::is_interrupt_enabled());
 }
 
 /// just for test blk_dev and return `!`
