@@ -18,7 +18,8 @@ use crate::{
         enable_external_interrupt, enable_software_interrupt, enable_stimer_interrupt,
         enable_user_memory_access,
     },
-    ArchAsm, ArchInt, ArchTrap, ArchTrapContext, ArchUserFloatContext, TrapType, UserPtrResult,
+    ArchAsm, ArchInt, ArchTrap, ArchTrapContext, ArchUserFloatContext, ExceptionType,
+    InterruptType, PageFaultType, TrapType, UserPtrResult,
 };
 
 global_asm!(include_str!("./trap.S"));
@@ -32,15 +33,30 @@ extern "C" {
 pub fn get_trap_type(scause: Scause, stval: usize) -> TrapType {
     match scause.cause() {
         Trap::Exception(Exception::LoadFault) => TrapType::Unknown,
-        Trap::Exception(Exception::UserEnvCall) => TrapType::SysCall,
-        Trap::Interrupt(Interrupt::SupervisorTimer) => TrapType::Timer,
-        Trap::Exception(Exception::StorePageFault) => TrapType::StorePageFault(stval),
-        Trap::Exception(Exception::StoreFault) => TrapType::StorePageFault(stval),
-        Trap::Exception(Exception::InstructionPageFault) => TrapType::InstructionPageFault(stval),
-        Trap::Exception(Exception::IllegalInstruction) => TrapType::IllegalInstruction(stval),
-        Trap::Exception(Exception::LoadPageFault) => TrapType::LoadPageFault(stval),
-        Trap::Interrupt(Interrupt::SupervisorExternal) => TrapType::SupervisorExternal,
-        Trap::Interrupt(Interrupt::SupervisorSoft) => TrapType::SupervisorSoft,
+        Trap::Exception(Exception::UserEnvCall) => TrapType::Exception(ExceptionType::Syscall),
+        Trap::Exception(Exception::StorePageFault) => TrapType::Exception(
+            ExceptionType::PageFault(PageFaultType::StorePageFault(stval)),
+        ),
+        Trap::Exception(Exception::StoreFault) => TrapType::Exception(ExceptionType::PageFault(
+            PageFaultType::StorePageFault(stval),
+        )),
+        Trap::Exception(Exception::InstructionPageFault) => TrapType::Exception(
+            ExceptionType::PageFault(PageFaultType::InstructionPageFault(stval)),
+        ),
+        Trap::Exception(Exception::IllegalInstruction) => TrapType::Exception(
+            ExceptionType::PageFault(PageFaultType::IllegalInstruction(stval)),
+        ),
+        Trap::Exception(Exception::LoadPageFault) => TrapType::Exception(ExceptionType::PageFault(
+            PageFaultType::LoadPageFault(stval),
+        )),
+        Trap::Interrupt(int) => match int {
+            Interrupt::SupervisorTimer => TrapType::Interrupt(InterruptType::Timer(-1)),
+            Interrupt::SupervisorExternal => {
+                TrapType::Interrupt(InterruptType::SupervisorExternal(-1))
+            }
+            Interrupt::SupervisorSoft => TrapType::Interrupt(InterruptType::SupervisorSoft(-1)),
+            _ => TrapType::Unknown,
+        },
         _ => panic!("unknown trap type: {:?}", scause.cause()),
     }
 }

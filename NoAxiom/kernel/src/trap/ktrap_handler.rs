@@ -16,7 +16,7 @@ pub fn kernel_trap_handler() {
         TrapType::Exception(exception) => kernel_exception_handler(exception),
         TrapType::Interrupt(interrupt) => kernel_interrupt_handler(interrupt),
         TrapType::None => {}
-        _ => panic!("unsupported trap type"),
+        TrapType::Unknown => panic!("unsupported trap type"),
     }
     current_cpu().sub_trap_depth();
 }
@@ -51,8 +51,8 @@ fn kernel_exception_handler(exception: ExceptionType) {
 fn kernel_interrupt_handler(interrupt: InterruptType) {
     use InterruptType::*;
     match interrupt {
-        SupervisorExternal(id) => ext_int_handler(),
-        Timer(id) => kernel_timer_trap_handler(),
-        SupervisorSoft(id) => ipi_handler(),
+        SupervisorExternal(_) => ext_int_handler(),
+        Timer(_) => kernel_timer_trap_handler(),
+        SupervisorSoft(_) => ipi_handler(),
     }
 }

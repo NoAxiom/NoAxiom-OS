@@ -19,6 +19,8 @@ use crate::{
 };
 
 /// user trap handler
+/// WARNING: don't try to use nested async function here
+/// or it would lead to data inconsistency caused by LA compiler
 #[no_mangle]
 pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
     Arch::disable_interrupt();
@@ -46,7 +48,7 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
     // user trap handler vector
     match trap_type {
         TrapType::Exception(exc) => match exc {
-            ExceptionType::SysCall => {
+            ExceptionType::Syscall => {
                 Arch::enable_interrupt();
                 let result = task.syscall(cx).await;
                 task.update_syscall_result(result);
@@ -139,7 +141,7 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
             };
         }
         TrapType::None => {}
-        _ => {
+        TrapType::Unknown => {
             panic!("unsupported trap type: {trap_type:x?}");
         }
     }
