@@ -61,7 +61,8 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
                             Ok(_) => trace!("[memory_validate] success in user_trap_handler"),
                             Err(_) => {
                                 warn!(
-                                    "[user_trap] page fault, tid: {}, trap_type: {:x?}, epc = {:#x}, user_sp = {:#x}, ra = {:#x}",
+                                    "[user_trap] pagefault @ {:#x}, tid: {}, trap_type: {:x?}, epc = {:#x}, user_sp = {:#x}, ra = {:#x}",
+                                    addr,
                                     task.tid(),
                                     pf,
                                     cx[TrapArgs::EPC],
@@ -77,7 +78,8 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
                     }
                     PageFaultType::IllegalInstruction(addr) => {
                         warn!(
-                            "[user_trap] illegal instruction, tid: {}, trap_type: {:x?}, epc = {:#x}, user_sp = {:#x}, ra = {:#x}",
+                            "[user_trap] illegal instruction @ {:#x}, tid: {}, trap_type: {:x?}, epc = {:#x}, user_sp = {:#x}, ra = {:#x}",
+                            addr,
                             task.tid(),
                             trap_type,
                             cx[TrapArgs::EPC],
@@ -92,7 +94,7 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
                 }
             }
             ExceptionType::Breakpoint => {
-                panic!(
+                warn!(
                     "[user_trap] breakpoint exception, tid: {}, trap_type: {:x?}, epc = {:#x}, user_sp = {:#x}, ra = {:#x}",
                     task.tid(),
                     trap_type,
@@ -100,12 +102,16 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
                     cx[TrapArgs::SP],
                     cx[TrapArgs::RA],
                 );
+                task.recv_siginfo(
+                    SigInfo::new_simple(Signal::SIGTRAP.into(), SigCode::Kernel),
+                    true,
+                );
             }
         },
         TrapType::Interrupt(int) => {
             match int {
                 // interrupt
-                InterruptType::Timer(id) => {
+                InterruptType::Timer(_) => {
                     // trace!(
                     //     "[SupervisorTimer] hart: {}, tid: {}",
                     //     get_hartid(),
@@ -114,7 +120,7 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
                     set_next_trigger(None);
                     task.yield_now().await;
                 }
-                InterruptType::SupervisorExternal(id) => {
+                InterruptType::SupervisorExternal(_) => {
                     // trace!(
                     //     "[SupervisorExternal] interrupted at hart: {}, tid: {}",
                     //     get_hartid(),
@@ -122,7 +128,7 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
                     // );
                     ext_int_handler();
                 }
-                InterruptType::SupervisorSoft(id) => {
+                InterruptType::SupervisorSoft(_) => {
                     // trace!(
                     //     "[SupervisorSoft] interrupted at hart: {}, tid: {}",
                     //     get_hartid(),
