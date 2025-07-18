@@ -138,7 +138,7 @@ fn get_trap_type(tf: Option<&mut TrapContext>) -> TrapType {
                     unsafe { emulate_load_store_insn(tf.unwrap()) }
                     TrapType::None
                 }
-                Exception::Syscall => TrapType::Exception(ExceptionType::SysCall),
+                Exception::Syscall => TrapType::Exception(ExceptionType::Syscall),
                 Exception::StorePageFault | Exception::PageModifyFault => TrapType::Exception(
                     ExceptionType::PageFault(PageFaultType::StorePageFault(badv)),
                 ),

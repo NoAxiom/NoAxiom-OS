@@ -1,7 +1,7 @@
 use core::ops::{Index, IndexMut};
 
 pub type PageFaultAddr = usize;
-pub type InterruptNumber = usize;
+pub type InterruptNumber = isize;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum InterruptType {
@@ -21,7 +21,7 @@ pub enum PageFaultType {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ExceptionType {
     Breakpoint,
-    SysCall,
+    Syscall,
     PageFault(PageFaultType),
 }
 
