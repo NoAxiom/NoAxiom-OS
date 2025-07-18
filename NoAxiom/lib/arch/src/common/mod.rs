@@ -7,6 +7,7 @@ mod interrupt;
 mod memory;
 mod time;
 mod trap;
+mod utils;
 
 pub use asm::*;
 pub use boot::*;
@@ -16,3 +17,4 @@ pub use interrupt::*;
 pub use memory::*;
 pub use time::*;
 pub use trap::*;
+pub use utils::*;

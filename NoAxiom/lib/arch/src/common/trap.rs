@@ -4,18 +4,33 @@ pub type PageFaultAddr = usize;
 pub type InterruptNumber = usize;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum TrapType {
-    Breakpoint,
-    SysCall,
+pub enum InterruptType {
     Timer(InterruptNumber),
-    Unknown,
     SupervisorExternal(InterruptNumber),
     SupervisorSoft(InterruptNumber),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum PageFaultType {
     StorePageFault(PageFaultAddr),
     LoadPageFault(PageFaultAddr),
     InstructionPageFault(PageFaultAddr),
     IllegalInstruction(PageFaultAddr),
-    None,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ExceptionType {
+    Breakpoint,
+    SysCall,
+    PageFault(PageFaultType),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum TrapType {
+    Exception(ExceptionType),
+    Interrupt(InterruptType),
+    Unknown, // unknown trap type
+    None,    // no trap type, implying the trap has been handled
 }
 
 /// Trap Frame Arg Type
