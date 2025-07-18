@@ -1,7 +1,10 @@
 use alloc::{string::String, vec::Vec};
 use core::{intrinsics::atomic_load_acquire, marker::PhantomData};
 
-use arch::{Arch, ArchMemory, ArchPageTableEntry, ArchTrap, MappingFlags, TrapType};
+use arch::{
+    Arch, ArchMemory, ArchPageTableEntry, ArchTrap, ExceptionType, MappingFlags, PageFaultType,
+    TrapType,
+};
 use config::mm::PAGE_SIZE;
 use include::errno::Errno;
 use ksync::mutex::check_no_lock;
@@ -128,34 +131,39 @@ impl<T> UserPtr<T> {
         }
         match Arch::check_read(self.addr()) {
             Ok(()) => Ok(()),
-            Err(trap_type) => match trap_type {
-                TrapType::LoadPageFault(addr) | TrapType::StorePageFault(addr) => {
-                    warn!(
-                        "[read] detect trap at addr {:#x} during syscall {:?}",
-                        self.addr(),
-                        current_syscall()
-                    );
-                    let task = current_task().unwrap();
-                    if check_no_lock() {
-                        task.memory_validate(addr, trap_type, false).await?;
-                    } else {
-                        warn!(
-                            "[read] block on addr {:#x} during syscall {:?}",
-                            self.addr(),
-                            current_syscall()
-                        );
-                        block_on(task.memory_validate(addr, trap_type, true))?;
-                    }
-                    Ok(())
+            Err(trap_type) => {
+                match trap_type {
+                    TrapType::Exception(ExceptionType::PageFault(pf)) => match pf {
+                        PageFaultType::LoadPageFault(addr)
+                        | PageFaultType::StorePageFault(addr) => {
+                            warn!(
+                                "[read] detect trap at addr {:#x} during syscall {:?}",
+                                self.addr(),
+                                current_syscall()
+                            );
+                            let task = current_task().unwrap();
+                            if check_no_lock() {
+                                task.memory_validate(addr, pf, false).await?;
+                            } else {
+                                warn!(
+                                    "[read] block on addr {:#x} during syscall {:?}",
+                                    self.addr(),
+                                    current_syscall()
+                                );
+                                block_on(task.memory_validate(addr, pf, true))?;
+                            }
+                            return Ok(());
+                        }
+                        _ => {}
+                    },
+                    _ => {}
                 }
-                _ => {
-                    return_errno!(
-                        Errno::EFAULT,
-                        "[user_ptr] trigger unexpected trap in read, trap_type: {:?}",
-                        trap_type
-                    );
-                }
-            },
+                return_errno!(
+                    Errno::EFAULT,
+                    "[user_ptr] trigger unexpected trap in read, trap_type: {:?}",
+                    trap_type
+                );
+            }
         }
     }
 
@@ -198,33 +206,39 @@ impl<T> UserPtr<T> {
         }
         match Arch::check_write(self.addr()) {
             Ok(()) => Ok(()),
-            Err(trap_type) => match trap_type {
-                TrapType::LoadPageFault(addr) | TrapType::StorePageFault(addr) => {
-                    warn!(
-                        "[write] detect trap at addr {:#x} during syscall {:?}",
-                        self.addr(),
-                        current_syscall()
-                    );
-                    let task = current_task().unwrap();
-                    if check_no_lock() {
-                        task.memory_validate(addr, trap_type, false).await?;
-                    } else {
-                        warn!(
-                            "[write] block on addr {:#x} during syscall {:?}",
-                            self.addr(),
-                            current_syscall()
-                        );
-                        block_on(task.memory_validate(addr, trap_type, true))?;
-                    }
-                    Ok(())
+            Err(trap_type) => {
+                match trap_type {
+                    TrapType::Exception(ExceptionType::PageFault(pf)) => match pf {
+                        PageFaultType::LoadPageFault(addr)
+                        | PageFaultType::StorePageFault(addr) => {
+                            warn!(
+                                "[write] detect trap at addr {:#x} during syscall {:?}",
+                                self.addr(),
+                                current_syscall()
+                            );
+                            let task = current_task().unwrap();
+                            if check_no_lock() {
+                                task.memory_validate(addr, pf, false).await?;
+                            } else {
+                                warn!(
+                                    "[write] block on addr {:#x} during syscall {:?}",
+                                    self.addr(),
+                                    current_syscall()
+                                );
+                                block_on(task.memory_validate(addr, pf, true))?;
+                            }
+                            return Ok(());
+                        }
+                        _ => {}
+                    },
+                    _ => {}
                 }
-                _ => {
-                    panic!(
-                        "[user_ptr] trigger unexpected trap in write, trap_type: {:?}",
-                        trap_type
-                    );
-                }
-            },
+                return_errno!(
+                    Errno::EFAULT,
+                    "[user_ptr] trigger unexpected trap in write, trap_type: {:?}",
+                    trap_type
+                );
+            }
         }
     }
 
@@ -312,7 +326,7 @@ impl<T> UserPtr<T> {
 
     /// translate current address to physical address
     pub async fn translate_pa(&self) -> SysResult<PhysAddr> {
-        if let Err(trap_type) = Arch::check_read(self.addr()) {
+        if let Err(TrapType::Exception(ExceptionType::PageFault(pf))) = Arch::check_read(self.addr()) {
             warn!(
                 "[translate_pa] detect trap at addr {:#x} during syscall {:?}",
                 self.addr(),
@@ -320,14 +334,14 @@ impl<T> UserPtr<T> {
             );
             let task = current_task().unwrap();
             if check_no_lock() {
-                task.memory_validate(self.addr(), trap_type, false).await?;
+                task.memory_validate(self.addr(), pf, false).await?;
             } else {
                 warn!(
                     "[translate_pa] block on addr {:#x} during syscall {:?}",
                     self.addr(),
                     current_syscall()
                 );
-                block_on(task.memory_validate(self.addr(), trap_type, true))?;
+                block_on(task.memory_validate(self.addr(), pf, true))?;
             }
         }
         let page_table = PageTable::from_ppn(Arch::current_root_ppn());
@@ -361,8 +375,8 @@ impl UserPtr<u8> {
             };
             if should_validate {
                 let trap_type = match is_write {
-                    true => TrapType::StorePageFault(vpn.as_va_usize()),
-                    false => TrapType::LoadPageFault(vpn.as_va_usize()),
+                    true => PageFaultType::StorePageFault(vpn.as_va_usize()),
+                    false => PageFaultType::LoadPageFault(vpn.as_va_usize()),
                 };
                 validate(memory_set, vpn, trap_type, None).await?;
             }

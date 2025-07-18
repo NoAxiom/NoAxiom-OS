@@ -18,7 +18,8 @@ use super::{
 };
 use crate::{
     la64::interrupt::is_interrupt_enabled, ArchAsm, ArchInt, ArchTrap, ArchTrapContext,
-    ArchUserFloatContext, InterruptNumber, TrapType, UserPtrResult,
+    ArchUserFloatContext, ExceptionType, InterruptNumber, InterruptType, PageFaultType, TrapType,
+    UserPtrResult,
 };
 
 global_asm!(include_str!("./trap.S"));
@@ -132,29 +133,35 @@ fn get_trap_type(tf: Option<&mut TrapContext>) -> TrapType {
     match estat.cause() {
         Trap::Exception(e) => {
             match e {
-                Exception::Breakpoint => TrapType::Breakpoint,
+                Exception::Breakpoint => TrapType::Exception(ExceptionType::Breakpoint),
                 Exception::AddressNotAligned => {
                     unsafe { emulate_load_store_insn(tf.unwrap()) }
                     TrapType::None
                 }
-                Exception::Syscall => TrapType::SysCall,
-                Exception::StorePageFault | Exception::PageModifyFault => {
-                    TrapType::StorePageFault(badv)
-                }
+                Exception::Syscall => TrapType::Exception(ExceptionType::SysCall),
+                Exception::StorePageFault | Exception::PageModifyFault => TrapType::Exception(
+                    ExceptionType::PageFault(PageFaultType::StorePageFault(badv)),
+                ),
                 Exception::PageNonExecutableFault
                 | Exception::FetchPageFault
                 | Exception::FetchInstructionAddressError
-                | Exception::InstructionPrivilegeIllegal => TrapType::InstructionPageFault(badv),
+                | Exception::InstructionPrivilegeIllegal => TrapType::Exception(
+                    ExceptionType::PageFault(PageFaultType::InstructionPageFault(badv)),
+                ),
                 Exception::LoadPageFault
                 | Exception::PageNonReadableFault
                 | Exception::MemoryAccessAddressError
-                | Exception::PagePrivilegeIllegal => TrapType::LoadPageFault(badv),
+                | Exception::PagePrivilegeIllegal => TrapType::Exception(ExceptionType::PageFault(
+                    PageFaultType::LoadPageFault(badv),
+                )),
                 Exception::InstructionNotExist => {
                     error!(
                         "[get_trap_type] InstructionNotExist, pc = {:#x}, BADV = {:#x}, BADI = {:#x}",
                         era::read().pc(), badv, badi::read().inst()
                     );
-                    TrapType::IllegalInstruction(badv)
+                    TrapType::Exception(ExceptionType::PageFault(
+                        PageFaultType::IllegalInstruction(badv),
+                    ))
                 }
                 _ => {
                     error!(
@@ -172,7 +179,7 @@ fn get_trap_type(tf: Option<&mut TrapContext>) -> TrapType {
         Trap::Interrupt(int) => {
             let int_num = get_interrupt_number(&int);
             match int {
-                Interrupt::Timer => TrapType::Timer(int_num),
+                Interrupt::Timer => TrapType::Interrupt(InterruptType::Timer(int_num)),
                 Interrupt::HWI0
                 | Interrupt::HWI1
                 | Interrupt::HWI2
@@ -180,9 +187,11 @@ fn get_trap_type(tf: Option<&mut TrapContext>) -> TrapType {
                 | Interrupt::HWI4
                 | Interrupt::HWI5
                 | Interrupt::HWI6
-                | Interrupt::HWI7 => TrapType::SupervisorExternal(int_num),
+                | Interrupt::HWI7 => {
+                    TrapType::Interrupt(InterruptType::SupervisorExternal(int_num))
+                }
                 Interrupt::SWI0 | Interrupt::SWI1 | Interrupt::IPI => {
-                    TrapType::SupervisorSoft(int_num)
+                    TrapType::Interrupt(InterruptType::SupervisorSoft(int_num))
                 }
                 _ => {
                     error!(

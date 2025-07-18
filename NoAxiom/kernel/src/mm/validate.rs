@@ -1,6 +1,9 @@
 use alloc::sync::Arc;
 
-use arch::{Arch, ArchMemory, ArchPageTableEntry, MappingFlags, PageTableEntry, TrapType};
+use arch::{
+    flag_match_with_trap_type, Arch, ArchMemory, ArchPageTableEntry, MappingFlags, PageFaultType,
+    PageTableEntry,
+};
 use ksync::mutex::SpinLock;
 use memory::{address::VirtAddr, frame::frame_alloc};
 
@@ -8,7 +11,6 @@ use super::{address::VirtPageNum, memory_set::MemorySet};
 use crate::{
     cpu::current_task, include::result::Errno, mm::page_table::PageTable, return_errno,
     sched::utils::yield_now, syscall::SysResult, task::Task,
-    utils::arch_utils::flag_match_with_trap_type,
 };
 
 /// # memory validate
@@ -29,7 +31,7 @@ use crate::{
 pub async fn validate(
     memory_set: &Arc<SpinLock<MemorySet>>,
     vpn: VirtPageNum,
-    trap_type: TrapType,
+    pf: PageFaultType,
     pte: Option<&mut PageTableEntry>,
 ) -> SysResult<()> {
     if let Some(pte) = pte {
@@ -38,7 +40,7 @@ pub async fn validate(
             trace!("[validate] realloc COW, vpn={:#x}", vpn.raw());
             memory_set.lock().realloc_cow(vpn, pte)?;
             Ok(())
-        } else if matches!(trap_type, TrapType::StorePageFault(_)) {
+        } else if matches!(pf, PageFaultType::StorePageFault(_)) {
             error!(
                 "[validate] store at invalid area, flags: {:?}, tid: {}",
                 flags,
@@ -50,7 +52,7 @@ pub async fn validate(
                 "[validate] unknown error, vpn: {:#x}, flag: {:?}, trap_type: {:#x?}, pte_raw: {:#x}",
                 vpn.raw(),
                 flags,
-                trap_type,
+                pf,
                 pte.0
             );
             Err(Errno::EFAULT)
@@ -87,12 +89,12 @@ pub async fn validate(
             if !ms.mmap_manager.frame_trackers.contains_key(&vpn) {
                 let mut mmap_page = ms.mmap_manager.mmap_map.get(&vpn).cloned().unwrap();
                 let pte_flags: MappingFlags = MappingFlags::from(mmap_page.prot) | MappingFlags::U;
-                if !flag_match_with_trap_type(pte_flags, trap_type) {
+                if !flag_match_with_trap_type(pte_flags, pf) {
                     error!(
                         "[validate] prot mismatch, vpn: {:#x}, prot: {:?}, trap_type: {:?}",
                         vpn.raw(),
                         mmap_page.prot,
-                        trap_type
+                        pf
                     );
                     return_errno!(Errno::EFAULT);
                 }
@@ -138,12 +140,12 @@ impl Task {
     pub async fn memory_validate(
         self: &Arc<Self>,
         addr: usize,
-        trap_type: TrapType,
+        pf: PageFaultType,
         is_blockon: bool,
     ) -> SysResult<()> {
         trace!(
             "[memory_validate] {:x?} at user_pc={:#x}, is_kernel: {}",
-            trap_type,
+            pf,
             self.trap_context()[arch::TrapArgs::EPC],
             is_blockon,
         );
@@ -151,6 +153,6 @@ impl Task {
         let vpn = VirtAddr::from(addr).floor();
         let pt = PageTable::from_ppn(Arch::current_root_ppn());
         let pte = pt.find_pte(vpn);
-        validate(ms, vpn, trap_type, pte).await
+        validate(ms, vpn, pf, pte).await
     }
 }
