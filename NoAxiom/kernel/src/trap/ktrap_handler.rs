@@ -3,6 +3,7 @@ use kfuture::block::block_on;
 
 use crate::{
     cpu::current_cpu,
+    fs::vfs::inc_interrupts_count,
     syscall::utils::current_syscall,
     trap::{ext_int::ext_int_handler, ipi::ipi_handler, ktimer::kernel_timer_trap_handler},
 };
@@ -14,7 +15,10 @@ pub fn kernel_trap_handler() {
     let trap_type = Arch::read_trap_type(None);
     match trap_type {
         TrapType::Exception(exception) => kernel_exception_handler(exception),
-        TrapType::Interrupt(interrupt) => kernel_interrupt_handler(interrupt),
+        TrapType::Interrupt(interrupt) => {
+            inc_interrupts_count();
+            kernel_interrupt_handler(interrupt)
+        }
         TrapType::None => {}
         TrapType::Unknown => panic!("unsupported trap type"),
     }

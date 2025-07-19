@@ -2,15 +2,21 @@ use alloc::sync::Arc;
 
 use exe::{dentry::ExeDentry, inode::ExeInode};
 use meminfo::{dentry::MemInfoDentry, inode::MemInfoInode};
-use mounts::{dentry::MountsDentry, inode::MountsInode};
+use mounts::dentry::MountsDentry;
 use status::{dentry::StatusDentry, inode::StatusInode};
 
 use crate::{
     fs::vfs::{
         basic::dentry::Dentry,
-        impls::ramfs::{
-            dentry::RamFsDentry,
-            inode::{RamFsDirInode, RamFsFileInode},
+        impls::{
+            proc::{
+                interrupts::{dentry::InterruptsDentry, inode::InterruptsInode},
+                mounts::inode::MountsInode,
+            },
+            ramfs::{
+                dentry::RamFsDentry,
+                inode::{RamFsDirInode, RamFsFileInode},
+            },
         },
     },
     syscall::SysResult,
@@ -18,10 +24,13 @@ use crate::{
 
 mod exe;
 pub mod filesystem;
+mod interrupts;
 mod meminfo;
 mod mounts;
 mod status;
 mod superblock;
+
+pub use interrupts::inc_interrupts_count;
 
 pub async fn init(fs_root: Arc<dyn Dentry>) -> SysResult<()> {
     assert_eq!(fs_root.name(), "proc");
@@ -55,6 +64,16 @@ pub async fn init(fs_root: Arc<dyn Dentry>) -> SysResult<()> {
     let sys_inode = Arc::new(RamFsDirInode::new(fs_root.super_block(), 0));
     sys_dentry.set_inode(sys_inode);
     fs_root.add_child_directly(sys_dentry.clone());
+
+    info!("[fs] create /proc/interrupts");
+    let interrupts_dentry = Arc::new(InterruptsDentry::new(
+        Some(fs_root.clone()),
+        "interrupts",
+        fs_root.super_block(),
+    ));
+    let interrupts_inode = Arc::new(InterruptsInode::new(fs_root.super_block()));
+    interrupts_dentry.set_inode(interrupts_inode);
+    sys_dentry.add_child_directly(interrupts_dentry);
 
     info!("[fs] create /proc/sys/kernel/pid_max, write 32768");
     let kernel_inode = Arc::new(RamFsDirInode::new(sys_dentry.super_block(), 0));

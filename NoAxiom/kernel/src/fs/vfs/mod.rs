@@ -14,7 +14,7 @@ use crate::{
 pub mod basic;
 pub mod impls;
 
-pub use impls::devfs::TTYFILE;
+pub use impls::{devfs::TTYFILE, inc_interrupts_count};
 
 lazy_static::lazy_static! {
     static ref ROOT_DENTRY: Once<Arc<dyn Dentry>> = Once::new();

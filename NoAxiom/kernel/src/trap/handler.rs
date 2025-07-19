@@ -10,6 +10,7 @@ use arch::{
 
 use super::{ext_int::ext_int_handler, ipi::ipi_handler};
 use crate::{
+    fs::vfs::inc_interrupts_count,
     signal::{
         sig_info::{SigCode, SigInfo},
         signal::Signal,
@@ -111,6 +112,7 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
             }
         },
         TrapType::Interrupt(int) => {
+            inc_interrupts_count();
             match int {
                 // interrupt
                 InterruptType::Timer(_) => {
