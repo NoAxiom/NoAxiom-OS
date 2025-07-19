@@ -1,5 +1,5 @@
 //! Network Layer
-use alloc::{boxed::Box, vec::Vec};
+use alloc::{boxed::Box, sync::Weak, vec::Vec};
 use core::task::Waker;
 
 use async_trait::async_trait;
@@ -15,6 +15,7 @@ use super::{
 };
 use crate::{
     constant::net::TCP_CONSTANTS,
+    fs::vfs::basic::file::File,
     include::{
         io::PollEvent,
         net::{ShutdownType, SocketOptions, SocketType},
@@ -335,11 +336,11 @@ impl Socket for TcpSocket {
         }
     }
 
-    fn bind(&mut self, local: IpEndpoint, fd: usize) -> SysResult<()> {
+    fn bind(&mut self, local: IpEndpoint, file: Weak<dyn File>) -> SysResult<()> {
         debug!("[Tcp {}] bind to {:?}", self.handles[0], local);
         let mut port_manager = TCP_PORT_MANAGER.lock();
         let port = port_manager.resolve_port(&local)?;
-        port_manager.bind_port_with_fd(port, fd)?;
+        port_manager.bind_port_with_file(port, file)?;
         self.local_endpoint = Some(IpEndpoint::new(local.addr, port));
         self.state = TcpState::Closed;
         Ok(())

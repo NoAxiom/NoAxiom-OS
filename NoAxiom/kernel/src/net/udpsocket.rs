@@ -1,4 +1,4 @@
-use alloc::{boxed::Box, vec};
+use alloc::{boxed::Box, sync::Weak, vec};
 use core::task::Waker;
 
 use async_trait::async_trait;
@@ -14,6 +14,7 @@ use super::{
 };
 use crate::{
     constant::net::UDP_CONSTANTS,
+    fs::vfs::basic::file::File,
     include::{
         io::PollEvent,
         net::{ShutdownType, SocketOptions, SocketType},
@@ -199,11 +200,11 @@ impl Socket for UdpSocket {
         }
     }
 
-    fn bind(&mut self, local: IpEndpoint, fd: usize) -> SysResult<()> {
+    fn bind(&mut self, local: IpEndpoint, file: Weak<dyn File>) -> SysResult<()> {
         debug!("[Udp {}] bind to: {:?}", self.handle, local);
         let mut port_manager = UDP_PORT_MANAGER.lock();
         let port = port_manager.resolve_port(&local)?;
-        let port = port_manager.bind_port_with_fd(port, fd)?;
+        let port = port_manager.bind_port_with_file(port, file)?;
         drop(port_manager);
 
         let mut sockets = SOCKET_SET.lock();

@@ -4,7 +4,7 @@ use smoltcp::wire::{IpAddress, IpEndpoint, Ipv4Address};
 
 use super::SyscallResult;
 use crate::{
-    fs::pipe::PipeFile,
+    fs::{pipe::PipeFile, vfs::basic::file::File},
     include::{
         net::{
             AddressFamily, PosixSocketOption, PosixSocketType, PosixTcpSocketOptions, ShutdownType,
@@ -55,24 +55,27 @@ impl Syscall<'_> {
         drop(fd_table);
 
         let mut socket = socket_file.socket().await;
-        let res = socket.bind(sock_addr, sockfd);
+        let socket_file: Arc<dyn File> = socket_file.clone();
+        let res = socket.bind(sock_addr, Arc::downgrade(&socket_file));
         match res {
             // !fixme: now we SPECIALLY handle EADDRINUSE, to handle the case that multiple sockets
             // !use the same port, and we just assume at the same task
             Err(Errno::EADDRINUSE) => {
                 warn!("[sys_bind] address already in use, so we copy from the old socket file");
                 // get the old socket file
-                let old_fd = crate::net::get_old_socket_fd(sock_addr.get_endpoint().port);
+                let port = sock_addr.get_endpoint().port;
+                let old_file = crate::net::get_old_socket_file(port)
+                    .expect(&format!("Repeatedly bind to a temporary port {}!", port));
 
                 // copy the old socket file to the current one, and the current one will be
                 // dropped
                 let mut fd_table = self.task.fd_table();
-                fd_table.copyfrom(old_fd, sockfd)?;
+                fd_table.set(sockfd, old_file);
                 drop(fd_table);
                 Ok(0)
             }
-            _ => {
-                debug!("[sys_bind] bind ok");
+            e => {
+                debug!("[sys_bind] bind with result {:?}", e);
                 Ok(0)
             }
         }

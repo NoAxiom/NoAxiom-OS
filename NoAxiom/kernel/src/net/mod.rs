@@ -5,6 +5,8 @@ use ksync::mutex::{RwLock, SpinLock};
 use port_manager::PortManager;
 use socket_set::SocketSet;
 
+use crate::fs::vfs::basic::file::File;
+
 // mod handle;
 // mod poll;
 mod port_manager;
@@ -26,10 +28,14 @@ lazy_static::lazy_static! {
     };
 }
 
-pub fn get_old_socket_fd(port: u16) -> usize {
+pub fn get_old_socket_file(port: u16) -> Option<Arc<dyn File>> {
     let port_manager = UDP_PORT_MANAGER.lock();
     if let Some(port_item) = port_manager.inner.get(&port) {
-        port_item.fd
+        if let Some(file) = &port_item.clone().file {
+            if let Some(arc_file) = file.upgrade() {
+                return Some(arc_file);
+            }
+        }
     } else {
         drop(port_manager);
         let port_manager = TCP_PORT_MANAGER.lock();
@@ -38,8 +44,14 @@ pub fn get_old_socket_fd(port: u16) -> usize {
             .inner
             .get(&port)
             .expect("Port {port} is not listened");
-        item.fd
+        if let Some(file) = &item.file {
+            if let Some(arc_file) = file.upgrade() {
+                return Some(arc_file);
+            }
+        }
     }
+
+    None
 }
 
 #[allow(dead_code)]

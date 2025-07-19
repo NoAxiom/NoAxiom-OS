@@ -1,4 +1,4 @@
-use alloc::boxed::Box;
+use alloc::{boxed::Box, sync::Weak};
 
 use async_trait::async_trait;
 use downcast_rs::{impl_downcast, DowncastSync};
@@ -6,6 +6,7 @@ use smoltcp::wire::IpEndpoint;
 
 use super::{tcpsocket::TcpSocket, NET_DEVICES, SOCKET_SET};
 use crate::{
+    fs::vfs::basic::file::File,
     include::net::{ShutdownType, SocketOptions, SocketType},
     syscall::SysResult,
 };
@@ -70,7 +71,7 @@ pub trait Socket: Send + Sync + DowncastSync {
     /// address and port number on the local machine.
     ///
     /// return: whether the operation is successful
-    fn bind(&mut self, local: IpEndpoint, fd: usize) -> SysResult<()>;
+    fn bind(&mut self, local: IpEndpoint, file: Weak<dyn File>) -> SysResult<()>;
 
     /// `backlog` is the maximum length to which the queue of pending
     /// connections

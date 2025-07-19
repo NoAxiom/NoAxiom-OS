@@ -1,16 +1,16 @@
-use alloc::{boxed::Box, collections::btree_map::BTreeMap};
+use alloc::{boxed::Box, collections::btree_map::BTreeMap, sync::Weak};
 
 use smoltcp::wire::IpEndpoint;
 
-use crate::{include::result::Errno, syscall::SysResult};
+use crate::{fs::vfs::basic::file::File, include::result::Errno, syscall::SysResult};
 
 pub struct PortItem {
-    pub fd: usize,
+    pub file: Option<Weak<dyn File>>,
 }
 
 impl PortItem {
-    pub fn new(fd: usize) -> Self {
-        Self { fd }
+    pub fn new(file: Option<Weak<dyn File>>) -> Self {
+        Self { file }
     }
 }
 
@@ -48,14 +48,14 @@ impl PortManager {
         Err(Errno::EADDRINUSE)
     }
 
-    /// Bind a port with **SPECIFIC** port and fd
-    pub fn bind_port_with_fd(&mut self, port: u16, fd: usize) -> SysResult<u16> {
+    /// Bind a port with **SPECIFIC** port and file
+    pub fn bind_port_with_file(&mut self, port: u16, file: Weak<dyn File>) -> SysResult<u16> {
         if let Some(_) = &self.inner.get(&port) {
-            error!("[port_manager] Port {port} is already listened (with fd {fd})");
+            error!("[port_manager] Port {port} is already listened (with file)");
             Err(Errno::EADDRINUSE)
         } else {
             // let waker = current_task().unwrap().waker();
-            self.inner.insert(port, PortItem::new(fd));
+            self.inner.insert(port, PortItem::new(Some(file)));
             Ok(port)
         }
     }
@@ -72,7 +72,7 @@ impl PortManager {
             Err(Errno::EADDRINUSE)
         } else {
             // let waker = current_task().unwrap().waker();
-            self.inner.insert(port, PortItem::new(usize::MAX));
+            self.inner.insert(port, PortItem::new(None));
             Ok(port)
         }
     }

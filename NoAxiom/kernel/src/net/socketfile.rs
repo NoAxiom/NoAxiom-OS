@@ -1,4 +1,7 @@
-use alloc::{boxed::Box, sync::Arc};
+use alloc::{
+    boxed::Box,
+    sync::{Arc, Weak},
+};
 use core::task::Waker;
 
 use async_trait::async_trait;
@@ -34,11 +37,11 @@ pub enum Sock {
 }
 
 impl Sock {
-    pub fn bind(&mut self, addr: SockAddr, fd: usize) -> SysResult<()> {
+    pub fn bind(&mut self, addr: SockAddr, file: Weak<dyn File>) -> SysResult<()> {
         let endpoint = addr.get_endpoint();
         match self {
-            Sock::Tcp(socket) => socket.bind(endpoint, fd),
-            Sock::Udp(socket) => socket.bind(endpoint, fd),
+            Sock::Tcp(socket) => socket.bind(endpoint, file),
+            Sock::Udp(socket) => socket.bind(endpoint, file),
         }
     }
     pub fn listen(&mut self, backlog: usize) -> SysResult<()> {
