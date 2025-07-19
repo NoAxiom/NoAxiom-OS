@@ -41,7 +41,6 @@ lazy_static! {
 pub enum PageState {
     Modified,
     Shared,
-    Invalid,
     Deleted,
 }
 
@@ -127,45 +126,30 @@ impl PageCacheManager {
         }
     }
 
-    fn alloc(&mut self, state: PageState) -> Page {
+    pub fn alloc(&mut self, state: PageState) -> Page {
         let sys_capacity = get_page_cache_capacity();
         let sys_thresold = get_page_cache_capacity_clean_threshold(sys_capacity);
         if self.page_count > sys_capacity {
             self.clean(sys_thresold);
         }
+        self.page_count += 1;
         Page::new(state)
     }
 
     pub fn get_page(&self, file: &Arc<dyn File>, offset_align: usize) -> Option<&Page> {
+        assert!(is_aligned(offset_align, PAGE_SIZE));
         if let Some(page_cache) = self.inner.get(file) {
             if let Some(page) = page_cache.get(&offset_align) {
-                debug!(
-                    "[PageCacheManager: get_page] file: {}, offset: {} succeed, content: {:?}",
-                    file.name(),
-                    offset_align,
-                    &page.as_mut_bytes_array()[..10],
-                );
                 return Some(page);
             }
         }
-
-        debug!(
-            "[PageCacheManager: get_page] file: {}, offset: {} fail",
-            file.name(),
-            offset_align,
-        );
         None
     }
 
     pub fn get_page_mut(&mut self, file: &Arc<dyn File>, offset_align: usize) -> Option<&mut Page> {
+        assert!(is_aligned(offset_align, PAGE_SIZE));
         if let Some(page_cache) = self.inner.get_mut(file) {
             if let Some(page) = page_cache.get_mut(&offset_align) {
-                debug!(
-                    "[PageCacheManager: get_page_mut] file: {}, offset: {} succeed, content: {:?}",
-                    file.name(),
-                    offset_align,
-                    &page.as_mut_bytes_array()[..10],
-                );
                 return Some(page);
             }
         }
@@ -178,33 +162,12 @@ impl PageCacheManager {
         None
     }
 
-    pub fn alloc_page_mut(
-        &mut self,
-        file: &Arc<dyn File>,
-        offset_align: usize,
-        state: PageState,
-    ) -> &mut Page {
+    pub fn fill_page(&mut self, file: &Arc<dyn File>, offset_align: usize, page: Page) {
         assert!(is_aligned(offset_align, PAGE_SIZE));
-        self.page_count += 1;
-        let page = self.alloc(state);
-        let page_cache = self.inner.entry(file.clone()).or_insert_with(HashMap::new);
-        if let Some(_) = page_cache.get(&offset_align) {
-            panic!(
-                "[PageCacheManager: alloc_page_mut] file: {}, offset: {} already exists",
-                file.name(),
-                offset_align
-            );
-        } else {
-            debug!(
-                "[PageCacheManager: alloc_page_mut] file: {}, offset: {}",
-                file.name(),
-                offset_align
-            );
-            assert!(page_cache.insert(offset_align, page).is_none());
-            page_cache
-                .get_mut(&offset_align)
-                .expect("[PageCacheManager: alloc_page_mut] page not found")
-        }
+        self.inner
+            .entry(file.clone())
+            .or_insert_with(HashMap::new)
+            .insert(offset_align, page);
     }
 
     pub fn mark_deleted(&mut self, file: &Arc<dyn File>) {
@@ -223,6 +186,5 @@ pub fn get_pagecache_rguard() -> RwLockReadGuard<'static, PageCacheManager> {
 
 #[inline(always)]
 pub fn get_pagecache_wguard() -> RwLockWriteGuard<'static, PageCacheManager> {
-    // FIXME: has deadlock risk !!
     PAGE_CACHE_MANAGER.write()
 }

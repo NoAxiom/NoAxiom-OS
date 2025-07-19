@@ -4,6 +4,8 @@ use core::{
     task::{Context, Poll},
 };
 
+use ::arch::{Arch, ArchInt};
+
 /// BlockWaker do nothing since we always poll the future
 struct BlockWaker;
 impl Wake for BlockWaker {
@@ -19,7 +21,12 @@ pub fn block_on<T>(future: impl Future<Output = T>) -> T {
     let mut future = Box::pin(future);
     let waker = Arc::new(BlockWaker).into();
     let mut cx = Context::from_waker(&waker);
+
     loop {
+        if !Arch::is_external_interrupt_enabled() {
+            Arch::enable_external_interrupt();
+        }
+
         if let Poll::Ready(res) = future.as_mut().poll(&mut cx) {
             return res;
         }

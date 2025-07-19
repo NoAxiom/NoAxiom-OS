@@ -87,7 +87,9 @@ pub fn run_tasks() -> ! {
     info!("[kernel] hart {} has been booted", get_hartid());
     loop {
         timer_handler();
+        // todo: can we improve the following interrupt check code?
         Arch::enable_interrupt();
+        Arch::enable_external_interrupt();
         #[cfg(feature = "debug_sig")]
         {
             use crate::utils::crossover::intermit;

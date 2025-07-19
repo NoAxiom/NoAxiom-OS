@@ -3,6 +3,10 @@ name = "driver"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+intable = []
+default = []
+
 [dependencies]
 include = { workspace = true }
 arch = { workspace = true }

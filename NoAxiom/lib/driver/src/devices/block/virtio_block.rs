@@ -1,22 +1,24 @@
 use alloc::boxed::Box;
-use core::task::Waker;
+use core::{
+    future::Future,
+    task::{Poll, Waker},
+};
 
 use arch::{Arch, ArchInt};
 use async_trait::async_trait;
-use kfuture::{suspend::SuspendFuture, take_waker::TakeWakerFuture};
-use ksync::{async_mutex::AsyncMutex, cell::SyncUnsafeCell};
+use ksync::{
+    async_mutex::{AsyncMutex, AsyncMutexGuard},
+    cell::SyncUnsafeCell,
+};
 use virtio_drivers::{
     device::blk::{BlkReq, BlkResp, RespStatus, VirtIOBlk},
     transport::Transport,
 };
 
-use crate::{
-    devices::{
-        block::BlockDevice,
-        hal::{dev_err, VirtioHalImpl},
-        DevResult,
-    },
-    plic::{disable_blk_irq, enable_blk_irq},
+use crate::devices::{
+    block::BlockDevice,
+    hal::{dev_err, VirtioHalImpl},
+    DevResult,
 };
 
 struct VirioBlkInner<T: Transport> {
@@ -85,7 +87,6 @@ impl<T: Transport> VirioBlkInner<T> {
 pub struct VirtioBlockDevice<T: Transport> {
     inner: AsyncMutex<VirioBlkInner<T>>,
     waker: SyncUnsafeCell<Option<Waker>>,
-    irq: SyncUnsafeCell<bool>,
 }
 
 impl<T: Transport> VirtioBlockDevice<T> {
@@ -96,31 +97,14 @@ impl<T: Transport> VirtioBlockDevice<T> {
                 blk: VirtIOBlk::new(transport).expect("Failed to create VirtIOBlk"),
             }),
             waker: SyncUnsafeCell::new(None),
-            irq: SyncUnsafeCell::new(true),
         }
-    }
-    fn save(&self, waker: Waker) {
-        assert!(self.waker.as_ref_mut().replace(waker).is_none());
     }
     fn wake(&self) {
         if let Some(waker) = self.waker.as_ref_mut().take() {
+            log::error!("wake waker");
             waker.wake();
         } else {
-            panic!("No waker to wake up!");
-        }
-    }
-    pub fn disable_irq(&self) {
-        let irq = self.irq.get();
-        if unsafe { *irq } {
-            unsafe { *irq = false };
-            disable_blk_irq();
-        }
-    }
-    pub fn enable_irq(&self) {
-        let irq = self.irq.get();
-        if !unsafe { *irq } {
-            unsafe { *irq = true };
-            enable_blk_irq();
+            log::error!("No waker to wake up!");
         }
     }
 }
@@ -136,56 +120,161 @@ impl<T: Transport + Send> BlockDevice for VirtioBlockDevice<T> {
     }
     fn sync_read(&self, id: usize, buf: &mut [u8]) -> DevResult<usize> {
         let mut inner = self.inner.spin_lock();
-        // self.disable_irq();
         let res = inner.sync_read(id, buf);
-        // self.enable_irq();
         res
     }
     fn sync_write(&self, id: usize, buf: &[u8]) -> DevResult<usize> {
         let mut inner = self.inner.spin_lock();
-        // self.disable_irq();
         let res = inner.sync_write(id, buf);
-        // self.enable_irq();
         res
     }
     async fn read(&self, id: usize, buf: &mut [u8]) -> DevResult<usize> {
         if buf.len() <= 2048 {
-            return Ok(self.sync_read(id, buf).unwrap());
+            return self.sync_read(id, buf);
         }
-        let mut inner = self.inner.lock().await;
-        let mut request = BlkReq::default();
-        let mut response = BlkResp::default();
+        let inner = self.inner.lock().await;
+        let request = BlkReq::default();
+        let response = BlkResp::default();
 
-        Arch::disable_external_interrupt();
-        let token = inner
-            .read_req(id, &mut request, buf, &mut response)
-            .unwrap();
-        self.save(TakeWakerFuture.await);
-        SuspendFuture::new().await; // Wait for an interrupt to tell us that the request completed...
-        inner
-            .read_response(token, &request, buf, &mut response)
-            .unwrap();
-
-        Ok(buf.len())
+        ReadFuture::new(id, request, buf, response, inner, self.waker.as_ref_mut()).await
     }
     async fn write(&self, id: usize, buf: &[u8]) -> DevResult<usize> {
         if buf.len() <= 2048 {
-            return Ok(self.sync_write(id, buf).unwrap());
+            return self.sync_write(id, buf);
         }
-        let mut inner = self.inner.lock().await;
-        let mut request = BlkReq::default();
-        let mut response = BlkResp::default();
+        let inner = self.inner.lock().await;
+        let request = BlkReq::default();
+        let response = BlkResp::default();
 
-        Arch::disable_external_interrupt();
-        let token = inner
-            .write_req(id, &mut request, buf, &mut response)
-            .unwrap();
-        self.save(TakeWakerFuture.await);
-        SuspendFuture::new().await; // Wait for an interrupt to tell us that the request completed...
-        inner
-            .write_response(token, &request, buf, &mut response)
-            .unwrap();
+        WriteFuture::new(id, request, buf, response, inner, self.waker.as_ref_mut()).await
+    }
+}
 
-        Ok(buf.len())
+struct ReadFuture<'a, T: Transport> {
+    id: usize,
+    request: BlkReq,
+    buffer: &'a mut [u8],
+    response: BlkResp,
+    sent: bool,
+    token: u16,
+    guard: AsyncMutexGuard<'a, VirioBlkInner<T>>,
+    waker: &'a mut Option<Waker>,
+}
+
+impl<'a, T: Transport> ReadFuture<'a, T> {
+    fn new(
+        id: usize,
+        request: BlkReq,
+        buffer: &'a mut [u8],
+        response: BlkResp,
+        guard: AsyncMutexGuard<'a, VirioBlkInner<T>>,
+        waker: &'a mut Option<Waker>,
+    ) -> Self {
+        Self {
+            id,
+            request,
+            buffer,
+            response,
+            sent: false,
+            token: 0,
+            guard,
+            waker,
+        }
+    }
+}
+
+impl<'a, T: Transport> Future for ReadFuture<'a, T> {
+    type Output = DevResult<usize>;
+
+    fn poll(
+        self: core::pin::Pin<&mut Self>,
+        cx: &mut core::task::Context<'_>,
+    ) -> core::task::Poll<Self::Output> {
+        let this = self.get_mut();
+        if !this.sent {
+            this.sent = true;
+            *this.waker = Some(cx.waker().clone());
+            Arch::disable_external_interrupt();
+            this.token = this
+                .guard
+                .read_req(this.id, &mut this.request, this.buffer, &mut this.response)
+                .unwrap();
+            return Poll::Pending;
+        }
+
+        if let Ok(_) =
+            this.guard
+                .read_response(this.token, &this.request, this.buffer, &mut this.response)
+        {
+            Poll::Ready(Ok(this.buffer.len()))
+        } else {
+            *this.waker = Some(cx.waker().clone());
+            Poll::Pending
+        }
+    }
+}
+
+struct WriteFuture<'a, T: Transport> {
+    id: usize,
+    request: BlkReq,
+    buffer: &'a [u8],
+    response: BlkResp,
+    sent: bool,
+    token: u16,
+    guard: AsyncMutexGuard<'a, VirioBlkInner<T>>,
+    waker: &'a mut Option<Waker>,
+}
+
+impl<'a, T: Transport> WriteFuture<'a, T> {
+    fn new(
+        id: usize,
+        request: BlkReq,
+        buffer: &'a [u8],
+        response: BlkResp,
+        guard: AsyncMutexGuard<'a, VirioBlkInner<T>>,
+        waker: &'a mut Option<Waker>,
+    ) -> Self {
+        Self {
+            id,
+            request,
+            buffer,
+            response,
+            sent: false,
+            token: 0,
+            guard,
+            waker,
+        }
+    }
+}
+
+impl<'a, T: Transport> Future for WriteFuture<'a, T> {
+    type Output = DevResult<usize>;
+
+    fn poll(
+        self: core::pin::Pin<&mut Self>,
+        cx: &mut core::task::Context<'_>,
+    ) -> core::task::Poll<Self::Output> {
+        let this = self.get_mut();
+        if !this.sent {
+            this.sent = true;
+            *this.waker = Some(cx.waker().clone());
+            Arch::disable_external_interrupt();
+            this.token = this
+                .guard
+                .write_req(this.id, &mut this.request, this.buffer, &mut this.response)
+                .unwrap();
+            // HERE cannot receive the interrupt
+            return Poll::Pending;
+        }
+
+        if let Ok(_) =
+            this.guard
+                .write_response(this.token, &this.request, this.buffer, &mut this.response)
+        {
+            Poll::Ready(Ok(this.buffer.len()))
+        } else {
+            *this.waker = Some(cx.waker().clone());
+            Poll::Pending
+        }
     }
 }

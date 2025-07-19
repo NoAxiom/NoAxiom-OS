@@ -368,6 +368,7 @@ impl dyn Dentry {
             let mut w_guard = crate::fs::pagecache::get_pagecache_wguard();
             let file = self.clone().open()?;
             w_guard.mark_deleted(&file);
+            drop(w_guard);
             self.set_inode_none();
             inode.set_state(InodeState::Deleted).await;
             // parent.remove_child(&self.name()).unwrap();
