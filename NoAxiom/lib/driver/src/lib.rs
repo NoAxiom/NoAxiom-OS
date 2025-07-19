@@ -27,6 +27,10 @@ pub fn init(dtb: usize) {
     {
         plic::init();
         plic::disable_blk_irq();
+        #[cfg(feature = "intable")]
+        {
+            plic::enable_blk_irq();
+        }
     }
 }
 
@@ -48,10 +52,12 @@ pub fn get_display_dev() -> Arc<&'static dyn DisplayDevice> {
     Arc::clone(DISPLAY_DEV.get().unwrap())
 }
 
+#[cfg(target_arch = "riscv64")]
 pub fn handle_irq() {
     use arch::{Arch, ArchInt};
     assert!(!Arch::is_interrupt_enabled());
     let irq = plic::claim();
+    log::error!("[driver] handle irq: {}", irq);
     if irq == 1 {
         get_blk_dev()
             .handle_interrupt()
@@ -60,7 +66,13 @@ pub fn handle_irq() {
         log::error!("[driver] unhandled irq: {}", irq);
     }
     plic::complete(irq);
+    log::error!("[driver] handle irq: {} finished", irq);
     assert!(!Arch::is_interrupt_enabled());
+}
+
+#[cfg(target_arch = "loongarch64")]
+pub fn handle_irq() {
+    unimplemented!("LoongArch64 does not support IRQ handling yet");
 }
 
 /// just for test blk_dev and return `!`

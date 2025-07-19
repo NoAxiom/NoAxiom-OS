@@ -232,16 +232,12 @@ impl dyn File {
                 PageState::Shared
             };
             let mut w_guard = get_pagecache_wguard();
-            let new_page = w_guard.alloc_page_mut(&self.clone(), offset_align, page_state);
-            self.base_read(offset_align, new_page.as_mut_bytes_array())
+            let page = w_guard.alloc(page_state);
+            drop(w_guard);
+            self.base_read(offset_align, page.as_mut_bytes_array())
                 .await?;
-            // debug!(
-            //     "[read_at] {} at {offset_align}, file_ino: {}, file_size: {},
-            // content: {:?}",     self.name(),
-            //     self.meta().inode.id(),
-            //     size,
-            //     &new_page.as_mut_bytes_array()[..10]
-            // );
+            let mut w_guard = get_pagecache_wguard();
+            w_guard.fill_page(&self.clone(), offset_align, page);
         }
 
         Ok((current_offset - offset) as isize)
@@ -304,13 +300,6 @@ impl dyn File {
                     );
                 }
                 page.mark_dirty();
-                // debug!(
-                //     "[write_at] {} at {offset_align}, file_ino: {}, file_size: {}, content:
-                // {:?}",     self.name(),
-                //     self.meta().inode.id(),
-                //     size,
-                //     &page.as_mut_bytes_array()[..10],
-                // );
 
                 buf = &buf[len..];
                 current_offset += len;
@@ -327,10 +316,8 @@ impl dyn File {
             } else {
                 PageState::Shared
             };
-            let new_page = w_guard.alloc_page_mut(&self.clone(), offset_align, page_state);
-            // todo: maybe can not read !!
-            self.base_read(offset_align, new_page.as_mut_bytes_array())
-                .await?;
+            let page = w_guard.alloc(page_state);
+            w_guard.fill_page(&self.clone(), offset_align, page);
         }
 
         Ok(ret as isize)

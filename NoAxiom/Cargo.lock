@@ -610,6 +610,10 @@ dependencies = [
 [[package]]
 name = "kfuture"
 version = "0.1.0"
+dependencies = [
+ "arch",
+ "log",
+]
 
 [[package]]
 name = "ksync"
