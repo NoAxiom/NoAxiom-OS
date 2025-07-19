@@ -6,8 +6,7 @@
     "qemu",
     "busybox",
     "log_print",
-    "debug_sig",
-    "full_func"
+    "debug_sig"
   ],
   "rust-analyzer.linkedProjects": [
     "${workspaceFolder}/NoAxiom/Cargo.toml"
