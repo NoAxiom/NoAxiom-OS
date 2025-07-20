@@ -10,6 +10,8 @@ runtests = []
 qemu = ["platform/qemu"]
 debug_sig = []                   #["console/debug_sig"]
 log_print = ["debug_sig"]
+final_test = []
+default = ["final_test"]
 
 [dependencies]
 # extern libs

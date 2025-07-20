@@ -84,7 +84,7 @@ impl PageCacheManager {
 
     // todo: use more efficient strategy to clean
     fn clean(&mut self, thresold: usize) {
-        error!("[PageCacheManager: clean], thresold: {}", thresold);
+        warn!("[PageCacheManager: clean], thresold: {}", thresold);
         let mut count = 0;
         for (file, page_cache) in self.inner.iter_mut() {
             debug!(
@@ -153,12 +153,6 @@ impl PageCacheManager {
                 return Some(page);
             }
         }
-
-        debug!(
-            "[PageCacheManager: get_page_mut] file: {}, offset: {} fail",
-            file.name(),
-            offset_align,
-        );
         None
     }
 

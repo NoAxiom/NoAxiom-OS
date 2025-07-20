@@ -10,14 +10,33 @@ fn main() {
 }
 
 static TARGET_PATH: &str = "../NoAxiom-OS-User/bin/";
+static FINAL_TARGET_PATH: &str = "../NoAxiom-OS-Test/official/final-bin/";
 
 fn insert_app_data() -> Result<()> {
     let mut f = File::create("src/link_apps.S").unwrap();
-    let mut apps: Vec<String> = read_dir("../../NoAxiom-OS-User/bin")?
+    let mut apps: Vec<(String, String)> = read_dir("../../NoAxiom-OS-User/bin")?
         .filter_map(|entry| entry.ok())
-        .map(|entry| entry.file_name().into_string().unwrap())
+        .map(|entry| {
+            (
+                entry.file_name().into_string().unwrap(),
+                TARGET_PATH.to_string(),
+            )
+        })
         .collect();
     apps.sort();
+    let mut final_apps: Vec<(String, String)> =
+        read_dir("../../NoAxiom-OS-Test/official/final-bin")?
+            .filter_map(|entry| entry.ok())
+            .map(|entry| {
+                (
+                    entry.file_name().into_string().unwrap(),
+                    FINAL_TARGET_PATH.to_string(),
+                )
+            })
+            .collect();
+    final_apps.sort();
+
+    apps.extend(final_apps);
 
     writeln!(
         f,
@@ -30,7 +49,7 @@ _num_app:
         apps.len() * 2
     )?;
 
-    for app in apps.iter() {
+    for (app, _) in apps.iter() {
         writeln!(f, r#"    .quad {}_start"#, app)?;
         writeln!(f, r#"    .quad {}_end"#, app)?;
     }
@@ -41,11 +60,11 @@ _num_app:
     .global _app_names
 _app_names:"#
     )?;
-    for app in apps.iter() {
+    for (app, _) in apps.iter() {
         writeln!(f, r#"    .string "{}""#, app)?;
     }
 
-    for (idx, app) in apps.iter().enumerate() {
+    for (idx, (app, target)) in apps.iter().enumerate() {
         println!("app_{}: {}", idx, app);
         writeln!(
             f,
@@ -57,7 +76,7 @@ _app_names:"#
 {0}_start:
     .incbin "{1}{0}"
 {0}_end:"#,
-            app, TARGET_PATH
+            app, target
         )?;
     }
     Ok(())
