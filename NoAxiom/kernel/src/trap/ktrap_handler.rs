@@ -15,10 +15,7 @@ pub fn kernel_trap_handler() {
     let trap_type = Arch::read_trap_type(None);
     match trap_type {
         TrapType::Exception(exception) => kernel_exception_handler(exception),
-        TrapType::Interrupt(interrupt) => {
-            inc_interrupts_count();
-            kernel_interrupt_handler(interrupt)
-        }
+        TrapType::Interrupt(interrupt) => kernel_interrupt_handler(interrupt),
         TrapType::None => {}
         TrapType::Unknown => panic!("unsupported trap type"),
     }
@@ -55,8 +52,17 @@ fn kernel_exception_handler(exception: ExceptionType) {
 fn kernel_interrupt_handler(interrupt: InterruptType) {
     use InterruptType::*;
     match interrupt {
-        SupervisorExternal(_) => ext_int_handler(),
-        Timer(_) => kernel_timer_trap_handler(),
-        SupervisorSoft(_) => ipi_handler(),
+        SupervisorExternal(id) => {
+            inc_interrupts_count(id);
+            ext_int_handler()
+        }
+        Timer(id) => {
+            inc_interrupts_count(id);
+            kernel_timer_trap_handler()
+        }
+        SupervisorSoft(id) => {
+            inc_interrupts_count(id);
+            ipi_handler()
+        }
     }
 }

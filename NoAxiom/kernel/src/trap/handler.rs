@@ -112,32 +112,34 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
             }
         },
         TrapType::Interrupt(int) => {
-            inc_interrupts_count();
             match int {
                 // interrupt
-                InterruptType::Timer(_) => {
+                InterruptType::Timer(id) => {
                     // trace!(
                     //     "[SupervisorTimer] hart: {}, tid: {}",
                     //     get_hartid(),
                     //     task.tid(),
                     // );
+                    inc_interrupts_count(id);
                     set_next_trigger(None);
                     task.yield_now().await;
                 }
-                InterruptType::SupervisorExternal(_) => {
+                InterruptType::SupervisorExternal(id) => {
                     // trace!(
                     //     "[SupervisorExternal] interrupted at hart: {}, tid: {}",
                     //     get_hartid(),
                     //     task.tid(),
                     // );
+                    inc_interrupts_count(id);
                     ext_int_handler();
                 }
-                InterruptType::SupervisorSoft(_) => {
+                InterruptType::SupervisorSoft(id) => {
                     // trace!(
                     //     "[SupervisorSoft] interrupted at hart: {}, tid: {}",
                     //     get_hartid(),
                     //     task.tid(),
                     // );
+                    inc_interrupts_count(id);
                     ipi_handler();
                 }
             };

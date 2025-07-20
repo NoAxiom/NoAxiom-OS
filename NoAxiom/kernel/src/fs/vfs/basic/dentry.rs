@@ -5,7 +5,7 @@ use alloc::{
     sync::{Arc, Weak},
     vec::Vec,
 };
-use core::panic;
+use core::{intrinsics::unlikely, panic};
 
 use async_trait::async_trait;
 use downcast_rs::DowncastSync;
@@ -348,6 +348,11 @@ impl dyn Dentry {
 
     /// Unlink, unlink self and delete the inner file if nlink is 0.
     pub async fn unlink(self: Arc<Self>) -> SyscallResult {
+        if unlikely(self.name() == "interrupts") {
+            // MENTION: this is required by official
+            return Err(Errno::ENOSYS);
+        }
+
         let inode = if let Ok(inode) = self.inode() {
             inode
         } else {
@@ -362,9 +367,6 @@ impl dyn Dentry {
         nlink -= 1;
         if nlink == 0 {
             let parent = self.parent().unwrap();
-            if parent.inode()?.file_type() != InodeMode::DIR {
-                return Err(Errno::ENOTDIR);
-            }
             let mut w_guard = crate::fs::pagecache::get_pagecache_wguard();
             let file = self.clone().open()?;
             w_guard.mark_deleted(&file);

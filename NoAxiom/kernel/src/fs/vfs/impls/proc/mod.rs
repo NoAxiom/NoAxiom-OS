@@ -73,7 +73,7 @@ pub async fn init(fs_root: Arc<dyn Dentry>) -> SysResult<()> {
     ));
     let interrupts_inode = Arc::new(InterruptsInode::new(fs_root.super_block()));
     interrupts_dentry.set_inode(interrupts_inode);
-    sys_dentry.add_child_directly(interrupts_dentry);
+    fs_root.add_child_directly(interrupts_dentry);
 
     info!("[fs] create /proc/sys/kernel/pid_max, write 32768");
     let kernel_inode = Arc::new(RamFsDirInode::new(sys_dentry.super_block(), 0));

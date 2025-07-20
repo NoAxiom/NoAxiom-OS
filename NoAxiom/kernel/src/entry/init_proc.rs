@@ -46,17 +46,39 @@ pub fn schedule_spawn_with_path() {
 
         #[cfg(feature = "final_test")]
         {
-            const LIBS: &[&str] = &["/glibc", "/musl"];
-            for lib in LIBS {
-                for name in FINAL_TESTS {
-                    let path_str = format!("{}/{}", *lib, *name);
-                    let path = Path::from_or_create(path_str, InodeMode::FILE)
-                        .await
-                        .unwrap();
-                    let file = path.dentry().open().unwrap();
-                    let content = get_content(*name);
-                    file.write_at(0, content).await.unwrap();
-                }
+            for name in FINAL_TESTS {
+                use alloc::string::ToString as _;
+
+                #[cfg(target_arch = "riscv64")]
+                let arch = "rv";
+                #[cfg(target_arch = "loongarch64")]
+                let arch = "la";
+
+                let musl_end = format!("_{}_musl", arch);
+                let glibc_end = format!("_{}_glibc", arch);
+
+                let path_str = if (*name).ends_with(&musl_end) {
+                    format!("/musl/{}", *name)
+                } else if (*name).ends_with(&glibc_end) {
+                    format!("/glibc/{}", *name)
+                } else {
+                    continue;
+                };
+
+                let path_str = if path_str.ends_with(&musl_end) {
+                    path_str.trim_end_matches(&musl_end)
+                } else if path_str.ends_with(&glibc_end) {
+                    path_str.trim_end_matches(&glibc_end)
+                } else {
+                    unreachable!("Unknown app name: {}", name);
+                };
+
+                let path = Path::from_or_create(path_str.to_string(), InodeMode::FILE)
+                    .await
+                    .unwrap();
+                let file = path.dentry().open().unwrap();
+                let content = get_content(*name);
+                file.write_at(0, content).await.unwrap();
             }
         }
     });
