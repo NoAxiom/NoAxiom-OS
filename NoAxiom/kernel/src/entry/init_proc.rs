@@ -6,21 +6,6 @@ use crate::{
     task::Task,
 };
 
-// just for simple, todo: use macro
-fn get_content(name: &str) -> &'static [u8] {
-    match name {
-        #[cfg(feature = "busybox")]
-        "run_busybox" => run_busybox_get_content(),
-        #[cfg(feature = "runtests")]
-        "run_tests" => run_tests_get_content(),
-        #[cfg(feature = "final_test")]
-        "interrupts_test_1_rv_musl" => interrupts_test_1_rv_musl_get_content(),
-        #[cfg(feature = "final_test")]
-        "interrupts_test_2_rv_musl" => interrupts_test_2_rv_musl_get_content(),
-        _ => panic!("Unknown app name: {}", name),
-    }
-}
-
 /// spawn init process
 #[allow(unused)]
 pub fn schedule_spawn_with_path() {
@@ -121,6 +106,19 @@ macro_rules! use_apps {
     };
 }
 
+macro_rules! gen_get_content {
+    ($($name:literal),+ $(,)?) => {
+        fn get_content(name: &str) -> &'static [u8] {
+            match name {
+                $(
+                    $name => paste::paste! { [<$name _get_content>]() },
+                )+
+                _ => panic!("Unknown app name: {}", name),
+            }
+        }
+    };
+}
+
 #[cfg(feature = "busybox")]
 use_app!("run_busybox", "init_proc");
 
@@ -128,4 +126,21 @@ use_app!("run_busybox", "init_proc");
 use_app!("run_tests", "init_proc");
 
 #[cfg(feature = "final_test")]
-use_apps!("interrupts_test_1_rv_musl", "interrupts_test_2_rv_musl");
+use_apps!(
+    "interrupts_test_1_rv_musl",
+    "interrupts_test_2_rv_musl",
+    "copy_file_range_test_1_rv_musl",
+    "copy_file_range_test_2_rv_musl",
+    "copy_file_range_test_3_rv_musl",
+    "copy_file_range_test_4_rv_musl"
+);
+
+gen_get_content!(
+    "run_tests",
+    "interrupts_test_1_rv_musl",
+    "interrupts_test_2_rv_musl",
+    "copy_file_range_test_1_rv_musl",
+    "copy_file_range_test_2_rv_musl",
+    "copy_file_range_test_3_rv_musl",
+    "copy_file_range_test_4_rv_musl",
+);

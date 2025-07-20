@@ -920,6 +920,7 @@ impl Syscall<'_> {
             file.write_at(length, &[0u8; 1]).await?;
             Ok(0)
         } else {
+            file.truncate_pagecache(length);
             file.inode().set_size(length);
             file.inode().truncate(length).await?;
             Ok(0)
@@ -1071,6 +1072,94 @@ impl Syscall<'_> {
             return Err(Errno::EACCES);
         }
         Ok(0)
+    }
+
+    pub async fn sys_copy_file_range(
+        &self,
+        fd_in: usize,
+        off_in: usize,
+        fd_out: usize,
+        off_out: usize,
+        len: usize,
+        flags: i32,
+    ) -> SyscallResult {
+        if flags != 0 {
+            return Err(Errno::EINVAL);
+        }
+        let fd_table = self.task.fd_table();
+        let in_file = fd_table.get(fd_in).ok_or(Errno::EBADF)?;
+        let out_file = fd_table.get(fd_out).ok_or(Errno::EBADF)?;
+        drop(fd_table);
+
+        if !in_file.meta().readable() || !out_file.meta().writable() {
+            return Err(Errno::EBADF);
+        }
+        let off_in = UserPtr::<u32>::new(off_in);
+        let off_in = off_in.get_ref_mut().await?;
+        let off_out = UserPtr::<u32>::new(off_out);
+        let off_out = off_out.get_ref_mut().await?;
+
+        info!(
+            "[sys_copy_file_range] fd_in: {}, off_in: {:?}, offset: {}, size: {}   fd_out: {}, off_out: {:?}, offset: {}, size: {}, len: {}",
+            fd_in,
+            off_in,
+            in_file.pos(),
+            in_file.size(),
+            fd_out,
+            off_out,
+            out_file.pos(),
+            out_file.size(),
+            len
+        );
+
+        // the write will always be successful
+        let in_file_size = in_file.size();
+        let in_file_offset = in_file.pos();
+        let ret_len = if off_in.is_none() {
+            if in_file_size <= in_file_offset {
+                return Ok(0);
+            }
+            in_file_size - in_file_offset
+        } else {
+            let off_in_value = **(off_in.as_ref().unwrap()) as usize;
+            if in_file_size <= off_in_value {
+                return Ok(0);
+            }
+            in_file_size - off_in_value
+        };
+        let ret_len = ret_len.min(len);
+
+        let mut buf = vec![0u8; ret_len];
+        if off_in.is_none() {
+            in_file.read(&mut buf).await?;
+        } else {
+            in_file
+                .read_at(**(off_in.as_ref().unwrap()) as usize, &mut buf)
+                .await?;
+            *off_in.unwrap() += ret_len as u32;
+        }
+
+        if off_out.is_none() {
+            out_file.write(&buf).await?;
+        } else {
+            out_file
+                .write_at(**(off_out.as_ref().unwrap()) as usize, &buf)
+                .await?;
+            *off_out.unwrap() += ret_len as u32;
+        }
+
+        debug!(
+            "[sys_copy_file_range] fd_in: {}, off_in: xx, offset: {}, size: {}   fd_out: {}, off_out: xx, offset: {}, size: {}, len: {}",
+            fd_in,
+            in_file.pos(),
+            in_file.size(),
+            fd_out,
+            out_file.pos(),
+            out_file.size(),
+            len
+        );
+
+        Ok(ret_len as isize)
     }
 }
 

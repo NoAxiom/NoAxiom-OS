@@ -259,6 +259,10 @@ impl dyn File {
     ///
     /// return the exact num of bytes write
     pub async fn write_at(self: &Arc<dyn File>, offset: usize, buf: &[u8]) -> SyscallResult {
+        if buf.is_empty() {
+            return Ok(0);
+        }
+
         let page_cache = self.page_cache();
         if page_cache.is_none() {
             assert_no_lock!();
@@ -332,6 +336,9 @@ impl dyn File {
     pub fn name(&self) -> String {
         self.dentry().name()
     }
+    pub fn pos(&self) -> usize {
+        self.meta().pos.load(Ordering::SeqCst)
+    }
     pub fn flags(&self) -> MutexGuard<'_, FileFlags> {
         self.meta().flags.lock()
     }
@@ -340,6 +347,11 @@ impl dyn File {
     }
     pub fn inode(&self) -> Arc<dyn Inode> {
         self.meta().inode.clone()
+    }
+
+    pub fn truncate_pagecache(self: &Arc<dyn File>, length: usize) {
+        let mut w_guard = get_pagecache_wguard();
+        w_guard.truncate(&self.clone(), length);
     }
 
     /// Reference: Phoenix  

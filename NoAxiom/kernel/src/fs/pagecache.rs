@@ -171,6 +171,15 @@ impl PageCacheManager {
             })
         });
     }
+
+    pub fn truncate(&mut self, file: &Arc<dyn File>, length: usize) {
+        if let Some(page_cache) = self.inner.get_mut(file) {
+            let init_size = page_cache.len();
+            page_cache.retain(|&offset, _| offset < length);
+            let removed = init_size - page_cache.len();
+            self.page_count -= removed;
+        }
+    }
 }
 
 #[inline(always)]
