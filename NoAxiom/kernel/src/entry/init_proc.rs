@@ -132,7 +132,8 @@ use_apps!(
     "copy_file_range_test_1_rv_musl",
     "copy_file_range_test_2_rv_musl",
     "copy_file_range_test_3_rv_musl",
-    "copy_file_range_test_4_rv_musl"
+    "copy_file_range_test_4_rv_musl",
+    "test_splice_rv_musl"
 );
 
 gen_get_content!(
@@ -143,4 +144,5 @@ gen_get_content!(
     "copy_file_range_test_2_rv_musl",
     "copy_file_range_test_3_rv_musl",
     "copy_file_range_test_4_rv_musl",
+    "test_splice_rv_musl",
 );
