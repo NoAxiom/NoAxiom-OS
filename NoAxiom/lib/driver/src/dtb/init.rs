@@ -43,14 +43,19 @@ pub fn dtb_init(dtb: usize) {
         } else {
             log::info!("   {}", node.name);
         }
+        let mut flag = false;
         for func in DTB_INITIALIZERS {
             if func(&node, &mut info) {
-                continue;
+                flag = true;
+                break;
             }
+        }
+        if flag {
+            continue;
         }
         for func in ARCH_DTB_INITIALIZERS {
             if func(&node, &mut info) {
-                continue;
+                break;
             }
         }
     }
