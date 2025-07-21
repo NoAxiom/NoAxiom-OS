@@ -6,32 +6,28 @@ use alloc::sync::Arc;
 
 use ksync::{assert_no_lock, Once};
 
-use crate::devices::{block::BlockDevice, gpu::DisplayDevice, net::NetWorkDevice};
+use crate::{
+    archs::arch_driver_init,
+    bus::bus_init,
+    devices::{block::BlockDevice, gpu::DisplayDevice, net::NetWorkDevice},
+    dtb::init::dtb_init,
+};
+extern crate alloc;
 
+mod archs;
 mod bus;
 pub mod devices;
 mod dtb;
-#[cfg(target_arch = "riscv64")]
-mod plic;
+mod irq;
 
-extern crate alloc;
+pub use irq::handle_irq;
 
 pub fn init(dtb: usize) {
     let dtb = dtb | arch::consts::KERNEL_ADDR_OFFSET;
     log::debug!("[driver] init with dtb: {:#x}", dtb);
-    dtb::init(dtb);
-    bus::probe_bus();
-
-    // the plic is used only for riscv64 arch
-    #[cfg(target_arch = "riscv64")]
-    {
-        plic::init();
-        plic::disable_blk_irq();
-        #[cfg(feature = "intable")]
-        {
-            plic::enable_blk_irq();
-        }
-    }
+    dtb_init(dtb);
+    bus_init();
+    arch_driver_init();
 }
 
 lazy_static::lazy_static! {
@@ -50,29 +46,6 @@ pub fn get_net_dev() -> Arc<&'static dyn NetWorkDevice> {
 
 pub fn get_display_dev() -> Arc<&'static dyn DisplayDevice> {
     Arc::clone(DISPLAY_DEV.get().unwrap())
-}
-
-#[cfg(target_arch = "riscv64")]
-pub fn handle_irq() {
-    use arch::{Arch, ArchInt};
-    assert!(!Arch::is_interrupt_enabled());
-    let irq = plic::claim();
-    log::error!("[driver] handle irq: {}", irq);
-    if irq == 1 {
-        get_blk_dev()
-            .handle_interrupt()
-            .expect("handle interrupt error");
-    } else {
-        log::error!("[driver] unhandled irq: {}", irq);
-    }
-    plic::complete(irq);
-    log::error!("[driver] handle irq: {} finished", irq);
-    assert!(!Arch::is_interrupt_enabled());
-}
-
-#[cfg(target_arch = "loongarch64")]
-pub fn handle_irq() {
-    unimplemented!("LoongArch64 does not support IRQ handling yet");
 }
 
 /// just for test blk_dev and return `!`

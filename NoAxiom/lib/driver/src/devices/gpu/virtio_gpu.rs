@@ -9,7 +9,7 @@ use virtio_drivers::{
 };
 
 use super::DisplayDevice;
-use crate::{devices::hal::VirtioHalImpl, dtb::dtb_info};
+use crate::{devices::hal::VirtioHalImpl, dtb::basic::dtb_info};
 
 /// Virtio GPU device at MMIO bus
 pub struct VirtioGpu {

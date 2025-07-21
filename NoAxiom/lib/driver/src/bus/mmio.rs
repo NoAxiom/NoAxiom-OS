@@ -3,7 +3,7 @@ use core::ptr::NonNull;
 use ksync::Lazy;
 use virtio_drivers::transport::mmio::{MmioTransport, VirtIOHeader};
 
-use crate::{devices::block::virtio_block::VirtioBlockDevice, dtb::dtb_info};
+use crate::{devices::block::virtio_block::VirtioBlockDevice, dtb::basic::dtb_info};
 
 static MMIO_BLOCK_DEVICE: Lazy<Option<VirtioBlockDevice<MmioTransport>>> = Lazy::new(|| {
     let dtb_info = dtb_info();

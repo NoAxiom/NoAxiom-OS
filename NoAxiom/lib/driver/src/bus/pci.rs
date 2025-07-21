@@ -16,7 +16,7 @@ use virtio_drivers::transport::{
 use super::pci_driver::PciRangeAllocator;
 use crate::{
     devices::{block::virtio_block::VirtioBlockDevice, hal::VirtioHalImpl, DevResult},
-    dtb::dtb_info,
+    dtb::basic::dtb_info,
 };
 
 pub fn probe_pcibus_devices() -> Option<&'static VirtioBlockDevice<PciTransport>> {
