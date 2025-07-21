@@ -138,11 +138,13 @@ run: backup
 	@$(QEMU) $(QFLAGS) $(RUN_OPTION)
 	@echo -e $(NORMAL)"Qemu exited. Log is saved to: $(LOG_SAVE_PATH)"$(RESET)
 
-qemu-dtb:
-	@rm -f log/qemu.dtb log/qemu.dts
-	$(QEMU) $(QFLAGS) -machine dumpdtb=log/qemu.dtb
-	@dtc -o log/qemu.dts -O dts -I dtb log/qemu.dtb
-	@echo "QEMU DTS files have been generated in log/qemu.dts"
+QEMU_DTB = log/qemu-$(ARCH_NAME).dtb
+QEMU_DTS = log/qemu-$(ARCH_NAME).dts
+qemu-dumpdtb:
+	@rm -f $(QEMU_DTS) $(QEMU_DTB)
+	$(QEMU) $(QFLAGS) -machine dumpdtb=$(QEMU_DTB)
+	@dtc -o $(QEMU_DTS) -O dts -I dtb $(QEMU_DTB)
+	@echo "QEMU DTS files have been generated in $(QEMU_DTS)"
 
 gdb-server: backup build
 	$(QEMU) $(QFLAGS) -s -S
