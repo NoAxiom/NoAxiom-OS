@@ -1,6 +1,4 @@
-use fdt::node::FdtNode;
-
-use crate::{dtb::basic::DtbInfo, get_blk_dev};
+use crate::get_blk_dev;
 
 mod plic;
 
@@ -29,15 +27,3 @@ pub fn arch_handle_irq() {
     log::error!("[driver] handle irq: {} finished", irq);
     assert!(!Arch::is_interrupt_enabled());
 }
-
-pub struct ArchDtbInfo {
-    pub plic: usize,
-}
-
-impl ArchDtbInfo {
-    pub fn new(plic: usize) -> Self {
-        Self { plic }
-    }
-}
-
-pub static ARCH_DTB_INITIALIZERS: &[fn(&FdtNode, &mut DtbInfo) -> bool] = &[plic::init_plic];

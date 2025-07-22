@@ -10,6 +10,10 @@ board = []
 [dependencies]
 # platform shouldn't depend on any other crates
 arch = { workspace = true }
+config = { workspace = true }
+ksync = { workspace = true }
+log = { workspace = true }
+fdt = "0.1.5"
 
 [target.'cfg(target_arch = "riscv64")'.dependencies]
 sbi-rt = { version = "0.0.3", features = ["legacy"] }

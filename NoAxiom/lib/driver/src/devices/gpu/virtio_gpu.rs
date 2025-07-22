@@ -3,13 +3,14 @@ use core::ptr::NonNull;
 
 use arch::{Arch, ArchMemory};
 use ksync::mutex::SpinLock;
+use platform::dtb::basic::dtb_info;
 use virtio_drivers::{
     device::gpu::VirtIOGpu,
     transport::mmio::{MmioTransport, VirtIOHeader},
 };
 
 use super::DisplayDevice;
-use crate::{devices::hal::VirtioHalImpl, dtb::basic::dtb_info};
+use crate::devices::hal::VirtioHalImpl;
 
 /// Virtio GPU device at MMIO bus
 pub struct VirtioGpu {

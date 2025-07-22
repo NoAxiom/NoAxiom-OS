@@ -10,10 +10,6 @@ pub const CHOSEN_NAME: &str = "chosen";
 pub const PCI_NAME: &str = "pci";
 pub const VIRTIO_MMIO_NAME: &str = "virtio_mmio";
 
-/// No initialization required Devices, but also from dtb info
-pub const GED_PADDR: usize = 0x100E_001C;
-pub const UART_PADDR: usize = 0x1FE0_01E0;
-
 pub const PCI_RANGE: (usize, usize) = (0x4000_0000, 0x0002_0000);
 pub const PCI_BUS_END: usize = 0x7F;
 

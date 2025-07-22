@@ -17,7 +17,6 @@ log = { workspace = true }
 config = { workspace = true }
 bitflags = { workspace = true }
 memory = { workspace = true }
-fdt = "0.1.5"
 plic = { git = "https://github.com/os-module/plic" }
 async-trait = "0.1.50"
 virtio-drivers-async = { git = "https://github.com/YuXuaann/virtio-drivers-async" }

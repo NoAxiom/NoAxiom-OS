@@ -1,6 +1,8 @@
 #![no_std]
 #![allow(deprecated)]
 
+extern crate alloc;
+
 mod basedev;
 pub use basedev::*;
 
@@ -21,3 +23,6 @@ pub use loongarch64_qemu::*;
 pub use riscv64_board::*;
 #[cfg(all(target_arch = "riscv64", feature = "qemu"))]
 pub use riscv64_qemu::*;
+
+mod archs;
+pub mod dtb;

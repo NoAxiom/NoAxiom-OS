@@ -10,10 +10,6 @@ pub const CHOSEN_NAME: &str = "chosen";
 pub const PCI_NAME: &str = "pci";
 pub const VIRTIO_MMIO_NAME: &str = "virtio_mmio";
 
-/// No initialization required Devices
-pub const GED_PADDR: usize = 0; // No GED on QEMU at riscv64
-pub const UART_PADDR: usize = 0; // No UART on QEMU at riscv64
-
 pub const PCI_RANGE: (usize, usize) = (0x4000_0000, 0x0002_0000);
 pub const PCI_BUS_END: usize = 0x7F;
 

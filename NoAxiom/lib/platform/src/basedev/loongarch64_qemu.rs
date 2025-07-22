@@ -1,7 +1,11 @@
 use arch::{consts::KERNEL_ADDR_OFFSET, Arch, ArchAsm, ArchInt};
 
 use super::BaseFu;
-use crate::{GED_PADDR, UART_PADDR};
+
+/// No initialization required Devices, but also from dtb info
+pub const GED_PADDR: usize = 0x100E_001C;
+pub const UART_PADDR: usize = 0x1FE0_01E0;
+
 const COM1_ADDR: usize = UART_PADDR | KERNEL_ADDR_OFFSET;
 const GED_ADDR: usize = GED_PADDR | KERNEL_ADDR_OFFSET;
 

@@ -2,12 +2,10 @@ extern crate alloc;
 
 use arch::{Arch, ArchAsm, ArchMemory};
 use config::cpu::CPU_NUM;
-use fdt::node::FdtNode;
 use ksync::Once;
 use log::debug;
+use platform::dtb::basic::dtb_info;
 use plic::{Mode, PLIC};
-
-use crate::dtb::basic::{dtb_info, DtbInfo};
 
 pub static PLIC: Once<PLIC<CPU_NUM>> = Once::new();
 
@@ -73,14 +71,4 @@ pub fn register_to_hart(hart: u32) {
     plic.enable(hart, Mode::Supervisor, irq);
     plic.set_threshold(hart, Mode::Supervisor, 0);
     log::info!("Register irq {} to hart {}", irq, hart);
-}
-
-pub fn init_plic(node: &FdtNode, info: &mut DtbInfo) -> bool {
-    if node.name.starts_with(platform::PLIC_NAME) {
-        let reg = node.reg().unwrap();
-        reg.for_each(|x| info.arch.plic = x.starting_address as usize);
-        true
-    } else {
-        false
-    }
 }

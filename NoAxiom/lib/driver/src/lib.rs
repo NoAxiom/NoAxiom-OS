@@ -5,19 +5,18 @@
 use alloc::sync::Arc;
 
 use ksync::{assert_no_lock, Once};
+use platform::dtb::init::dtb_init;
 
 use crate::{
     archs::arch_driver_init,
-    bus::bus_init,
+    bus::probe_bus,
     devices::{block::BlockDevice, gpu::DisplayDevice, net::NetWorkDevice},
-    dtb::init::dtb_init,
 };
 extern crate alloc;
 
 mod archs;
 mod bus;
 pub mod devices;
-mod dtb;
 mod irq;
 
 pub use irq::handle_irq;
@@ -26,7 +25,7 @@ pub fn init(dtb: usize) {
     let dtb = dtb | arch::consts::KERNEL_ADDR_OFFSET;
     log::debug!("[driver] init with dtb: {:#x}", dtb);
     dtb_init(dtb);
-    bus_init();
+    probe_bus();
     arch_driver_init();
 }
 

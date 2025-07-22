@@ -278,7 +278,6 @@ dependencies = [
  "bitflags 2.9.1",
  "cfg-if",
  "config",
- "fdt",
  "include",
  "kfuture",
  "ksync",
@@ -775,6 +774,10 @@ name = "platform"
 version = "0.1.0"
 dependencies = [
  "arch",
+ "config",
+ "fdt",
+ "ksync",
+ "log",
  "sbi-rt",
 ]
 

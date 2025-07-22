@@ -1,7 +1,7 @@
 use arch::ArchMemory;
 use include::errno::Errno;
 use ksync::Lazy;
-use platform::{PCI_BUS_END, PCI_RANGE};
+use platform::{dtb::basic::dtb_info, PCI_BUS_END, PCI_RANGE};
 use virtio_drivers::transport::{
     pci::{
         bus::{
@@ -14,10 +14,7 @@ use virtio_drivers::transport::{
 };
 
 use super::pci_driver::PciRangeAllocator;
-use crate::{
-    devices::{block::virtio_block::VirtioBlockDevice, hal::VirtioHalImpl, DevResult},
-    dtb::basic::dtb_info,
-};
+use crate::devices::{block::virtio_block::VirtioBlockDevice, hal::VirtioHalImpl, DevResult};
 
 pub fn probe_pcibus_devices() -> Option<&'static VirtioBlockDevice<PciTransport>> {
     PCI_BLOCK_DEVICE.as_ref()

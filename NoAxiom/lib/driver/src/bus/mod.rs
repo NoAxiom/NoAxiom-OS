@@ -15,7 +15,7 @@ mod mmio;
 mod pci;
 mod pci_driver;
 
-fn probe_bus() {
+pub fn probe_bus() {
     probe_mmiobus_devices().map(|dev| {
         log::debug!("[driver] probe mmio bus");
         BLK_DEV.call_once(|| Arc::new(&*dev as &'static dyn BlockDevice));
@@ -29,9 +29,4 @@ fn probe_bus() {
         Arc::new(&*LOOPBACK as &'static dyn NetWorkDevice)
     });
     log::debug!("[driver] probe succeed");
-}
-
-#[inline]
-pub fn bus_init() {
-    probe_bus();
 }
