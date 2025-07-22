@@ -5,7 +5,6 @@
 use alloc::sync::Arc;
 
 use ksync::{assert_no_lock, Once};
-use platform::dtb::init::dtb_init;
 
 use crate::{
     archs::arch_driver_init,
@@ -21,10 +20,7 @@ mod irq;
 
 pub use irq::handle_irq;
 
-pub fn init(dtb: usize) {
-    let dtb = dtb | arch::consts::KERNEL_ADDR_OFFSET;
-    log::debug!("[driver] init with dtb: {:#x}", dtb);
-    dtb_init(dtb);
+pub fn driver_init() {
     probe_bus();
     arch_driver_init();
 }

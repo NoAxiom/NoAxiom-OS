@@ -5,7 +5,7 @@ use fdt::{node::FdtNode, Fdt};
 use crate::{
     archs::{
         consts::{PCI_NAME, VIRTIO_MMIO_NAME},
-        dtb::ARCH_DTB_INITIALIZERS,
+        dtb::{get_dtb, ARCH_DTB_INITIALIZERS},
     },
     dtb::basic::{DtbInfo, DTB_INFO},
 };
@@ -51,6 +51,9 @@ fn dtb_init_one(node: &FdtNode, info: &mut DtbInfo) {
 }
 
 pub fn dtb_init(dtb: usize) {
+    let dtb = get_dtb(dtb) | arch::consts::KERNEL_ADDR_OFFSET;
+    log::debug!("[platform] init with dtb: {:#x}", dtb);
+
     let fdt = unsafe { Fdt::from_ptr(dtb as *const u8).unwrap() };
     let mut info = DtbInfo::new_bare();
     for node in fdt.all_nodes() {

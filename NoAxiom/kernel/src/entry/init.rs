@@ -1,11 +1,12 @@
 use arch::{Arch, ArchBoot, ArchInt, _entry_other_hart, consts::KERNEL_ADDR_OFFSET, ArchInfo};
-use platform::archs::dtb::get_dtb;
+use driver::driver_init;
+use platform::dtb::init::dtb_init;
 
 use crate::{
     config::cpu::CPU_NUM,
     constant::banner::NOAXIOM_BANNER,
     cpu::get_hartid,
-    driver::{driver_init, log::log_init},
+    driver::log::log_init,
     entry::init_proc::schedule_spawn_with_path,
     mm::{
         bss::bss_init,
@@ -80,7 +81,8 @@ pub extern "C" fn _boot_hart_init(_hartid: usize, dtb: usize) -> ! {
     kernel_space_init();
 
     // device init
-    driver_init(get_dtb(dtb));
+    dtb_init(dtb);
+    driver_init();
 
     // fs init
     Arch::enable_interrupt();
