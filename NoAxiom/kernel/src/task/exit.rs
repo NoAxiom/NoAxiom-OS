@@ -1,11 +1,13 @@
 use alloc::sync::Arc;
 
 use ksync::assert_no_lock;
+use platform::archs::{base::Base, common::base::BaseFu};
 
 use super::Task;
 use crate::{
     config::task::INIT_PROCESS_ID,
     cpu::current_cpu,
+    driver::base::shutdown,
     include::futex::FUTEX_BITSET_MATCH_ANY,
     mm::user_ptr::UserPtr,
     signal::{
@@ -50,7 +52,7 @@ pub async fn init_proc_exit_handler(task: &Arc<Task>) {
         ),
     }
     println!("[kernel] system shutdown (normal exit)");
-    platform::shutdown();
+    shutdown();
 }
 
 impl Task {

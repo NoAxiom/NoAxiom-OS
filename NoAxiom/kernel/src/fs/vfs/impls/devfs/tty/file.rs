@@ -6,6 +6,7 @@ use include::errno::Errno;
 use ksync::mutex::SpinLock;
 
 use crate::{
+    driver::base::getchar,
     fs::vfs::basic::file::{File, FileMeta},
     include::{
         fs::{
@@ -56,13 +57,13 @@ impl File for TtyFile {
         unreachable!("readlink from tty");
     }
     async fn base_read(&self, _offset: usize, buf: &mut [u8]) -> SyscallResult {
-        let mut c = platform::getchar() as i8;
+        let mut c = getchar() as i8;
         loop {
             if c != -1 {
                 break;
             } else {
                 yield_now().await;
-                c = platform::getchar() as i8;
+                c = getchar() as i8;
             }
         }
         buf[0] = c as u8;

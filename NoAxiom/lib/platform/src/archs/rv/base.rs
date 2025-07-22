@@ -1,4 +1,4 @@
-use super::BaseFu;
+use crate::archs::common::base::BaseFu;
 
 pub struct Base;
 

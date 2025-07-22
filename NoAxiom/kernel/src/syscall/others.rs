@@ -1,5 +1,5 @@
 use super::{Syscall, SyscallResult};
-use crate::{mm::user_ptr::UserPtr, utils::random_fill};
+use crate::{driver::base::shutdown, mm::user_ptr::UserPtr, utils::random_fill};
 
 impl Syscall<'_> {
     /// get a random number
@@ -19,9 +19,9 @@ impl Syscall<'_> {
                 "[kernel] press any key to shutdown, system time: {:?}",
                 crate::time::gettime::get_time_duration()
             );
-            while platform::getchar() as i8 == -1 {}
+            while crate::driver::base::getchar() as i8 == -1 {}
         }
         println!("[kernel] system shutdown (syscall)");
-        platform::shutdown()
+        shutdown()
     }
 }

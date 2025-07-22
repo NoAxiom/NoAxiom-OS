@@ -1,18 +1,23 @@
 use arch::{consts::KERNEL_ADDR_OFFSET, Arch, ArchAsm, ArchInt};
 
-use super::BaseFu;
+use crate::archs::common::base::BaseFu;
 
 /// No initialization required Devices, but also from dtb info
-pub const GED_PADDR: usize = 0x100E_001C;
-pub const UART_PADDR: usize = 0x1FE0_01E0;
+const GED_PADDR: usize = 0x100E_001C;
+const UART_PADDR: usize = 0x1FE0_01E0;
 
-const COM1_ADDR: usize = UART_PADDR | KERNEL_ADDR_OFFSET;
-const GED_ADDR: usize = GED_PADDR | KERNEL_ADDR_OFFSET;
+pub fn get_com1_addr() -> usize {
+    UART_PADDR | KERNEL_ADDR_OFFSET
+}
+
+pub fn get_ged_addr() -> usize {
+    GED_PADDR | KERNEL_ADDR_OFFSET
+}
 
 pub struct Base;
 impl Base {
     pub fn base_putchar(c: u8) {
-        let ptr = COM1_ADDR as *mut u8;
+        let ptr = get_com1_addr() as *mut u8;
         loop {
             unsafe {
                 if ptr.add(5).read_volatile() & (1 << 5) != 0 {
@@ -25,7 +30,7 @@ impl Base {
         }
     }
     pub fn base_getchar() -> Option<u8> {
-        let ptr = COM1_ADDR as *mut u8;
+        let ptr = get_com1_addr() as *mut u8;
         unsafe {
             if ptr.add(5).read_volatile() & 1 == 0 {
                 // The DR bit is 0, meaning no data
@@ -59,7 +64,7 @@ impl BaseFu for Base {
 
     #[inline]
     fn shutdown() -> ! {
-        let ptr = GED_ADDR as *mut u8;
+        let ptr = get_ged_addr() as *mut u8;
         // Shutdown the whole system, including all CPUs.
         unsafe { ptr.write_volatile(0x34) };
         loop {

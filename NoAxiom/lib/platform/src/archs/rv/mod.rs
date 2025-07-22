@@ -2,6 +2,8 @@ use fdt::node::FdtNode;
 
 use crate::{dtb::basic::DtbInfo, PLIC_NAME};
 
+pub mod base;
+
 pub struct ArchDtbInfo {
     pub plic: usize,
 }

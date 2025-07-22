@@ -3,9 +3,6 @@
 
 extern crate alloc;
 
-mod basedev;
-pub use basedev::*;
-
 #[cfg(all(target_arch = "loongarch64", feature = "board"))]
 mod loongarch64_board;
 #[cfg(all(target_arch = "loongarch64", feature = "qemu"))]
@@ -24,5 +21,5 @@ pub use riscv64_board::*;
 #[cfg(all(target_arch = "riscv64", feature = "qemu"))]
 pub use riscv64_qemu::*;
 
-mod archs;
+pub mod archs;
 pub mod dtb;
