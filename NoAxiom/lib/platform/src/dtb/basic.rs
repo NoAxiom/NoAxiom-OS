@@ -2,7 +2,8 @@ use alloc::vec::Vec;
 
 use ksync::Once;
 
-use crate::archs::ArchDtbInfo;
+use crate::archs::dtb::ArchDtbInfo;
+
 pub struct DtbInfo {
     pub arch: ArchDtbInfo,
     pub virtio_mmio_regions: Vec<(usize, usize)>, // start_addr, size
