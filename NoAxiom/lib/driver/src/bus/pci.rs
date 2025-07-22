@@ -1,7 +1,10 @@
 use arch::ArchMemory;
 use include::errno::Errno;
 use ksync::Lazy;
-use platform::{dtb::basic::dtb_info, PCI_BUS_END, PCI_RANGE};
+use platform::{
+    archs::devconf::{PCI_BUS_END, PCI_RANGE},
+    dtb::basic::dtb_info,
+};
 use virtio_drivers::transport::{
     pci::{
         bus::{

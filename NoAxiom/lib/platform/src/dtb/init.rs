@@ -3,9 +3,11 @@ use alloc::string::String;
 use fdt::{node::FdtNode, Fdt};
 
 use crate::{
-    archs::dtb::ARCH_DTB_INITIALIZERS,
+    archs::{
+        consts::{PCI_NAME, VIRTIO_MMIO_NAME},
+        dtb::ARCH_DTB_INITIALIZERS,
+    },
     dtb::basic::{DtbInfo, DTB_INFO},
-    PCI_NAME, VIRTIO_MMIO_NAME,
 };
 
 fn mmio_init(node: &FdtNode, info: &mut DtbInfo) -> bool {

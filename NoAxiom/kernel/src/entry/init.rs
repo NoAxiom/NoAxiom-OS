@@ -1,4 +1,5 @@
 use arch::{Arch, ArchBoot, ArchInt, _entry_other_hart, consts::KERNEL_ADDR_OFFSET, ArchInfo};
+use platform::archs::dtb::get_dtb;
 
 use crate::{
     config::cpu::CPU_NUM,
@@ -79,7 +80,7 @@ pub extern "C" fn _boot_hart_init(_hartid: usize, dtb: usize) -> ! {
     kernel_space_init();
 
     // device init
-    driver_init(platform::get_dtb(dtb));
+    driver_init(get_dtb(dtb));
 
     // fs init
     Arch::enable_interrupt();

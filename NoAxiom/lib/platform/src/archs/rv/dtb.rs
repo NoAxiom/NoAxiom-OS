@@ -1,6 +1,11 @@
 use fdt::node::FdtNode;
 
-use crate::{dtb::basic::DtbInfo, PLIC_NAME};
+use crate::{archs::consts::PLIC_NAME, dtb::basic::DtbInfo};
+
+/// Device Tree Base Address, at riscv64 is read from register
+pub fn get_dtb(dtb: usize) -> usize {
+    dtb
+}
 
 pub struct ArchDtbInfo {
     pub plic: usize,
