@@ -231,6 +231,10 @@ vscode:
 	@cp -f $(ROOT)/utils/vscode-template/* $(ROOT)/.vscode/
 	@echo "VSCode template copied."
 
+switch-arch:
+	@echo "Switching architecture..."
+	@cd utils/scripts && sh vscode_switch_arch.sh
+
 env: add-target git-update vendor
 
 build-all:
@@ -245,6 +249,6 @@ all: build-all
 .PHONY: asm asm-user asm-all             # generate assembly info
 .PHONY: build-user build-kernel          # for more specific build
 .PHONY: add-target env git-update vendor # environment setup
-.PHONY: config vscode                    # config
+.PHONY: config vscode switch-arch        # config
 .PHONY: info help count                  # information utils
 .PHONY: docker build-all                 # for competition
