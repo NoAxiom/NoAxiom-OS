@@ -17,7 +17,6 @@
 #![allow(deprecated)]
 
 extern crate alloc;
-#[macro_use]
 extern crate log;
 
 /// common modules

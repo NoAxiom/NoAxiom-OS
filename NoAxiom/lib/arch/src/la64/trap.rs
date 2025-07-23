@@ -122,7 +122,7 @@ fn get_trap_type(tf: Option<&mut TrapContext>) -> TrapType {
     match estat.cause() {
         Trap::Exception(Exception::Syscall) | Trap::Interrupt(_) => {}
         _ => {
-            info!(
+            log::info!(
                 "[get_trap_type] estat: {:x?}, badv: {:#x}, pc: {:#x}",
                 estat.cause(),
                 badv,

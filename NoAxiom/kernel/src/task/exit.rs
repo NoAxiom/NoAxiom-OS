@@ -1,7 +1,6 @@
 use alloc::sync::Arc;
 
 use ksync::assert_no_lock;
-use platform::archs::{base::Base, common::base::BaseFu};
 
 use super::Task;
 use crate::{
