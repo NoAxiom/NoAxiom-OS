@@ -1,12 +1,13 @@
 pub mod virtio_block;
 use alloc::boxed::Box;
 
-use crate::devices::DevResult;
+use crate::devices::{
+    basic::Device, block::virtio_block::block_mmio_init, DevResult,
+};
 
 #[async_trait::async_trait]
 #[allow(unused_variables)]
-pub trait BlockDevice: Send + Sync {
-    fn device_name(&self) -> &'static str;
+pub trait BlockDevice: Send + Sync + Device {
     fn handle_interrupt(&self) -> DevResult<()> {
         unimplemented!("{} not implement handle_interrupt!", self.device_name())
     }
@@ -25,4 +26,14 @@ pub trait BlockDevice: Send + Sync {
     async fn sync_all(&self) -> DevResult<()> {
         unimplemented!("{} not implement sync_all!", self.device_name())
     }
+}
+
+pub enum BlockDeviceType {
+    Virtio,
+    PhysRV,
+    PhysLA,
+}
+
+pub fn block_init() {
+    block_mmio_init();
 }

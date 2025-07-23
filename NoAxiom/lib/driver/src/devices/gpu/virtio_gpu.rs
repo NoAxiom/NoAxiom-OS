@@ -10,7 +10,7 @@ use virtio_drivers::{
 };
 
 use super::DisplayDevice;
-use crate::devices::hal::VirtioHalImpl;
+use crate::devices::{basic::Device, hal::VirtioHalImpl};
 
 /// Virtio GPU device at MMIO bus
 pub struct VirtioGpu {
@@ -21,7 +21,9 @@ pub struct VirtioGpu {
 impl VirtioGpu {
     pub async fn new() -> Self {
         unsafe {
-            let (virtio7_paddr, size) = dtb_info().virtio_mmio_regions[7];
+            let info = &dtb_info().virtio.mmio_regions[7];
+            let virtio7_paddr = info.start_addr;
+            let size = info.size;
             let virtio7 = virtio7_paddr | Arch::KERNEL_ADDR_OFFSET;
             let header = NonNull::new(virtio7 as *mut VirtIOHeader).unwrap();
             // fixme: | kernel addr offset
@@ -36,6 +38,12 @@ impl VirtioGpu {
                 fb,
             }
         }
+    }
+}
+
+impl Device for VirtioGpu {
+    fn device_name(&self) -> &'static str {
+        "Virtio GPU"
     }
 }
 

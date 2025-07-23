@@ -1,9 +1,9 @@
-use alloc::string::String;
+use alloc::{string::String, sync::Arc};
 use core::ops::DerefMut;
 
 use arch::{Arch, ArchTime};
 use include::errno::Errno;
-use ksync::mutex::SpinLock;
+use ksync::{mutex::SpinLock, Once};
 use smoltcp::{
     iface::{self, Config, Interface},
     phy::{Device, Loopback, Medium},
@@ -12,7 +12,11 @@ use smoltcp::{
 };
 
 use super::NetWorkDevice;
-use crate::devices::DevResult;
+use crate::{
+    device_cast,
+    devices::{basic::Device as BasicDevice, DevResult},
+    register_net_dev,
+};
 
 pub struct LoopBackDev {
     // todo: use one lock
@@ -58,6 +62,12 @@ impl LoopBackDev {
     }
 }
 
+impl BasicDevice for LoopBackDev {
+    fn device_name(&self) -> &'static str {
+        "LoopBack Device"
+    }
+}
+
 impl NetWorkDevice for LoopBackDev {
     fn mac(&self) -> EthernetAddress {
         EthernetAddress([0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
@@ -93,4 +103,10 @@ impl NetWorkDevice for LoopBackDev {
 pub fn get_time_ms() -> usize {
     const MSEC_PER_SEC: usize = 1000;
     arch::Arch::get_time() / (Arch::get_freq() / MSEC_PER_SEC)
+}
+
+static LOOPBACK: Once<LoopBackDev> = Once::new();
+pub fn init_loopback_dev() {
+    LOOPBACK.call_once(|| LoopBackDev::new());
+    register_net_dev(device_cast!(LOOPBACK, NetWorkDevice));
 }

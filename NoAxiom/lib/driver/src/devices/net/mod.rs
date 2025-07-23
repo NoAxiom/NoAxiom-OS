@@ -6,11 +6,11 @@ use smoltcp::{
     wire::EthernetAddress,
 };
 
-use crate::devices::DevResult;
+use crate::devices::{basic::Device, net::loopback::init_loopback_dev, DevResult};
 
 pub mod loopback;
 
-pub trait NetWorkDevice: Send + Sync {
+pub trait NetWorkDevice: Send + Sync + Device {
     /// get the MAC address of the network card
     fn mac(&self) -> EthernetAddress;
 
@@ -38,4 +38,15 @@ pub trait NetWorkDevice: Send + Sync {
     // fn operstate(&self) -> Operstate;
 
     // fn set_operstate(&self, state: Operstate);
+}
+
+pub enum NetDeviceType {
+    LoopBack,
+    Virtio,
+    PhysRV,
+    PhysLA,
+}
+
+pub fn net_init() {
+    init_loopback_dev();
 }

@@ -4,7 +4,7 @@ use alloc::{boxed::Box, sync::Arc, vec::Vec};
 use core::num::NonZeroUsize;
 
 use async_trait::async_trait;
-use driver::devices::{block::BlockDevice, DevResult};
+use driver::devices::{basic::Device, block::BlockDevice, DevResult};
 use ksync::{assert_no_lock, async_mutex::AsyncMutex, cell::SyncUnsafeCell};
 use lru::LruCache;
 
@@ -105,11 +105,14 @@ impl AsyncBlockCache {
     }
 }
 
-#[async_trait]
-impl BlockDevice for AsyncBlockCache {
+impl Device for AsyncBlockCache {
     fn device_name(&self) -> &'static str {
         "AsyncBlockCache"
     }
+}
+
+#[async_trait]
+impl BlockDevice for AsyncBlockCache {
     async fn read(&self, id: usize, buf: &mut [u8]) -> DevResult<usize> {
         assert_eq!(buf.len(), BLOCK_SIZE);
         let data = self.read_sector(id).await;

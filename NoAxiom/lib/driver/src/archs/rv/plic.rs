@@ -10,27 +10,27 @@ use plic::{Mode, PLIC};
 pub static PLIC: Once<PLIC<CPU_NUM>> = Once::new();
 
 pub fn disable_blk_irq() {
-    let plic = unsafe { PLIC.get_unchecked() };
+    let plic = PLIC.get().unwrap();
     let irq = 1;
     let hart = Arch::get_hartid();
     plic.disable(hart as u32, Mode::Supervisor, irq);
 }
 
 pub fn enable_blk_irq() {
-    let plic = unsafe { PLIC.get_unchecked() };
+    let plic = PLIC.get().unwrap();
     let irq = 1;
     let hart = Arch::get_hartid();
     plic.enable(hart as u32, Mode::Supervisor, irq);
 }
 
 pub fn claim() -> u32 {
-    let plic = unsafe { PLIC.get_unchecked() };
+    let plic = PLIC.get().unwrap();
     let hart = Arch::get_hartid();
     plic.claim(hart as u32, Mode::Supervisor)
 }
 
 pub fn complete(irq: u32) {
-    let plic = unsafe { PLIC.get_unchecked() };
+    let plic = PLIC.get().unwrap();
     let hart = Arch::get_hartid();
     plic.complete(hart as u32, Mode::Supervisor, irq);
 }
@@ -44,7 +44,7 @@ pub fn init() {
 
     let priority = 1;
     let irq = 1;
-    let plic = unsafe { PLIC.get_unchecked() };
+    let plic = PLIC.get().unwrap();
     plic.set_priority(irq, priority);
 
     // todo: register more devices
@@ -66,7 +66,7 @@ pub fn init() {
 }
 
 pub fn register_to_hart(hart: u32) {
-    let plic = unsafe { PLIC.get_unchecked() };
+    let plic = PLIC.get().unwrap();
     let irq = 1;
     plic.enable(hart, Mode::Supervisor, irq);
     plic.set_threshold(hart, Mode::Supervisor, 0);

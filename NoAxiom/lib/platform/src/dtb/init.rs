@@ -7,15 +7,21 @@ use crate::{
         consts::{PCI_NAME, VIRTIO_MMIO_NAME},
         dtb::{get_dtb, ARCH_DTB_INITIALIZERS},
     },
-    dtb::basic::{DtbInfo, DTB_INFO},
+    dtb::{
+        basic::{DtbInfo, DTB_INFO},
+        virtio::DtbVirtioRegion,
+    },
 };
 
 fn mmio_init(node: &FdtNode, info: &mut DtbInfo) -> bool {
     if node.name.starts_with(VIRTIO_MMIO_NAME) {
         let reg = node.reg().unwrap();
         reg.for_each(|x| {
-            info.virtio_mmio_regions
-                .push((x.starting_address as usize, x.size.unwrap()));
+            let start = x.starting_address as usize;
+            let size = x.size.unwrap();
+            info.virtio
+                .mmio_regions
+                .push(DtbVirtioRegion::new(start, size));
         });
         true
     } else {
@@ -27,7 +33,7 @@ fn pci_init(node: &FdtNode, info: &mut DtbInfo) -> bool {
     if node.name.starts_with(PCI_NAME) {
         let reg = node.reg().unwrap();
         reg.for_each(|x| {
-            info.pci_ecam_base = x.starting_address as usize;
+            info.virtio.pci_ecam.push(x.starting_address as usize);
         });
         true
     } else {
@@ -64,6 +70,7 @@ pub fn dtb_init(dtb: usize) {
         }
         dtb_init_one(&node, &mut info);
     }
-    info.virtio_mmio_regions.sort_by(|a, b| a.0.cmp(&b.0));
+
+    info.normalize();
     DTB_INFO.call_once(|| info);
 }

@@ -1,6 +1,7 @@
-use alloc::boxed::Box;
+use alloc::{boxed::Box, sync::Arc};
 use core::{
     future::Future,
+    ptr::NonNull,
     task::{Poll, Waker},
 };
 
@@ -9,16 +10,27 @@ use async_trait::async_trait;
 use ksync::{
     async_mutex::{AsyncMutex, AsyncMutexGuard},
     cell::SyncUnsafeCell,
+    Once,
 };
+use platform::dtb::basic::dtb_info;
 use virtio_drivers::{
     device::blk::{BlkReq, BlkResp, RespStatus, VirtIOBlk},
-    transport::Transport,
+    transport::{
+        mmio::{MmioTransport, VirtIOHeader},
+        pci::PciTransport,
+        Transport,
+    },
 };
 
-use crate::devices::{
-    block::BlockDevice,
-    hal::{dev_err, VirtioHalImpl},
-    DevResult,
+use crate::{
+    device_cast,
+    devices::{
+        basic::Device,
+        block::BlockDevice,
+        hal::{dev_err, VirtioHalImpl},
+        DevResult,
+    },
+    register_blk_dev,
 };
 
 struct VirioBlkInner<T: Transport> {
@@ -109,11 +121,14 @@ impl<T: Transport> VirtioBlockDevice<T> {
     }
 }
 
-#[async_trait]
-impl<T: Transport + Send> BlockDevice for VirtioBlockDevice<T> {
+impl<T: Transport> Device for VirtioBlockDevice<T> {
     fn device_name(&self) -> &'static str {
         "VirtIOBlockWrapper"
     }
+}
+
+#[async_trait]
+impl<T: Transport + Send> BlockDevice for VirtioBlockDevice<T> {
     fn handle_interrupt(&self) -> DevResult<()> {
         self.wake();
         Ok(())
@@ -277,4 +292,36 @@ impl<'a, T: Transport> Future for WriteFuture<'a, T> {
             Poll::Pending
         }
     }
+}
+
+// ====== MMIO defined device init ======
+static MMIO_DEV: Once<VirtioBlockDevice<MmioTransport>> = Once::new();
+fn realize_virtio_block_device_mmio() -> Option<VirtioBlockDevice<MmioTransport>> {
+    let dtb_info = dtb_info();
+    if dtb_info.virtio.mmio_regions.is_empty() {
+        return None;
+    }
+
+    let (addr, size) = dtb_info.virtio.mmio_regions[0].simplified();
+    log::info!("[driver] probe virtio wrapper at {:#x}", addr);
+    let addr = addr | arch::consts::KERNEL_ADDR_OFFSET;
+    let header = NonNull::new(addr as *mut VirtIOHeader).unwrap();
+    let transport = unsafe { MmioTransport::new(header, size).unwrap() };
+
+    Some(VirtioBlockDevice::new(transport))
+}
+pub(crate) fn block_mmio_init() {
+    if let Some(dev) = realize_virtio_block_device_mmio() {
+        MMIO_DEV.call_once(|| dev);
+        register_blk_dev(device_cast!(MMIO_DEV, BlockDevice));
+    } else {
+        log::warn!("[driver] no virtio block device found in MMIO regions");
+    }
+}
+
+// ====== PCI defined device init ======
+static PCI_DEV: Once<VirtioBlockDevice<PciTransport>> = Once::new();
+pub(crate) fn register_virtio_block_device_pci(dev: VirtioBlockDevice<PciTransport>) {
+    PCI_DEV.call_once(|| dev);
+    register_blk_dev(device_cast!(PCI_DEV, BlockDevice));
 }
