@@ -1,6 +1,9 @@
 use fdt::node::FdtNode;
 
-use crate::{archs::consts::PLIC_NAME, dtb::basic::DtbInfo};
+use crate::{
+    archs::rv::plic::{init_plic, OF_PLIC_TYPE},
+    dtb::basic::DtbInfo,
+};
 
 /// Device Tree Base Address, at riscv64 is read from register
 pub fn get_dtb(dtb: usize) -> usize {
@@ -17,14 +20,5 @@ impl ArchDtbInfo {
     }
 }
 
-pub static ARCH_DTB_INITIALIZERS: &[fn(&FdtNode, &mut DtbInfo) -> bool] = &[init_plic];
-
-pub fn init_plic(node: &FdtNode, info: &mut DtbInfo) -> bool {
-    if node.name.starts_with(PLIC_NAME) {
-        let reg = node.reg().unwrap();
-        reg.for_each(|x| info.arch.plic = x.starting_address as usize);
-        true
-    } else {
-        false
-    }
-}
+pub const ARCH_OF_INITIALIZERS: &[(&str, fn(&FdtNode, &mut DtbInfo))] =
+    &[(OF_PLIC_TYPE, init_plic)];

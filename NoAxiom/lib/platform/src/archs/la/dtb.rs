@@ -14,4 +14,4 @@ impl ArchDtbInfo {
     }
 }
 
-pub static ARCH_DTB_INITIALIZERS: &[fn(&FdtNode, &mut DtbInfo) -> bool] = &[];
+pub const ARCH_OF_INITIALIZERS: &[(&str, fn(&FdtNode, &mut DtbInfo))] = &[];
