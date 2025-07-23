@@ -40,7 +40,7 @@ pub trait NetWorkDevice: Send + Sync + Device {
     // fn set_operstate(&self, state: Operstate);
 }
 
-pub enum NetDeviceType {
+pub enum NetDriverType {
     LoopBack,
     Virtio,
     PhysRV,

@@ -28,7 +28,7 @@ pub trait BlockDevice: Send + Sync + Device {
     }
 }
 
-pub enum BlockDeviceType {
+pub enum BlockDriverType {
     Virtio,
     PhysRV,
     PhysLA,

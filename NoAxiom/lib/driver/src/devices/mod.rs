@@ -2,7 +2,7 @@ use include::errno::Errno;
 
 pub mod basic;
 pub mod block;
-pub mod gpu;
+pub mod display;
 pub mod hal;
 pub mod manager;
 pub mod net;

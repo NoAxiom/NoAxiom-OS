@@ -2,7 +2,7 @@ use alloc::sync::Arc;
 
 use ksync::Once;
 
-use crate::devices::{block::BlockDevice, gpu::DisplayDevice, net::NetWorkDevice};
+use crate::devices::{block::BlockDevice, display::DisplayDevice, net::NetWorkDevice};
 
 // todo: add multi-devices support for single dev type
 lazy_static::lazy_static! {

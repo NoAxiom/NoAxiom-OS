@@ -25,8 +25,8 @@ use virtio_drivers::{
 use crate::{
     device_cast,
     devices::{
-        basic::Device,
-        block::BlockDevice,
+        basic::{Device, DriverType},
+        block::{BlockDevice, BlockDriverType},
         hal::{dev_err, VirtioHalImpl},
         DevResult,
     },
@@ -124,6 +124,9 @@ impl<T: Transport> VirtioBlockDevice<T> {
 impl<T: Transport> Device for VirtioBlockDevice<T> {
     fn device_name(&self) -> &'static str {
         "VirtIOBlockWrapper"
+    }
+    fn driver_type(&self) -> DriverType {
+        DriverType::Block(BlockDriverType::Virtio)
     }
 }
 

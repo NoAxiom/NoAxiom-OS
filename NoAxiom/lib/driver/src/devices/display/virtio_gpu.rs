@@ -10,7 +10,11 @@ use virtio_drivers::{
 };
 
 use super::DisplayDevice;
-use crate::devices::{basic::Device, hal::VirtioHalImpl};
+use crate::devices::{
+    basic::{Device, DriverType},
+    display::DisplayDriverType,
+    hal::VirtioHalImpl,
+};
 
 /// Virtio GPU device at MMIO bus
 pub struct VirtioGpu {
@@ -44,6 +48,9 @@ impl VirtioGpu {
 impl Device for VirtioGpu {
     fn device_name(&self) -> &'static str {
         "Virtio GPU"
+    }
+    fn driver_type(&self) -> DriverType {
+        DriverType::Display(DisplayDriverType::Virtio)
     }
 }
 

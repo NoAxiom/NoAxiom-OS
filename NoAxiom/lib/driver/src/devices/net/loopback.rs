@@ -14,7 +14,11 @@ use smoltcp::{
 use super::NetWorkDevice;
 use crate::{
     device_cast,
-    devices::{basic::Device as BasicDevice, DevResult},
+    devices::{
+        basic::{Device as BasicDevice, DriverType},
+        net::NetDriverType,
+        DevResult,
+    },
     register_net_dev,
 };
 
@@ -65,6 +69,9 @@ impl LoopBackDev {
 impl BasicDevice for LoopBackDev {
     fn device_name(&self) -> &'static str {
         "LoopBack Device"
+    }
+    fn driver_type(&self) -> DriverType {
+        DriverType::NetWork(NetDriverType::Virtio)
     }
 }
 

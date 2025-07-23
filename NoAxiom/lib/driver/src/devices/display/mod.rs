@@ -10,7 +10,7 @@ pub trait DisplayDevice: Send + Sync + Device {
     async fn flush(&self);
 }
 
-pub enum DisplayDeviceType {
+pub enum DisplayDriverType {
     Virtio,
     PhysRV,
     PhysLA,
