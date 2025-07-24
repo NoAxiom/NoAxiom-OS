@@ -1,6 +1,6 @@
 use alloc::sync::Arc;
 
-use ksync::async_mutex::{AsyncMutex, AsyncMutexGuard};
+use ksync::{AsyncMutex, AsyncMutexGuard};
 
 use super::IExtFs;
 use crate::fs::vfs::basic::superblock::{SuperBlock, SuperBlockMeta};

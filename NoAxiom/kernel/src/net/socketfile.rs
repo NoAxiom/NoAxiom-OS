@@ -2,7 +2,7 @@ use alloc::{boxed::Box, sync::Arc};
 use core::task::Waker;
 
 use async_trait::async_trait;
-use ksync::async_mutex::{AsyncMutex, AsyncMutexGuard};
+use ksync::{AsyncMutex, AsyncMutexGuard};
 use smoltcp::wire::IpEndpoint;
 
 use super::{socket::SocketMeta, tcpsocket::TcpSocket, udpsocket::UdpSocket};

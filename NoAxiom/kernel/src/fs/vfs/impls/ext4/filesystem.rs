@@ -3,7 +3,7 @@ use alloc::{boxed::Box, sync::Arc};
 use async_trait::async_trait;
 use driver::devices::block::BlockDevice;
 use ext4_rs::ext4_defs::ROOT_INODE;
-use ksync::async_mutex::AsyncMutex;
+use ksync::AsyncMutex;
 
 use super::{dentry::Ext4Dentry, inode::Ext4DirInode, superblock::Ext4SuperBlock, IExtFs};
 use crate::{

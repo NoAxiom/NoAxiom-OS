@@ -6,6 +6,9 @@ edition = "2021"
 [dependencies]
 spin = "0.9"
 kernel-sync = { git = "https://github.com/os-module/kernel-sync.git" }
+event-listener = { version = "5", default-features = false, features = [] }
+event-listener-strategy = { version = "0.5", default-features = false }
+pin-project-lite = "0.2"
 arch = { workspace = true }
 config = { workspace = true }
 kfuture = { workspace = true }

@@ -9,7 +9,7 @@ use driver::devices::{
     block::BlockDevice,
     DevResult,
 };
-use ksync::{assert_no_lock, async_mutex::AsyncMutex, cell::SyncUnsafeCell};
+use ksync::{assert_no_lock, cell::SyncUnsafeCell, AsyncMutex};
 use lru::LruCache;
 
 use crate::config::fs::{BLOCK_SIZE, MAX_LRU_CACHE_SIZE};
