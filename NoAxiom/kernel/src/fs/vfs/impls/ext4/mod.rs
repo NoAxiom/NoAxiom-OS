@@ -30,7 +30,7 @@ use alloc::sync::Arc;
 
 use driver::devices::block::BlockDevice;
 #[allow(dead_code, unused_variables)]
-pub fn ext4_rs_test(device: Arc<&'static dyn BlockDevice>) {
+pub fn ext4_rs_test(device: &'static dyn BlockDevice) {
     use ext4_rs::ext4_defs::*;
 
     use crate::sched::utils::block_on;

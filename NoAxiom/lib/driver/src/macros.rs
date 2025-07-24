@@ -3,6 +3,6 @@
 #[macro_export]
 macro_rules! device_cast {
     ($name:ident, $parent:ident) => {
-        Arc::new($name.get().unwrap() as &'static dyn $parent)
+        $name.get().unwrap() as &'static dyn $parent
     };
 }

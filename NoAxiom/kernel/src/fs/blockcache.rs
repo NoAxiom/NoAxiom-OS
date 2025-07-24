@@ -23,16 +23,16 @@ lazy_static::lazy_static! {
     });
 }
 
-pub fn get_block_cache() -> Arc<&'static dyn BlockDevice> {
+pub fn get_block_cache() -> &'static dyn BlockDevice {
     log::debug!("[block_cache] use block cache");
-    Arc::new(BLOCK_CACHE.as_ref())
+    BLOCK_CACHE.as_ref()
 }
 
 /// async block cache with LRU strategy  
 pub struct AsyncBlockCache {
     cache: AsyncMutex<LruCache<usize, Arc<[u8; BLOCK_SIZE]>>>, /* todo: use async_mutex, or
                                                                 * doesn't need */
-    block_device: Arc<&'static dyn BlockDevice>,
+    block_device: &'static dyn BlockDevice,
 }
 
 // impl Drop for CacheData {

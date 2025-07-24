@@ -8,13 +8,13 @@ use crate::config::fs::BLOCK_SIZE;
 
 #[derive(Clone)]
 pub struct DiskCursor {
-    blk: Arc<&'static dyn BlockDevice>,
+    blk: &'static dyn BlockDevice,
     blk_id: usize,
     offset: usize,
 }
 
 impl DiskCursor {
-    pub fn new(blk: Arc<&'static dyn BlockDevice>, blk_id: usize, offset: usize) -> Self {
+    pub fn new(blk: &'static dyn BlockDevice, blk_id: usize, offset: usize) -> Self {
         Self {
             blk,
             blk_id,

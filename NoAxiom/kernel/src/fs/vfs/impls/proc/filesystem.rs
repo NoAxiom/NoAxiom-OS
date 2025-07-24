@@ -42,7 +42,7 @@ impl FileSystem for ProcDevFs {
         parent: Option<Arc<dyn Dentry>>,
         _flags: MountFlags,
         name: &str,
-        device: Option<Arc<&'static dyn BlockDevice>>,
+        device: Option<&'static dyn BlockDevice>,
     ) -> Arc<dyn Dentry> {
         let super_block_meta = SuperBlockMeta::new(device, self.clone());
         let fs_super_block = Arc::new(ProcDevFsSuperBlock::new(super_block_meta));

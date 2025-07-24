@@ -32,7 +32,7 @@ pub trait FileSystem: Send + Sync {
         parent: Option<Arc<dyn Dentry>>,
         flags: MountFlags,
         name: &str,
-        device: Option<Arc<&'static dyn BlockDevice>>,
+        device: Option<&'static dyn BlockDevice>,
     ) -> Arc<dyn Dentry>;
 }
 
@@ -59,7 +59,7 @@ impl FileSystem for EmptyFileSystem {
         _parent: Option<Arc<dyn Dentry>>,
         _flags: MountFlags,
         _name: &str,
-        _device: Option<Arc<&'static dyn BlockDevice>>,
+        _device: Option<&'static dyn BlockDevice>,
     ) -> Arc<dyn Dentry> {
         unreachable!()
     }

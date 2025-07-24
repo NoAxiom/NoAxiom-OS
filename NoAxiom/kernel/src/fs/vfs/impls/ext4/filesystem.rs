@@ -44,7 +44,7 @@ impl FileSystem for AsyncSmpExt4 {
         parent: Option<Arc<dyn Dentry>>,
         _flags: MountFlags,
         name: &str,
-        device: Option<Arc<&'static dyn BlockDevice>>,
+        device: Option<&'static dyn BlockDevice>,
     ) -> Arc<dyn Dentry> {
         let super_block_meta = SuperBlockMeta::new(device.clone(), self.clone());
         let blk = device.unwrap();
