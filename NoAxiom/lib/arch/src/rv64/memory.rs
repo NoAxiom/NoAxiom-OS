@@ -22,6 +22,7 @@ pub const PHYS_MEMORY_START: usize = 0x8020_0000;
 pub const PHYS_MEMORY_SIZE: usize = 0x4000_0000;
 pub const PHYS_MEMORY_END: usize = PHYS_MEMORY_START + PHYS_MEMORY_SIZE;
 pub const KERNEL_ADDR_OFFSET: usize = 0xffff_ffc0_0000_0000;
+pub const IO_ADDR_OFFSET: usize = 0xffff_ffd0_0000_0000;
 
 pub struct PageTable {
     root_ppn: usize,
@@ -161,6 +162,7 @@ impl ArchMemory for RV64 {
     const PHYS_MEMORY_START: usize = PHYS_MEMORY_START;
     const PHYS_MEMORY_END: usize = PHYS_MEMORY_END;
     const KERNEL_ADDR_OFFSET: usize = KERNEL_ADDR_OFFSET;
+    const IO_ADDR_OFFSET: usize = IO_ADDR_OFFSET;
     type PageTable = PageTable;
     fn tlb_init() {}
     // flush all TLB

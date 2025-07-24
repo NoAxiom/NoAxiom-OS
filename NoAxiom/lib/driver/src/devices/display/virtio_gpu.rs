@@ -1,7 +1,7 @@
 use alloc::boxed::Box;
 use core::ptr::NonNull;
 
-use arch::{Arch, ArchMemory};
+use arch::consts::IO_ADDR_OFFSET;
 use ksync::mutex::SpinLock;
 use platform::dtb::basic::dtb_info;
 use virtio_drivers::{
@@ -28,7 +28,7 @@ impl VirtioGpu {
             let info = &dtb_info().virtio.mmio_regions[7];
             let virtio7_paddr = info.start_addr;
             let size = info.size;
-            let virtio7 = virtio7_paddr | Arch::KERNEL_ADDR_OFFSET;
+            let virtio7 = virtio7_paddr | IO_ADDR_OFFSET;
             let header = NonNull::new(virtio7 as *mut VirtIOHeader).unwrap();
             // fixme: | kernel addr offset
             let transport = MmioTransport::new(header, size).unwrap();

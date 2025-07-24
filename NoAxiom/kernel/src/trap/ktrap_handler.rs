@@ -28,19 +28,20 @@ fn kernel_exception_handler(exception: ExceptionType) {
             PageFaultType::StorePageFault(addr)
             | PageFaultType::LoadPageFault(addr)
             | PageFaultType::InstructionPageFault(addr) => {
-                let task = current_cpu()
-                    .task
-                    .as_mut()
-                    .expect("page fault without task running");
-                // fixme: currently this block_on cannot be canceled
-                warn!(
-                    "[kernel] block on memory_validate, addr: {:#x}, syscall: {:?}",
-                    addr,
-                    current_syscall(),
-                );
-                match block_on(task.memory_validate(addr, pf, true)) {
-                    Ok(_) => trace!("[memory_validate] success in kernel_trap_handler"),
-                    Err(_) => panic!("memory_validate failed"),
+                let task = current_cpu().task.as_mut();
+                if let Some(task) = task {
+                    // fixme: currently this block_on cannot be canceled
+                    warn!(
+                        "[kernel] block on memory_validate, addr: {:#x}, syscall: {:?}",
+                        addr,
+                        current_syscall(),
+                    );
+                    match block_on(task.memory_validate(addr, pf, true)) {
+                        Ok(_) => trace!("[memory_validate] success in kernel_trap_handler"),
+                        Err(_) => panic!("memory_validate failed"),
+                    }
+                } else {
+                    panic!("page fault without task running, addr: {:#x}", addr);
                 }
             }
             _ => panic!("unsupported page fault type: {:?}", pf),

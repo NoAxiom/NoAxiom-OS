@@ -1,4 +1,4 @@
-use alloc::{boxed::Box, sync::Arc};
+use alloc::boxed::Box;
 use core::{
     future::Future,
     ptr::NonNull,
@@ -307,7 +307,7 @@ fn realize_virtio_block_device_mmio() -> Option<VirtioBlockDevice<MmioTransport>
 
     let (addr, size) = dtb_info.virtio.mmio_regions[0].simplified();
     log::info!("[driver] probe virtio wrapper at {:#x}", addr);
-    let addr = addr | arch::consts::KERNEL_ADDR_OFFSET;
+    let addr = addr | arch::consts::IO_ADDR_OFFSET;
     let header = NonNull::new(addr as *mut VirtIOHeader).unwrap();
     let transport = unsafe { MmioTransport::new(header, size).unwrap() };
 

@@ -12,7 +12,7 @@ use include::{
     return_errno,
 };
 
-use crate::utils::{kernel_va_to_pa, kernel_vpn_to_ppn};
+use crate::utils::{kernel_iovpn_to_ppn, kernel_va_to_pa, kernel_vpn_to_ppn};
 
 /// addr type def
 /// note that the highter bits of pagenum isn't used and it can be any value
@@ -146,6 +146,11 @@ impl VirtPageNum {
     #[inline(always)]
     pub fn kernel_translate_into_ppn(&self) -> PhysPageNum {
         let pa = kernel_vpn_to_ppn(self.0);
+        PhysPageNum::from(pa)
+    }
+    #[inline(always)]
+    pub fn iovpn_into_ppn(&self) -> PhysPageNum {
+        let pa = kernel_iovpn_to_ppn(self.0);
         PhysPageNum::from(pa)
     }
     #[inline(always)]

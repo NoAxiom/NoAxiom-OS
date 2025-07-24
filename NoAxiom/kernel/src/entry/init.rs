@@ -1,4 +1,4 @@
-use arch::{Arch, ArchBoot, ArchInt, _entry_other_hart, consts::KERNEL_ADDR_OFFSET, ArchInfo};
+use arch::{Arch, ArchBoot, ArchInfo, ArchInt, _entry_other_hart, consts::KERNEL_ADDR_OFFSET};
 use driver::driver_init;
 use platform::dtb::init::dtb_init;
 

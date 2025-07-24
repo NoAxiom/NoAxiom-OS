@@ -135,7 +135,7 @@ fn register_virtio_pci_device(transport: PciTransport, bdf: DeviceFunction) {
 }
 
 pub(crate) fn probe_pci_bus() {
-    let base_vaddr = dtb_info().virtio.pci_ecam_base() | arch::Arch::KERNEL_ADDR_OFFSET;
+    let base_vaddr = dtb_info().virtio.pci_ecam_base() | arch::Arch::IO_ADDR_OFFSET;
     let mut root = unsafe { PciRoot::new(MmioCam::new(base_vaddr as *mut u8, Cam::Ecam)) };
 
     // PCI 32-bit MMIO space

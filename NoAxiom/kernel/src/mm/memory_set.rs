@@ -198,7 +198,7 @@ impl MemorySet {
         let mut memory_set = MemorySet::new_allocated();
         #[cfg(target_arch = "riscv64")]
         {
-            use arch::consts::{KERNEL_ADDR_OFFSET, KERNEL_VIRT_MEMORY_END};
+            use arch::consts::{IO_ADDR_OFFSET, KERNEL_VIRT_MEMORY_END};
             use platform::archs::devconf::get_mmio_regions;
             macro_rules! kernel_push_area {
                 ($($start:expr, $end:expr, $permission:expr)*) => {
@@ -247,10 +247,22 @@ impl MemorySet {
             info!("mapping memory-mapped registers");
             let mmio_regions = get_mmio_regions();
             for (start, len) in mmio_regions {
-                let s_addr = *start + KERNEL_ADDR_OFFSET;
-                let e_addr = *start + *len + KERNEL_ADDR_OFFSET;
+                let s_addr = *start + IO_ADDR_OFFSET;
+                let e_addr = *start + *len + IO_ADDR_OFFSET;
                 debug!("[kernel] pushing MMIO area: [{:#x},{:#x})", s_addr, e_addr);
-                kernel_push_area!(s_addr, e_addr, map_permission!(R, W));
+                memory_set
+                    .push_area(
+                        MapArea::new(
+                            (s_addr as usize).into(),
+                            (e_addr as usize).into(),
+                            MapType::IOPort, // IO area
+                            map_permission!(R, W),
+                            MapAreaType::KernelSpace,
+                        )
+                        .unwrap(),
+                        None,
+                    )
+                    .unwrap();
             }
         }
         memory_set.page_table().mark_as_kernel();

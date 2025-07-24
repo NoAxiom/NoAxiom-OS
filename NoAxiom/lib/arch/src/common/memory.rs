@@ -56,6 +56,7 @@ pub trait ArchMemory {
     const PHYS_MEMORY_START: usize;
     const PHYS_MEMORY_END: usize;
     const KERNEL_ADDR_OFFSET: usize;
+    const IO_ADDR_OFFSET: usize;
     type PageTable: ArchPageTable;
     fn tlb_init();
     fn tlb_flush();

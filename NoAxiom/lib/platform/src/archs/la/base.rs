@@ -1,4 +1,4 @@
-use arch::{consts::KERNEL_ADDR_OFFSET, Arch, ArchAsm, ArchInt};
+use arch::{consts::IO_ADDR_OFFSET, Arch, ArchAsm, ArchInt};
 
 use crate::archs::common::base::BaseFu;
 
@@ -7,11 +7,11 @@ const GED_PADDR: usize = 0x100E_001C;
 const UART_PADDR: usize = 0x1FE0_01E0;
 
 pub fn get_com1_addr() -> usize {
-    UART_PADDR | KERNEL_ADDR_OFFSET
+    UART_PADDR | IO_ADDR_OFFSET
 }
 
 pub fn get_ged_addr() -> usize {
-    GED_PADDR | KERNEL_ADDR_OFFSET
+    GED_PADDR | IO_ADDR_OFFSET
 }
 
 pub struct Base;

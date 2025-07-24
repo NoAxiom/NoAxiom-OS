@@ -4,8 +4,8 @@ use alloc::sync::Arc;
 use core::intrinsics::unlikely;
 
 use arch::{
-    consts::KERNEL_ADDR_OFFSET, Arch, ArchInt, ExceptionType, InterruptType, PageFaultType,
-    TrapArgs, TrapType,
+    consts::KERNEL_ADDR_OFFSET, Arch, ArchInt, ExceptionType, InterruptType, PageFaultType, TrapArgs,
+    TrapType,
 };
 
 use super::{ext_int::ext_int_handler, ipi::ipi_handler};

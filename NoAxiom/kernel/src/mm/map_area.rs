@@ -122,8 +122,13 @@ impl MapArea {
                 let flags = self.map_permission.into();
                 page_table.map(vpn, ppn, flags);
             }
+            MapType::IOPort => {
+                let ppn = vpn.iovpn_into_ppn();
+                let flags = self.map_permission.into();
+                page_table.map(vpn, ppn, flags);
+            }
             // linear: for special usage
-            MapType::Linear { ppn_offset } => {
+            MapType::Linear(ppn_offset) => {
                 let ppn = VirtPageNum::from((vpn.raw() as isize + ppn_offset) as usize)
                     .kernel_translate_into_ppn();
                 let flags = self.map_permission.into();
@@ -139,11 +144,13 @@ impl MapArea {
     /// and data frame will be saved by self
     pub fn map_each(&mut self, page_table: &mut PageTable) -> SysResult<()> {
         trace!(
-            "map_each: va_range = {:?}, ppn_range = [{:#x},{:#x}), type: {:?}",
+            "map_each: va_range = {:?}, ppn_range = [{:#x},{:#x}), type: {:?}, (IOPort?: [{:#x},{:#x}])",
             self.vpn_range,
             self.vpn_range.start().kernel_translate_into_ppn().raw(),
             self.vpn_range.end().kernel_translate_into_ppn().raw(),
-            self.map_type
+            self.map_type,
+            self.vpn_range.start().iovpn_into_ppn().raw(),
+            self.vpn_range.end().iovpn_into_ppn().raw(),
         );
         for vpn in self.vpn_range.into_iter() {
             self.map_one(vpn, page_table)?;

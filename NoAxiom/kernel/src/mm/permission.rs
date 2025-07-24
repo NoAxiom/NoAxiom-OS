@@ -15,9 +15,12 @@ pub enum MapType {
     /// Direct mapping, with simple translation, only for kernel
     Direct,
 
+    /// IO Port mapping, with page table translation
+    IOPort,
+
     /// Shifted mapping, with page table translation
     /// isize is the shift offset (phys page num offset)
-    Linear { ppn_offset: isize },
+    Linear(isize),
 }
 
 bitflags! {

@@ -1,6 +1,6 @@
 extern crate alloc;
 
-use arch::{Arch, ArchAsm, ArchMemory};
+use arch::{consts::IO_ADDR_OFFSET, Arch, ArchAsm};
 use config::cpu::CPU_NUM;
 use ksync::Once;
 use log::debug;
@@ -36,7 +36,7 @@ pub fn complete(irq: u32) {
 }
 
 pub fn init() {
-    let plic_addr = dtb_info().arch.plic | arch::Arch::KERNEL_ADDR_OFFSET;
+    let plic_addr = dtb_info().arch.plic | IO_ADDR_OFFSET;
     debug!("PLIC addr: {:#x}", plic_addr);
     let privileges = [2; CPU_NUM];
     let plic = PLIC::new(plic_addr, privileges);
