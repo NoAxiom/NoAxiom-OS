@@ -1,7 +1,5 @@
 use arch::ArchMemory;
-use driver::{
-    block::virtio_block::VirtioBlockDevice, devices::set_blk_dev, hal::VirtioHalImpl, DevResult,
-};
+use driver::{block::virtio_block::VirtioBlockDevice, hal::VirtioHalImpl, DevResult};
 use include::errno::Errno;
 use virtio_drivers::transport::{
     pci::{
@@ -15,7 +13,10 @@ use virtio_drivers::transport::{
 };
 
 use super::pci_driver::PciRangeAllocator;
-use crate::archs::devconf::{PCI_BUS_END, PCI_RANGE};
+use crate::{
+    archs::devconf::{PCI_BUS_END, PCI_RANGE},
+    device::manager::DEV_BUS,
+};
 
 const PCI_BAR_NUM: u8 = 6;
 
@@ -121,7 +122,7 @@ fn register_virtio_pci_device(transport: PciTransport, bdf: DeviceFunction) {
     match dev_type {
         DeviceType::Block => {
             let blk_dev = VirtioBlockDevice::new(transport);
-            set_blk_dev(blk_dev);
+            DEV_BUS.add_block_device(blk_dev);
         }
         _ => {
             log::warn!("[pci] IGNORED {:?} virtio device at {}", dev_type, bdf);

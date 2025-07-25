@@ -1,12 +1,15 @@
+use alloc::vec::Vec;
+
 use arch::{consts::IO_ADDR_OFFSET, Arch, ArchAsm, ArchInt};
 use config::cpu::CPU_NUM;
 use log::debug;
 use plic::{Mode, PLIC};
 
-use crate::{basic::Device, block::BlockDevice, get_blk_dev, interrupt::InterruptDevice};
+use crate::{basic::Device, interrupt::InterruptDevice, DevResult};
 
 pub struct PlicDevice {
-    dev: PLIC<CPU_NUM>,
+    controller: PLIC<CPU_NUM>,
+    devices: Vec<&'static dyn InterruptDevice>,
 }
 
 impl Device for PlicDevice {
@@ -19,10 +22,9 @@ impl Device for PlicDevice {
 }
 
 impl InterruptDevice for PlicDevice {
-    fn handle_irq(&self) {
-        if let Some(blk) = get_blk_dev() {
-            self.handle_irq_with_blk(blk)
-        }
+    fn handle_irq(&self) -> DevResult<()> {
+        let dev = *self.devices.first().unwrap();
+        self.handle_irq_with_dev(dev)
     }
 }
 
@@ -39,21 +41,22 @@ impl PlicDevice {
     }
 
     fn inner(&self) -> &PLIC<CPU_NUM> {
-        &self.dev
+        &self.controller
     }
 
-    fn handle_irq_with_blk(&self, blk: &'static dyn BlockDevice) {
+    fn handle_irq_with_dev(&self, dev: &'static dyn InterruptDevice) -> DevResult<()> {
         assert!(!Arch::is_interrupt_enabled());
         let irq = self.claim();
         log::error!("[driver] handle irq: {}", irq);
         if irq == 1 {
-            blk.handle_interrupt().expect("handle interrupt error");
+            dev.handle_irq()?;
         } else {
             log::error!("[driver] unhandled irq: {}", irq);
         }
         self.complete(irq);
         log::error!("[driver] handle irq: {} finished", irq);
         assert!(!Arch::is_interrupt_enabled());
+        Ok(())
     }
 
     fn disable_blk_irq(&self) {
@@ -102,11 +105,14 @@ impl PlicDevice {
             log::debug!("Init hifive or vf2 plic success");
         }
 
-        Self { dev: plic }
+        Self {
+            controller: plic,
+            devices: Vec::new(),
+        }
     }
 
     fn register_to_hart(&self, hart: u32) {
-        let plic = &self.dev;
+        let plic = &self.controller;
         let irq = 1;
         plic.enable(hart, Mode::Supervisor, irq);
         plic.set_threshold(hart, Mode::Supervisor, 0);

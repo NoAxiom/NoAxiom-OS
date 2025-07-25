@@ -1,5 +1,6 @@
 use alloc::{collections::btree_map::BTreeMap, sync::Arc};
 
+use device::DEV_BUS;
 use driver::net::NetWorkDevice;
 use ksync::mutex::{RwLock, SpinLock};
 use port_manager::PortManager;
@@ -21,7 +22,7 @@ lazy_static::lazy_static! {
     pub static ref UDP_PORT_MANAGER: Arc<SpinLock<PortManager>> = Arc::new(SpinLock::new(PortManager::new()));
     pub static ref NET_DEVICES: RwLock<BTreeMap<usize, &'static dyn NetWorkDevice>> = {
         let net_devices = RwLock::new(BTreeMap::new());
-        net_devices.write().insert(0, driver::get_net_dev().unwrap());
+        net_devices.write().insert(0, DEV_BUS.get_default_network_device().unwrap());
         net_devices
     };
 }

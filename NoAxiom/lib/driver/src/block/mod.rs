@@ -1,14 +1,11 @@
 pub mod virtio_block;
 use alloc::boxed::Box;
 
-use crate::{basic::Device, DevResult};
+use crate::{basic::Device, interrupt::InterruptDevice, DevResult};
 
 #[async_trait::async_trait]
 #[allow(unused_variables)]
-pub trait BlockDevice: Send + Sync + Device {
-    fn handle_interrupt(&self) -> DevResult<()> {
-        unimplemented!("{} not implement handle_interrupt!", self.device_name())
-    }
+pub trait BlockDevice: Send + Sync + Device + InterruptDevice {
     fn sync_read(&self, id: usize, buf: &mut [u8]) -> DevResult<usize> {
         unimplemented!("{} not implement read!", self.device_name())
     }

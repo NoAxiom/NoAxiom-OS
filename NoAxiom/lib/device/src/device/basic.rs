@@ -5,6 +5,8 @@ use driver::basic::DeviceType;
 use ksync::Once;
 use virtio_drivers::transport::mmio::{MmioError, MmioTransport, VirtIOHeader};
 
+use crate::device::manager::get_intr_dev;
+
 pub struct MmioRegion {
     pub addr: usize,
     pub size: usize,
@@ -13,12 +15,6 @@ pub struct MmioRegion {
 impl MmioRegion {
     pub fn new(addr: usize, size: usize) -> Self {
         Self { addr, size }
-    }
-    pub fn end_addr(&self) -> usize {
-        self.addr + self.size
-    }
-    pub fn simplified(&self) -> (usize, usize) {
-        (self.addr, self.size)
     }
     pub fn into_virtio_transport(&self) -> Result<MmioTransport, MmioError> {
         let iova = self.addr | arch::consts::IO_ADDR_OFFSET;
@@ -57,4 +53,10 @@ pub static DEV_CONFIG_MANAGER: Once<DeviceConfigManager> = Once::new();
 pub fn device_init(dtb: usize) {
     crate::device::dtb::dtb_init(dtb);
     crate::device::realize::device_realize();
+}
+
+pub fn handle_irq() {
+    if let Some(dev) = get_intr_dev() {
+        dev.handle_irq().expect("[driver] handle_irq failed");
+    }
 }

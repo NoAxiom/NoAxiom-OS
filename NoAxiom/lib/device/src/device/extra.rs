@@ -1,8 +1,10 @@
-use driver::{net::loopback::LoopBackDev, set_net_dev};
+use driver::net::loopback::LoopBackDev;
+
+use crate::device::manager::DEV_BUS;
 
 fn register_loopback_device() {
     let dev = LoopBackDev::new();
-    set_net_dev(dev);
+    DEV_BUS.add_network_device(dev);
 }
 
 pub fn register_extra_devices() {

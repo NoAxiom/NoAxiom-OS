@@ -2,7 +2,6 @@ use driver::{
     basic::{BlockDeviceType, DeviceType, InterruptDeviceType, NetDeviceType},
     block::virtio_block::VirtioBlockDevice,
     interrupt::plic::PlicDevice,
-    set_blk_dev, set_intr_dev,
 };
 use virtio_drivers::transport::{DeviceType as VirtioDevType, Transport};
 
@@ -11,6 +10,7 @@ use crate::{
     device::{
         basic::{DeviceConfig, DeviceConfigType, DEV_CONFIG_MANAGER},
         extra::register_extra_devices,
+        manager::{set_intr_dev, DEV_BUS},
     },
 };
 
@@ -26,7 +26,7 @@ fn virtio_mmio_realize(config: &DeviceConfig) {
                         config.region.size
                     );
                 let blk = VirtioBlockDevice::new(transport);
-                set_blk_dev(blk);
+                DEV_BUS.add_block_device(blk);
             }
             VirtioDevType::Network => {
                 log::info!(
@@ -60,63 +60,68 @@ fn virtio_mmio_realize(config: &DeviceConfig) {
     }
 }
 
+fn pci_realize(config: &DeviceConfig) {
+    log::info!(
+        "[platform] realize PCI ECAM device: type {:?} @ addr: {:#x}, size: {:#x}",
+        config.dev_type,
+        config.region.addr,
+        config.region.size
+    );
+    let pci_ecam_base = config.region.addr;
+    probe_pci_bus(pci_ecam_base);
+}
+
+fn normal_realize(config: &DeviceConfig) {
+    log::info!(
+        "[platform] realize normal device: type {:?} @ addr: {:#x}, size: {:#x}",
+        config.dev_type,
+        config.region.addr,
+        config.region.size
+    );
+    match config.dev_type {
+        DeviceType::Block(blk_type) => {
+            match blk_type {
+                BlockDeviceType::Virtio => {
+                    log::warn!("[platform] UNEXPECTED realize virtio block device!!! SKIP device realization");
+                }
+                _ => {
+                    log::warn!("[platform] UNKNOWN block device!!!");
+                }
+            }
+        }
+        DeviceType::Net(net_type) => {
+            match net_type {
+                NetDeviceType::Virtio => {
+                    log::warn!("[platform] UNEXPECTED realize virtio net device!!! SKIP device realization");
+                }
+                _ => {
+                    log::warn!("[platform] UNKNOWN network device!!!");
+                }
+            }
+        }
+        DeviceType::Interrupt(interrupt_type) => match interrupt_type {
+            InterruptDeviceType::PLIC => {
+                set_intr_dev(PlicDevice::new(config.region.addr));
+            }
+        },
+        _ => {
+            log::warn!(
+                "[platform] realize normal device: unknown type {:?} @ addr: {:#x}, size: {:#x}",
+                config.dev_type,
+                config.region.addr,
+                config.region.size
+            );
+        }
+    }
+}
+
 pub fn dtb_realize() {
     let manager = DEV_CONFIG_MANAGER.get().unwrap();
     for config in manager.devices.iter() {
         match config.conf_type {
-            DeviceConfigType::VirtioMmio => {
-                virtio_mmio_realize(config);
-            }
-            DeviceConfigType::PciEcam => {
-                log::info!(
-                    "[platform] realize PCI ECAM device: type {:?} @ addr: {:#x}, size: {:#x}",
-                    config.dev_type,
-                    config.region.addr,
-                    config.region.size
-                );
-                let pci_ecam_base = config.region.addr;
-                probe_pci_bus(pci_ecam_base);
-            }
-            DeviceConfigType::Normal => {
-                log::info!(
-                    "[platform] realize normal device: type {:?} @ addr: {:#x}, size: {:#x}",
-                    config.dev_type,
-                    config.region.addr,
-                    config.region.size
-                );
-                match config.dev_type {
-                    DeviceType::Block(blk_type) => match blk_type {
-                        BlockDeviceType::Virtio => {
-                            log::warn!("[platform] UNEXPECTED realize virtio block device!!! SKIP device realization");
-                            // virtio_mmio_realize(config);
-                        }
-                        _ => {
-                            log::warn!("[platform] UNKNOWN block device!!!");
-                        }
-                    },
-                    DeviceType::Net(net_type) => match net_type {
-                        NetDeviceType::Virtio => {
-                            virtio_mmio_realize(config);
-                        }
-                        _ => {
-                            log::warn!("[platform] UNKNOWN network device!!!");
-                        }
-                    },
-                    DeviceType::Interrupt(interrupt_type) => match interrupt_type {
-                        InterruptDeviceType::PLIC => {
-                            set_intr_dev(PlicDevice::new(config.region.addr));
-                        }
-                    },
-                    _ => {
-                        log::warn!(
-                            "[platform] realize normal device: unknown type {:?} @ addr: {:#x}, size: {:#x}",
-                            config.dev_type,
-                            config.region.addr,
-                            config.region.size
-                        );
-                    }
-                }
-            }
+            DeviceConfigType::VirtioMmio => virtio_mmio_realize(config),
+            DeviceConfigType::PciEcam => pci_realize(config),
+            DeviceConfigType::Normal => normal_realize(config),
         }
     }
 }

@@ -1,3 +1,5 @@
+use device::handle_irq;
+
 pub fn ext_int_handler() {
-    driver::interrupt::handle_irq();
+    handle_irq();
 }

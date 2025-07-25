@@ -19,6 +19,7 @@ use crate::{
     basic::Device,
     block::BlockDevice,
     hal::{dev_err, VirtioHalImpl},
+    interrupt::InterruptDevice,
     DevResult,
 };
 
@@ -119,12 +120,15 @@ impl<T: Transport> Device for VirtioBlockDevice<T> {
     }
 }
 
-#[async_trait]
-impl<T: Transport + Send> BlockDevice for VirtioBlockDevice<T> {
-    fn handle_interrupt(&self) -> DevResult<()> {
+impl<T: Transport> InterruptDevice for VirtioBlockDevice<T> {
+    fn handle_irq(&self) -> DevResult<()> {
         self.wake();
         Ok(())
     }
+}
+
+#[async_trait]
+impl<T: Transport + Send> BlockDevice for VirtioBlockDevice<T> {
     fn sync_read(&self, id: usize, buf: &mut [u8]) -> DevResult<usize> {
         let mut inner = self.inner.spin_lock();
         let res = inner.sync_read(id, buf);

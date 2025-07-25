@@ -10,6 +10,7 @@ pub mod pipe;
 pub mod vfs;
 
 use arch::{Arch, ArchInt};
+use device::DEV_BUS;
 
 pub async fn init() {
     info!(
@@ -23,10 +24,9 @@ pub async fn init() {
 #[allow(unused)]
 pub fn test() {
     use blockcache::get_block_cache;
-    use driver::get_blk_dev;
     // crate::sched::utils::block_on(driver::blk_dev_test(1000, 100000));
     // let dev = get_block_cache();
-    let dev = get_blk_dev().unwrap();
+    let dev = DEV_BUS.get_default_block_device().unwrap();
 
     vfs::impls::ext4::ext4_rs_test(dev);
 }
