@@ -5,7 +5,7 @@ use alloc::{
 
 use async_trait::async_trait;
 use downcast_rs::{impl_downcast, DowncastSync};
-use driver::devices::block::BlockDevice;
+use driver::block::BlockDevice;
 use ksync::Once;
 
 use super::{

@@ -1,13 +1,16 @@
-use platform::archs::{base::Base, common::base::BaseFu};
+use driver::base::{
+    char::{CharDev, CharDevice},
+    power::{PowerDev, PowerDevice},
+};
 
 pub fn getchar() -> u8 {
-    Base::getchar()
+    CharDev::getchar()
 }
 
 pub fn putchar(c: u8) {
-    Base::putchar(c);
+    CharDev::putchar(c);
 }
 
 pub fn shutdown() -> ! {
-    Base::shutdown()
+    PowerDev::shutdown()
 }

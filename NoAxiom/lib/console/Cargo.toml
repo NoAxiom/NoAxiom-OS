@@ -7,5 +7,5 @@ edition = "2021"
 debug_sig = []
 
 [dependencies]
-platform = { workspace = true }
 ksync = { workspace = true }
+driver = { workspace = true }

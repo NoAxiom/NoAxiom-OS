@@ -1,7 +1,7 @@
-use alloc::{boxed::Box, sync::Arc, vec::Vec};
+use alloc::{boxed::Box, vec::Vec};
 
 use async_trait::async_trait;
-use driver::devices::block::BlockDevice;
+use driver::block::BlockDevice;
 use fatfs::*;
 
 use crate::config::fs::BLOCK_SIZE;

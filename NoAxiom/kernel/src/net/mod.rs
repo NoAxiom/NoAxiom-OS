@@ -1,6 +1,6 @@
 use alloc::{collections::btree_map::BTreeMap, sync::Arc};
 
-use driver::devices::net::NetWorkDevice;
+use driver::net::NetWorkDevice;
 use ksync::mutex::{RwLock, SpinLock};
 use port_manager::PortManager;
 use socket_set::SocketSet;
@@ -21,7 +21,7 @@ lazy_static::lazy_static! {
     pub static ref UDP_PORT_MANAGER: Arc<SpinLock<PortManager>> = Arc::new(SpinLock::new(PortManager::new()));
     pub static ref NET_DEVICES: RwLock<BTreeMap<usize, &'static dyn NetWorkDevice>> = {
         let net_devices = RwLock::new(BTreeMap::new());
-        net_devices.write().insert(0, driver::get_net_dev());
+        net_devices.write().insert(0, driver::get_net_dev().unwrap());
         net_devices
     };
 }
@@ -46,7 +46,7 @@ pub fn get_old_socket_fd(port: u16) -> usize {
 pub mod test {
     use core::ops::DerefMut;
 
-    use driver::devices::net::loopback::LoopBackDev;
+    use driver::net::loopback::LoopBackDev;
     use ksync::mutex::SpinLock;
     use smoltcp::{
         iface::SocketSet,

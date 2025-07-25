@@ -204,8 +204,8 @@ version = "0.1.0"
 name = "console"
 version = "0.1.0"
 dependencies = [
+ "driver",
  "ksync",
- "platform",
 ]
 
 [[package]]
@@ -279,6 +279,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "device"
+version = "0.1.0"
+dependencies = [
+ "arch",
+ "config",
+ "driver",
+ "fdt",
+ "include",
+ "ksync",
+ "lazy_static",
+ "log",
+ "virtio-drivers",
+ "virtio-drivers-async",
+]
+
+[[package]]
 name = "downcast-rs"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -299,8 +315,8 @@ dependencies = [
  "lazy_static",
  "log",
  "memory",
- "platform",
  "plic",
+ "sbi-rt",
  "smoltcp",
  "spin 0.7.1",
  "virtio-drivers",
@@ -603,6 +619,7 @@ dependencies = [
  "config",
  "console",
  "crate_interface",
+ "device",
  "downcast-rs",
  "driver",
  "ext4_rs",
@@ -623,7 +640,6 @@ dependencies = [
  "num-traits",
  "paste",
  "pin-project-lite",
- "platform",
  "ringbuffer",
  "smoltcp",
  "spin 0.7.1",
@@ -732,7 +748,6 @@ dependencies = [
  "arch",
  "buddy_system_allocator",
  "config",
- "console",
  "include",
  "ksync",
  "lazy_static",
@@ -806,18 +821,6 @@ name = "pin-utils"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
-
-[[package]]
-name = "platform"
-version = "0.1.0"
-dependencies = [
- "arch",
- "config",
- "fdt",
- "ksync",
- "log",
- "sbi-rt",
-]
 
 [[package]]
 name = "plic"

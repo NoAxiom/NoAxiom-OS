@@ -4,11 +4,7 @@ use alloc::{boxed::Box, sync::Arc, vec::Vec};
 use core::num::NonZeroUsize;
 
 use async_trait::async_trait;
-use driver::devices::{
-    basic::{Device, DriverType},
-    block::BlockDevice,
-    DevResult,
-};
+use driver::{basic::Device, block::BlockDevice, DevResult};
 use ksync::{assert_no_lock, cell::SyncUnsafeCell, AsyncMutex};
 use lru::LruCache;
 
@@ -19,7 +15,7 @@ lazy_static::lazy_static! {
         cache: AsyncMutex::new(LruCache::new(
             NonZeroUsize::new(MAX_LRU_CACHE_SIZE).unwrap(),
         )),
-        block_device: driver::get_blk_dev(),
+        block_device: driver::get_blk_dev().unwrap(),
     });
 }
 
@@ -113,8 +109,8 @@ impl Device for AsyncBlockCache {
     fn device_name(&self) -> &'static str {
         "AsyncBlockCache"
     }
-    fn driver_type(&self) -> DriverType {
-        DriverType::Unknown
+    fn device_type(&self) -> &'static driver::basic::DeviceType {
+        &driver::basic::DeviceType::Unknown
     }
 }
 

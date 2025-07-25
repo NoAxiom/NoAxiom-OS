@@ -6,7 +6,6 @@ use alloc::{
 use core::fmt::{self, Debug, Formatter};
 
 use arch::consts::KERNEL_PHYS_MEMORY_END;
-use console::println;
 use ksync::mutex::SpinLock;
 use lazy_static::lazy_static;
 
@@ -108,7 +107,7 @@ impl StackFrameAllocator {
         self.start = l.0;
         self.current = l.0;
         self.end = r.0;
-        println!(
+        log::debug!(
             "[kernel] FRAME: init {} physical frames, range: [{:#x}, {:#x}]",
             (self.end - self.start) as isize,
             self.start,
@@ -209,13 +208,13 @@ impl StackFrameAllocator {
         let total = self.stat_total();
         let peak_ratio = peak * 100 / total;
         let remained_ratio = remained * 100 / total;
-        println!(
+        log::debug!(
             "[frame] current: {:#x}, end: {:#x}, recycled: {} frames",
             self.current,
             self.end,
             self.recycled.len()
         );
-        println!(
+        log::debug!(
             "[frame] peak: {}, now: {}, total: {}, peak ratio: {}%, current ratio: {}%",
             peak, remained, total, peak_ratio, remained_ratio
         );
@@ -226,7 +225,7 @@ pub fn print_frame_info() {
     if let Some(guard) = FRAME_ALLOCATOR.try_lock() {
         guard.debug()
     } else {
-        println!("[frame] FRAME_ALLOCATOR is already locked");
+        log::debug!("[frame] FRAME_ALLOCATOR is already locked");
     }
 }
 
@@ -235,7 +234,7 @@ pub fn print_frame_info_simple() {
         let remained = guard.stat_allocated();
         let total = guard.stat_total();
         let remained_ratio = remained * 100 / total;
-        println!("\u{1B}[1;90m[frame] alloc: {}%\u{1B}[0m", remained_ratio);
+        log::debug!("\u{1B}[1;90m[frame] alloc: {}%\u{1B}[0m", remained_ratio);
     }
 }
 

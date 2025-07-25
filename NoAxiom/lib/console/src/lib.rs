@@ -3,8 +3,8 @@
 
 use core::fmt::{self, Write};
 
+use driver::base::char::{CharDev, CharDevice};
 use ksync::mutex::SpinLock;
-use platform::archs::{base::Base, common::base::BaseFu};
 
 static PRINT_MUTEX: SpinLock<Stdout> = SpinLock::new(Stdout::new());
 
@@ -18,7 +18,7 @@ impl Stdout {
 impl Write for Stdout {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         for c in s.chars() {
-            Base::putchar(c as u8);
+            CharDev::putchar(c as u8);
         }
         Ok(())
     }

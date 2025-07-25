@@ -26,7 +26,7 @@ pub fn test() {
     use driver::get_blk_dev;
     // crate::sched::utils::block_on(driver::blk_dev_test(1000, 100000));
     // let dev = get_block_cache();
-    let dev = get_blk_dev();
+    let dev = get_blk_dev().unwrap();
 
     vfs::impls::ext4::ext4_rs_test(dev);
 }

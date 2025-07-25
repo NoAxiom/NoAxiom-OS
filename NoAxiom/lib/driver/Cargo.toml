@@ -10,7 +10,6 @@ default = []
 [dependencies]
 include = { workspace = true }
 arch = { workspace = true }
-platform = { workspace = true }
 ksync = { workspace = true }
 kfuture = { workspace = true }
 log = { workspace = true }
@@ -19,12 +18,8 @@ bitflags = { workspace = true }
 memory = { workspace = true }
 plic = { git = "https://github.com/os-module/plic" }
 async-trait = "0.1.50"
-virtio-drivers-async = { git = "https://github.com/YuXuaann/virtio-drivers-async" }
-# virtio-drivers = { git = "https://github.com/rcore-os/virtio-drivers", default-features = false, features = [
-#     "alloc",
-#     "embedded-io",
-# ] }
-virtio-drivers = { git = "https://github.com/YuXuaann/virtio-drivers-async", branch = "virtio-driver-0.9.0-nightly" }
+virtio-drivers-async = { workspace = true }
+virtio-drivers = { workspace = true }
 smoltcp = { version = "0.11.0", default-features = false, features = [
     "alloc",
     "log",
@@ -44,3 +39,6 @@ cfg-if = "1.0"
 volatile = "0.2"
 spin = "0.7.0"
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
+
+[target.'cfg(target_arch = "riscv64")'.dependencies]
+sbi-rt = { version = "0.0.3", features = ["legacy"] }

@@ -7,7 +7,6 @@ use core::{
 
 use buddy_system_allocator::Heap;
 use config::mm::KERNEL_HEAP_SIZE;
-use console::println;
 use ksync::mutex::SpinLock;
 
 #[global_allocator]
@@ -39,15 +38,15 @@ pub fn print_heap_info() {
         let actual = heap.stats_alloc_actual();
         let total = heap.stats_total_bytes();
         // calc in usize
-        println!("[heap] {:?}", heap);
-        println!(
+        log::debug!("[heap] {:?}", heap);
+        log::debug!(
             "[heap] alloc: {}%, real-used: {}%, utilization: {}%",
             actual * 100 / total,
             user * 100 / total,
             user * 100 / actual,
         );
     } else {
-        println!("[heap] HEAP_ALLOCATOR is already locked");
+        log::debug!("[heap] HEAP_ALLOCATOR is already locked");
     }
 }
 
@@ -56,7 +55,7 @@ pub fn print_heap_info_simple() {
         let user = heap.stats_alloc_user();
         let actual = heap.stats_alloc_actual();
         let total = heap.stats_total_bytes();
-        println!(
+        log::debug!(
             "\u{1B}[1;90m[heap]  alloc: {}%, used: {}%\u{1B}[0m",
             actual * 100 / total,
             user * 100 / total,

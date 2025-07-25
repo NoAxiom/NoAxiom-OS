@@ -1,7 +1,7 @@
 use alloc::{boxed::Box, sync::Arc};
 
 use async_trait::async_trait;
-use driver::devices::block::BlockDevice;
+use driver::block::BlockDevice;
 use ext4_rs::ext4_defs::ROOT_INODE;
 use ksync::AsyncMutex;
 

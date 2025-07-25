@@ -2,25 +2,18 @@
 #![allow(deprecated)]
 #![feature(impl_trait_in_assoc_type)]
 
-use crate::{
-    archs::arch_driver_init,
-    bus::bus_init,
-    devices::{block::block_init, net::net_init},
-};
 extern crate alloc;
 
-mod archs;
-mod bus;
+pub mod base;
+pub mod basic;
+pub mod block;
 pub mod devices;
-mod irq;
-mod macros;
+pub mod display;
+pub mod hal;
+pub mod interrupt;
+pub(crate) mod macros;
+pub mod net;
 
-pub use devices::manager::*;
-pub use irq::handle_irq;
+pub type DevResult<T> = Result<T, include::errno::Errno>;
 
-pub fn driver_init() {
-    bus_init();
-    block_init();
-    net_init();
-    arch_driver_init();
-}
+pub use devices::*;
