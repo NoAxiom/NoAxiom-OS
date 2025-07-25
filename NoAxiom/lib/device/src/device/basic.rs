@@ -5,7 +5,7 @@ use driver::basic::DeviceType;
 use ksync::Once;
 use virtio_drivers::transport::mmio::{MmioError, MmioTransport, VirtIOHeader};
 
-use crate::device::manager::get_intr_dev;
+use crate::device::manager::get_int_ctrl_dev;
 
 pub struct MmioRegion {
     pub addr: usize,
@@ -56,7 +56,7 @@ pub fn device_init(dtb: usize) {
 }
 
 pub fn handle_irq() {
-    if let Some(dev) = get_intr_dev() {
+    if let Some(dev) = get_int_ctrl_dev() {
         dev.handle_irq().expect("[driver] handle_irq failed");
     }
 }

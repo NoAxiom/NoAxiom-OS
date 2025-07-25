@@ -396,7 +396,7 @@ impl Socket for TcpSocket {
         yield_now().await; // amazing yield maybe
 
         let driver_write_guard = NET_DEVICES.write();
-        let iface = driver_write_guard.get(&0).unwrap().clone(); // now we only have one net device
+        let iface = *driver_write_guard.get(&0).unwrap(); // now we only have one net device
         drop(driver_write_guard);
         let mut sockets = SOCKET_SET.lock();
         let local_socket = sockets.get_mut::<tcp::Socket>(self.handles[0]);
@@ -440,7 +440,7 @@ impl Socket for TcpSocket {
                     }
                     error!("[Tcp {}] connect loop: Closed", self.handles[0]);
                     let driver_write_guard = NET_DEVICES.write();
-                    let iface = driver_write_guard.get(&0).unwrap().clone(); // now we only have one net device
+                    let iface = *driver_write_guard.get(&0).unwrap(); // now we only have one net device
                     drop(driver_write_guard);
 
                     let mut iface_inner = iface.inner_iface().lock();

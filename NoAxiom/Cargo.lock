@@ -316,6 +316,7 @@ name = "driver"
 version = "0.1.0"
 dependencies = [
  "arch",
+ "array-init",
  "async-trait",
  "bitfield-struct",
  "bitflags 2.9.1",

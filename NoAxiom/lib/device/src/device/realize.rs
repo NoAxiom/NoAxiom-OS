@@ -9,8 +9,7 @@ use crate::{
     bus::pci::probe_pci_bus,
     device::{
         basic::{DeviceConfig, DeviceConfigType, DEV_CONFIG_MANAGER},
-        extra::register_extra_devices,
-        manager::{set_intr_dev, DEV_BUS},
+        manager::{get_int_ctrl_dev, set_int_ctrl_dev, DEV_BUS},
     },
 };
 
@@ -101,7 +100,7 @@ fn normal_realize(config: &DeviceConfig) {
         }
         DeviceType::Interrupt(interrupt_type) => match interrupt_type {
             InterruptDeviceType::PLIC => {
-                set_intr_dev(PlicDevice::new(config.region.addr));
+                set_int_ctrl_dev(PlicDevice::new(config.region.addr));
             }
         },
         _ => {
@@ -111,6 +110,14 @@ fn normal_realize(config: &DeviceConfig) {
                 config.region.addr,
                 config.region.size
             );
+        }
+    }
+}
+
+fn int_ctrl_realize() {
+    if let Some(ic) = get_int_ctrl_dev() {
+        for &dev in DEV_BUS.interrupt.lock().iter() {
+            ic.register_dev(dev);
         }
     }
 }
@@ -127,6 +134,6 @@ pub fn dtb_realize() {
 }
 
 pub fn device_realize() {
-    register_extra_devices();
     dtb_realize();
+    int_ctrl_realize();
 }

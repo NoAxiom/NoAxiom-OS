@@ -1,7 +1,10 @@
 use alloc::{boxed::Box, vec::Vec};
 
 use driver::{
-    block::BlockDevice, device_cast, display::DisplayDevice, interrupt::InterruptDevice,
+    block::BlockDevice,
+    device_cast,
+    display::DisplayDevice,
+    interrupt::{InterruptControllerDevice, InterruptDevice},
     net::NetWorkDevice,
 };
 use ksync::mutex::SpinLock;
@@ -23,14 +26,19 @@ macro_rules! define_global_device {
     };
 }
 
-define_global_device!(INTR_DEV, get_intr_dev, set_intr_dev, InterruptDevice);
+define_global_device!(
+    INT_CTRL_DEV,
+    get_int_ctrl_dev,
+    set_int_ctrl_dev,
+    InterruptControllerDevice
+);
 
 pub struct GeneralBus {
     // interrupt devices do not contain intr controller
     pub block: SpinLock<Vec<&'static dyn BlockDevice>>,
     pub display: SpinLock<Vec<&'static dyn DisplayDevice>>,
     pub network: SpinLock<Vec<&'static dyn NetWorkDevice>>,
-    pub intr: SpinLock<Vec<&'static dyn InterruptDevice>>,
+    pub interrupt: SpinLock<Vec<&'static dyn InterruptDevice>>,
 }
 
 impl GeneralBus {
@@ -39,22 +47,31 @@ impl GeneralBus {
             display: SpinLock::new(Vec::new()),
             block: SpinLock::new(Vec::new()),
             network: SpinLock::new(Vec::new()),
-            intr: SpinLock::new(Vec::new()),
+            interrupt: SpinLock::new(Vec::new()),
         }
     }
-    pub fn add_block_device<T: BlockDevice + 'static>(&self, dev: T) {
+    pub fn add_block_device<T: BlockDevice + 'static>(&self, dev: T) -> &'static dyn BlockDevice {
         let dev: &'static dyn BlockDevice = Box::leak(Box::new(dev));
         let intr = device_cast!(dev, InterruptDevice);
         self.block.lock().push(dev);
-        self.intr.lock().push(intr);
+        self.interrupt.lock().push(intr);
+        dev
     }
-    pub fn add_display_device<T: DisplayDevice + 'static>(&self, dev: T) {
+    pub fn add_display_device<T: DisplayDevice + 'static>(
+        &self,
+        dev: T,
+    ) -> &'static dyn DisplayDevice {
         let dev: &'static dyn DisplayDevice = Box::leak(Box::new(dev));
         self.display.lock().push(dev);
+        dev
     }
-    pub fn add_network_device<T: NetWorkDevice + 'static>(&self, dev: T) {
+    pub fn add_network_device<T: NetWorkDevice + 'static>(
+        &self,
+        dev: T,
+    ) -> &'static dyn NetWorkDevice {
         let dev: &'static dyn NetWorkDevice = Box::leak(Box::new(dev));
         self.network.lock().push(dev);
+        dev
     }
     pub fn get_default_block_device(&self) -> Option<&'static dyn BlockDevice> {
         self.block.lock().first().copied()

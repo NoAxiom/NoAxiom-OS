@@ -1,7 +1,7 @@
 use alloc::{collections::btree_map::BTreeMap, sync::Arc};
 
 use device::DEV_BUS;
-use driver::net::NetWorkDevice;
+use driver::net::{loopback::LoopBackDev, NetWorkDevice};
 use ksync::mutex::{RwLock, SpinLock};
 use port_manager::PortManager;
 use socket_set::SocketSet;
@@ -22,7 +22,16 @@ lazy_static::lazy_static! {
     pub static ref UDP_PORT_MANAGER: Arc<SpinLock<PortManager>> = Arc::new(SpinLock::new(PortManager::new()));
     pub static ref NET_DEVICES: RwLock<BTreeMap<usize, &'static dyn NetWorkDevice>> = {
         let net_devices = RwLock::new(BTreeMap::new());
-        net_devices.write().insert(0, DEV_BUS.get_default_network_device().unwrap());
+        let dev = LoopBackDev::new();
+        DEV_BUS.add_network_device(dev);
+        net_devices.write().extend(
+            DEV_BUS
+                .network
+                .lock()
+                .iter()
+                .enumerate()
+                .map(|(i, dev)| (i, *dev))
+        );
         net_devices
     };
 }

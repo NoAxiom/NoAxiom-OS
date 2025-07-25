@@ -1,15 +1,19 @@
-use alloc::vec::Vec;
-
 use arch::{consts::IO_ADDR_OFFSET, Arch, ArchAsm, ArchInt};
-use config::cpu::CPU_NUM;
+use array_init::array_init;
+use config::cpu::{CPU_NUM, PLIC_SLOTS};
+use ksync::Once;
 use log::debug;
 use plic::{Mode, PLIC};
 
-use crate::{basic::Device, interrupt::InterruptDevice, DevResult};
+use crate::{
+    basic::Device,
+    interrupt::{InterruptControllerDevice, InterruptDevice},
+    DevResult,
+};
 
 pub struct PlicDevice {
     controller: PLIC<CPU_NUM>,
-    devices: Vec<&'static dyn InterruptDevice>,
+    devices: [[Once<&'static dyn InterruptDevice>; PLIC_SLOTS]; CPU_NUM],
 }
 
 impl Device for PlicDevice {
@@ -23,8 +27,19 @@ impl Device for PlicDevice {
 
 impl InterruptDevice for PlicDevice {
     fn handle_irq(&self) -> DevResult<()> {
-        let dev = *self.devices.first().unwrap();
+        let entry = &self.devices[Arch::get_hartid()][0];
+        let dev = *entry.get().unwrap();
         self.handle_irq_with_dev(dev)
+    }
+}
+
+impl InterruptControllerDevice for PlicDevice {
+    fn register_dev(&self, dev: &'static dyn InterruptDevice) {
+        log::info!("[driver] Registering device: {}", dev.device_name());
+        // todo add hart here
+        for i in 0..CPU_NUM {
+            self.devices[i][0].call_once(|| dev);
+        }
     }
 }
 
@@ -107,7 +122,7 @@ impl PlicDevice {
 
         Self {
             controller: plic,
-            devices: Vec::new(),
+            devices: array_init(|_| array_init(|_| Once::new())),
         }
     }
 

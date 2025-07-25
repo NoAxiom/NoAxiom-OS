@@ -117,8 +117,7 @@ impl Device for AsyncBlockCache {
 
 impl InterruptDevice for AsyncBlockCache {
     fn handle_irq(&self) -> DevResult<()> {
-        // No IRQ for block cache
-        Ok(())
+        unreachable!("Block cache should not handle IRQs");
     }
 }
 
