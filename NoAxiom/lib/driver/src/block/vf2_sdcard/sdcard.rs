@@ -1,4 +1,4 @@
-use arch::{consts::IO_ADDR_OFFSET, Arch, ArchTime};
+use arch::{Arch, ArchTime};
 use ksync::AsyncMutex;
 
 use crate::{
@@ -10,6 +10,7 @@ use crate::{
         },
         BlockDevice,
     },
+    interrupt::InterruptDevice,
     DevResult,
 };
 
@@ -90,6 +91,12 @@ impl Device for VF2SdcardDevice {
     }
     fn device_type(&self) -> &'static DeviceType {
         &DeviceType::Block(BlockDeviceType::PhysRV)
+    }
+}
+
+impl InterruptDevice for VF2SdcardDevice {
+    fn handle_irq(&self) -> DevResult<()> {
+        unimplemented!()
     }
 }
 
