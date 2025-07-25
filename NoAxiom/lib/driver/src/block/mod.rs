@@ -1,3 +1,4 @@
+pub mod vf2_sdcard;
 pub mod virtio_block;
 use alloc::boxed::Box;
 
