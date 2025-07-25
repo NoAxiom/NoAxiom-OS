@@ -1,28 +1,42 @@
+use arch::consts::IO_ADDR_OFFSET;
 use bitfield_struct::bitfield;
+use ksync::Once;
 
 use crate::block::vf2_sdcard::{cmd::Cmd, utils::GetBit};
 
-pub const SDIO_BASE: usize = 0x16020000;
-pub const CTRL_REG: usize = SDIO_BASE + 0x00;
-pub const POWER_REG: usize = SDIO_BASE + 0x04;
-pub const BLK_SIZE_REG: usize = SDIO_BASE + 0x1c;
-pub const BYTE_CNT_REG: usize = SDIO_BASE + 0x20;
-pub const CMD_REG: usize = SDIO_BASE + 0x2c;
-pub const ARG_REG: usize = SDIO_BASE + 0x28;
-pub const RESP0_REG: usize = SDIO_BASE + 0x30;
-pub const RESP1_REG: usize = SDIO_BASE + 0x34;
-pub const RESP2_REG: usize = SDIO_BASE + 0x38;
-pub const RESP3_REG: usize = SDIO_BASE + 0x3c;
-pub const STATUS_REG: usize = SDIO_BASE + 0x48;
-pub const CDETECT_REG: usize = SDIO_BASE + 0x50;
-pub const BUS_MODE_REG: usize = SDIO_BASE + 0x80;
-pub const CTYPE_REG: usize = SDIO_BASE + 0x18;
-pub const CLOCK_ENABLE_REG: usize = SDIO_BASE + 0x10;
-pub const DBADDRL_REG: usize = SDIO_BASE + 0x88; // DMA DES Address Lower
-pub const DBADDRU_REG: usize = SDIO_BASE + 0x8c; // DMA DES Address Upper
-pub const CLK_DIVIDER_REG: usize = SDIO_BASE + 0x08;
-pub const RAW_INT_STATUS_REG: usize = SDIO_BASE + 0x44;
-pub const FIFO_DATA_REG: usize = SDIO_BASE + 0x600;
+pub static SDIO_BASE: Once<usize> = Once::new();
+pub fn get_sdio_vbase() -> usize {
+    *SDIO_BASE.get().unwrap()
+}
+pub fn get_sdio_pbase() -> usize {
+    *SDIO_BASE.get().unwrap() | IO_ADDR_OFFSET
+}
+pub fn set_sdio_base(base: usize) {
+    SDIO_BASE.call_once(|| base);
+}
+
+lazy_static::lazy_static! {
+    pub static ref CTRL_REG: usize = get_sdio_vbase() + 0x00;
+    pub static ref POWER_REG: usize = get_sdio_vbase() + 0x04;
+    pub static ref BLK_SIZE_REG: usize = get_sdio_vbase() + 0x1c;
+    pub static ref BYTE_CNT_REG: usize = get_sdio_vbase() + 0x20;
+    pub static ref CMD_REG: usize = get_sdio_vbase() + 0x2c;
+    pub static ref ARG_REG: usize = get_sdio_vbase() + 0x28;
+    pub static ref RESP0_REG: usize = get_sdio_vbase() + 0x30;
+    pub static ref RESP1_REG: usize = get_sdio_vbase() + 0x34;
+    pub static ref RESP2_REG: usize = get_sdio_vbase() + 0x38;
+    pub static ref RESP3_REG: usize = get_sdio_vbase() + 0x3c;
+    pub static ref STATUS_REG: usize = get_sdio_vbase() + 0x48;
+    pub static ref CDETECT_REG: usize = get_sdio_vbase() + 0x50;
+    pub static ref BUS_MODE_REG: usize = get_sdio_vbase() + 0x80;
+    pub static ref CTYPE_REG: usize = get_sdio_vbase() + 0x18;
+    pub static ref CLOCK_ENABLE_REG: usize = get_sdio_vbase() + 0x10;
+    pub static ref DBADDRL_REG: usize = get_sdio_vbase() + 0x88; // DMA DES Address Lower
+    pub static ref DBADDRU_REG: usize = get_sdio_vbase() + 0x8c; // DMA DES Address Upper
+    pub static ref CLK_DIVIDER_REG: usize = get_sdio_vbase() + 0x08;
+    pub static ref RAW_INT_STATUS_REG: usize = get_sdio_vbase() + 0x44;
+    pub static ref FIFO_DATA_REG: usize = get_sdio_vbase() + 0x600;
+}
 
 macro_rules! impl_into_u32 {
     ($name:ident) => {

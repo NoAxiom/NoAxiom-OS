@@ -14,10 +14,10 @@ pub trait BlockDevice: Send + Sync + Device + InterruptDevice {
         unimplemented!("{} not implement write!", self.device_name())
     }
     async fn read(&self, id: usize, buf: &mut [u8]) -> DevResult<usize> {
-        unimplemented!("{} not implement read!", self.device_name())
+        self.sync_read(id, buf)
     }
     async fn write(&self, id: usize, buf: &[u8]) -> DevResult<usize> {
-        unimplemented!("{} not implement read!", self.device_name())
+        self.sync_write(id, buf)
     }
     async fn sync_all(&self) -> DevResult<()> {
         unimplemented!("{} not implement sync_all!", self.device_name())

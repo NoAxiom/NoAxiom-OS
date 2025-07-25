@@ -1,5 +1,6 @@
 pub mod cmd;
 pub mod register;
+pub mod sdcard;
 pub mod utils;
 use core::{
     fmt::{Display, Formatter},
@@ -19,7 +20,7 @@ enum DataTransType<'a> {
 
 fn wait_ms_util_can_send_cmd<T: SDIo, S: SleepOps>(io: &mut T) -> bool {
     let f = || {
-        let cmd_reg = CmdReg::from(read_reg(io, CMD_REG));
+        let cmd_reg = CmdReg::from(read_reg(io, *CMD_REG));
         !cmd_reg.start_cmd()
     };
     S::sleep_ms_until(1, f);
@@ -28,7 +29,7 @@ fn wait_ms_util_can_send_cmd<T: SDIo, S: SleepOps>(io: &mut T) -> bool {
 
 fn wait_ms_util_can_send_data<T: SDIo, S: SleepOps>(io: &mut T) -> bool {
     let f = || {
-        let status_reg = StatusReg::from(read_reg(io, STATUS_REG));
+        let status_reg = StatusReg::from(read_reg(io, *STATUS_REG));
         !status_reg.data_busy()
     };
     S::sleep_ms_until(100, f);
@@ -37,7 +38,7 @@ fn wait_ms_util_can_send_data<T: SDIo, S: SleepOps>(io: &mut T) -> bool {
 
 fn wait_ms_util_response<T: SDIo, S: SleepOps>(io: &mut T) -> bool {
     let f = || {
-        let raw_int_status_reg = RawInterruptStatusReg::from(read_reg(io, RAW_INT_STATUS_REG));
+        let raw_int_status_reg = RawInterruptStatusReg::from(read_reg(io, *RAW_INT_STATUS_REG));
         let int = raw_int_status_reg.int_status();
         let raw_int_status = RawInterrupt::from(int);
         raw_int_status.command_done()
@@ -47,7 +48,7 @@ fn wait_ms_util_response<T: SDIo, S: SleepOps>(io: &mut T) -> bool {
 }
 
 fn fifo_filled_cnt<T: SDIo>(io: &mut T) -> usize {
-    let status = StatusReg::from(read_reg(io, STATUS_REG));
+    let status = StatusReg::from(read_reg(io, *STATUS_REG));
     status.fifo_count() as usize
 }
 
@@ -66,8 +67,8 @@ fn send_cmd<T: SDIo, S: SleepOps>(
     }
     // info!("send cmd type:{:?}, value:{:#?}", cmd_type, cmd);
     // write arg
-    write_reg(io, ARG_REG, arg.into());
-    write_reg(io, CMD_REG, cmd.into());
+    write_reg(io, *ARG_REG, arg.into());
+    write_reg(io, *CMD_REG, cmd.into());
     // Wait for cmd accepted
     let command_accept = wait_ms_util_can_send_cmd::<_, S>(io);
     // info!("command accepted {}", command_accept);
@@ -78,14 +79,14 @@ fn send_cmd<T: SDIo, S: SleepOps>(
     }
 
     if cmd.data_expected() {
-        let mut fifo_addr = FIFO_DATA_REG;
+        let mut fifo_addr = *FIFO_DATA_REG;
         match data_trans_type {
             DataTransType::Read(buffer) => {
                 // info!("data_expected read....");
                 let mut buf_offset = 0;
                 S::sleep_ms_until(250, || {
                     let raw_int_status_reg =
-                        RawInterruptStatusReg::from(read_reg(io, RAW_INT_STATUS_REG));
+                        RawInterruptStatusReg::from(read_reg(io, *RAW_INT_STATUS_REG));
                     let int = raw_int_status_reg.int_status();
                     let mut raw_int_status = RawInterrupt::from(int);
                     if raw_int_status.rxdr() {
@@ -113,7 +114,7 @@ fn send_cmd<T: SDIo, S: SleepOps>(
             DataTransType::Write(buffer) => {
                 let mut buf_offset = 0;
                 S::sleep_ms_until(250, || {
-                    let raw_int_status = read_reg(io, RAW_INT_STATUS_REG);
+                    let raw_int_status = read_reg(io, *RAW_INT_STATUS_REG);
                     let mut raw_int_status = RawInterrupt::from(raw_int_status as u16);
                     if raw_int_status.txdr() {
                         debug!("TXDR....");
@@ -140,16 +141,16 @@ fn send_cmd<T: SDIo, S: SleepOps>(
         debug!("Current FIFO count: {}", fifo_filled_cnt(io));
     }
     // Clear interrupt by writing 1
-    let raw_int_status = read_reg(io, RAW_INT_STATUS_REG);
-    write_reg(io, RAW_INT_STATUS_REG, raw_int_status);
+    let raw_int_status = read_reg(io, *RAW_INT_STATUS_REG);
+    write_reg(io, *RAW_INT_STATUS_REG, raw_int_status);
     // check error
     let raw_int_status = RawInterruptStatusReg::from(raw_int_status);
     let mut raw_int_status = RawInterrupt::from(raw_int_status.int_status());
     let resp = [
-        read_reg(io, RESP0_REG),
-        read_reg(io, RESP1_REG),
-        read_reg(io, RESP2_REG),
-        read_reg(io, RESP3_REG),
+        read_reg(io, *RESP0_REG),
+        read_reg(io, *RESP1_REG),
+        read_reg(io, *RESP2_REG),
+        read_reg(io, *RESP3_REG),
     ];
     if raw_int_status.have_error() {
         error!("card has error {:#?}", raw_int_status);
@@ -163,8 +164,8 @@ fn send_cmd<T: SDIo, S: SleepOps>(
 fn reset_clock<T: SDIo, S: SleepOps>(io: &mut T) {
     // disable clock
     let mut clock_enable = ClockEnableReg::from(0);
-    // write to CLOCK_ENABLE_REG
-    write_reg(io, CLOCK_ENABLE_REG, clock_enable.into());
+    // write to *CLOCK_ENABLE_REG
+    write_reg(io, *CLOCK_ENABLE_REG, clock_enable.into());
     // send reset clock command
     let clock_cmd = CmdReg::from(0)
         .with_start_cmd(true)
@@ -179,11 +180,11 @@ fn reset_clock<T: SDIo, S: SleepOps>(io: &mut T) {
     );
     // set clock divider to 400kHz (low)
     let clock_divider = ClockDividerReg::new().with_clk_divider0(4);
-    write_reg(io, CLK_DIVIDER_REG, clock_divider.into());
+    write_reg(io, *CLK_DIVIDER_REG, clock_divider.into());
     // send_cmd(Cmd::ResetClock,clock_disable_cmd,CmdArg::new(0));
     // enable clock
     clock_enable.set_clk_enable(1);
-    write_reg(io, CLOCK_ENABLE_REG, clock_enable.into());
+    write_reg(io, *CLOCK_ENABLE_REG, clock_enable.into());
     // send reset clock command
     send_cmd::<_, S>(
         io,
@@ -194,37 +195,37 @@ fn reset_clock<T: SDIo, S: SleepOps>(io: &mut T) {
     );
     info!(
         "now clk enable {:#?}",
-        ClockEnableReg::from(read_reg(io, CLOCK_ENABLE_REG))
+        ClockEnableReg::from(read_reg(io, *CLOCK_ENABLE_REG))
     );
     log::debug!("reset clock success");
 }
 
 fn reset_fifo<T: SDIo>(io: &mut T) {
-    let ctrl = ControlReg::from(read_reg(io, CTRL_REG)).with_fifo_reset(true);
+    let ctrl = ControlReg::from(read_reg(io, *CTRL_REG)).with_fifo_reset(true);
     // todo!(why write to fifo data)?
-    // write_reg(CTRL_REG,ctrl.raw());
-    write_reg(io, FIFO_DATA_REG, ctrl.into());
+    // write_reg(*CTRL_REG,ctrl.raw());
+    write_reg(io, *FIFO_DATA_REG, ctrl.into());
     log::debug!("reset fifo success");
 }
 
 fn reset_dma<T: SDIo>(io: &mut T) {
-    let buf_mode_reg = BusModeReg::from(read_reg(io, BUS_MODE_REG))
+    let buf_mode_reg = BusModeReg::from(read_reg(io, *BUS_MODE_REG))
         .with_de(false)
         .with_swr(true);
-    write_reg(io, BUS_MODE_REG, buf_mode_reg.into());
-    let ctrl = ControlReg::from(read_reg(io, CTRL_REG))
+    write_reg(io, *BUS_MODE_REG, buf_mode_reg.into());
+    let ctrl = ControlReg::from(read_reg(io, *CTRL_REG))
         .with_dma_reset(true)
         .with_use_internal_dmac(false);
     // ctrl.dma_enable().set(u1!(0));
-    write_reg(io, CTRL_REG, ctrl.into());
+    write_reg(io, *CTRL_REG, ctrl.into());
     log::debug!("reset dma success");
 }
 
 fn set_transaction_size<T: SDIo>(io: &mut T, blk_size: u32, byte_count: u32) {
     let blk_size = BlkSizeReg::new(blk_size);
-    write_reg(io, BLK_SIZE_REG, blk_size.into());
+    write_reg(io, *BLK_SIZE_REG, blk_size.into());
     let byte_count = ByteCountReg::new(byte_count);
-    write_reg(io, BYTE_CNT_REG, byte_count.into());
+    write_reg(io, *BLK_SIZE_REG, byte_count.into());
 }
 
 fn test_read<T: SDIo, S: SleepOps>(io: &mut T) {
@@ -303,7 +304,7 @@ fn check_bus_width<T: SDIo, S: SleepOps>(io: &mut T, rca: u32) -> usize {
         DataTransType::Read(&mut buffer),
     );
     // info!("Current FIFO count: {}", fifo_filled_cnt(io)); //2
-    let resp = u64::from_be(read_fifo(io, FIFO_DATA_REG));
+    let resp = u64::from_be(read_fifo(io, *FIFO_DATA_REG));
     log::debug!("Bus width supported: {:b}", (resp >> 48) & 0xF);
     // info!("Current FIFO count: {}", fifo_filled_cnt(io)); //0
     0
@@ -412,30 +413,30 @@ fn check_big_support<T: SDIo, S: SleepOps>(io: &mut T) -> bool {
 
 fn init_sdcard<T: SDIo, S: SleepOps>(io: &mut T) {
     // read DETECT_REG
-    let detect = read_reg(io, CDETECT_REG);
+    let detect = read_reg(io, *CDETECT_REG);
     info!("detect: {:#?}", CDetectReg::new(detect));
     // read POWER_REG
-    let power = read_reg(io, POWER_REG);
+    let power = read_reg(io, *POWER_REG);
     info!("power: {:#?}", PowerReg::new(power));
-    // read CLOCK_ENABLE_REG
-    let clock_enable = read_reg(io, CLOCK_ENABLE_REG);
+    // read *CLOCK_ENABLE_REG
+    let clock_enable = read_reg(io, *CLOCK_ENABLE_REG);
     info!("clock_enable: {:#?}", ClockEnableReg::from(clock_enable));
     // read CARD_TYPE_REG
-    let card_type = read_reg(io, CTYPE_REG);
+    let card_type = read_reg(io, *CTYPE_REG);
     info!("card_type: {:#?}", CardTypeReg::from(card_type));
     // read Control Register
-    let control = read_reg(io, CTRL_REG);
+    let control = read_reg(io, *CTRL_REG);
     info!("control: {:#?}", ControlReg::from(control));
     // read  bus mode register
-    let bus_mode = read_reg(io, BUS_MODE_REG);
+    let bus_mode = read_reg(io, *BUS_MODE_REG);
     info!("bus_mode(DMA): {:#?}", BusModeReg::from(bus_mode));
     // read DMA Descriptor List Base Address Register
-    let dma_desc_base_lower = read_reg(io, DBADDRL_REG);
-    let dma_desc_base_upper = read_reg(io, DBADDRU_REG);
+    let dma_desc_base_lower = read_reg(io, *DBADDRL_REG);
+    let dma_desc_base_upper = read_reg(io, *DBADDRU_REG);
     let dma_desc_base: usize = dma_desc_base_lower as usize | (dma_desc_base_upper as usize) << 32;
     info!("dma_desc_base: {:#x?}", dma_desc_base);
     // read clock divider register
-    let clock_divider = read_reg(io, CLK_DIVIDER_REG);
+    let clock_divider = read_reg(io, *CLK_DIVIDER_REG);
     info!("clock_divider: {:#?}", ClockDividerReg::from(clock_divider));
 
     // reset card clock to 400Mhz
@@ -445,12 +446,12 @@ fn init_sdcard<T: SDIo, S: SleepOps>(io: &mut T) {
 
     // set data width --> 1bit
     let ctype = CardTypeReg::from(0).with_card_width4_1(0);
-    write_reg(io, CTYPE_REG, ctype.into());
+    write_reg(io, *CTYPE_REG, ctype.into());
 
     // reset dma
     reset_dma(io);
 
-    let ctrl = ControlReg::from(read_reg(io, CTRL_REG));
+    let ctrl = ControlReg::from(read_reg(io, *CTRL_REG));
     info!("ctrl: {:#?}", ctrl);
 
     // go idle state
@@ -475,14 +476,14 @@ fn init_sdcard<T: SDIo, S: SleepOps>(io: &mut T) {
     check_csd::<_, S>(io, rca);
 
     // let raw_int_status =
-    // RawInterruptStatusReg::from(read_reg(io,RAW_INT_STATUS_REG)); log::debug!("
-    // RAW_INT_STATUS_REG: {:#?}", raw_int_status);
+    // RawInterruptStatusReg::from(read_reg(io,*RAW_INT_STATUS_REG)); log::debug!("
+    // *RAW_INT_STATUS_REG: {:#?}", raw_int_status);
 
     S::sleep_ms(1);
 
     select_card::<_, S>(io, rca);
 
-    let status = StatusReg::from(read_reg(io, STATUS_REG));
+    let status = StatusReg::from(read_reg(io, *STATUS_REG));
     // info!("Now FIFO Count is {}", status.fifo_count());
 
     // check bus width
@@ -491,11 +492,14 @@ fn init_sdcard<T: SDIo, S: SleepOps>(io: &mut T) {
     test_read::<_, S>(io);
     // test_write_read();
 
-    info!("CTRL_REG: {:#?}", ControlReg::from(read_reg(io, CTRL_REG)));
-    let raw_int_status = RawInterruptStatusReg::from(read_reg(io, RAW_INT_STATUS_REG));
-    info!("RAW_INT_STATUS_REG: {:#?}", raw_int_status);
+    info!(
+        "*CTRL_REG: {:#?}",
+        ControlReg::from(read_reg(io, *CTRL_REG))
+    );
+    let raw_int_status = RawInterruptStatusReg::from(read_reg(io, *RAW_INT_STATUS_REG));
+    info!("*RAW_INT_STATUS_REG: {:#?}", raw_int_status);
     // Clear interrupt by writing 1
-    write_reg(io, RAW_INT_STATUS_REG, raw_int_status.into());
+    write_reg(io, *RAW_INT_STATUS_REG, raw_int_status.into());
 
     log::debug!("init sd success");
 }
