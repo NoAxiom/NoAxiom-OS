@@ -35,11 +35,13 @@ BUILD_ARGS += INIT_PROC=runtests
 BUILD_ARGS += ON_SCREEN=false
 BUILD_ARGS += LOG=DEBUG
 BUILD_ARGS += ARCH_NAME=loongarch64
+BUILD_ARGS += FEAT_ON_QEMU=false
 
 default: build img uimage run
 
 build:
 	@echo $(NORMAL)"[2k-1000 Test] Building $(ARCH_NAME) NoAxiom Kernel..."$(RESET)
+	@mkdir -p $(IMG_DIR)
 	@cd $(ROOT) && make build $(BUILD_ARGS)
 
 img:

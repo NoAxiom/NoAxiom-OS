@@ -20,6 +20,7 @@ export NORMAL := "\e[32m"
 export RESET := "\e[0m"
 export RELEASE ?= false
 export TOOLCHAIN_DIR := $(ROOT)/utils/toolchain
+export FEAT_ON_QEMU ?= true
 
 # Arch config
 ifeq ($(ARCH_NAME),riscv64) # RISC-V64

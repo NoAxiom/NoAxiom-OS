@@ -1,5 +1,6 @@
 #!/bin/sh
 SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
+echo "Script path: $SCRIPTPATH"
 BIOS="$SCRIPTPATH"/u-boot-with-spl.bin
 # 检查是否已存在软链接，避免重复创建
 [ ! -L /tmp/qemu ] && ln -sf "$SCRIPTPATH"/../tmp/qemu /tmp/qemu
@@ -24,5 +25,4 @@ DEBUG_GMAC_PHYAD=0 "$QEMU"\
          -smp threads=1 \
          -hda $FS_IMG \
          -s $@ 2>&1 \
-         -machine dumpdtb=/home/ecs-user/os/laqemu.dtb \
         #  -hda $HARDDISK

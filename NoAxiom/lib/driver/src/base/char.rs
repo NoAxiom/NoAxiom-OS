@@ -10,8 +10,10 @@ mod la_virtio {
     use crate::{base::char::CharDevice, basic::Device};
 
     /// No initialization required Devices, but also from dtb info
+    #[cfg(feature = "qemu")]
     const UART_PADDR: usize = 0x1FE0_01E0; // qemu-virt
-                                           // const UART_PADDR: usize = 0x1FE2_0000; // qemu-2k1000
+    #[cfg(not(feature = "qemu"))]
+    const UART_PADDR: usize = 0x1FE2_0000; // qemu-2k1000
     fn get_com1_addr() -> usize {
         UART_PADDR | IO_ADDR_OFFSET
     }

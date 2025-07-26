@@ -4,7 +4,7 @@ endif
 
 FEATURES :=
 
-QEMU := 1
+FEAT_ON_QEMU ?= true
 LOG_PRINT := 
 
 ifneq ($(RELEASE),true)
@@ -15,7 +15,7 @@ ifneq ($(MULTICORE), 1)
 	FEATURES += multicore
 endif
 
-ifneq ($(QEMU), )
+ifeq ($(FEAT_ON_QEMU),true)
 	FEATURES += qemu
 endif
 

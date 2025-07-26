@@ -6,6 +6,7 @@ edition = "2021"
 [features]
 intable = []
 default = []
+qemu = []
 
 [dependencies]
 include = { workspace = true }
