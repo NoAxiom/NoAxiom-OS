@@ -14,12 +14,13 @@ export ROOT := $(shell pwd)
 export LOG ?= DEBUG
 export CONFIG ?= default
 export USER_PROJECT := NoAxiom-OS-User
+export UTILS := NoAxiom-OS-Utils
 export ERROR := "\e[31m"
 export WARN := "\e[33m"
 export NORMAL := "\e[32m"
 export RESET := "\e[0m"
 export RELEASE ?= false
-export TOOLCHAIN_DIR := $(ROOT)/utils/toolchain
+export TOOLCHAIN_DIR := $(ROOT)/$(UTILS)/toolchain
 export FEAT_ON_QEMU ?= true
 
 # Arch config
@@ -89,7 +90,7 @@ endif
 MAKE_OPTION ?= build run
 default: $(MAKE_OPTION)
 
-CONFIG_DIR := ./utils/config
+CONFIG_DIR := ./$(UTILS)/config
 CONFIG_FILE := $(CONFIG_DIR)/$(CONFIG).mk
 config.mk:
 	@touch ./config.mk
@@ -140,8 +141,18 @@ run: backup
 	@echo -e $(NORMAL)"Qemu exited. Log is saved to: $(LOG_SAVE_PATH)"$(RESET)
 
 
-TEST_2K1000_DIR := $(ROOT)/utils/la-2k1000-sim
+TEST_2K1000_DIR := $(ROOT)/$(UTILS)/la-2k1000-sim
 test_2k1000:
+	@echo -e $(NORMAL)"Running 2k-1000 tests..."$(RESET)
+	@echo -e $(NORMAL)"Checking la-2k1000-sim submodule..."$(RESET)
+	@cd $(ROOT)/$(UTILS) && \
+	if [ -d "la-2k1000-sim/.git" ] || [ -f "la-2k1000-sim/.git" ]; then \
+		echo -e $(NORMAL)"Submodule exists, updating to latest..."$(RESET); \
+		cd la-2k1000-sim && git fetch origin && git pull origin main; \
+	else \
+		echo -e $(NORMAL)"Submodule not found, initializing and updating..."$(RESET); \
+		git submodule update --init la-2k1000-sim; \
+	fi
 	@cd $(TEST_2K1000_DIR) && make
 
 QEMU_DTB = log/qemu-$(ARCH_NAME).dtb
@@ -234,12 +245,12 @@ git-update:
 vscode:
 	@echo "Copying vscode template..."
 	@mkdir -p $(ROOT)/.vscode
-	@cp -f $(ROOT)/utils/vscode-template/* $(ROOT)/.vscode/
+	@cp -f $(ROOT)/$(UTILS)/vscode-template/* $(ROOT)/.vscode/
 	@echo "VSCode template copied."
 
 switch-arch:
 	@echo "Switching architecture..."
-	@cd utils/scripts && sh vscode_switch_arch.sh
+	@cd $(UTILS)/scripts && sh vscode_switch_arch.sh
 
 env: add-target git-update vendor
 

@@ -7,3 +7,6 @@
 [submodule "NoAxiom-OS-Document"]
 	path = NoAxiom-OS-Document
 	url = https://github.com/NoAxiom/NoAxiom-OS-Document.git
+[submodule "NoAxiom-OS-Utils"]
+	path = NoAxiom-OS-Utils
+	url = https://github.com/NoAxiom/NoAxiom-OS-Utils
