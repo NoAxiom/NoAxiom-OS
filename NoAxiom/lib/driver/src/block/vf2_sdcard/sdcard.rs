@@ -70,6 +70,7 @@ pub struct VF2SdcardDevice {
 
 impl VF2SdcardDevice {
     // compatible: starfive,jh7110-sdio
+    // name: sdio0 / sdio1 (depends on 你插的卡槽)
     pub fn new(base_addr: usize) -> Self {
         // 8.13 M
         set_sdio_base(base_addr);

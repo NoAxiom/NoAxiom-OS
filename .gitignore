@@ -16,4 +16,9 @@ NoAxiom/kernel/src/link_apps.S
 output/
 kernel-rv
 kernel-la
+kernel.ui
 config.mk
+utils/easy-fs-fuse
+utils/la-2k1000-sim/nand.dat
+utils/la-2k1000-sim/qemu-system-loongarch64
+utils/la-2k1000-sim/u-boot-with-spl.bin

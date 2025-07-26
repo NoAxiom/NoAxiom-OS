@@ -1,0 +1,730 @@
+=> fdt addr 0x900000000eccbac0
+=> fdt print /
+/ {
+        model = "loongson-2k1000";
+        compatible = "loongson,loongson3";
+        #address-cells = <0x00000002>;
+        #size-cells = <0x00000002>;
+        aliases {
+                ethernet0 = "/soc/ethernet@40040000";
+                ethernet1 = "/soc/ethernet@40050000";
+                serial0 = "/soc/serial@1fe20000";
+                spi0 = "/soc/spi@1fff0220";
+        };
+        cpus {
+                #address-cells = <0x00000001>;
+                #size-cells = <0x00000000>;
+                cpu@0 {
+                        device_type = "cpu";
+                        compatible = "loongarch";
+                        reg = <0x00000000>;
+                        numa-node-id = <0x00000000>;
+                };
+                cpu@1 {
+                        device_type = "cpu";
+                        compatible = "loongarch";
+                        reg = <0x00000001>;
+                        numa-node-id = <0x00000000>;
+                };
+        };
+        interrupt-controller {
+                compatible = "loongson,cpu-interrupt-controller";
+                interrupt-controller;
+                #interrupt-cells = <0x00000001>;
+                phandle = <0x00000001>;
+        };
+        interrupt-controller@1fe01400 {
+                compatible = "loongson,2k1000-icu";
+                interrupt-controller;
+                #interrupt-cells = <0x00000001>;
+                reg = <0x00000000 0x1fe01400 0x00000000 0x00000040 0x00000000 0x1fe01040 0x00000000 0x00000010>;
+                interrupt-parent = <0x00000001>;
+                interrupt-names = "cascade";
+                interrupts = <0x00000003>;
+                phandle = <0x00000003>;
+        };
+        clocks {
+                compatible = "simple-bus";
+                #address-cells = <0x00000001>;
+                #size-cells = <0x00000000>;
+                u-boot,dm-pre-reloc;
+                osc-clock {
+                        compatible = "fixed-clock";
+                        #clock-cells = <0x00000000>;
+                        clock-frequency = <0x05f5e100>;
+                        clock-output-names = "osc-clk";
+                        u-boot,dm-pre-reloc;
+                        phandle = <0x00000005>;
+                };
+                apb-clock {
+                        compatible = "fixed-clock";
+                        #clock-cells = <0x00000000>;
+                        clock-frequency = <0x07735940>;
+                        clock-output-names = "apb-clk";
+                        u-boot,dm-pre-reloc;
+                        phandle = <0x00000002>;
+                };
+        };
+        pinmux@1fe00420 {
+                compatible = "pinctrl-single";
+                reg = <0x80000000 0x1fe00420 0x00000000 0x00000018>;
+                #address-cells = <0x00000001>;
+                #size-cells = <0x00000000>;
+                #pinctrl-cells = <0x00000002>;
+                pinctrl-single,bit-per-mux;
+                pinctrl-single,register-width = <0x00000020>;
+                pinctrl-single,function-mask = <0x00000001>;
+                pinmux_sdio_sdio {
+                        pinctrl-single,bits = <0x00000000 0x00100000 0x00100000>;
+                        phandle = <0x00000017>;
+                };
+                pinmux_sdio_gpio {
+                        pinctrl-single,bits = <0x00000000 0x00000000 0x00100000>;
+                        phandle = <0x00000012>;
+                };
+                pinmux_can0_can {
+                        pinctrl-single,bits = <0x00000000 0x00010000 0x00010000>;
+                };
+                pinmux_can0_gpio {
+                        pinctrl-single,bits = <0x00000000 0x00000000 0x00010000>;
+                };
+                pinmux_can1_can {
+                        pinctrl-single,bits = <0x00000000 0x00020000 0x00020000>;
+                };
+                pinmux_can1_gpio {
+                        pinctrl-single,bits = <0x00000000 0x00000000 0x00020000>;
+                };
+                pinmux_pwm0_pwm {
+                        pinctrl-single,bits = <0x00000000 0x00001000 0x00001000>;
+                        phandle = <0x0000001b>;
+                };
+                pinmux_pwm0_gpio {
+                        pinctrl-single,bits = <0x00000000 0x00000000 0x00001000>;
+                };
+                pinmux_pwm1_pwm {
+                        pinctrl-single,bits = <0x00000000 0x00002000 0x00002000>;
+                        phandle = <0x0000001c>;
+                };
+                pinmux_pwm1_gpio {
+                        pinctrl-single,bits = <0x00000000 0x00000000 0x00002000>;
+                };
+                pinmux_pwm2_pwm {
+                        pinctrl-single,bits = <0x00000000 0x00004000 0x00004000>;
+                        phandle = <0x0000001d>;
+                };
+                pinmux_pwm2_gpio {
+                        pinctrl-single,bits = <0x00000000 0x00000000 0x00004000>;
+                };
+                pinmux_pwm3_pwm {
+                        pinctrl-single,bits = <0x00000000 0x00008000 0x00008000>;
+                        phandle = <0x0000001e>;
+                };
+                pinmux_pwm3_gpio {
+                        pinctrl-single,bits = <0x00000000 0x00000000 0x00008000>;
+                };
+                pinmux_i2c0_i2c {
+                        pinctrl-single,bits = <0x00000000 0x00000400 0x00000400>;
+                        phandle = <0x00000013>;
+                };
+                pinmux_i2c0_gpio {
+                        pinctrl-single,bits = <0x00000000 0x00000000 0x00000400>;
+                };
+                pinmux_i2c1_i2c {
+                        pinctrl-single,bits = <0x00000000 0x00000800 0x00000800>;
+                        phandle = <0x00000014>;
+                };
+                pinmux_i2c1_gpio {
+                        pinctrl-single,bits = <0x00000000 0x00000000 0x00000800>;
+                };
+                pinmux_nand_nand {
+                        pinctrl-single,bits = <0x00000000 0x00000200 0x00000200>;
+                        phandle = <0x00000015>;
+                };
+                pinmux_nand_gpio {
+                        pinctrl-single,bits = <0x00000000 0x00000000 0x00000200>;
+                        phandle = <0x00000019>;
+                };
+                pinmux_sata_sata {
+                        pinctrl-single,bits = <0x00000000 0x00000100 0x00000100>;
+                };
+                pinmux_sata_gpio {
+                        pinctrl-single,bits = <0x00000000 0x00000000 0x00000100>;
+                };
+                pinmux_lio_lio {
+                        pinctrl-single,bits = <0x00000000 0x00000080 0x00000080>;
+                };
+                pinmux_lio_gpio {
+                        pinctrl-single,bits = <0x00000000 0x00000000 0x00000080>;
+                        phandle = <0x00000006>;
+                };
+                pinmux_i2s_i2s {
+                        pinctrl-single,bits = <0x00000000 0x00000040 0x00000040>;
+                };
+                pinmux_i2s_gpio {
+                        pinctrl-single,bits = <0x00000000 0x00000000 0x00000040>;
+                        phandle = <0x00000022>;
+                };
+                pinmux_hda_hda {
+                        pinctrl-single,bits = <0x00000000 0x00000010 0x00000010>;
+                };
+                pinmux_hda_gpio {
+                        pinctrl-single,bits = <0x00000000 0x00000000 0x00000010>;
+                        phandle = <0x00000021>;
+                };
+                pinmux_gmac1_gmac1 {
+                        pinctrl-single,bits = <0x00000000 0x00000008 0x00000008>;
+                        phandle = <0x0000000f>;
+                };
+                pinmux_gmac1_gpio {
+                        pinctrl-single,bits = <0x00000000 0x00000000 0x00000008>;
+                };
+                pinmux_uart2_uart2 {
+                        pinctrl-single,bits = <0x00000008 0x00002000 0x00002000>;
+                };
+                pinmux_uart2_gpio {
+                        pinctrl-single,bits = <0x00000008 0x00000000 0x00002000>;
+                        phandle = <0x00000008>;
+                };
+                pinmux_uart1_uart1 {
+                        pinctrl-single,bits = <0x00000008 0x00001000 0x00001000>;
+                };
+                pinmux_uart1_gpio {
+                        pinctrl-single,bits = <0x00000008 0x00000000 0x00001000>;
+                        phandle = <0x00000007>;
+                };
+                pinmux_cam_cam {
+                        pinctrl-single,bits = <0x00000010 0x00000020 0x00000020>;
+                };
+                pinmux_cam_gpio {
+                        pinctrl-single,bits = <0x00000010 0x00000000 0x00000020>;
+                        phandle = <0x0000000b>;
+                };
+                pinmux_dvo1_dvo1 {
+                        pinctrl-single,bits = <0x00000010 0x00000010 0x00000010>;
+                        phandle = <0x0000000c>;
+                };
+                pinmux_dvo1_gpio {
+                        pinctrl-single,bits = <0x00000010 0x00000000 0x00000010>;
+                };
+                pinmux_dvo0_dvo0 {
+                        pinctrl-single,bits = <0x00000010 0x00000002 0x00000002>;
+                        phandle = <0x00000009>;
+                };
+                pinmux_dvo0_gpio {
+                        pinctrl-single,bits = <0x00000010 0x00000000 0x00000002>;
+                };
+        };
+        soc {
+                compatible = "simple-bus";
+                #address-cells = <0x00000002>;
+                #size-cells = <0x00000002>;
+                ranges = <0x00000000 0x10000000 0x80000000 0x10000000 0x00000000 0x10000000 0x00000000 0x02000000 0x80000000 0x02000000 0x00000000 0x02000000 0x00000000 0x0d000000 0x00000000 0x0d000000 0x00000000 0x02000000 0x00000000 0x20000000 0x80000000 0x20000000 0x00000000 0x10000000 0x00000000 0x40000000 0x80000000 0x40000000 0x00000000 0x40000000 0x000000fe 0x00000000 0x800000fe 0x00000000 0x00000000 0x40000000>;
+                dma-coherent;
+                u-boot,dm-pre-reloc;
+                cam_disable = <0x00000001>;
+                vpu_disable = <0x00000001>;
+                pcie0_enable = <0x00000000>;
+                pcie1_enable = <0x00000001>;
+                serial@1fe20000 {
+                        compatible = "ns16550a";
+                        reg = <0x00000000 0x1fe20000 0x00000000 0x00000010>;
+                        clocks = <0x00000002>;
+                        clock-names = "clk";
+                        interrupt-parent = <0x00000003>;
+                        interrupts = <0x00000000>;
+                        no-loopback-test;
+                        u-boot,dm-pre-reloc;
+                };
+                ahci@400e0000 {
+                        compatible = "loongson,ls-ahci";
+                        reg = <0x00000000 0x400e0000 0x00000000 0x00010000>;
+                        interrupt-parent = <0x00000003>;
+                        interrupts = <0x00000013>;
+                        dma-mask = <0x00000000 0xffffffff>;
+                };
+                rtc@1fe27800 {
+                        #address-cells = <0x00000001>;
+                        #size-cells = <0x00000001>;
+                        compatible = "loongson,ls-rtc";
+                        reg = <0x00000000 0x1fe27800 0x00000000 0x00000100>;
+                        interrupt-parent = <0x00000003>;
+                        interrupts = <0x00000034>;
+                };
+                syscon@0x1fe27000 {
+                        compatible = "syscon";
+                        reg = <0x00000000 0x1fe27000 0x00000000 0x00000058>;
+                        phandle = <0x00000004>;
+                };
+                reboot {
+                        compatible = "syscon-reboot";
+                        regmap = <0x00000004>;
+                        offset = <0x00000030>;
+                        mask = <0x00000001>;
+                };
+                poweroff {
+                        compatible = "syscon-poweroff";
+                        regmap = <0x00000004>;
+                        offset = <0x00000014>;
+                        mask = <0x00003c00>;
+                        value = <0x00003c00>;
+                };
+                dc@400c0000 {
+                        compatible = "loongson,ls-dc", "simple-bus";
+                        reg = <0x00000000 0x400c0000 0x00000000 0x0000ffff 0x00000000 0x1fe004b0 0x00000000 0x00000010 0x00000000 0x1fe004c0 0x00000000 0x00000010>;
+                        #address-cells = <0x00000001>;
+                        #size-cells = <0x00000000>;
+                        u-boot,dm-pre-reloc;
+                        dvo@0 {
+                                compatible = "loongson,ls-dc-dvo";
+                                reg = <0x00000000>;
+                                clocks = <0x00000005>;
+                                clock-names = "refclk";
+                                pix-fmt = "rgb565";
+                                pinctrl-0 = <0x00000006 0x00000007 0x00000008 0x00000009>;
+                                status = "disabled";
+                        };
+                        dvo@1 {
+                                compatible = "loongson,ls-dc-dvo";
+                                reg = <0x00000001>;
+                                clocks = <0x00000005>;
+                                clock-names = "refclk";
+                                pix-fmt = "rgb888";
+                                ddc-i2c-bus = <0x0000000a>;
+                                pinctrl-0 = <0x0000000b 0x0000000c>;
+                                status = "okay";
+                                connector-type = "panel";
+                                connector = <0x0000000d>;
+                        };
+                };
+                ethernet@40040000 {
+                        compatible = "snps,dwmac-3.70a", "snps,arc-dwmac-3.70a";
+                        reg = <0x00000000 0x40040000 0x00000000 0x00008000>;
+                        interrupt-parent = <0x00000003>;
+                        interrupts = <0x0000000c 0x0000000d>;
+                        interrupt-names = "macirq", "eth_wake_irq";
+                        phy-mode = "rgmii-txid";
+                        bus_id = <0x00000000>;
+                        phy_addr = <0xffffffff>;
+                        phy-handle = <0x0000000e>;
+                        dma-mask = <0xffffffff 0xffffffff>;
+                        status = "okay";
+                        mdio@0 {
+                                #address-cells = <0x00000001>;
+                                #size-cells = <0x00000000>;
+                                compatible = "snps,dwmac-mdio";
+                                ethernet-phy@0 {
+                                        reg = <0x00000000>;
+                                        phandle = <0x0000000e>;
+                                };
+                        };
+                };
+                ethernet@40050000 {
+                        compatible = "snps,dwmac-3.70a", "snps,arc-dwmac-3.70a";
+                        reg = <0x00000000 0x40050000 0x00000000 0x00008000>;
+                        pinctrl-names = "default";
+                        pinctrl-0 = <0x0000000f>;
+                        interrupt-parent = <0x00000003>;
+                        interrupts = <0x0000000e 0x0000000f>;
+                        interrupt-names = "macirq", "eth_wake_irq";
+                        phy-mode = "rgmii-txid";
+                        bus_id = <0x00000001>;
+                        phy_addr = <0xffffffff>;
+                        phy-handle = <0x00000010>;
+                        dma-mask = <0xffffffff 0xffffffff>;
+                        status = "okay";
+                        mdio@1 {
+                                #address-cells = <0x00000001>;
+                                #size-cells = <0x00000000>;
+                                compatible = "snps,dwmac-mdio";
+                                ethernet-phy@1 {
+                                        reg = <0x00000000>;
+                                        phandle = <0x00000010>;
+                                };
+                        };
+                };
+                dmacfg@1fe00438 {
+                        compatible = "loongson,ls-dma-config";
+                        reg = <0x00000000 0x1fe00438 0x00000000 0x00000008>;
+                        #config-cells = <0x00000002>;
+                        phandle = <0x00000011>;
+                };
+                dma@1fe00c00 {
+                        compatible = "loongson,ls2k1000-dma";
+                        reg = <0x00000000 0x1fe00c00 0x00000000 0x00000008>;
+                        dma-cfg = <0x00000011 0x00000000 0x00000000>;
+                        #dma-cells = <0x00000001>;
+                        dma-channels = <0x00000001>;
+                        dma-requests = <0x00000001>;
+                        phandle = <0x00000016>;
+                };
+                dma@1fe00c10 {
+                        compatible = "loongson,ls2k1000-dma";
+                        reg = <0x00000000 0x1fe00c10 0x00000000 0x00000008>;
+                        dma-cfg = <0x00000011 0x00000001 0x00000003>;
+                        #dma-cells = <0x00000001>;
+                        dma-channels = <0x00000001>;
+                        dma-requests = <0x00000001>;
+                };
+                dma@1fe00c20 {
+                        compatible = "loongson,ls2k1000-dma";
+                        reg = <0x00000000 0x1fe00c20 0x00000000 0x00000008>;
+                        dma-cfg = <0x00000011 0x00000002 0x00000004>;
+                        #dma-cells = <0x00000001>;
+                        dma-channels = <0x00000001>;
+                        dma-requests = <0x00000001>;
+                };
+                dma@1fe00c30 {
+                        compatible = "loongson,ls2k1000-dma";
+                        reg = <0x00000000 0x1fe00c30 0x00000000 0x00000008>;
+                        dma-cfg = <0x00000011 0x00000003 0x00000001>;
+                        #dma-cells = <0x00000001>;
+                        dma-channels = <0x00000001>;
+                        dma-requests = <0x00000001>;
+                        phandle = <0x00000018>;
+                };
+                dma@1fe00c40 {
+                        compatible = "loongson,ls2k1000-dma";
+                        reg = <0x00000000 0x1fe00c40 0x00000000 0x00000008>;
+                        dma-cfg = <0x00000011 0x00000003 0x00000005>;
+                        #dma-cells = <0x00000001>;
+                        dma-channels = <0x00000001>;
+                        dma-requests = <0x00000001>;
+                };
+                gpio@1fe00500 {
+                        #address-cells = <0x00000001>;
+                        #size-cells = <0x00000000>;
+                        compatible = "loongson,ls-gpio";
+                        reg = <0x00000000 0x1fe00500 0x00000000 0x00000038>;
+                        pinctrl-0 = <0x00000012>;
+                        pinctrl-names = "default";
+                        bank@0 {
+                                reg = <0x00000000>;
+                                gpio-controller;
+                                #gpio-cells = <0x00000002>;
+                                phandle = <0x00000023>;
+                        };
+                        bank@1 {
+                                reg = <0x00000001>;
+                                gpio-controller;
+                                #gpio-cells = <0x00000002>;
+                                phandle = <0x0000001a>;
+                        };
+                };
+                can@1fe20c00 {
+                        compatible = "nxp,sja1000";
+                        reg = <0x00000000 0x1fe20c00 0x00000000 0x00001000>;
+                        nxp,external-clock-frequency = <0x05f5e100>;
+                        interrupt-parent = <0x00000003>;
+                        interrupts = <0x00000010>;
+                        status = "disabled";
+                };
+                can@1fe20d00 {
+                        compatible = "nxp,sja1000";
+                        reg = <0x00000000 0x1fe20d00 0x00000000 0x00001000>;
+                        nxp,external-clock-frequency = <0x05f5e100>;
+                        interrupt-parent = <0x00000003>;
+                        interrupts = <0x00000011>;
+                        status = "disabled";
+                };
+                spi@1fff0220 {
+                        compatible = "loongson,ls-spi";
+                        reg = <0x00000000 0x1fff0220 0x00000000 0x00004000>;
+                        #address-cells = <0x00000001>;
+                        #size-cells = <0x00000000>;
+                        clocks = <0x00000005>;
+                        clock-names = "sclk";
+                        status = "okay";
+                        u-boot,dm-pre-reloc;
+                        spi-flash@0 {
+                                compatible = "jedec,spi-nor";
+                                spi-max-frequency = <0x017d7840>;
+                                reg = <0x00000000>;
+                        };
+                };
+                i2c@1fe21000 {
+                        compatible = "opencores,i2c-ocores";
+                        reg = <0x00000000 0x1fe21000 0x00000000 0x00000800>;
+                        #address-cells = <0x00000001>;
+                        #size-cells = <0x00000000>;
+                        pinctrl-names = "default";
+                        pinctrl-0 = <0x00000013>;
+                        interrupt-parent = <0x00000003>;
+                        interrupts = <0x00000016>;
+                        clock-frequency = <0x00061a80>;
+                        reg-shift = <0x00000000>;
+                        clocks = <0x00000002>;
+                        clock-names = "scl";
+                        status = "disabled";
+                };
+                i2c@1fe21800 {
+                        compatible = "opencores,i2c-ocores";
+                        reg = <0x00000000 0x1fe21800 0x00000000 0x00000800>;
+                        #address-cells = <0x00000001>;
+                        #size-cells = <0x00000000>;
+                        pinctrl-names = "default";
+                        pinctrl-0 = <0x00000014>;
+                        interrupt-parent = <0x00000003>;
+                        interrupts = <0x00000017>;
+                        clock-frequency = <0x00061a80>;
+                        reg-shift = <0x00000000>;
+                        clocks = <0x00000002>;
+                        clock-names = "scl";
+                        status = "disabled";
+                        phandle = <0x0000000a>;
+                };
+                nand-controller@1fe26000 {
+                        compatible = "loongson,ls-nand";
+                        reg = <0x00000000 0x1fe26000 0x00000000 0x00000044>;
+                        pinctrl-names = "default";
+                        pinctrl-0 = <0x00000015>;
+                        dmas = <0x00000016 0x00000000>;
+                        dma-names = "nand-rw";
+                        nand-cs-origin = <0x00000002>;
+                        nand-ecc-algo = "bch";
+                        nand-ecc-strength = <0x00000004>;
+                        status = "disabled";
+                };
+                mmc@1fe2c000 {
+                        compatible = "loongson,ls1x-mmc";
+                        reg = <0x00000000 0x1fe2c000 0x00000000 0x00001000>;
+                        pinctrl-names = "default";
+                        pinctrl-0 = <0x00000017>;
+                        dmas = <0x00000018 0x00000000>;
+                        dma-names = "sdio0";
+                        cap-sd-highspeed;
+                        cap-mmc-highspeed;
+                        status = "disabled";
+                };
+                otg@40000000 {
+                        compatible = "snps,dwc2";
+                        reg = <0x00000000 0x40000000 0x00000000 0x00040000>;
+                        interrupt-parent = <0x00000003>;
+                        interrupts = <0x00000031>;
+                        dma-mask = <0x00000000 0xffffffff>;
+                        status = "okay";
+                };
+                ehci@40060000 {
+                        compatible = "generic-ehci";
+                        reg = <0x00000000 0x40060000 0x00000000 0x00008000>;
+                        dma-mask = <0x00000000 0xffffffff>;
+                        pinctrl-0 = <0x00000019>;
+                        pinctrl-names = "default";
+                        gpios = <0x0000001a 0x00000018 0x00000000>;
+                };
+                ohci@40070000 {
+                        compatible = "generic-ohci";
+                        reg = <0x00000000 0x40070000 0x00000000 0x00008000>;
+                        dma-mask = <0x00000000 0xffffffff>;
+                };
+                pwm@1fe02000 {
+                        compatible = "loongson,ls2x-pwm";
+                        #pwm-cells = <0x00000003>;
+                        reg = <0x00000000 0x1fe02000 0x00000000 0x0000000f>;
+                        interrupt-parent = <0x00000003>;
+                        interrupts = <0x00000018>;
+                        pinctrl-names = "default";
+                        pinctrl-0 = <0x0000001b>;
+                        status = "disabled";
+                };
+                pwm@1fe02010 {
+                        compatible = "loongson,ls2x-pwm";
+                        #pwm-cells = <0x00000003>;
+                        reg = <0x00000000 0x1fe02010 0x00000000 0x0000000f>;
+                        interrupt-parent = <0x00000003>;
+                        interrupts = <0x00000019>;
+                        pinctrl-names = "default";
+                        pinctrl-0 = <0x0000001c>;
+                        status = "disabled";
+                };
+                pwm@1fe02020 {
+                        compatible = "loongson,ls2x-pwm";
+                        #pwm-cells = <0x00000003>;
+                        reg = <0x00000000 0x1fe02020 0x00000000 0x0000000f>;
+                        interrupt-parent = <0x00000003>;
+                        interrupts = <0x0000001a>;
+                        pinctrl-names = "default";
+                        pinctrl-0 = <0x0000001d>;
+                        status = "disabled";
+                };
+                pwm@1fe02030 {
+                        compatible = "loongson,ls2x-pwm";
+                        #pwm-cells = <0x00000003>;
+                        reg = <0x00000000 0x1fe02030 0x00000000 0x0000000f>;
+                        interrupt-parent = <0x00000003>;
+                        interrupts = <0x0000001b>;
+                        pinctrl-names = "default";
+                        pinctrl-0 = <0x0000001e>;
+                        status = "disabled";
+                };
+                usb_config_phy@1fe00440 {
+                        compatible = "ls2k-usb-phy";
+                        reg = <0x00000000 0x1fe00440 0x00000000 0x00000004>;
+                        status = "disable";
+                };
+                usb_config_phy@1fe00444 {
+                        compatible = "ls2k-usb-phy";
+                        reg = <0x00000000 0x1fe00444 0x00000000 0x00000004>;
+                        status = "disable";
+                };
+                usb_config_phy@1fe00448 {
+                        compatible = "ls2k-usb-phy";
+                        reg = <0x00000000 0x1fe00448 0x00000000 0x00000004>;
+                        status = "disable";
+                };
+                usb_config_phy@1fe0044c {
+                        compatible = "ls2k-usb-phy";
+                        reg = <0x00000000 0x1fe0044c 0x00000000 0x00000004>;
+                        status = "disable";
+                };
+                pcie@0 {
+                        compatible = "loongson,ls2k1000-pci";
+                        #interrupt-cells = <0x00000001>;
+                        bus-range = <0x00000001 0x00000016>;
+                        #size-cells = <0x00000002>;
+                        #address-cells = <0x00000003>;
+                        reg = <0x000000fe 0x00000000 0x00000000 0x20000000>;
+                        ranges = <0x02000000 0x00000000 0x60000000 0x00000000 0x60000000 0x00000000 0x20000000 0x01000000 0x00000000 0x00008000 0x00000000 0x18008000 0x00000000 0x00008000>;
+                        pci_bridge@9,0 {
+                                compatible = "pciclass060400", "pciclass0604";
+                                reg = <0x00004800 0x00000000 0x00000000 0x00000000 0x00000000>;
+                                interrupts = <0x00000020>;
+                                interrupt-parent = <0x00000003>;
+                                #interrupt-cells = <0x00000001>;
+                                interrupt-map-mask = <0x00000000 0x00000000 0x00000000 0x00000000>;
+                                interrupt-map = <0x00000000 0x00000000 0x00000000 0x00000000 0x00000003 0x00000020>;
+                        };
+                        pci_bridge@10,0 {
+                                compatible = "pciclass060400", "pciclass0604";
+                                reg = <0x00005000 0x00000000 0x00000000 0x00000000 0x00000000>;
+                                interrupts = <0x00000021>;
+                                interrupt-parent = <0x00000003>;
+                                #interrupt-cells = <0x00000001>;
+                                interrupt-map-mask = <0x00000000 0x00000000 0x00000000 0x00000000>;
+                                interrupt-map = <0x00000000 0x00000000 0x00000000 0x00000000 0x00000003 0x00000021>;
+                        };
+                        pci_bridge@11,0 {
+                                compatible = "pciclass060400", "pciclass0604";
+                                reg = <0x00005800 0x00000000 0x00000000 0x00000000 0x00000000>;
+                                interrupts = <0x00000022>;
+                                interrupt-parent = <0x00000003>;
+                                #interrupt-cells = <0x00000001>;
+                                interrupt-map-mask = <0x00000000 0x00000000 0x00000000 0x00000000>;
+                                interrupt-map = <0x00000000 0x00000000 0x00000000 0x00000000 0x00000003 0x00000022>;
+                        };
+                        pci_bridge@12,0 {
+                                compatible = "pciclass060400", "pciclass0604";
+                                reg = <0x00006000 0x00000000 0x00000000 0x00000000 0x00000000>;
+                                interrupts = <0x00000023>;
+                                interrupt-parent = <0x00000003>;
+                                #interrupt-cells = <0x00000001>;
+                                interrupt-map-mask = <0x00000000 0x00000000 0x00000000 0x00000000>;
+                                interrupt-map = <0x00000000 0x00000000 0x00000000 0x00000000 0x00000003 0x00000023>;
+                        };
+                        pci_bridge@13,0 {
+                                compatible = "pciclass060400", "pciclass0604";
+                                reg = <0x00006800 0x00000000 0x00000000 0x00000000 0x00000000>;
+                                interrupts = <0x00000024>;
+                                interrupt-parent = <0x00000003>;
+                                #interrupt-cells = <0x00000001>;
+                                interrupt-map-mask = <0x00000000 0x00000000 0x00000000 0x00000000>;
+                                interrupt-map = <0x00000000 0x00000000 0x00000000 0x00000000 0x00000003 0x00000024>;
+                        };
+                        pci_bridge@14,0 {
+                                compatible = "pciclass060400", "pciclass0604";
+                                reg = <0x00007000 0x00000000 0x00000000 0x00000000 0x00000000>;
+                                interrupts = <0x00000025>;
+                                interrupt-parent = <0x00000003>;
+                                #interrupt-cells = <0x00000001>;
+                                interrupt-map-mask = <0x00000000 0x00000000 0x00000000 0x00000000>;
+                                interrupt-map = <0x00000000 0x00000000 0x00000000 0x00000000 0x00000003 0x00000025>;
+                        };
+                };
+        };
+        chosen {
+                stdout-path = "serial0:115200n8";
+                bootargs = "earlycon";
+        };
+        sysinfo-smbios {
+                compatible = "u-boot,sysinfo-smbios";
+                u-boot,dm-pre-reloc;
+                smbios {
+                        system {
+                                manufacturer = "Loongson";
+                                product = "LS2K1000";
+                        };
+                        baseboard {
+                                manufacturer = "Loongson";
+                                product = "LS2K1000-DP";
+                        };
+                        chassis {
+                                manufacturer = "Loongson";
+                                product = "LS2K1000-DP";
+                        };
+                };
+        };
+        memory {
+                device_type = "memory";
+                reg = <0x90000000 0x00000000 0x00000000 0x10000000 0x90000000 0x90000000 0x00000000 0x30000000>;
+                u-boot,dm-pre-reloc;
+        };
+        reserved-memory {
+                #address-cells = <0x00000002>;
+                #size-cells = <0x00000002>;
+                ranges;
+                bootparam_region {
+                        reg = <0x90000000 0x0f000000 0x00000000 0x01000000>;
+                        no-map;
+                };
+        };
+        ram@0 {
+                compatible = "loongson,ls2k1000-ddr";
+                u-boot,dm-pre-reloc;
+                soc-config-reg = <0x1fe00424>;
+                mc-disable-offs = <0x00000008>;
+                mc-default-offs = <0x00000009>;
+                sdram-type = "ddr3";
+                dimm-type = "udimm";
+                cs-map = <0x00000001>;
+                data-width = <0x00000020>;
+                sdram-width = <0x00000010>;
+                sdram-banks = <0x00000008>;
+                sdram-rows = <0x0000000f>;
+                sdram-cols = <0x0000000a>;
+                clk-latency = <0x00000030>;
+                rd-latency = <0x00000009>;
+                wr-latency = <0x00000004>;
+                cmd-timing-mode = <0x00000001>;
+                reset-revert;
+        };
+        panel-rgb {
+                compatible = "simple-panel";
+                backlight = <0x0000001f>;
+                phandle = <0x0000000d>;
+                display-timings {
+                        native-mode = <0x00000020>;
+                        1024x600 {
+                                clock-frequency = <0x030d4000>;
+                                hactive = <0x00000400>;
+                                vactive = <0x00000258>;
+                                hsync-len = <0x00000014>;
+                                hfront-porch = <0x000000a0>;
+                                hback-porch = <0x0000008c>;
+                                vfront-porch = <0x0000000c>;
+                                vback-porch = <0x00000014>;
+                                vsync-len = <0x00000003>;
+                                de-active = <0x00000001>;
+                                hsync-active = <0x00000000>;
+                                vsync-active = <0x00000000>;
+                                pixelclk-active = <0x00000000>;
+                                phandle = <0x00000020>;
+                        };
+                };
+        };
+        backlight {
+                compatible = "gpio-backlight";
+                pinctrl-0 = <0x00000021 0x00000022>;
+                pinctrl-names = "default";
+                gpios = <0x00000023 0x00000018 0x00000000>;
+                phandle = <0x0000001f>;
+        };
+};

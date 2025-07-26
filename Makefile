@@ -138,6 +138,11 @@ run: backup
 	@$(QEMU) $(QFLAGS) $(RUN_OPTION)
 	@echo -e $(NORMAL)"Qemu exited. Log is saved to: $(LOG_SAVE_PATH)"$(RESET)
 
+
+TEST_2K1000_DIR := $(ROOT)/utils/la-2k1000-sim
+test_2k1000:
+	@cd $(TEST_2K1000_DIR) && make
+
 QEMU_DTB = log/qemu-$(ARCH_NAME).dtb
 QEMU_DTS = log/qemu-$(ARCH_NAME).dts
 qemu-dumpdtb:
