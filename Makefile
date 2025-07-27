@@ -237,7 +237,7 @@ add-target:
 git-update:
 	@echo "Updating git submodules..."
 	@git submodule init
-	@git submodule update --recursive
+	@git submodule update --init --recursive
 	@echo "Submodules updated."
 	@echo "Checking submodule status..."
 	@git submodule status
