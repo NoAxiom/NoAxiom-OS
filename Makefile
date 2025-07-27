@@ -235,9 +235,11 @@ add-target:
 	@rustup target add riscv64gc-unknown-none-elf
 
 git-update:
-	@echo "Updating git submodules..."
+	@echo $(NORMAL)"Updating git submodules..."$(RESET)
+	@echo $(NORMAL)"Make sure you have git-lfs installed."$(RESET)
 	@git submodule init
 	@git submodule update --init --recursive
+	@cd $(TEST_2K1000_DIR) && git lfs pull
 	@echo "Submodules updated."
 	@echo "Checking submodule status..."
 	@git submodule status
