@@ -22,6 +22,7 @@ export RESET := "\e[0m"
 export RELEASE ?= false
 export TOOLCHAIN_DIR := $(ROOT)/$(UTILS)/toolchain
 export FEAT_ON_QEMU ?= true
+export FINAL_CASES ?= false
 
 # Arch config
 ifeq ($(ARCH_NAME),riscv64) # RISC-V64
@@ -55,9 +56,13 @@ endif
 
 # Test and fs image config
 TEST_DIR := $(ROOT)/$(PROJECT)-OS-Test
-RAW_FS_IMG := $(TEST_DIR)/$(TEST_TYPE)/img/fs-$(ARCH_NAME).img
+export IMG_SUFFIX := 
+ifeq ($(FINAL_CASES),true) # Musl
+export IMG_SUFFIX := -final
+endif
+RAW_FS_IMG := $(TEST_DIR)/$(TEST_TYPE)/img/fs-$(ARCH_NAME)$(IMG_SUFFIX).img
 FS_IMG_DIR := $(TEST_DIR)/$(TEST_TYPE)/tmp-img
-FS_IMG := $(TEST_DIR)/$(TEST_TYPE)/tmp-img/fs-$(ARCH_NAME).fs.img
+FS_IMG := $(TEST_DIR)/$(TEST_TYPE)/tmp-img/fs-$(ARCH_NAME)$(IMG_SUFFIX).fs.img
 
 # Qemu flags config
 QFLAGS := 

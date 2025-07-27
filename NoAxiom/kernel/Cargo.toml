@@ -8,10 +8,9 @@ multicore = ["config/multicore"]
 busybox = []
 runtests = []
 qemu = ["device/qemu", "driver/qemu"]
-debug_sig = [] #["console/debug_sig"]
+debug_sig = []                        #["console/debug_sig"]
 log_print = ["debug_sig"]
-final_test = []
-default = ["final_test"]
+default = []
 
 [dependencies]
 # extern libs
