@@ -15,7 +15,7 @@ use crate::{
         },
         impls::rust_fat32::fs_err,
     },
-    include::{fs::InodeMode, result::Errno},
+    include::{fs::{FileFlags, InodeMode}, result::Errno},
     syscall::SysResult,
 };
 
@@ -50,7 +50,7 @@ impl Dentry for Fat32Dentry {
         Arc::new(Self::new(Some(self), name, super_block))
     }
 
-    fn open(self: Arc<Self>) -> SysResult<Arc<dyn File>> {
+    fn open(self: Arc<Self>, file_flags: &FileFlags) -> SysResult<Arc<dyn File>> {
         let inode = self.inode()?;
         match inode.file_type() {
             InodeMode::DIR => Ok(Arc::new(Fat32Dir::new(
@@ -58,12 +58,14 @@ impl Dentry for Fat32Dentry {
                 inode
                     .downcast_arc::<Fat32DirInode>()
                     .map_err(|_| Errno::EIO)?,
+                file_flags,
             ))),
             InodeMode::FILE => Ok(Arc::new(Fat32File::new(
                 self.clone(),
                 inode
                     .downcast_arc::<Fat32FileInode>()
                     .map_err(|_| Errno::EIO)?,
+                file_flags,
             ))),
             _ => Err(Errno::EINVAL),
         }

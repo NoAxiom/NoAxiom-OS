@@ -17,7 +17,10 @@ use crate::{
         },
         impls::ext4::{fs_err, superblock::Ext4SuperBlock},
     },
-    include::{fs::InodeMode, result::Errno},
+    include::{
+        fs::{FileFlags, InodeMode},
+        result::Errno,
+    },
     syscall::SysResult,
 };
 
@@ -53,7 +56,7 @@ impl Dentry for Ext4Dentry {
         Arc::new(Self::new(Some(self), name, super_block))
     }
 
-    fn open(self: Arc<Self>) -> SysResult<Arc<dyn File>> {
+    fn open(self: Arc<Self>, file_flags: &FileFlags) -> SysResult<Arc<dyn File>> {
         let inode = self.inode()?;
         match inode.file_type() {
             InodeMode::DIR => Ok(Arc::new(Ext4Dir::new(
@@ -61,12 +64,14 @@ impl Dentry for Ext4Dentry {
                 inode
                     .downcast_arc::<Ext4DirInode>()
                     .map_err(|_| Errno::EIO)?,
+                file_flags,
             ))),
             InodeMode::FILE => Ok(Arc::new(Ext4File::new(
                 self.clone(),
                 inode
                     .downcast_arc::<Ext4FileInode>()
                     .map_err(|_| Errno::EIO)?,
+                file_flags,
             ))),
             InodeMode::LINK => todo!("link file!"),
             _ => Err(Errno::EINVAL),

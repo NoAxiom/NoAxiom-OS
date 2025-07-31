@@ -27,7 +27,7 @@ use super::{
 use crate::{
     fs::{fdtable::FdTable, path::Path},
     include::{
-        fs::InodeMode,
+        fs::{FileFlags, InodeMode},
         process::{
             auxv::{AuxEntry, AT_NULL, AT_RANDOM},
             CloneFlags, TaskFlags,
@@ -628,7 +628,7 @@ impl Task {
         args: Vec<String>,
         envs: Vec<String>,
     ) -> SysResult<()> {
-        let elf_file = path.dentry().open()?;
+        let elf_file = path.dentry().open(&FileFlags::O_RDWR)?;
         let ElfMemoryInfo {
             memory_set,
             entry_point,

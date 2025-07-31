@@ -15,7 +15,11 @@ use crate::{
         },
         impls::ext4::{fs_err, inode::Ext4DirInode},
     },
-    include::{fs::InodeMode, io::PollEvent, result::Errno},
+    include::{
+        fs::{FileFlags, InodeMode},
+        io::PollEvent,
+        result::Errno,
+    },
     sched::utils::block_on,
     syscall::SyscallResult,
 };
@@ -29,9 +33,9 @@ pub struct Ext4File {
 }
 
 impl Ext4File {
-    pub fn new(dentry: Arc<Ext4Dentry>, inode: Arc<Ext4FileInode>) -> Self {
+    pub fn new(dentry: Arc<Ext4Dentry>, inode: Arc<Ext4FileInode>, file_flags: &FileFlags) -> Self {
         Self {
-            meta: FileMeta::new(dentry.clone(), inode.clone()),
+            meta: FileMeta::new(dentry.clone(), inode.clone(), file_flags),
             ino: block_on(inode.get_inode().lock()).inode_num,
         }
     }
@@ -142,9 +146,9 @@ pub struct Ext4Dir {
 }
 
 impl Ext4Dir {
-    pub fn new(dentry: Arc<Ext4Dentry>, inode: Arc<Ext4DirInode>) -> Self {
+    pub fn new(dentry: Arc<Ext4Dentry>, inode: Arc<Ext4DirInode>, file_flags: &FileFlags) -> Self {
         Self {
-            meta: FileMeta::new(dentry.clone(), inode.clone()),
+            meta: FileMeta::new(dentry.clone(), inode.clone(), file_flags),
             ino: inode.get_inode().lock().inode_num,
         }
     }

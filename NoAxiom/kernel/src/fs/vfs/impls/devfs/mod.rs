@@ -62,8 +62,7 @@ pub async fn init(fs_root: Arc<dyn Dentry>) -> SysResult<()> {
     tty_dentry.set_inode(tty_inode);
     fs_root.add_child_directly(tty_dentry.clone());
 
-    let tty_file = tty_dentry.open()?;
-    tty_file.set_flags(FileFlags::O_RDWR);
+    let tty_file = tty_dentry.open(&FileFlags::O_RDWR)?;
     TTYFILE.call_once(|| tty_file);
 
     info!("[fs] create /dev/rtc");

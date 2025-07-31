@@ -11,7 +11,7 @@ macro_rules! dentry_default {
                     file::{File, FileMeta},
                     superblock::SuperBlock,
                 },
-                include::fs::InodeMode,
+                include::fs::{FileFlags, InodeMode},
                 syscall::SysResult,
             };
 
@@ -44,10 +44,11 @@ macro_rules! dentry_default {
                     );
                 }
 
-                fn open(self: Arc<Self>) -> SysResult<Arc<dyn File>> {
+                fn open(self: Arc<Self>, file_flags: &FileFlags) -> SysResult<Arc<dyn File>> {
                     Ok(Arc::new($file_struct::new(FileMeta::new(
                         self.clone(),
                         self.inode()?,
+                        file_flags,
                     ))))
                 }
 

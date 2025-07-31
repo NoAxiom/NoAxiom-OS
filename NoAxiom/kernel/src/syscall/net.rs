@@ -6,6 +6,7 @@ use super::SyscallResult;
 use crate::{
     fs::pipe::PipeFile,
     include::{
+        fs::FileFlags,
         net::{
             AddressFamily, PosixSocketOption, PosixSocketType, PosixTcpSocketOptions, ShutdownType,
             SockAddr, SocketLevel,
@@ -410,7 +411,7 @@ impl Syscall<'_> {
         _protocol: isize,
         sv: usize,
     ) -> SyscallResult {
-        let (read_end, write_end) = PipeFile::new_pipe();
+        let (read_end, write_end) = PipeFile::new_pipe(&FileFlags::O_RDWR);
 
         let user_ptr = UserPtr::<i32>::new(sv);
         let buf_slice = user_ptr.as_slice_mut_checked(2).await?;

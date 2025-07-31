@@ -16,7 +16,11 @@ use crate::{
         file::{File, FileMeta},
         inode::Inode,
     },
-    include::{fs::InodeMode, io::PollEvent, result::Errno},
+    include::{
+        fs::{FileFlags, InodeMode},
+        io::PollEvent,
+        result::Errno,
+    },
     syscall::SyscallResult,
 };
 
@@ -26,9 +30,13 @@ pub struct Fat32File {
 }
 
 impl Fat32File {
-    pub fn new(dentry: Arc<Fat32Dentry>, inode: Arc<Fat32FileInode>) -> Self {
+    pub fn new(
+        dentry: Arc<Fat32Dentry>,
+        inode: Arc<Fat32FileInode>,
+        file_flags: &FileFlags,
+    ) -> Self {
         Self {
-            meta: FileMeta::new(dentry.clone(), inode.clone()),
+            meta: FileMeta::new(dentry.clone(), inode.clone(), file_flags),
             inner: inode.get_file(),
         }
     }
@@ -120,9 +128,13 @@ pub struct Fat32Dir {
 }
 
 impl Fat32Dir {
-    pub fn new(dentry: Arc<Fat32Dentry>, inode: Arc<Fat32DirInode>) -> Self {
+    pub fn new(
+        dentry: Arc<Fat32Dentry>,
+        inode: Arc<Fat32DirInode>,
+        file_flags: &FileFlags,
+    ) -> Self {
         Self {
-            meta: FileMeta::new(dentry.clone(), inode.clone()),
+            meta: FileMeta::new(dentry.clone(), inode.clone(), file_flags),
             inner: inode.get_dir(),
         }
     }

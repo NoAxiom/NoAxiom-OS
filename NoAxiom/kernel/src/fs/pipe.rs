@@ -263,7 +263,7 @@ impl Dentry for PipeDentry {
         unreachable!("pipe dentry should not have child");
     }
 
-    fn open(self: Arc<Self>) -> SysResult<Arc<dyn File>> {
+    fn open(self: Arc<Self>, file_flags: &FileFlags) -> SysResult<Arc<dyn File>> {
         unreachable!("pipe dentry should not open");
     }
 
@@ -329,24 +329,30 @@ impl PipeFile {
     pub fn into_dyn(self: Arc<Self>) -> Arc<dyn File> {
         self.clone()
     }
-    fn new_read_end(buffer: Arc<SpinLock<PipeBuffer>>, name: &str) -> Arc<Self> {
+    fn new_read_end(
+        buffer: Arc<SpinLock<PipeBuffer>>,
+        name: &str,
+        file_flags: &FileFlags,
+    ) -> Arc<Self> {
         let name = format!("{}-read", name);
         let dentry = PipeDentry::new(&name);
         let inode = Arc::new(PipeInode::new());
         dentry.set_inode(inode.clone());
-        let meta = FileMeta::new(dentry, inode);
+        let meta = FileMeta::new(dentry, inode, &(*file_flags | FileFlags::O_RDONLY));
         let res = Arc::new(Self { buffer, meta });
-        res.clone().into_dyn().set_flags(FileFlags::O_RDONLY);
         res
     }
-    fn new_write_end(buffer: Arc<SpinLock<PipeBuffer>>, name: &str) -> Arc<Self> {
+    fn new_write_end(
+        buffer: Arc<SpinLock<PipeBuffer>>,
+        name: &str,
+        file_flags: &FileFlags,
+    ) -> Arc<Self> {
         let name = format!("{}-write", name);
         let dentry = PipeDentry::new(&name);
         let inode = Arc::new(PipeInode::new());
         dentry.set_inode(inode.clone());
-        let meta = FileMeta::new(dentry, inode);
+        let meta = FileMeta::new(dentry, inode, &(*file_flags | FileFlags::O_WRONLY));
         let res = Arc::new(Self { buffer, meta });
-        res.clone().into_dyn().set_flags(FileFlags::O_WRONLY);
         res
     }
     fn is_read_end(&self) -> bool {
@@ -356,11 +362,11 @@ impl PipeFile {
         self.meta.writable()
     }
     /// Create a new pipe, return (read end, write end)
-    pub fn new_pipe() -> (Arc<Self>, Arc<Self>) {
+    pub fn new_pipe(file_flags: &FileFlags) -> (Arc<Self>, Arc<Self>) {
         let buffer = Arc::new(SpinLock::new(PipeBuffer::new()));
         let name = format!("pipe-{}", global_alloc());
-        let read_end = Self::new_read_end(buffer.clone(), &name);
-        let write_end = Self::new_write_end(buffer.clone(), &name);
+        let read_end = Self::new_read_end(buffer.clone(), &name, file_flags);
+        let write_end = Self::new_write_end(buffer.clone(), &name, file_flags);
         buffer.lock().read_end = true;
         buffer.lock().write_end = true;
         (read_end, write_end)
@@ -381,11 +387,6 @@ impl File for PipeFile {
         PipeReadFuture::new(buf.len(), self.buffer.clone()).await?;
         let mut buffer = self.buffer.lock();
         let ret = buffer.read(buf);
-        debug!(
-            "[pipe] {} read buf as string: {}",
-            self.meta.dentry().name(),
-            alloc::string::String::from_utf8_lossy(buf)
-        );
         if ret != 0 {
             buffer.notify_write_waker();
         }
@@ -400,11 +401,6 @@ impl File for PipeFile {
         PipeWriteFuture::new(buf.len(), self.buffer.clone()).await?;
         let mut buffer = self.buffer.lock();
         let ret = buffer.write(buf);
-        debug!(
-            "[pipe] {} write buf as string: {}",
-            self.meta.dentry().name(),
-            alloc::string::String::from_utf8_lossy(buf)
-        );
         if ret != 0 {
             buffer.notify_read_waker();
         }

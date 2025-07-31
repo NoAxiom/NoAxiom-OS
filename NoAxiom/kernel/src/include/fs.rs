@@ -8,8 +8,10 @@ use strum::FromRepr;
 use crate::fs::vfs::basic::inode::Inode;
 
 bitflags! {
+    /// File access modes
+    /// Defined in <fcntl.h>.
     #[derive(Debug, Clone, Copy)]
-    pub struct FileFlags: u32 {
+    pub struct FileFlags: i32 {
         // TODO do not use 0
         // NOTE: bitflags do not encourage zero bit flag, we should not directly check `O_RDONLY`
         const O_RDONLY    = 0;
@@ -20,10 +22,17 @@ bitflags! {
         const O_TRUNC     = 1 << 9;
         const O_APPEND    = 1 << 10;
         const O_NONBLOCK  = 1 << 11;
+        const O_DSYNC     = 1 << 12;
+        const O_ASYNC     = 1 << 13;
+        const O_DIRECT    = 1 << 14;
         const O_LARGEFILE = 1 << 15;
         const O_DIRECTORY = 1 << 16;
         const O_NOFOLLOW  = 1 << 17;
+        const O_NOATIME   = 1 << 18;
         const O_CLOEXEC   = 1 << 19;
+        const O_SYNC      = (1 << 20) | (1 << 12);
+        const O_PATH      = 1 << 21;
+        const O_TMPFILE   = (1 << 22) | (1 << 16);
     }
 
     /// User group read and write permissions

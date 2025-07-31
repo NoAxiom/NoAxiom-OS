@@ -22,7 +22,7 @@ use super::{
 use crate::{
     fs::{path::Path, vfs::basic::inode::InodeState},
     include::{
-        fs::{InodeMode, RenameFlags},
+        fs::{FileFlags, InodeMode, RenameFlags},
         result::Errno,
     },
     sched::utils::block_on,
@@ -68,7 +68,7 @@ pub trait Dentry: Send + Sync + DowncastSync {
     /// Get the meta of the dentry
     fn meta(&self) -> &DentryMeta;
     /// Open the file associated with the dentry
-    fn open(self: Arc<Self>) -> SysResult<Arc<dyn File>>;
+    fn open(self: Arc<Self>, file_flags: &FileFlags) -> SysResult<Arc<dyn File>>;
     /// Get new dentry from name
     fn from_name(self: Arc<Self>, name: &str) -> Arc<dyn Dentry>;
     /// Create a new dentry with `name` and `mode`
@@ -226,7 +226,7 @@ impl dyn Dentry {
             }
             assert!(current.clone().inode().unwrap().file_type() == InodeMode::DIR);
             if current.clone().children().is_empty() {
-                if let Ok(current_dir) = current.clone().open() {
+                if let Ok(current_dir) = current.clone().open(&FileFlags::empty()) {
                     warn!(
                         "[find_path] the {} is not open! Now open it.",
                         current.name()
@@ -299,7 +299,7 @@ impl dyn Dentry {
                 continue;
             }
             if current.clone().children().is_empty() {
-                if let Ok(current_dir) = current.clone().open() {
+                if let Ok(current_dir) = current.clone().open(&FileFlags::empty()) {
                     assert_no_lock!();
                     current_dir.load_dir().await.unwrap();
                 }
@@ -347,7 +347,7 @@ impl dyn Dentry {
     }
 
     /// Unlink, unlink self and delete the inner file if nlink is 0.
-    pub async fn unlink(self: Arc<Self>) -> SyscallResult {
+    pub async fn unlink(self: Arc<Self>, file_flags: &FileFlags) -> SyscallResult {
         if unlikely(self.name() == "interrupts") {
             // MENTION: this is required by official
             return Err(Errno::ENOSYS);
@@ -368,13 +368,17 @@ impl dyn Dentry {
         if nlink == 0 {
             let parent = self.parent().unwrap();
             let mut w_guard = crate::fs::pagecache::get_pagecache_wguard();
-            let file = self.clone().open()?;
+            let file = self.clone().open(file_flags)?;
             w_guard.mark_deleted(&file);
             drop(w_guard);
             self.set_inode_none();
             inode.set_state(InodeState::Deleted).await;
             // parent.remove_child(&self.name()).unwrap();
-            parent.open().unwrap().delete_child(&self.name()).await?;
+            parent
+                .open(&FileFlags::empty())
+                .unwrap()
+                .delete_child(&self.name())
+                .await?;
         }
         Ok(0)
     }
@@ -421,7 +425,7 @@ impl dyn Dentry {
             }
             tar_parent
                 .clone()
-                .open()?
+                .open(&FileFlags::empty())?
                 .delete_child(tar_name.as_str())
                 .await?;
         }
@@ -462,7 +466,7 @@ impl Dentry for EmptyDentry {
         &self.meta
     }
 
-    fn open(self: Arc<Self>) -> SysResult<Arc<dyn File>> {
+    fn open(self: Arc<Self>, file_flags: &FileFlags) -> SysResult<Arc<dyn File>> {
         unreachable!()
     }
 

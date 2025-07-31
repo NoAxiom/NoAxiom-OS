@@ -11,7 +11,7 @@ use super::{
 };
 use crate::{
     fs::vfs::basic::file::{File, FileMeta},
-    include::io::PollEvent,
+    include::{fs::FileFlags, io::PollEvent},
     syscall::{SysResult, SyscallResult},
 };
 
@@ -21,9 +21,13 @@ pub struct RamFsFile {
 }
 
 impl RamFsFile {
-    pub fn new(dentry: Arc<RamFsDentry>, inode: Arc<RamFsFileInode>) -> Self {
+    pub fn new(
+        dentry: Arc<RamFsDentry>,
+        inode: Arc<RamFsFileInode>,
+        file_flags: &FileFlags,
+    ) -> Self {
         Self {
-            meta: FileMeta::new(dentry.clone(), inode.clone()),
+            meta: FileMeta::new(dentry.clone(), inode.clone(), file_flags),
             data: Arc::new(RwLock::new(Vec::new())),
         }
     }
@@ -82,9 +86,13 @@ pub struct RamFsDir {
 }
 
 impl RamFsDir {
-    pub fn new(dentry: Arc<RamFsDentry>, inode: Arc<RamFsDirInode>) -> Self {
+    pub fn new(
+        dentry: Arc<RamFsDentry>,
+        inode: Arc<RamFsDirInode>,
+        file_flags: &FileFlags,
+    ) -> Self {
         Self {
-            meta: FileMeta::new(dentry.clone(), inode.clone()),
+            meta: FileMeta::new(dentry.clone(), inode.clone(), file_flags),
         }
     }
 }

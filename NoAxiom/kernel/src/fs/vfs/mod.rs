@@ -9,7 +9,7 @@ use ksync::Once;
 
 use crate::{
     fs::{blockcache::get_block_cache, manager::FS_MANAGER, path::Path},
-    include::fs::{InodeMode, MountFlags},
+    include::fs::{FileFlags, InodeMode, MountFlags},
 };
 pub mod basic;
 pub mod impls;
@@ -51,7 +51,7 @@ pub async fn fs_init() {
 
     // Load the root dentry
     root_dentry()
-        .open()
+        .open(&FileFlags::empty())
         .unwrap()
         .load_dir()
         .await
@@ -66,17 +66,25 @@ pub async fn fs_init() {
         let ls = Path::from_or_create(format!("/ls"), InodeMode::FILE)
             .await
             .unwrap();
-        ls.dentry().open().expect("open ls failed");
+        ls.dentry()
+            .open(&FileFlags::empty())
+            .expect("open ls failed");
 
         let logon = Path::from_or_create(format!("/logon"), InodeMode::FILE)
             .await
             .unwrap();
-        logon.dentry().open().expect("open logon failed");
+        logon
+            .dentry()
+            .open(&FileFlags::empty())
+            .expect("open logon failed");
 
         let logoff = Path::from_or_create(format!("/logoff"), InodeMode::FILE)
             .await
             .unwrap();
-        logoff.dentry().open().expect("open logoff failed");
+        logoff
+            .dentry()
+            .open(&FileFlags::empty())
+            .expect("open logoff failed");
     }
 }
 

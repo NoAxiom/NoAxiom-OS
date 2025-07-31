@@ -20,7 +20,7 @@ use crate::{
     config::mm::{PAGE_SIZE, PAGE_WIDTH, USER_STACK_SIZE},
     cpu::current_task,
     fs::{path::Path, vfs::basic::file::File},
-    include::{mm::MmapFlags, process::auxv::*},
+    include::{fs::FileFlags, mm::MmapFlags, process::auxv::*},
     map_permission,
     mm::{
         address::{VirtAddr, VirtPageNum},
@@ -490,7 +490,7 @@ impl MemorySet {
         auxs.push(AuxEntry(AT_PAGESZ, PAGE_SIZE as usize));
         if let Some(path) = elf.dl_interp {
             auxs.push(AuxEntry(AT_BASE, DL_INTERP_OFFSET));
-            let dl_interp_file = path.dentry().open()?;
+            let dl_interp_file = path.dentry().open(&FileFlags::O_RDWR)?;
             let dl_interp_info = memory_set
                 .map_elf(&dl_interp_file, DL_INTERP_OFFSET, true)
                 .await?;

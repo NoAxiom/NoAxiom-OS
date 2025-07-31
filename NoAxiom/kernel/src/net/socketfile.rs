@@ -141,7 +141,7 @@ impl Dentry for SocketDentry {
         unreachable!("socket dentry should not have child");
     }
 
-    fn open(self: Arc<Self>) -> SysResult<Arc<dyn File>> {
+    fn open(self: Arc<Self>, _file_flags: &FileFlags) -> SysResult<Arc<dyn File>> {
         unreachable!("socket dentry should not open");
     }
 
@@ -177,8 +177,7 @@ impl SocketFile {
 
         let dentry = SocketDentry::new(&format!("socket-{}", global_alloc()));
         let empty_inode = EmptyInode::new();
-        let meta = FileMeta::new(dentry, Arc::new(empty_inode));
-        meta.set_flags(FileFlags::O_RDWR);
+        let meta = FileMeta::new(dentry, Arc::new(empty_inode), &FileFlags::O_RDWR);
 
         Ok(Self {
             meta,
@@ -190,8 +189,7 @@ impl SocketFile {
     pub fn new_from_socket(socket: Arc<SocketFile>, sock: Sock) -> Self {
         let dentry = SocketDentry::new(&format!("socket-{}", global_alloc()));
         let empty_inode = EmptyInode::new();
-        let meta = FileMeta::new(dentry, Arc::new(empty_inode));
-        meta.set_flags(FileFlags::O_RDWR);
+        let meta = FileMeta::new(dentry, Arc::new(empty_inode), &FileFlags::O_RDWR);
 
         Self {
             meta,

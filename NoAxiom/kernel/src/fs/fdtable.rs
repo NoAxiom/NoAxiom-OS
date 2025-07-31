@@ -163,10 +163,10 @@ impl FdTable {
     }
 
     /// Set the `flags` of the `fd` slot
-    pub fn set_fdflag(&mut self, fd: usize, flags: FcntlArgFlags) {
+    pub fn set_fdflag(&mut self, fd: usize, flags: &FcntlArgFlags) {
         if fd < self.table.len() {
             if let Some(entry) = &mut self.table[fd] {
-                entry.flags = flags;
+                entry.flags = flags.clone();
             }
         }
     }

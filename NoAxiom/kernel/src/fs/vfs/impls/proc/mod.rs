@@ -19,6 +19,7 @@ use crate::{
             },
         },
     },
+    include::fs::FileFlags,
     syscall::SysResult,
 };
 
@@ -80,7 +81,10 @@ pub async fn init(fs_root: Arc<dyn Dentry>) -> SysResult<()> {
     let kernel_dentry = sys_dentry.add_child("kernel", kernel_inode);
     let pid_max_inode = Arc::new(RamFsFileInode::new(kernel_dentry.super_block(), 0));
     let pid_max_dentry = kernel_dentry.add_child("pid_max", pid_max_inode);
-    pid_max_dentry.open()?.write("32768\0".as_bytes()).await?;
+    pid_max_dentry
+        .open(&FileFlags::O_WRONLY)?
+        .write("32768\0".as_bytes())
+        .await?;
 
     info!("[fs] create /proc/self");
     let self_dentry: Arc<dyn Dentry> = Arc::new(RamFsDentry::new(

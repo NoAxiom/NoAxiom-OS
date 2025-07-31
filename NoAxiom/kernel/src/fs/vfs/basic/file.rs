@@ -3,16 +3,13 @@
 use alloc::{boxed::Box, string::String, sync::Arc, vec::Vec};
 use core::{
     hash::{Hash, Hasher},
-    sync::atomic::{AtomicUsize, Ordering},
+    sync::atomic::{AtomicI32, AtomicUsize, Ordering},
     task::Waker,
 };
 
 use async_trait::async_trait;
 use config::mm::PAGE_SIZE;
 use downcast_rs::{impl_downcast, DowncastSync};
-use ksync::mutex::{SpinLock, SpinLockGuard};
-type Mutex<T> = SpinLock<T>;
-type MutexGuard<'a, T> = SpinLockGuard<'a, T>;
 
 use super::{
     dentry::{self, Dentry},
@@ -35,7 +32,7 @@ use crate::{
 
 pub struct FileMeta {
     /// File flags, may be modified by multiple tasks
-    flags: Mutex<FileFlags>,
+    flags: AtomicI32,
     /// The position of the file, may be modified by multiple tasks
     pub pos: AtomicUsize,
     /// Pointer to the Dentry
@@ -45,9 +42,9 @@ pub struct FileMeta {
 }
 
 impl FileMeta {
-    pub fn new(dentry: Arc<dyn Dentry>, inode: Arc<dyn Inode>) -> Self {
+    pub fn new(dentry: Arc<dyn Dentry>, inode: Arc<dyn Inode>, flags: &FileFlags) -> Self {
         Self {
-            flags: Mutex::new(FileFlags::empty()),
+            flags: AtomicI32::new(flags.bits()),
             pos: AtomicUsize::new(0),
             dentry,
             inode,
@@ -57,21 +54,23 @@ impl FileMeta {
     pub fn empty() -> Self {
         let dentry = Arc::new(dentry::EmptyDentry::new("empty-file"));
         let inode = Arc::new(inode::EmptyInode::new());
-        Self::new(dentry, inode)
+        Self::new(dentry, inode, &FileFlags::empty())
     }
     pub fn dentry(&self) -> Arc<dyn Dentry> {
         self.dentry.clone()
     }
     pub fn readable(&self) -> bool {
-        let flags = self.flags.lock();
+        let flags =
+            FileFlags::from_bits(self.flags.load(Ordering::SeqCst)).unwrap_or(FileFlags::empty());
         !flags.contains(FileFlags::O_WRONLY) || flags.contains(FileFlags::O_RDWR)
     }
     pub fn writable(&self) -> bool {
-        let flags = self.flags.lock();
+        let flags =
+            FileFlags::from_bits(self.flags.load(Ordering::SeqCst)).unwrap_or(FileFlags::empty());
         flags.contains(FileFlags::O_WRONLY) || flags.contains(FileFlags::O_RDWR)
     }
     pub fn set_flags(&self, flags: FileFlags) {
-        *self.flags.lock() = flags;
+        self.flags.store(flags.bits(), Ordering::SeqCst);
     }
 }
 
@@ -339,11 +338,8 @@ impl dyn File {
     pub fn pos(&self) -> usize {
         self.meta().pos.load(Ordering::SeqCst)
     }
-    pub fn flags(&self) -> MutexGuard<'_, FileFlags> {
-        self.meta().flags.lock()
-    }
-    pub fn set_flags(&self, flags: FileFlags) {
-        *self.meta().flags.lock() = flags;
+    pub fn flags(&self) -> FileFlags {
+        FileFlags::from_bits(self.meta().flags.load(Ordering::SeqCst)).unwrap_or(FileFlags::empty())
     }
     pub fn inode(&self) -> Arc<dyn Inode> {
         self.meta().inode.clone()
@@ -423,7 +419,7 @@ impl EmptyFile {
         let dentry = Arc::new(dentry::EmptyDentry::new("empty-file"));
         let inode = Arc::new(inode::EmptyInode::new());
         Self {
-            meta: FileMeta::new(dentry, inode),
+            meta: FileMeta::new(dentry, inode, &FileFlags::empty()),
         }
     }
 }

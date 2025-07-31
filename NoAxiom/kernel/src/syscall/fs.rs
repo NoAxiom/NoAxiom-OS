@@ -50,8 +50,10 @@ impl Syscall<'_> {
     }
 
     /// Create a pipe
-    pub async fn sys_pipe2(&self, pipe: usize, _flag: usize) -> SyscallResult {
-        let (read_end, write_end) = PipeFile::new_pipe();
+    pub async fn sys_pipe2(&self, pipe: usize, flags: i32) -> SyscallResult {
+        let flags = FileFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
+        let (read_end, write_end) = PipeFile::new_pipe(&flags);
+        let flags = FcntlArgFlags::from_arg(flags);
 
         let user_ptr = UserPtr::<i32>::new(pipe);
         let buf_slice = user_ptr.as_slice_mut_checked(2).await?;
@@ -59,10 +61,12 @@ impl Syscall<'_> {
         let mut fd_table = self.task.fd_table();
         let read_fd = fd_table.alloc_fd()?;
         fd_table.set(read_fd, read_end);
+        fd_table.set_fdflag(read_fd, &flags);
         buf_slice[0] = read_fd as i32;
 
         let write_fd = fd_table.alloc_fd()?;
         fd_table.set(write_fd, write_end);
+        fd_table.set_fdflag(write_fd, &flags);
         buf_slice[1] = write_fd as i32;
 
         info!("[sys_pipe]: read fd {}, write fd {}", read_fd, write_fd);
@@ -123,7 +127,7 @@ impl Syscall<'_> {
         &self,
         fd: isize,
         filename: usize,
-        flags: u32,
+        flags: i32,
         mode: u32,
     ) -> SyscallResult {
         let path_str = UserPtr::<u8>::new(filename).get_string_from_ptr()?;
@@ -162,9 +166,8 @@ impl Syscall<'_> {
             return Err(Errno::ENOTDIR);
         }
 
-        let file = dentry.open()?;
+        let file = dentry.open(&flags)?;
         let file_path = file.dentry().path();
-        file.set_flags(flags);
         let mut fd_table = self.task.fd_table();
         let fd = fd_table.alloc_fd()?;
         fd_table.set(fd, file);
@@ -407,14 +410,13 @@ impl Syscall<'_> {
         dirfd: isize,
         path: usize,
         stat_buf: usize,
-        _flags: usize,
+        flags: i32,
     ) -> SyscallResult {
+        let flags = FileFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
         let path = get_path(self.task.clone(), path, dirfd, "sys_newfstat")?;
-        trace!(
-            "[sys_newfstat] dirfd: {}, path: {:?}, stat_buf: {:#x}",
-            dirfd,
-            path,
-            stat_buf
+        info!(
+            "[sys_newfstat] dirfd: {}, path: {:?}, stat_buf: {:#x}, flags: {:?}",
+            dirfd, path, stat_buf, flags
         );
         let kstat = Kstat::from_stat(path.dentry().inode()?)?;
         let ptr = UserPtr::<Kstat>::new(stat_buf);
@@ -590,6 +592,7 @@ impl Syscall<'_> {
         Ok(0)
     }
 
+    // todo: fix the linkat
     /// Create a hard link
     pub async fn sys_linkat(
         &self,
@@ -597,7 +600,7 @@ impl Syscall<'_> {
         oldpath: usize,
         newdirfd: isize,
         newpath: usize,
-        _flags: usize,
+        _flags: i32,
     ) -> SyscallResult {
         let task = self.task;
         let cwd = task.cwd().clone();
@@ -619,6 +622,7 @@ impl Syscall<'_> {
             "[sys_linkat] old_path: {:?}, new_path: {:?}",
             old_path, new_path
         );
+
         let old_dentry = if cwd == "/" {
             Path::try_from("/musl/busybox".to_string())
                 .unwrap()
@@ -631,6 +635,7 @@ impl Syscall<'_> {
         new_dentry.link_to(old_dentry).await
     }
 
+    // todo: AT_SYMLINK_NOFOLLOW
     /// Read link file, error if the file is not a link
     pub async fn sys_readlinkat(
         &self,
@@ -650,18 +655,19 @@ impl Syscall<'_> {
         }
         let user_ptr = UserPtr::<u8>::new(buf);
         let buf_slice = user_ptr.as_slice_mut_checked(buflen).await?;
-        let file = dentry.open()?;
+        let file = dentry.open(&FileFlags::empty())?;
         let res = file.base_readlink(buf_slice).await;
         res
     }
 
     /// Unlink a file, also delete the file if nlink is 0
-    pub async fn sys_unlinkat(&self, dirfd: isize, path: usize, _flags: usize) -> SyscallResult {
-        info!("[sys_unlinkat] dirfd: {}", dirfd);
+    pub async fn sys_unlinkat(&self, dirfd: isize, path: usize, flags: i32) -> SyscallResult {
+        let flags = FileFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
+        info!("[sys_unlinkat] dirfd: {}, flags: {:?}", dirfd, flags);
         let task = self.task;
         let path = get_path(task.clone(), path, dirfd, "sys_unlinkat")?;
         let dentry = path.dentry();
-        dentry.unlink().await?;
+        dentry.unlink(&flags).await?;
         debug!("[sys_unlinkat] unlink ok");
         Ok(0)
     }
@@ -723,7 +729,7 @@ impl Syscall<'_> {
     /// below on the open file descriptor fd.
     pub fn sys_fcntl(&self, fd: usize, cmd: usize, arg: usize) -> SyscallResult {
         let task = self.task;
-        let flags = FileFlags::from_bits_retain(arg as u32);
+        let flags = FileFlags::from_bits_retain(arg as i32);
         let mut fd_table = task.fd_table();
         let file = fd_table.get(fd).ok_or(Errno::EBADF)?;
         // let file_name = file.dentry().path()?;
@@ -733,13 +739,13 @@ impl Syscall<'_> {
         info!("[sys_fcntl] fd: {fd}, cmd: {op:?}, arg: {flags:?}");
         match op {
             FcntlFlags::F_SETFL => {
-                file.set_flags(flags);
+                file.meta().set_flags(flags);
                 Ok(0)
             }
             FcntlFlags::F_SETFD => {
-                let arg = FileFlags::from_bits_retain(arg as u32);
+                let arg = FileFlags::from_bits_retain(arg as i32);
                 let fd_flags = FcntlArgFlags::from_arg(arg);
-                fd_table.set_fdflag(fd, fd_flags);
+                fd_table.set_fdflag(fd, &fd_flags);
                 Ok(0)
             }
             FcntlFlags::F_GETFD => {
@@ -758,7 +764,7 @@ impl Syscall<'_> {
             FcntlFlags::F_DUPFD_CLOEXEC => {
                 let new_fd = fd_table.alloc_fd_after(arg)?;
                 assert!(new_fd > fd);
-                fd_table.set_fdflag(new_fd, FcntlArgFlags::FD_CLOEXEC);
+                fd_table.set_fdflag(new_fd, &FcntlArgFlags::FD_CLOEXEC);
                 fd_table.copyfrom(fd, new_fd)
             }
             _ => {
@@ -810,9 +816,9 @@ impl Syscall<'_> {
         dirfd: isize,
         path: usize,
         times: usize,
-        flags: usize,
+        flags: i32,
     ) -> SyscallResult {
-        let flags = FileFlags::from_bits(flags as u32).ok_or(Errno::EINVAL)?;
+        let flags = FileFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
         info!(
             "[sys_utimensat] dirfd: {}, times: {:#x}, flags: {:?}",
             dirfd, times, flags
@@ -1032,6 +1038,8 @@ impl Syscall<'_> {
         Ok(0)
     }
 
+    /// check user's permissions of a file relative to a directory file
+    /// descriptor
     pub fn sys_faccessat(&self, fd: usize, path: usize, mode: i32, flag: i32) -> SyscallResult {
         pub const AT_EACCESS: i32 = 0x200;
         pub const AT_EMPTY_PATH: i32 = 0x1000;
