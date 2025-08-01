@@ -85,10 +85,12 @@ impl<'a> Syscall<'a> {
             SYS_GETSOCKOPT =>   self.sys_getsockopt(args[0], args[1], args[2], args[3], args[4]).await,
 
             // process
-            SYS_GETUID =>               Self::empty_syscall("getuid", 0),
-            SYS_GETEUID =>              Self::empty_syscall("geteuid", 0),
-            SYS_GETGID =>               Self::empty_syscall("getgid", 0),
-            SYS_GETEGID =>              Self::empty_syscall("getegid", 0),
+            SYS_GETUID =>               self.sys_getuid(),
+            SYS_GETEUID =>              self.sys_geteuid(),
+            SYS_GETGID =>               self.sys_getgid(),
+            SYS_GETEGID =>              self.sys_getegid(),
+            SYS_SETUID =>               self.sys_setuid(args[0] as u32),
+            SYS_SETGID =>               self.sys_setgid(args[0] as u32),
             SYS_EXIT =>                 self.sys_exit(args[0] as i32),
             SYS_EXIT_GROUP =>           self.sys_exit_group(args[0] as i32),
             SYS_CLONE =>                self.sys_clone(&args).await,
@@ -106,7 +108,6 @@ impl<'a> Syscall<'a> {
             SYS_FUTEX =>                self.sys_futex(args[0] as _, args[1] as _, args[2] as _, args[3] as _, args[4] as _, args[5] as _).await,
             SYS_SETSID =>               self.sys_setsid(),
             SYS_GETRUSAGE =>            self.sys_getrusage(args[0] as _, args[1]).await,
-            SYS_SETUID =>               self.sys_setuid(args[0] as u32),
             
             // signal
             SYS_SIGTIMEDWAIT => self.sys_sigtimedwait(args[0], args[1], args[2]).await,

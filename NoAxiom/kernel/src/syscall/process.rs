@@ -534,4 +534,53 @@ impl Syscall<'_> {
         }
         Ok(0)
     }
+
+    pub fn sys_setgid(&self, gid: u32) -> SyscallResult {
+        info!("[sys_setgid] set gid to {}", gid);
+        if self.task.euid() == 0 {
+            warn!(
+                "[sys_setgid] task {} is root, set gid to {}",
+                self.task.tid(),
+                gid
+            );
+            self.task.set_gid(gid);
+            self.task.set_egid(gid);
+            self.task.set_sgid(gid);
+            self.task.set_fsgid(gid);
+        } else {
+            if gid != self.task.gid() && gid != self.task.sgid() {
+                warn!(
+                    "[sys_setgid] task {} is not root, set gid to {}",
+                    self.task.tid(),
+                    gid
+                );
+                return Err(Errno::EPERM);
+            } else {
+                warn!("[sys_setgid] task {} set gid to {}", self.task.tid(), gid);
+                self.task.set_egid(gid);
+                self.task.set_fsgid(gid);
+            }
+        }
+        Ok(0)
+    }
+
+    pub fn sys_getuid(&self) -> SyscallResult {
+        info!("[sys_getuid] get uid: {}", self.task.uid());
+        Ok(self.task.uid() as isize)
+    }
+
+    pub fn sys_geteuid(&self) -> SyscallResult {
+        info!("[sys_geteuid] get euid: {}", self.task.euid());
+        Ok(self.task.euid() as isize)
+    }
+
+    pub fn sys_getgid(&self) -> SyscallResult {
+        info!("[sys_getgid] get gid: {}", self.task.gid());
+        Ok(self.task.gid() as isize)
+    }
+
+    pub fn sys_getegid(&self) -> SyscallResult {
+        info!("[sys_getegid] get egid: {}", self.task.egid());
+        Ok(self.task.egid() as isize)
+    }
 }
