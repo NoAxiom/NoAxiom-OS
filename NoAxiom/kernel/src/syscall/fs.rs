@@ -1,7 +1,6 @@
 use alloc::{string::ToString, sync::Arc, vec::Vec};
 
 use config::task::INIT_PROCESS_ID;
-use ext4_rs::ext4_defs::X_OK;
 use ksync::assert_no_lock;
 
 use super::{SysResult, Syscall, SyscallResult};
@@ -13,13 +12,13 @@ use crate::{
         fs::{
             FcntlArgFlags, FcntlFlags, FileFlags, InodeMode, IoctlCmd, Iovec, Kstat, MountFlags,
             NoAxiomIoctlCmd, RenameFlags, RtcIoctlCmd, SeekFrom, Statfs, Statx, TtyIoctlCmd,
-            Whence, OTHER_MASK, TYPE_MASK,
+            Whence,
         },
         resource::Resource,
         result::Errno,
         time::TimeSpec,
     },
-    mm::{permission, user_ptr::UserPtr},
+    mm::user_ptr::UserPtr,
     return_errno,
     signal::interruptable::interruptable,
     task::Task,
@@ -1031,7 +1030,7 @@ impl Syscall<'_> {
 
     pub fn sys_fchmod(&self, fd: usize, path: usize, mode: usize) -> SyscallResult {
         let path = get_path(self.task.clone(), path, fd as isize, "sys_fchmod")?;
-        info!("[sys_fchmod] set {:?} mode to {:?}", mode, path);
+        info!("[sys_fchmod] set {:o} mode to {:?}", mode, path);
 
         let inode = path.dentry().inode()?;
         inode.set_permission(mode as u32);
@@ -1041,10 +1040,41 @@ impl Syscall<'_> {
     pub fn sys_fchmodat(&self, fd: usize, path: usize, mode: usize, _flag: i32) -> SyscallResult {
         // todo: support flag
         let path = get_path(self.task.clone(), path, fd as isize, "sys_fchmodat")?;
-        info!("[sys_fchmodat] set {:?} mode to {:?}, flags", mode, path);
+        info!("[sys_fchmodat] set {:o} mode to {:?}", mode, path);
 
         let inode = path.dentry().inode()?;
         inode.set_permission(mode as u32);
+        Ok(0)
+    }
+
+    pub fn sys_fchown(&self, fd: usize, owner: u32, group: u32) -> SyscallResult {
+        let file = self.task.fd_table().get(fd).ok_or(Errno::EBADF)?;
+        info!(
+            "[sys_fchown] set owner: {:?}, group: {:?} for file: {}",
+            owner,
+            group,
+            file.name()
+        );
+        file.inode().chown(self.task, owner, group)?;
+        Ok(0)
+    }
+
+    pub fn sys_fchownat(
+        &self,
+        fd: usize,
+        path: usize,
+        owner: u32,
+        group: u32,
+        _flag: i32,
+    ) -> SyscallResult {
+        let path = get_path(self.task.clone(), path, fd as isize, "sys_fchownat")?;
+        info!(
+            "[sys_fchownat] set owner: {:?}, group: {:?} for {:?}",
+            owner, group, path
+        );
+
+        let inode = path.dentry().inode()?;
+        inode.chown(self.task, owner, group)?;
         Ok(0)
     }
 
@@ -1094,6 +1124,14 @@ impl Syscall<'_> {
             }
             return Ok(0);
         }
+
+        debug!(
+            "[sys_faccessat] uid: {}, gid: {}, inode uid: {}, inode gid: {}",
+            uid,
+            gid,
+            inode.uid(),
+            inode.gid()
+        );
 
         let permission = if uid == inode.uid() {
             pri.user_permissions() as i32

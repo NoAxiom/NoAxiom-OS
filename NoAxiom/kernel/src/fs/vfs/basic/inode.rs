@@ -3,6 +3,7 @@ use core::sync::atomic::{AtomicU32, Ordering};
 
 use async_trait::async_trait;
 use downcast_rs::{impl_downcast, DowncastSync};
+use include::errno::Errno;
 use ksync::mutex::SpinLock;
 
 use super::superblock::{EmptySuperBlock, SuperBlock};
@@ -14,6 +15,7 @@ use crate::{
         time::TimeSpec,
     },
     syscall::SysResult,
+    task::Task,
     utils::global_alloc,
 };
 
@@ -131,6 +133,15 @@ impl dyn Inode {
     pub fn state(&self) -> InodeState {
         self.meta().inner.lock().state
     }
+    #[inline(always)]
+    pub fn inode_mode(&self) -> InodeMode {
+        InodeMode::from_bits(self.meta().inode_mode.load(Ordering::SeqCst))
+            .unwrap_or(InodeMode::empty())
+    }
+    #[inline(always)]
+    pub fn set_inode_mode(&self, mode: InodeMode) {
+        self.meta().inode_mode.store(mode.bits(), Ordering::SeqCst);
+    }
     pub fn file_type(&self) -> InodeMode {
         let inode_mode = self.meta().inode_mode.load(Ordering::SeqCst);
         let inode_mode = inode_mode & TYPE_MASK;
@@ -202,6 +213,83 @@ impl dyn Inode {
                 inner.state = state;
             }
         }
+    }
+
+    /// ref: RocketOS
+    /// change the owner and group of a file
+    pub fn chown(&self, task: &Arc<Task>, uid: u32, gid: u32) -> SysResult<()> {
+        let euid = task.fsuid();
+        let egid = task.fsgid();
+        let mut mode = self.inode_mode();
+        info!(
+            "[chown] euid: {}, egid: {}, uid: {}, gid: {}, mode: {:?}",
+            euid, egid, uid, gid, mode
+        );
+
+        let uid_change = uid != u32::MAX; // -1 means not to change
+        let gid_change = gid != u32::MAX; // -1 means not to change
+
+        // ROOT
+        if euid == 0 {
+            if uid_change {
+                if mode.other_permissions() != 0 && mode.contains(InodeMode::FILE) {
+                    warn!("[chown] Root User changes the owner");
+                    if mode.contains(InodeMode::GROUP_EXEC) {
+                        // clear setuid and setgid
+                        mode &= !(InodeMode::SET_GID | InodeMode::SET_UID);
+                    } else {
+                        mode &= !(InodeMode::SET_UID);
+                    }
+                    self.set_inode_mode(mode);
+                }
+
+                self.set_uid(uid);
+            }
+            if gid_change {
+                self.set_gid(gid);
+            }
+            return Ok(());
+        }
+
+        // change uid
+        if uid_change {
+            // just support root changer owner
+            warn!("[chown] User changes the owner, but not root, not supported yet");
+            return Err(Errno::EPERM);
+        }
+
+        // change gid
+        if gid_change && gid != self.gid() {
+            warn!("inode gid: {}", self.gid());
+            if euid != self.uid() {
+                error!(
+                    "[chown] No permission to change ownership, euid: {}, egid: {}",
+                    euid, egid
+                );
+                return Err(Errno::EPERM);
+            }
+            // 检查new_gid是否是当前用户的egid或附属组
+            if egid != gid {
+                let sup_groups = task.sup_groups();
+                if !sup_groups.contains(&gid) {
+                    error!("[chown] New group {} is not in the effective groups of task {}, euid: {}, egid: {}", gid, task.tid(), euid, egid);
+                    return Err(Errno::EPERM);
+                }
+            }
+            if mode.other_permissions() != 0 && mode.contains(InodeMode::FILE) {
+                warn!("[chown] Normal User changes the owner");
+                // 如果是文件是non-group-executable, 则保留setgid位
+                if mode.contains(InodeMode::GROUP_EXEC) {
+                    // clear setuid and setgid
+                    mode &= !(InodeMode::SET_GID | InodeMode::SET_UID);
+                } else {
+                    mode &= !(InodeMode::SET_UID);
+                }
+                self.set_inode_mode(mode);
+            }
+            self.set_gid(gid);
+        }
+        Ok(())
     }
 }
 

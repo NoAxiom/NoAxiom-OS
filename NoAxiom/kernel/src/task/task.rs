@@ -89,7 +89,16 @@ type ThreadOnly<T> = SyncUnsafeCell<T>;
 #[repr(C, align(64))]
 pub struct Task {
     // mutable
-    pcb: Mutable<PCB>, // task control block inner, protected by lock
+    pcb: Mutable<PCB>,               // task control block inner, protected by lock
+    uid: AtomicU32,                  // user id
+    gid: AtomicU32,                  // group id
+    fsuid: AtomicU32,                // user id - file system
+    fsgid: AtomicU32,                // group id - file system
+    euid: AtomicU32,                 // user id - effective
+    egid: AtomicU32,                 // group id - effective
+    suid: AtomicU32,                 // user id - saved
+    sgid: AtomicU32,                 // group id - saved
+    sup_groups: SharedMut<Vec<u32>>, // supplementary groups
 
     // thread only / once initialization
     tcb: ThreadOnly<TCB>,                  // thread control block
@@ -108,14 +117,6 @@ pub struct Task {
     pgid: Arc<AtomicUsize>,               // process group id
     futex: SharedMut<FutexQueue>,         // futex wait queue
     itimer: SharedMut<ITimerManager>,     // interval timer
-    uid: Arc<AtomicU32>,                  // user id
-    gid: Arc<AtomicU32>,                  // group id
-    fsuid: Arc<AtomicU32>,                // user id - file system
-    fsgid: Arc<AtomicU32>,                // group id - file system
-    euid: Arc<AtomicU32>,                 // user id - effective
-    egid: Arc<AtomicU32>,                 // group id - effective
-    suid: Arc<AtomicU32>,                 // user id - saved
-    sgid: Arc<AtomicU32>,                 // group id - saved
 }
 
 /// user tasks
@@ -215,6 +216,10 @@ impl Task {
     #[inline(always)]
     pub fn set_sgid(&self, sgid: u32) {
         self.sgid.store(sgid, core::sync::atomic::Ordering::SeqCst);
+    }
+    #[inline(always)]
+    pub fn sup_groups(&self) -> SpinLockGuard<Vec<u32>> {
+        self.sup_groups.lock()
     }
 
     /// check if the task is group leader
@@ -492,14 +497,15 @@ impl Task {
             }),
             futex: Shared::new(FutexQueue::new()),
             itimer: Shared::new(ITimerManager::new()),
-            uid: Arc::new(AtomicU32::new(0)),   // default user id
-            gid: Arc::new(AtomicU32::new(0)),   // default group id
-            fsuid: Arc::new(AtomicU32::new(0)), // default fs user id
-            fsgid: Arc::new(AtomicU32::new(0)), // default fs group id
-            euid: Arc::new(AtomicU32::new(0)),  // default effective user id
-            egid: Arc::new(AtomicU32::new(0)),  // default effective group id
-            suid: Arc::new(AtomicU32::new(0)),  // default saved user id
-            sgid: Arc::new(AtomicU32::new(0)),  // default saved group id
+            uid: AtomicU32::new(0),              // default user id
+            gid: AtomicU32::new(0),              // default group id
+            fsuid: AtomicU32::new(0),            // default fs user id
+            fsgid: AtomicU32::new(0),            // default fs group id
+            euid: AtomicU32::new(0),             // default effective user id
+            egid: AtomicU32::new(0),             // default effective group id
+            suid: AtomicU32::new(0),             // default saved user id
+            sgid: AtomicU32::new(0),             // default saved group id
+            sup_groups: Shared::new(Vec::new()), // default supplementary groups
         });
         task.thread_group().insert(&task);
         TASK_MANAGER.insert(&task);
@@ -665,14 +671,15 @@ impl Task {
                 }),
                 futex: self.futex.clone(),
                 itimer: self.itimer.clone(),
-                uid: self.uid.clone(),
-                gid: self.gid.clone(),
-                fsuid: self.fsuid.clone(),
-                fsgid: self.fsgid.clone(),
-                euid: self.euid.clone(),
-                egid: self.egid.clone(),
-                suid: self.suid.clone(),
-                sgid: self.sgid.clone(),
+                uid: AtomicU32::new(self.uid()),
+                gid: AtomicU32::new(self.gid()),
+                fsuid: AtomicU32::new(self.fsuid()),
+                fsgid: AtomicU32::new(self.fsgid()),
+                euid: AtomicU32::new(self.euid()),
+                egid: AtomicU32::new(self.egid()),
+                suid: AtomicU32::new(self.suid()),
+                sgid: AtomicU32::new(self.sgid()),
+                sup_groups: self.sup_groups.clone(),
             });
             new_thread.thread_group.lock().insert(&new_thread);
             TASK_MANAGER.insert(&new_thread);
@@ -703,14 +710,15 @@ impl Task {
                 }),
                 futex: Shared::new(FutexQueue::new()),
                 itimer: Shared::new(ITimerManager::new()),
-                uid: self.uid.clone(),
-                gid: self.gid.clone(),
-                fsuid: self.fsuid.clone(),
-                fsgid: self.fsgid.clone(),
-                euid: self.euid.clone(),
-                egid: self.egid.clone(),
-                suid: self.suid.clone(),
-                sgid: self.sgid.clone(),
+                uid: AtomicU32::new(self.uid()),
+                gid: AtomicU32::new(self.gid()),
+                fsuid: AtomicU32::new(self.fsuid()),
+                fsgid: AtomicU32::new(self.fsgid()),
+                euid: AtomicU32::new(self.euid()),
+                egid: AtomicU32::new(self.egid()),
+                suid: AtomicU32::new(self.suid()),
+                sgid: AtomicU32::new(self.sgid()),
+                sup_groups: self.sup_groups.clone(),
             });
             new_process.thread_group().insert(&new_process);
             self.pcb().children.push(new_process.clone());
