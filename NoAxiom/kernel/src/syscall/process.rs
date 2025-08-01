@@ -505,4 +505,33 @@ impl Syscall<'_> {
         usage.write(rusage).await?;
         Ok(0)
     }
+
+    pub fn sys_setuid(&self, uid: u32) -> SyscallResult {
+        info!("[sys_setuid] set uid to {}", uid);
+        if self.task.euid() == 0 {
+            warn!(
+                "[sys_setuid] task {} is root, set uid to {}",
+                self.task.tid(),
+                uid
+            );
+            self.task.set_uid(uid);
+            self.task.set_euid(uid);
+            self.task.set_suid(uid);
+            self.task.set_fsuid(uid);
+        } else {
+            if uid != self.task.uid() && uid != self.task.suid() {
+                warn!(
+                    "[sys_setuid] task {} is not root, set uid to {}",
+                    self.task.tid(),
+                    uid
+                );
+                return Err(Errno::EPERM);
+            } else {
+                warn!("[sys_setuid] task {} set uid to {}", self.task.tid(), uid);
+                self.task.set_euid(uid);
+                self.task.set_fsuid(uid);
+            }
+        }
+        Ok(0)
+    }
 }

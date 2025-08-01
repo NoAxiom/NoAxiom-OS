@@ -106,6 +106,7 @@ impl<'a> Syscall<'a> {
             SYS_FUTEX =>                self.sys_futex(args[0] as _, args[1] as _, args[2] as _, args[3] as _, args[4] as _, args[5] as _).await,
             SYS_SETSID =>               self.sys_setsid(),
             SYS_GETRUSAGE =>            self.sys_getrusage(args[0] as _, args[1]).await,
+            SYS_SETUID =>               self.sys_setuid(args[0] as u32),
             
             // signal
             SYS_SIGTIMEDWAIT => self.sys_sigtimedwait(args[0], args[1], args[2]).await,
@@ -162,7 +163,6 @@ impl<'a> Syscall<'a> {
             SYS_BPF =>             Self::empty_syscall("SYS_BPF", 0),
             SYS_KEYCTL =>          Self::empty_syscall("SYS_KEYCTL", 0),
             SYS_ADD_KEY =>         Self::empty_syscall("SYS_ADD_KEY", 0),
-            SYS_SETUID =>          Self::empty_syscall("SYS_SETUID", 0),
 
             // unsupported
             _ => {

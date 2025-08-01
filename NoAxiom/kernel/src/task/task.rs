@@ -112,6 +112,10 @@ pub struct Task {
     gid: Arc<AtomicU32>,                  // group id
     fsuid: Arc<AtomicU32>,                // user id - file system
     fsgid: Arc<AtomicU32>,                // group id - file system
+    euid: Arc<AtomicU32>,                 // user id - effective
+    egid: Arc<AtomicU32>,                 // group id - effective
+    suid: Arc<AtomicU32>,                 // user id - saved
+    sgid: Arc<AtomicU32>,                 // group id - saved
 }
 
 /// user tasks
@@ -179,6 +183,38 @@ impl Task {
     pub fn set_fsgid(&self, fsgid: u32) {
         self.fsgid
             .store(fsgid, core::sync::atomic::Ordering::SeqCst);
+    }
+    #[inline(always)]
+    pub fn euid(&self) -> u32 {
+        self.euid.load(core::sync::atomic::Ordering::SeqCst)
+    }
+    #[inline(always)]
+    pub fn egid(&self) -> u32 {
+        self.egid.load(core::sync::atomic::Ordering::SeqCst)
+    }
+    #[inline(always)]
+    pub fn set_euid(&self, euid: u32) {
+        self.euid.store(euid, core::sync::atomic::Ordering::SeqCst);
+    }
+    #[inline(always)]
+    pub fn set_egid(&self, egid: u32) {
+        self.egid.store(egid, core::sync::atomic::Ordering::SeqCst);
+    }
+    #[inline(always)]
+    pub fn suid(&self) -> u32 {
+        self.suid.load(core::sync::atomic::Ordering::SeqCst)
+    }
+    #[inline(always)]
+    pub fn set_suid(&self, suid: u32) {
+        self.suid.store(suid, core::sync::atomic::Ordering::SeqCst);
+    }
+    #[inline(always)]
+    pub fn sgid(&self) -> u32 {
+        self.sgid.load(core::sync::atomic::Ordering::SeqCst)
+    }
+    #[inline(always)]
+    pub fn set_sgid(&self, sgid: u32) {
+        self.sgid.store(sgid, core::sync::atomic::Ordering::SeqCst);
     }
 
     /// check if the task is group leader
@@ -460,6 +496,10 @@ impl Task {
             gid: Arc::new(AtomicU32::new(0)),   // default group id
             fsuid: Arc::new(AtomicU32::new(0)), // default fs user id
             fsgid: Arc::new(AtomicU32::new(0)), // default fs group id
+            euid: Arc::new(AtomicU32::new(0)),  // default effective user id
+            egid: Arc::new(AtomicU32::new(0)),  // default effective group id
+            suid: Arc::new(AtomicU32::new(0)),  // default saved user id
+            sgid: Arc::new(AtomicU32::new(0)),  // default saved group id
         });
         task.thread_group().insert(&task);
         TASK_MANAGER.insert(&task);
@@ -629,6 +669,10 @@ impl Task {
                 gid: self.gid.clone(),
                 fsuid: self.fsuid.clone(),
                 fsgid: self.fsgid.clone(),
+                euid: self.euid.clone(),
+                egid: self.egid.clone(),
+                suid: self.suid.clone(),
+                sgid: self.sgid.clone(),
             });
             new_thread.thread_group.lock().insert(&new_thread);
             TASK_MANAGER.insert(&new_thread);
@@ -663,6 +707,10 @@ impl Task {
                 gid: self.gid.clone(),
                 fsuid: self.fsuid.clone(),
                 fsgid: self.fsgid.clone(),
+                euid: self.euid.clone(),
+                egid: self.egid.clone(),
+                suid: self.suid.clone(),
+                sgid: self.sgid.clone(),
             });
             new_process.thread_group().insert(&new_process);
             self.pcb().children.push(new_process.clone());
