@@ -5,7 +5,7 @@ use core::{
     intrinsics::{likely, unlikely},
     marker::PhantomData,
     ptr::null,
-    sync::atomic::AtomicUsize,
+    sync::atomic::{AtomicU32, AtomicUsize},
     task::Waker,
 };
 
@@ -108,6 +108,10 @@ pub struct Task {
     pgid: Arc<AtomicUsize>,               // process group id
     futex: SharedMut<FutexQueue>,         // futex wait queue
     itimer: SharedMut<ITimerManager>,     // interval timer
+    uid: Arc<AtomicU32>,                  // user id
+    gid: Arc<AtomicU32>,                  // group id
+    fsuid: Arc<AtomicU32>,                // user id - file system
+    fsgid: Arc<AtomicU32>,                // group id - file system
 }
 
 /// user tasks
@@ -139,6 +143,42 @@ impl Task {
     }
     pub fn set_pgid(&self, pgid: usize) {
         self.pgid.store(pgid, core::sync::atomic::Ordering::SeqCst);
+    }
+
+    /// uid & gid
+    #[inline(always)]
+    pub fn uid(&self) -> u32 {
+        self.uid.load(core::sync::atomic::Ordering::SeqCst)
+    }
+    #[inline(always)]
+    pub fn gid(&self) -> u32 {
+        self.gid.load(core::sync::atomic::Ordering::SeqCst)
+    }
+    #[inline(always)]
+    pub fn fsuid(&self) -> u32 {
+        self.fsuid.load(core::sync::atomic::Ordering::SeqCst)
+    }
+    #[inline(always)]
+    pub fn fsgid(&self) -> u32 {
+        self.fsgid.load(core::sync::atomic::Ordering::SeqCst)
+    }
+    #[inline(always)]
+    pub fn set_uid(&self, uid: u32) {
+        self.uid.store(uid, core::sync::atomic::Ordering::SeqCst);
+    }
+    #[inline(always)]
+    pub fn set_gid(&self, gid: u32) {
+        self.gid.store(gid, core::sync::atomic::Ordering::SeqCst);
+    }
+    #[inline(always)]
+    pub fn set_fsuid(&self, fsuid: u32) {
+        self.fsuid
+            .store(fsuid, core::sync::atomic::Ordering::SeqCst);
+    }
+    #[inline(always)]
+    pub fn set_fsgid(&self, fsgid: u32) {
+        self.fsgid
+            .store(fsgid, core::sync::atomic::Ordering::SeqCst);
     }
 
     /// check if the task is group leader
@@ -416,6 +456,10 @@ impl Task {
             }),
             futex: Shared::new(FutexQueue::new()),
             itimer: Shared::new(ITimerManager::new()),
+            uid: Arc::new(AtomicU32::new(0)),   // default user id
+            gid: Arc::new(AtomicU32::new(0)),   // default group id
+            fsuid: Arc::new(AtomicU32::new(0)), // default fs user id
+            fsgid: Arc::new(AtomicU32::new(0)), // default fs group id
         });
         task.thread_group().insert(&task);
         TASK_MANAGER.insert(&task);
@@ -581,6 +625,10 @@ impl Task {
                 }),
                 futex: self.futex.clone(),
                 itimer: self.itimer.clone(),
+                uid: self.uid.clone(),
+                gid: self.gid.clone(),
+                fsuid: self.fsuid.clone(),
+                fsgid: self.fsgid.clone(),
             });
             new_thread.thread_group.lock().insert(&new_thread);
             TASK_MANAGER.insert(&new_thread);
@@ -611,6 +659,10 @@ impl Task {
                 }),
                 futex: Shared::new(FutexQueue::new()),
                 itimer: Shared::new(ITimerManager::new()),
+                uid: self.uid.clone(),
+                gid: self.gid.clone(),
+                fsuid: self.fsuid.clone(),
+                fsgid: self.fsgid.clone(),
             });
             new_process.thread_group().insert(&new_process);
             self.pcb().children.push(new_process.clone());

@@ -7,6 +7,19 @@ use strum::FromRepr;
 
 use crate::fs::vfs::basic::inode::Inode;
 
+/// Type.
+pub const TYPE_MASK: u32 = 0o170000;
+/// All permissions.
+pub const ALL_PERMISSIONS_MASK: u32 = 0o7777;
+/// Privilege bits.
+pub const PRIVILEGE_MASK: u32 = 0o777;
+/// Read, write, execute/search by owner.
+pub const OWNER_MASK: u32 = 0o700;
+/// Read, write, execute/search by group.
+pub const GROUP_MASK: u32 = 0o70;
+/// Read, write, execute/search by others.
+pub const OTHER_MASK: u32 = 0o7;
+
 bitflags! {
     /// File access modes
     /// Defined in <fcntl.h>.
@@ -59,9 +72,7 @@ bitflags! {
     }
 
     #[derive(Debug, Clone, Copy, Eq, PartialEq)]
-    pub struct InodeMode: u32 {
-        /// Type.
-        const TYPE_MASK = 0o170000;
+    pub struct InodeMode: u32 { // todo: u16
         /// FIFO.
         const FIFO  = 0o010000;
         /// Character device.
@@ -83,8 +94,7 @@ bitflags! {
         const SET_GID = 0o2000;
         /// sticky bit
         const STICKY = 0o1000;
-        /// Read, write, execute/search by owner.
-        const OWNER_MASK = 0o700;
+
         /// Read permission, owner.
         const OWNER_READ = 0o400;
         /// Write permission, owner.
@@ -92,8 +102,6 @@ bitflags! {
         /// Execute/search permission, owner.
         const OWNER_EXEC = 0o100;
 
-        /// Read, write, execute/search by group.
-        const GROUP_MASK = 0o70;
         /// Read permission, group.
         const GROUP_READ = 0o40;
         /// Write permission, group.
@@ -101,8 +109,6 @@ bitflags! {
         /// Execute/search permission, group.
         const GROUP_EXEC = 0o10;
 
-        /// Read, write, execute/search by others.
-        const OTHER_MASK = 0o7;
         /// Read permission, others.
         const OTHER_READ = 0o4;
         /// Write permission, others.
@@ -167,6 +173,18 @@ bitflags! {
         const MS_BORN = 1 << 29;
         const MS_ACTIVE = 1 << 30;
         const MS_NOUSER = 1 << 31;
+    }
+}
+
+impl InodeMode {
+    pub fn user_permissions(&self) -> u32 {
+        (self.bits() & OWNER_MASK) >> 6
+    }
+    pub fn group_permissions(&self) -> u32 {
+        (self.bits() & GROUP_MASK) >> 3
+    }
+    pub fn other_permissions(&self) -> u32 {
+        self.bits() & OTHER_MASK
     }
 }
 

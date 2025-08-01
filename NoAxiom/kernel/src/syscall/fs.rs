@@ -1,6 +1,7 @@
 use alloc::{string::ToString, sync::Arc, vec::Vec};
 
 use config::task::INIT_PROCESS_ID;
+use ext4_rs::ext4_defs::X_OK;
 use ksync::assert_no_lock;
 
 use super::{SysResult, Syscall, SyscallResult};
@@ -12,13 +13,13 @@ use crate::{
         fs::{
             FcntlArgFlags, FcntlFlags, FileFlags, InodeMode, IoctlCmd, Iovec, Kstat, MountFlags,
             NoAxiomIoctlCmd, RenameFlags, RtcIoctlCmd, SeekFrom, Statfs, Statx, TtyIoctlCmd,
-            Whence,
+            Whence, OTHER_MASK, TYPE_MASK,
         },
         resource::Resource,
         result::Errno,
         time::TimeSpec,
     },
-    mm::user_ptr::UserPtr,
+    mm::{permission, user_ptr::UserPtr},
     return_errno,
     signal::interruptable::interruptable,
     task::Task,
@@ -1028,57 +1029,95 @@ impl Syscall<'_> {
         Ok(out_len as isize)
     }
 
-    pub fn sys_fchmodat(&self, fd: usize, path: usize, mode: usize, _flag: usize) -> SyscallResult {
+    pub fn sys_fchmod(&self, fd: usize, path: usize, mode: usize) -> SyscallResult {
+        let path = get_path(self.task.clone(), path, fd as isize, "sys_fchmod")?;
+        info!("[sys_fchmod] set {:?} mode to {:?}", mode, path);
+
+        let inode = path.dentry().inode()?;
+        inode.set_permission(mode as u32);
+        Ok(0)
+    }
+
+    pub fn sys_fchmodat(&self, fd: usize, path: usize, mode: usize, _flag: i32) -> SyscallResult {
+        // todo: support flag
         let path = get_path(self.task.clone(), path, fd as isize, "sys_fchmodat")?;
-        let mode = InodeMode::from_bits_truncate(mode as u32);
         info!("[sys_fchmodat] set {:?} mode to {:?}, flags", mode, path);
 
         let inode = path.dentry().inode()?;
-        inode.set_privilege(mode);
+        inode.set_permission(mode as u32);
         Ok(0)
     }
 
     /// check user's permissions of a file relative to a directory file
     /// descriptor
-    pub fn sys_faccessat(&self, fd: usize, path: usize, mode: i32, flag: i32) -> SyscallResult {
-        pub const AT_EACCESS: i32 = 0x200;
-        pub const AT_EMPTY_PATH: i32 = 0x1000;
-        pub const AT_SYMLINK_NOFOLLOW: i32 = 0x100;
-        pub const AT_SYMLINK_FOLLOW: i32 = 0x400;
-        pub const AT_NO_AUTOMOUNT: i32 = 0x800;
-        pub const AT_STATX_SYNC_TYPE: i32 = 0x6000;
-
+    pub fn sys_faccessat(&self, fd: usize, path: usize, mode: i32, flags: i32) -> SyscallResult {
         pub const F_OK: i32 = 0;
-        pub const R_OK: i32 = 4;
-        pub const W_OK: i32 = 2;
         pub const X_OK: i32 = 1;
-
-        if mode & !7 != 0 {
-            return Err(Errno::EINVAL);
-        }
-        if flag & !(AT_EACCESS | AT_SYMLINK_NOFOLLOW | AT_EMPTY_PATH | 0x60 | 0x2 | 0xfffe | 0x1)
-            != 0
-        {
-            return Err(Errno::EINVAL);
-        }
+        pub const W_OK: i32 = 2;
+        pub const R_OK: i32 = 4;
+        const AT_EACCESS: i32 = 0x200;
+        const UID_ROOT: u32 = 0;
+        let path = get_path(self.task.clone(), path, fd as isize, "sys_faccessat")?;
         log::info!(
             "[sys_faccessat] fd: {}, path: {:?}, mode: {}, flags: {}",
             fd,
             path,
             mode,
-            flag
+            flags
         );
-        let path = get_path(self.task.clone(), path, fd as isize, "sys_faccessat")?;
-        if mode == 0 {
+        let inode = path.dentry().inode()?;
+        let pri = inode.privilege();
+        let is_fs = flags & AT_EACCESS != 0;
+
+        if mode & !(F_OK | R_OK | W_OK | X_OK) != 0 {
+            error!("[sys_faccessat] shouldn't have mode: {:?}", mode);
+            return Err(Errno::EINVAL);
+        } else if mode == 0 {
             return Ok(0);
         }
-        let pri = path.dentry().inode()?.privilege().bits();
-        if mode & R_OK != 0 && pri & 0o4 == 0
-            || mode & W_OK != 0 && pri & 0o2 == 0
-            || mode & X_OK != 0 && pri & 0o1 == 0
-        {
+
+        let uid = if is_fs {
+            self.task.fsuid()
+        } else {
+            self.task.uid()
+        };
+        let gid = if is_fs {
+            self.task.fsgid()
+        } else {
+            self.task.gid()
+        };
+
+        if uid == UID_ROOT {
+            if (mode & X_OK != 0) && (pri.bits() & 0o111 == 0) {
+                error!("[sys_faccessat] root user cannot execute file: {:?}", path);
+                return Err(Errno::EACCES);
+            }
+            return Ok(0);
+        }
+
+        let permission = if uid == inode.uid() {
+            pri.user_permissions() as i32
+        } else if gid == inode.gid() {
+            pri.group_permissions() as i32
+        } else {
+            pri.other_permissions() as i32
+        };
+
+        if (mode & X_OK != 0) && (permission & X_OK == 0) {
+            error!("[sys_faccessat] user cannot execute file: {:?}", path);
             return Err(Errno::EACCES);
         }
+
+        if (mode & R_OK != 0) && (permission & R_OK == 0) {
+            error!("[sys_faccessat] user cannot read file: {:?}", path);
+            return Err(Errno::EACCES);
+        }
+
+        if (mode & W_OK != 0) && (permission & W_OK == 0) {
+            error!("[sys_faccessat] user cannot write file: {:?}", path);
+            return Err(Errno::EACCES);
+        }
+
         Ok(0)
     }
 

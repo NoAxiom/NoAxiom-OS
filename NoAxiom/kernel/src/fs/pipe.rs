@@ -15,6 +15,7 @@ use alloc::{boxed::Box, sync::Arc, vec::Vec};
 use core::{
     future::Future,
     pin::Pin,
+    sync::atomic::Ordering,
     task::{Context, Poll, Waker},
 };
 
@@ -263,7 +264,7 @@ impl Dentry for PipeDentry {
         unreachable!("pipe dentry should not have child");
     }
 
-    fn open(self: Arc<Self>, file_flags: &FileFlags) -> SysResult<Arc<dyn File>> {
+    fn open(self: Arc<Self>, _file_flags: &FileFlags) -> SysResult<Arc<dyn File>> {
         unreachable!("pipe dentry should not open");
     }
 
@@ -299,7 +300,7 @@ impl Inode for PipeInode {
         Ok(Stat {
             st_dev: 0,
             st_ino: self.meta.id as u64,
-            st_mode: self.meta.inode_mode.bits(),
+            st_mode: self.meta.inode_mode.load(Ordering::SeqCst),
             st_nlink: 1,
             st_uid: 0,
             st_gid: 0,

@@ -1,4 +1,5 @@
 use alloc::{boxed::Box, sync::Arc};
+use core::sync::atomic::{AtomicU32, Ordering};
 
 use async_trait::async_trait;
 use downcast_rs::{impl_downcast, DowncastSync};
@@ -7,7 +8,9 @@ use ksync::mutex::SpinLock;
 use super::superblock::{EmptySuperBlock, SuperBlock};
 use crate::{
     include::{
-        fs::{InodeMode, Stat, Statx, StatxTimestamp},
+        fs::{
+            InodeMode, Stat, Statx, StatxTimestamp, ALL_PERMISSIONS_MASK, PRIVILEGE_MASK, TYPE_MASK,
+        },
         time::TimeSpec,
     },
     syscall::SysResult,
@@ -30,11 +33,14 @@ pub struct InodeMeta {
     /// The inner data of the inode, maybe modified by multiple tasks
     pub inner: Mutex<InodeMetaInner>,
     /// The mode of file
-    pub inode_mode: InodeMode,
+    pub inode_mode: AtomicU32,
     /// The super block of the inode
     pub super_block: Arc<dyn SuperBlock>,
     /// The page cache of the file, managed by the `Inode`
     pub page_cache: Option<()>,
+
+    uid: AtomicU32,
+    gid: AtomicU32,
 }
 
 // todo: Drop for the InodeMeta, sync the page cache according to the state
@@ -59,11 +65,12 @@ impl InodeMeta {
                 mtime_nsec: 0,
                 ctime_sec: 0,
                 ctime_nsec: 0,
-                privilege: inode_mode,
             }),
-            inode_mode,
+            inode_mode: AtomicU32::new(inode_mode.bits()),
             super_block,
             page_cache,
+            uid: AtomicU32::new(0), // default user id
+            gid: AtomicU32::new(0), // default group id
         }
     }
 }
@@ -84,8 +91,6 @@ pub struct InodeMetaInner {
     /// Last status change time.
     pub ctime_sec: usize,
     pub ctime_nsec: usize,
-
-    pub privilege: InodeMode,
 }
 
 #[async_trait]
@@ -102,24 +107,52 @@ impl dyn Inode {
     pub fn id(&self) -> usize {
         self.meta().id
     }
+    #[inline(always)]
+    pub fn uid(&self) -> u32 {
+        self.meta().uid.load(Ordering::SeqCst)
+    }
+    #[inline(always)]
+    pub fn gid(&self) -> u32 {
+        self.meta().gid.load(Ordering::SeqCst)
+    }
+    #[inline(always)]
+    pub fn set_uid(&self, uid: u32) {
+        self.meta().uid.store(uid, Ordering::SeqCst);
+    }
+    #[inline(always)]
+    pub fn set_gid(&self, gid: u32) {
+        self.meta().gid.store(gid, Ordering::SeqCst);
+    }
+    #[inline(always)]
     pub fn size(&self) -> usize {
         self.meta().inner.lock().size
     }
+    #[inline(always)]
     pub fn state(&self) -> InodeState {
         self.meta().inner.lock().state
     }
     pub fn file_type(&self) -> InodeMode {
-        self.meta().inode_mode
+        let inode_mode = self.meta().inode_mode.load(Ordering::SeqCst);
+        let inode_mode = inode_mode & TYPE_MASK;
+        InodeMode::from_bits(inode_mode).expect("Invalid inode file type!")
     }
+    #[inline(always)]
     pub fn set_size(&self, size: usize) {
         self.meta().inner.lock().size = size;
     }
     pub fn privilege(&self) -> InodeMode {
-        self.meta().inner.lock().privilege
+        let inode_mode = self.meta().inode_mode.load(Ordering::SeqCst);
+        let inode_mode = inode_mode & PRIVILEGE_MASK;
+        InodeMode::from_bits(inode_mode).expect("Invalid inode privilege!")
     }
-    pub fn set_privilege(&self, mode: InodeMode) {
-        self.meta().inner.lock().privilege = mode;
+    pub fn set_permission(&self, mode: u32) {
+        let inode_mode = self.meta().inode_mode.load(Ordering::SeqCst);
+        self.meta().inode_mode.store(
+            (inode_mode & !ALL_PERMISSIONS_MASK) | (mode & ALL_PERMISSIONS_MASK),
+            Ordering::SeqCst,
+        );
     }
+    #[inline(always)]
     pub fn page_cache(&self) -> Option<()> {
         self.meta().page_cache
     }

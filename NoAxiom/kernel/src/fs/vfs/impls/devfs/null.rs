@@ -40,7 +40,7 @@ impl Inode for NullInode {
     }
     fn stat(&self) -> Result<crate::include::fs::Stat, crate::include::result::Errno> {
         let inner = self.meta.inner.lock();
-        let mode = self.meta.inode_mode.bits();
+        let mode = self.meta.inode_mode.load(core::sync::atomic::Ordering::SeqCst);
         Ok(Stat {
             st_dev: 1,
             st_ino: self.meta.id as u64,
