@@ -42,14 +42,12 @@ managed = { version = "0.8.0", default-features = false, features = ["map"] }
 # uart8250 = { git = "https://github.com/os-module/uart-rs.git" }
 ringbuffer = "0.15.0"
 async-task = { version = "4", default-features = false }
-buddy_system_allocator = "0.9.0"
 thiserror = { version = "1.0", package = "thiserror-core", default-features = false }
 paste = "1"
 lru = "0.12.5"
 bit_field = "0.10.1"
 async-trait = "0.1.50"
 nb = "1.0.0"
-volatile = "0.2"
 downcast-rs = { version = "1.2.0", default-features = false }
 array-init = "2.1.0"
 libc = "0.2"
@@ -63,7 +61,6 @@ ext4_rs = { git = "https://github.com/YuXuaann/ext4_rs-async-smp" }
 arch = { workspace = true }
 kfuture = { workspace = true }
 ksync = { workspace = true }
-console = { workspace = true }
 fatfs = { workspace = true }
 config = { workspace = true }
 driver = { workspace = true }

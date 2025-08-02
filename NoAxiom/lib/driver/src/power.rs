@@ -6,7 +6,7 @@ pub trait PowerDevice: Device {
 mod la_virtio {
     use arch::{consts::IO_ADDR_OFFSET, Arch, ArchAsm, ArchInt};
 
-    use crate::{base::power::PowerDevice, basic::Device};
+    use crate::{basic::Device, power::PowerDevice};
 
     const GED_PADDR: usize = 0x100E_001C;
     fn get_ged_addr() -> usize {
@@ -43,7 +43,7 @@ pub use la_virtio::*;
 
 #[cfg(target_arch = "riscv64")]
 mod rv {
-    use crate::{base::power::PowerDevice, basic::Device};
+    use crate::{basic::Device, power::PowerDevice};
 
     pub struct PowerDev;
     impl PowerDevice for PowerDev {

@@ -47,14 +47,13 @@ extern crate alloc;
 #[macro_use]
 extern crate log;
 #[macro_use]
-extern crate console;
+extern crate driver;
 #[macro_use]
 extern crate ksync;
 
 use config;
 mod constant;
 mod cpu;
-mod driver;
 mod entry;
 mod fs;
 mod include;
@@ -70,4 +69,4 @@ mod time;
 mod trap;
 mod utils;
 
-core::arch::global_asm!(include_str!("link_apps.S"));
+use entry::init::_boot_hart_init as main;

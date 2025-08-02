@@ -6,6 +6,8 @@ use crate::{
     task::Task,
 };
 
+core::arch::global_asm!(include_str!("../link_apps.S"));
+
 /// spawn init process
 #[allow(unused)]
 pub fn schedule_spawn_with_path() {

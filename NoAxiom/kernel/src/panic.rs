@@ -7,7 +7,7 @@ use memory::{frame::print_frame_info, heap::print_heap_info};
 
 use crate::{
     cpu::{current_cpu, get_hartid},
-    syscall::{utils::current_syscall, Syscall},
+    syscall::utils::current_syscall,
     time::gettime::get_time_ms,
 };
 
@@ -51,5 +51,8 @@ fn panic(info: &PanicInfo) -> ! {
     }
     print_frame_info();
     print_heap_info();
-    Syscall::sys_systemshutdown()
+    #[cfg(feature = "debug_sig")]
+    driver::base_dev::debug_shutdown();
+    #[cfg(not(feature = "debug_sig"))]
+    driver::base_dev::shutdown();
 }

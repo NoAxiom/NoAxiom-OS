@@ -1,25 +1,22 @@
-pub trait CharDevice: Device {
-    fn putchar(c: u8);
-    fn getchar() -> u8;
-}
-
 #[cfg(target_arch = "loongarch64")]
 mod la_virtio {
     use arch::consts::IO_ADDR_OFFSET;
 
-    use crate::{base::char::CharDevice, basic::Device};
+    use crate::{basic::Device, char::CharDevice};
 
     /// No initialization required Devices, but also from dtb info
     #[cfg(feature = "qemu")]
     const UART_PADDR: usize = 0x1FE0_01E0; // qemu-virt
     #[cfg(not(feature = "qemu"))]
     const UART_PADDR: usize = 0x1FE2_0000; // qemu-2k1000
-    fn get_com1_addr() -> usize {
+
+    #[inline(always)]
+    const fn get_com1_addr() -> usize {
         UART_PADDR | IO_ADDR_OFFSET
     }
 
-    pub struct CharDev;
-    impl CharDev {
+    pub struct DebugCharDev;
+    impl DebugCharDev {
         pub fn base_putchar(c: u8) {
             let ptr = get_com1_addr() as *mut u8;
             loop {
@@ -47,7 +44,7 @@ mod la_virtio {
         }
     }
 
-    impl CharDevice for CharDev {
+    impl CharDevice for DebugCharDev {
         #[inline]
         fn putchar(c: u8) {
             if c == b'\n' {
@@ -66,7 +63,7 @@ mod la_virtio {
             }
         }
     }
-    impl Device for CharDev {
+    impl Device for DebugCharDev {
         fn device_name(&self) -> &'static str {
             "char"
         }
@@ -81,10 +78,10 @@ pub use la_virtio::*;
 
 #[cfg(target_arch = "riscv64")]
 mod rv {
-    use crate::{base::char::CharDevice, basic::Device};
+    use crate::{basic::Device, char::CharDevice};
 
-    pub struct CharDev;
-    impl CharDevice for CharDev {
+    pub struct DebugCharDev;
+    impl CharDevice for DebugCharDev {
         #[inline]
         fn putchar(ch: u8) {
             sbi_rt::legacy::console_putchar(ch as usize);
@@ -97,7 +94,7 @@ mod rv {
         }
     }
 
-    impl Device for CharDev {
+    impl Device for DebugCharDev {
         fn device_name(&self) -> &'static str {
             "char"
         }
@@ -109,5 +106,3 @@ mod rv {
 
 #[cfg(target_arch = "riscv64")]
 pub use rv::*;
-
-use crate::basic::Device;

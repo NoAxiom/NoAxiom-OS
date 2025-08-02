@@ -45,7 +45,6 @@ chrono = { version = "0.4", default-features = false, features = [
 ], optional = true }
 async-trait = "0.1"
 spin = "0.9"
-console = { path = "../console" }
 
 [dev-dependencies]
 env_logger = "0.9"

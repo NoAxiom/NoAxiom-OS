@@ -5,7 +5,6 @@ use crate::{
     config::cpu::CPU_NUM,
     constant::banner::NOAXIOM_BANNER,
     cpu::get_hartid,
-    driver::log::log_init,
     entry::init_proc::schedule_spawn_with_path,
     mm::{
         bss::bss_init,
@@ -15,6 +14,8 @@ use crate::{
     },
     sched::{runtime::run_tasks, utils::block_on},
     time::clock::ktime_init,
+    utils::log::log_init,
+    with_interrupt_on,
 };
 
 /// awake other core
@@ -59,10 +60,6 @@ fn hello_world() {
     println!("[kernel] ARCH = {}", Arch::ARCH_NAME);
 }
 
-// pub static BOOT_HART_ID: AtomicUsize = AtomicUsize::new(0);
-
-/// init bss, mm, console, and other drivers, then jump to rust_main,
-/// called by [`super::boot`]
 #[no_mangle]
 pub extern "C" fn _boot_hart_init(
     #[allow(unused)] arg0: usize,
@@ -90,8 +87,7 @@ pub extern "C" fn _boot_hart_init(
     device_init();
 
     // fs init
-    Arch::enable_interrupt();
-    block_on(crate::fs::init());
+    with_interrupt_on!(block_on(crate::fs::init()));
 
     // spawn init_proc and wake other harts
     ktime_init();

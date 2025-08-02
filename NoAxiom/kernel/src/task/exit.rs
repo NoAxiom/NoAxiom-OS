@@ -1,12 +1,12 @@
 use alloc::sync::Arc;
 
+use driver::base_dev::shutdown;
 use ksync::assert_no_lock;
 
 use super::Task;
 use crate::{
     config::task::INIT_PROCESS_ID,
     cpu::current_cpu,
-    driver::base::shutdown,
     include::futex::FUTEX_BITSET_MATCH_ANY,
     mm::user_ptr::UserPtr,
     signal::{
