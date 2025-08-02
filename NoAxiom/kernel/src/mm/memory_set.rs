@@ -223,7 +223,7 @@ impl MemorySet {
         #[cfg(target_arch = "riscv64")]
         {
             use arch::consts::{IO_ADDR_OFFSET, KERNEL_VIRT_MEMORY_END};
-            use device::devconf::get_mmio_regions;
+            use driver::probe::devconf::get_mmio_regions;
             macro_rules! kernel_push_area {
                 ($($start:expr, $end:expr, $permission:expr)*) => {
                     $(

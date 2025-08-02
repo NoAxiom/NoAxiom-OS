@@ -90,7 +90,7 @@ impl Device for VF2SdcardDevice {
         "VF2SdcardDevice"
     }
     fn device_type(&self) -> &'static DeviceType {
-        &DeviceType::Block(BlockDeviceType::PhysRV)
+        &DeviceType::Block(BlockDeviceType::VF2Sdcard)
     }
 }
 

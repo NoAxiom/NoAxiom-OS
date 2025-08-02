@@ -10,7 +10,7 @@ pub mod pipe;
 pub mod vfs;
 
 use arch::{Arch, ArchInt};
-use device::DEV_BUS;
+use driver::manager::DEV_BUS;
 
 pub async fn init() {
     info!(

@@ -1,5 +1,12 @@
+//! Structures and functions for PCI bus operations.
+//!
+//! Currently, it just re-exports structures from the crate [virtio-drivers][1]
+//! and its module [`virtio_drivers::transport::pci::bus`][2].
+//!
+//! [1]: https://docs.rs/virtio-drivers/latest/virtio_drivers/
+//! [2]: https://docs.rs/virtio-drivers/latest/virtio_drivers/transport/pci/bus/index.html
+
 use arch::ArchMemory;
-use driver::{basic::DevResult, block::virtio_block::VirtioBlockDevice, hal::VirtioHalImpl};
 use include::errno::Errno;
 use virtio_drivers::transport::{
     pci::{
@@ -12,11 +19,52 @@ use virtio_drivers::transport::{
     DeviceType, Transport,
 };
 
-use super::pci_driver::PciRangeAllocator;
 use crate::{
-    device::manager::DEV_BUS,
-    dtb::devconf::{PCI_BUS_END, PCI_RANGE},
+    basic::DevResult,
+    block::virtio_block::VirtioBlockDevice,
+    hal::VirtioHalImpl,
+    manager::DEV_BUS,
+    probe::arch::devconf::{PCI_BUS_END, PCI_RANGE},
 };
+
+/// Used to allocate MMIO regions for PCI BARs.
+pub struct PciRangeAllocator {
+    _start: u64,
+    end: u64,
+    current: u64,
+}
+
+impl PciRangeAllocator {
+    /// Creates a new allocator from a memory range.
+    pub const fn new(base: u64, size: u64) -> Self {
+        Self {
+            _start: base,
+            end: base + size,
+            current: base,
+        }
+    }
+
+    /// Allocates a memory region with the given size.
+    ///
+    /// The `size` should be a power of 2, and the returned value is also a
+    /// multiple of `size`.
+    pub fn alloc(&mut self, size: u64) -> Option<u64> {
+        if !size.is_power_of_two() {
+            return None;
+        }
+        let ret = align_up(self.current, size);
+        if ret + size > self.end {
+            return None;
+        }
+
+        self.current = ret + size;
+        Some(ret)
+    }
+}
+
+const fn align_up(addr: u64, align: u64) -> u64 {
+    (addr + align - 1) & !(align - 1)
+}
 
 const PCI_BAR_NUM: u8 = 6;
 

@@ -4,11 +4,11 @@ use alloc::{boxed::Box, sync::Arc, vec::Vec};
 use core::num::NonZeroUsize;
 
 use async_trait::async_trait;
-use device::DEV_BUS;
 use driver::{
     basic::{DevResult, Device},
     block::BlockDevice,
     interrupt::InterruptDevice,
+    manager::DEV_BUS,
 };
 use ksync::{assert_no_lock, cell::SyncUnsafeCell, AsyncMutex};
 use lru::LruCache;
