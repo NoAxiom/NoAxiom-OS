@@ -70,4 +70,4 @@ mod time;
 mod trap;
 mod utils;
 
-core::arch::global_asm!(include_str!("link_apps.S"));
+use entry::init::_boot_hart_init as main;

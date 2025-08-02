@@ -36,9 +36,6 @@ smoltcp = { version = "0.11.0", default-features = false, features = [
     "async",
     "log",
 ] }
-cfg-if = "1.0"
-volatile = "0.2"
-spin = "0.7.0"
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 bitfield-struct = "0.8.0"
 array-init = "2.1.0"

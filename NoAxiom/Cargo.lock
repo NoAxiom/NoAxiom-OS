@@ -67,7 +67,7 @@ dependencies = [
  "rlibc",
  "sbi-rt",
  "spin 0.9.8",
- "volatile 0.4.6",
+ "volatile",
 ]
 
 [[package]]
@@ -155,6 +155,15 @@ name = "buddy_system_allocator"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d44d578cadd17312c75e7d0ef489361f160ace58f7139aa32001fee1a51b89b5"
+dependencies = [
+ "spin 0.9.8",
+]
+
+[[package]]
+name = "buddy_system_allocator"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a1a0108968a3a2dab95b089c0fc3f1afa7759aa5ebe6f1d86d206d6f7ba726eb"
 dependencies = [
  "spin 0.9.8",
 ]
@@ -320,7 +329,6 @@ dependencies = [
  "async-trait",
  "bitfield-struct",
  "bitflags 2.9.1",
- "cfg-if",
  "config",
  "include",
  "kfuture",
@@ -331,10 +339,8 @@ dependencies = [
  "plic",
  "sbi-rt",
  "smoltcp",
- "spin 0.7.1",
  "virtio-drivers",
  "virtio-drivers-async",
- "volatile 0.2.7",
 ]
 
 [[package]]
@@ -628,7 +634,7 @@ dependencies = [
  "atomic_enum",
  "bit_field",
  "bitflags 2.9.1",
- "buddy_system_allocator",
+ "buddy_system_allocator 0.9.1",
  "config",
  "console",
  "crate_interface",
@@ -658,7 +664,6 @@ dependencies = [
  "spin 0.7.1",
  "strum",
  "thiserror-core",
- "volatile 0.2.7",
  "xmas-elf",
 ]
 
@@ -759,7 +764,7 @@ name = "memory"
 version = "0.1.0"
 dependencies = [
  "arch",
- "buddy_system_allocator",
+ "buddy_system_allocator 0.11.0",
  "config",
  "include",
  "ksync",
@@ -1138,12 +1143,6 @@ dependencies = [
 
 [[package]]
 name = "volatile"
-version = "0.2.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f6b06ad3ed06fef1713569d547cdbdb439eafed76341820fb0e0344f29a41945"
-
-[[package]]
-name = "volatile"
 version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "442887c63f2c839b346c192d047a7c87e73d0689c9157b00b53dcc27dd5ea793"
@@ -1378,7 +1377,7 @@ dependencies = [
  "bit_field",
  "bitflags 2.9.1",
  "rustversion",
- "volatile 0.4.6",
+ "volatile",
 ]
 
 [[package]]
