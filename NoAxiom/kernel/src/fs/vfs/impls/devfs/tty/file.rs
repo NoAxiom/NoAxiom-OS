@@ -2,11 +2,11 @@ use alloc::{boxed::Box, vec::Vec};
 use core::task::Waker;
 
 use async_trait::async_trait;
+use driver::base_dev::getchar;
 use include::errno::Errno;
 use ksync::mutex::SpinLock;
 
 use crate::{
-    driver::base::getchar,
     fs::vfs::basic::file::{File, FileMeta},
     include::{
         fs::{

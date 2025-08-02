@@ -5,7 +5,6 @@ use crate::{
     config::cpu::CPU_NUM,
     constant::banner::NOAXIOM_BANNER,
     cpu::get_hartid,
-    driver::log::log_init,
     entry::init_proc::schedule_spawn_with_path,
     mm::{
         bss::bss_init,
@@ -15,6 +14,7 @@ use crate::{
     },
     sched::{runtime::run_tasks, utils::block_on},
     time::clock::ktime_init,
+    utils::log::log_init,
     with_interrupt_on,
 };
 

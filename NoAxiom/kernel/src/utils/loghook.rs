@@ -1,9 +1,7 @@
 use arch::{Arch, ArchTime};
+use driver::base_dev::shutdown;
 
-use crate::{
-    constant::time::MSEC_PER_SEC, driver::base::shutdown, include::time::TimeSpec,
-    time::gettime::get_time,
-};
+use crate::{constant::time::MSEC_PER_SEC, include::time::TimeSpec, time::gettime::get_time};
 
 pub const LOG_BEGIN: TimeSpec = from_ms(0);
 pub const LOG_END: TimeSpec = from_ms(60000);

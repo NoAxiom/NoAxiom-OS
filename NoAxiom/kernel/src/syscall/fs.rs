@@ -1,8 +1,4 @@
-use alloc::{
-    string::{String, ToString},
-    sync::Arc,
-    vec::Vec,
-};
+use alloc::{string::ToString, sync::Arc, vec::Vec};
 
 use config::task::INIT_PROCESS_ID;
 use ksync::assert_no_lock;
@@ -10,7 +6,6 @@ use ksync::assert_no_lock;
 use super::{SysResult, Syscall, SyscallResult};
 use crate::{
     constant::fs::{AT_FDCWD, UTIME_NOW, UTIME_OMIT},
-    driver::log::{switch_log_off, switch_log_on},
     fs::{fdtable::RLimit, manager::FS_MANAGER, path::Path, pipe::PipeFile, vfs::root_dentry},
     include::{
         fs::{
@@ -27,7 +22,10 @@ use crate::{
     signal::interruptable::interruptable,
     task::Task,
     time::gettime::get_time_duration,
-    utils::hack::{switch_into_ltp, switch_outof_ltp},
+    utils::{
+        hack::{switch_into_ltp, switch_outof_ltp},
+        log::{switch_log_off, switch_log_on},
+    },
 };
 
 impl Syscall<'_> {

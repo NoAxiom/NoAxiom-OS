@@ -2,7 +2,7 @@
 
 use core::sync::atomic::{fence, AtomicBool, Ordering};
 
-use log::{self, Level, LevelFilter, Log, Metadata, Record};
+use log::{Level, LevelFilter, Log, Metadata, Record};
 
 use crate::{
     cpu::{current_cpu, get_hartid},

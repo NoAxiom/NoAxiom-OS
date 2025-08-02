@@ -9,7 +9,6 @@ bitflags = "2.6.0"
 arch = { path = "lib/arch" }
 kfuture = { path = "lib/kfuture" }
 ksync = { path = "lib/ksync" }
-console = { path = "lib/console" }
 fatfs = { path = "lib/fatfs", default-features = false, features = [
     "alloc",
     "lfn",

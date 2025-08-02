@@ -1,3 +1,10 @@
+use crate::basic::Device;
+
+pub trait CharDevice: Device {
+    fn putchar(c: u8);
+    fn getchar() -> u8;
+}
+
 // //! Adapted from MankorOS
 
 // pub mod uart8250;
@@ -190,8 +197,11 @@
 //             stdout = root.find_node(stdout_path);
 //         }
 //         if stdout.is_none() {
-//             println!("Unable to parse /chosen, choosing first serial
-// device");             stdout = root.find_compatible(&[
+//             println!(
+//                 "Unable to parse /chosen, choosing first serial
+// device"
+//             );
+//             stdout = root.find_compatible(&[
 //                 "ns16550a",
 //                 "snps,dw-apb-uart", // C910, VF2
 //                 "sifive,uart0",     // sifive_u QEMU (FU540)
@@ -214,9 +224,13 @@
 //     let size = reg.size.unwrap();
 //     let base_vaddr = base_paddr + VIRT_RAM_OFFSET;
 //     let irq_number =
-// stdout.property("interrupts").unwrap().as_usize().unwrap();     log::info!("
-// IRQ number: {}", irq_number);     kernel_page_table_mut().ioremap(base_paddr,
-// size, PTEFlags::R | PTEFlags::W);     let first_compatible =
+// stdout.property("interrupts").unwrap().as_usize().unwrap();     log::info!(
+//         "
+// IRQ number: {}",
+//         irq_number
+//     );
+//     kernel_page_table_mut().ioremap(base_paddr, size, PTEFlags::R |
+// PTEFlags::W);     let first_compatible =
 // stdout.compatible().unwrap().first();     match first_compatible {
 //         "ns16550a" | "snps,dw-apb-uart" => {
 //             // VisionFive 2 (FU740)
@@ -225,8 +239,11 @@
 //             // Parse clock frequency
 //             let freq_raw = stdout
 //                 .property("clock-frequency")
-//                 .expect("No clock-frequency property of stdout serial
-// device")                 .as_usize()
+//                 .expect(
+//                     "No clock-frequency property of stdout serial
+// device",
+//                 )
+//                 .as_usize()
 //                 .expect("Parse clock-frequency to usize failed");
 //             let mut reg_io_width = 1;
 //             if let Some(reg_io_width_raw) = stdout.property("reg-io-width") {
@@ -240,8 +257,10 @@
 //                     .as_usize()
 //                     .expect("Parse reg-shift to usize failed");
 //             }
-//             log::info!("uart: base_paddr:{base_paddr:#x}, size:{size:#x},
-// reg_io_width:{reg_io_width}, reg_shift:{reg_shift}");
+//             log::info!(
+//                 "uart: base_paddr:{base_paddr:#x}, size:{size:#x},
+// reg_io_width:{reg_io_width}, reg_shift:{reg_shift}"
+//             );
 
 //             let uart = unsafe {
 //                 Uart::new(

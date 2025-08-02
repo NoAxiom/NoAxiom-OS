@@ -47,14 +47,13 @@ extern crate alloc;
 #[macro_use]
 extern crate log;
 #[macro_use]
-extern crate console;
+extern crate driver;
 #[macro_use]
 extern crate ksync;
 
 use config;
 mod constant;
 mod cpu;
-mod driver;
 mod entry;
 mod fs;
 mod include;

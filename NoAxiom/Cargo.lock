@@ -152,15 +152,6 @@ checksum = "1b8e56985ec62d17e9c1001dc89c88ecd7dc08e47eba5ec7c29c7b5eeecde967"
 
 [[package]]
 name = "buddy_system_allocator"
-version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d44d578cadd17312c75e7d0ef489361f160ace58f7139aa32001fee1a51b89b5"
-dependencies = [
- "spin 0.9.8",
-]
-
-[[package]]
-name = "buddy_system_allocator"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a1a0108968a3a2dab95b089c0fc3f1afa7759aa5ebe6f1d86d206d6f7ba726eb"
@@ -219,14 +210,6 @@ dependencies = [
 [[package]]
 name = "config"
 version = "0.1.0"
-
-[[package]]
-name = "console"
-version = "0.1.0"
-dependencies = [
- "driver",
- "ksync",
-]
 
 [[package]]
 name = "core-foundation-sys"
@@ -422,7 +405,6 @@ dependencies = [
  "async-trait",
  "bitflags 2.9.1",
  "chrono",
- "console",
  "env_logger",
  "fscommon",
  "log",
@@ -634,9 +616,7 @@ dependencies = [
  "atomic_enum",
  "bit_field",
  "bitflags 2.9.1",
- "buddy_system_allocator 0.9.1",
  "config",
- "console",
  "crate_interface",
  "device",
  "downcast-rs",
@@ -764,7 +744,7 @@ name = "memory"
 version = "0.1.0"
 dependencies = [
  "arch",
- "buddy_system_allocator 0.11.0",
+ "buddy_system_allocator",
  "config",
  "include",
  "ksync",
