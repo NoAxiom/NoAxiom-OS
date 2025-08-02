@@ -319,7 +319,11 @@ impl dyn Dentry {
                 debug!("[find_path_or_create] create dir {}", name);
                 assert_no_lock!();
                 assert!(arch::Arch::is_interrupt_enabled());
-                current = current.create(name, InodeMode::DIR).await.unwrap();
+                // default is 0o755（rwxr-xr-x）
+                current = current
+                    .create(name, InodeMode::dir_default())
+                    .await
+                    .unwrap();
             } else {
                 debug!("[find_path_or_create] create file {}", name);
                 assert_no_lock!();
@@ -443,6 +447,22 @@ impl dyn Dentry {
             self.set_inode_none();
         }
 
+        Ok(())
+    }
+
+    /// Check if the dentry has access to the file.
+    pub fn check_access(self: &Arc<Self>) -> SysResult<()> {
+        if self.inode()?.privilege().bits() & 0o111 == 0 {
+            warn!(
+                "[check_access] {} has no access, its access is {}",
+                self.name(),
+                self.inode()?.privilege().bits()
+            );
+            return Err(Errno::EACCES);
+        }
+        if let Some(parent) = self.parent() {
+            return parent.check_access();
+        }
         Ok(())
     }
 }

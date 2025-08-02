@@ -186,6 +186,15 @@ impl InodeMode {
     pub fn other_permissions(&self) -> u32 {
         self.bits() & OTHER_MASK
     }
+    pub fn dir_default() -> Self {
+        InodeMode::DIR
+            | InodeMode::OWNER_READ
+            | InodeMode::OTHER_WRITE
+            | InodeMode::OWNER_EXEC
+            | InodeMode::GROUP_READ
+            | InodeMode::GROUP_EXEC
+            | InodeMode::OTHER_EXEC
+    }
 }
 
 impl From<CreateMode> for InodeMode {

@@ -22,10 +22,10 @@ pub struct Ext4FileInode {
 }
 
 impl Ext4FileInode {
-    pub fn new(superblock: Arc<dyn SuperBlock>, inode: IExtInode) -> Self {
+    pub fn new(superblock: Arc<dyn SuperBlock>, inode: IExtInode, mode: InodeMode) -> Self {
         let file_size = inode.inode.size();
         Self {
-            meta: InodeMeta::new(superblock, InodeMode::FILE, file_size as usize, true),
+            meta: InodeMeta::new(superblock, InodeMode::FILE | mode, file_size as usize, true),
             ino: Arc::new(AsyncMutex::new(inode)),
         }
     }
@@ -103,9 +103,9 @@ pub struct Ext4DirInode {
 }
 
 impl Ext4DirInode {
-    pub fn new(superblock: Arc<dyn SuperBlock>, inode: IExtInode) -> Self {
+    pub fn new(superblock: Arc<dyn SuperBlock>, inode: IExtInode, mode: InodeMode) -> Self {
         Self {
-            meta: InodeMeta::new(superblock, InodeMode::DIR, 0, false),
+            meta: InodeMeta::new(superblock, InodeMode::DIR | mode, 0, false),
             ino: Arc::new(SpinLock::new(inode)),
         }
     }

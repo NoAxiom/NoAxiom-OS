@@ -15,7 +15,7 @@ use crate::{
         },
         impls::disk_cursor::DiskCursor,
     },
-    include::fs::MountFlags,
+    include::fs::{InodeMode, MountFlags},
 };
 
 pub struct AsyncSmpExt4 {
@@ -60,9 +60,13 @@ impl FileSystem for AsyncSmpExt4 {
 
         let ext4 = fs_super_block.get_fs().await;
 
+        let root_inode = ext4.get_inode_ref(ROOT_INODE).await;
+        let mode = root_inode.inode.mode;
+
         let root_inode = Arc::new(Ext4DirInode::new(
             fs_super_block.clone(),
             ext4.get_inode_ref(ROOT_INODE).await,
+            InodeMode::from_bits(mode as u32).unwrap(),
         ));
         root_dentry.set_inode(root_inode);
 

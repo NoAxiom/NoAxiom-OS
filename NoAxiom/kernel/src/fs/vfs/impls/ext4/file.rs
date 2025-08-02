@@ -191,6 +191,7 @@ impl File for Ext4Dir {
         for entry in entries {
             let entry_inode = ext4.get_inode_ref(entry.inode).await;
             let file_type = entry_inode.inode.file_type();
+            let mode = entry_inode.inode.mode;
             let child_name = entry.get_name();
             if child_name == "." || child_name == ".." {
                 if unsafe { FIRST } {
@@ -202,9 +203,17 @@ impl File for Ext4Dir {
                 debug!("load {:?}: {}", file_type, child_name);
             }
             let inode: Arc<dyn Inode> = if file_type.contains(InodeFileType::S_IFREG) {
-                Arc::new(Ext4FileInode::new(super_block.clone(), entry_inode))
+                Arc::new(Ext4FileInode::new(
+                    super_block.clone(),
+                    entry_inode,
+                    InodeMode::from_bits(mode as u32).unwrap(),
+                ))
             } else if file_type == InodeFileType::S_IFDIR {
-                Arc::new(Ext4DirInode::new(super_block.clone(), entry_inode))
+                Arc::new(Ext4DirInode::new(
+                    super_block.clone(),
+                    entry_inode,
+                    InodeMode::from_bits(mode as u32).unwrap(),
+                ))
             } else {
                 unreachable!(
                     "load_dir: unsupportable file {}: type {:?}",

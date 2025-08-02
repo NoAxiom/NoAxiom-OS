@@ -126,8 +126,8 @@ impl Dentry for Ext4Dentry {
         assert!(Arch::is_interrupt_enabled());
         if mode.contains(InodeMode::FILE) {
             debug!(
-                "[ext4] create file: {}, parent_inode: {}",
-                child_path, this_inode_num
+                "[ext4] create file: {}, parent_inode: {}, mode: {:?}",
+                child_path, this_inode_num, mode
             );
             let new_file_inode = ext4
                 .create(this_inode_num, name, 0x8000)
@@ -137,16 +137,16 @@ impl Dentry for Ext4Dentry {
             drop(ext4);
             // let inode_type = new_file_inode.inode.file_type();
             // debug!("new file inode type: {:?}", inode_type);
-            let new_inode = Ext4FileInode::new(super_block.clone(), new_file_inode);
+            let new_inode = Ext4FileInode::new(super_block.clone(), new_file_inode, mode);
             Ok(self.into_dyn().add_child(name, Arc::new(new_inode)))
         } else if mode.contains(InodeMode::DIR) {
-            debug!("[ext4] create dir: {}", child_path);
+            debug!("[ext4] create dir: {}, mode: {:?}", child_path, mode);
             ext4.dir_mk(&child_path).await.map_err(fs_err)?;
             let inode_num = ext4.ext4_dir_open(&child_path).await.map_err(fs_err)?;
             let new_dir_inode = ext4.get_inode_ref(inode_num).await;
             trace!("[ext4] drop ext4");
             drop(ext4);
-            let new_inode = Ext4DirInode::new(super_block.clone(), new_dir_inode);
+            let new_inode = Ext4DirInode::new(super_block.clone(), new_dir_inode, mode);
             Ok(self.into_dyn().add_child(name, Arc::new(new_inode)))
         } else {
             Err(Errno::EINVAL)

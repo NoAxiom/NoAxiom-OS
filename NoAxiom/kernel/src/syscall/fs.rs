@@ -1,4 +1,8 @@
-use alloc::{string::ToString, sync::Arc, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    sync::Arc,
+    vec::Vec,
+};
 
 use config::task::INIT_PROCESS_ID;
 use ksync::assert_no_lock;
@@ -344,7 +348,7 @@ impl Syscall<'_> {
             self.task.clone(),
             path,
             dirfd,
-            InodeMode::DIR,
+            InodeMode::DIR | mode,
             "sys_mkdirat",
         )
         .await?;
@@ -1081,29 +1085,30 @@ impl Syscall<'_> {
     /// check user's permissions of a file relative to a directory file
     /// descriptor
     pub fn sys_faccessat(&self, fd: usize, path: usize, mode: i32, flags: i32) -> SyscallResult {
-        pub const F_OK: i32 = 0;
-        pub const X_OK: i32 = 1;
-        pub const W_OK: i32 = 2;
-        pub const R_OK: i32 = 4;
+        const F_OK: i32 = 0;
+        const X_OK: i32 = 1;
+        const W_OK: i32 = 2;
+        const R_OK: i32 = 4;
         const AT_EACCESS: i32 = 0x200;
         const UID_ROOT: u32 = 0;
         let path = get_path(self.task.clone(), path, fd as isize, "sys_faccessat")?;
+        let dentry = path.dentry();
+        let inode = dentry.inode()?;
+        let pri = inode.privilege();
+        let is_fs = flags & AT_EACCESS != 0;
+
         log::info!(
-            "[sys_faccessat] fd: {}, path: {:?}, mode: {}, flags: {}",
+            "[sys_faccessat] fd: {}, path: {:?}, mode: {}, flags: {}, file_pri: {:?}",
             fd,
             path,
             mode,
-            flags
+            flags,
+            pri
         );
-        let inode = path.dentry().inode()?;
-        let pri = inode.privilege();
-        let is_fs = flags & AT_EACCESS != 0;
 
         if mode & !(F_OK | R_OK | W_OK | X_OK) != 0 {
             error!("[sys_faccessat] shouldn't have mode: {:?}", mode);
             return Err(Errno::EINVAL);
-        } else if mode == 0 {
-            return Ok(0);
         }
 
         let uid = if is_fs {
@@ -1132,6 +1137,13 @@ impl Syscall<'_> {
             inode.uid(),
             inode.gid()
         );
+
+        if mode == F_OK {
+            if let Some(parent) = dentry.parent() {
+                parent.check_access()?;
+            }
+            return Ok(0);
+        }
 
         let permission = if uid == inode.uid() {
             pri.user_permissions() as i32
