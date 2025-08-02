@@ -1138,10 +1138,12 @@ impl Syscall<'_> {
             inode.gid()
         );
 
+        // check if the parent directory is accessible
+        if let Some(parent) = dentry.parent() {
+            parent.check_access()?;
+        }
+
         if mode == F_OK {
-            if let Some(parent) = dentry.parent() {
-                parent.check_access()?;
-            }
             return Ok(0);
         }
 
