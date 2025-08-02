@@ -43,6 +43,9 @@ impl Syscall<'_> {
         let cwd = self.task.cwd().clone();
         let cwd_str = format!("{}\0", cwd.as_str());
         let cwd_bytes = cwd_str.as_bytes();
+        if cwd_bytes.len() > size {
+            return Err(Errno::ERANGE);
+        }
 
         info!("[sys_getcwd] buf: {:?}, size: {}, cwd:{:?}", buf, size, cwd);
 
@@ -891,7 +894,14 @@ impl Syscall<'_> {
             Whence::SeekSet => file.seek(SeekFrom::Start(offset as u64)),
             Whence::SeekCur => file.seek(SeekFrom::Current(offset as i64)),
             Whence::SeekEnd => file.seek(SeekFrom::End(offset as i64)),
-            e => unimplemented!("lseek whence unimplemented: {e:?}"),
+            Whence::SeekData => {
+                error!("[sys_lseek] SeekData is not implemented, offset not changed");
+                return Ok(file.pos() as isize);
+            }
+            Whence::SeekHold => {
+                error!("[sys_lseek] SeekHold is not implemented, offset not changed");
+                return Ok(file.pos() as isize);
+            }
         }
     }
 
