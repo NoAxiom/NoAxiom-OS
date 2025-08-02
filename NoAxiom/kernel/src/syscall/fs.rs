@@ -807,14 +807,29 @@ impl Syscall<'_> {
         let mut buf = vec![0u8; count];
         let read_len = if !offset_ptr.is_null() {
             let offset = offset_ptr.read().await?;
-            let read_len = in_file.read_at(offset, &mut buf).await? as usize;
+            let read_fut = in_file.read_at(offset, &mut buf);
+            let read_len = if in_file.is_interruptable() {
+                interruptable(self.task, read_fut, None, None).await?
+            } else {
+                read_fut.await
+            }? as usize;
             offset_ptr.write(offset + read_len).await?;
             read_len
         } else {
-            in_file.read(&mut buf).await? as usize
+            let read_fut = in_file.read(&mut buf);
+            if in_file.is_interruptable() {
+                interruptable(self.task, read_fut, None, None).await?
+            } else {
+                read_fut.await
+            }? as usize
         };
 
-        out_file.write(&buf[..read_len]).await
+        let write_fut = out_file.write(&buf[..read_len]);
+        if out_file.is_interruptable() {
+            interruptable(self.task, write_fut, None, None).await?
+        } else {
+            write_fut.await
+        }
     }
 
     /// Modify timestamp of a file
