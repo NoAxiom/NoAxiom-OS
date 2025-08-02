@@ -338,7 +338,8 @@ impl Socket for TcpSocket {
     fn bind(&mut self, local: IpEndpoint, fd: usize) -> SysResult<()> {
         debug!("[Tcp {}] bind to {:?}", self.handles[0], local);
         let mut port_manager = TCP_PORT_MANAGER.lock();
-        let port = port_manager.resolve_port(&local)?;
+        let mut local = local;
+        let port = port_manager.resolve_port(&mut local)?;
         port_manager.bind_port_with_fd(port, fd)?;
         self.local_endpoint = Some(IpEndpoint::new(local.addr, port));
         self.state = TcpState::Closed;
