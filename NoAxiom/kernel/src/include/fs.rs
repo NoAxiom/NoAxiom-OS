@@ -374,7 +374,7 @@ pub struct Kstat {
 impl Kstat {
     pub fn from_stat(inode: Arc<dyn Inode>) -> SysResult<Self> {
         let stat = inode.stat()?;
-        let st_mode = inode.privilege();
+        let st_mode = inode.inode_mode();
         Ok(Kstat {
             st_dev: stat.st_dev,
             st_ino: stat.st_ino,
