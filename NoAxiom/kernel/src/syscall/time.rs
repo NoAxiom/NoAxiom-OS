@@ -111,14 +111,21 @@ impl Syscall<'_> {
         pub const TIMER_ABSTIME: usize = 1;
         let request = UserPtr::<TimeSpec>::new(request);
         let remain = UserPtr::<TimeSpec>::new(remain);
-        let request = Duration::from(request.read().await?);
+        let request_timespec = request.read().await?;
+
+        // Validate the input timespec
+        if !request_timespec.is_valid() {
+            return Err(Errno::EINVAL);
+        }
+
+        let request = Duration::from(request_timespec);
         let current = get_time_duration();
         let remain_time = realtime(self.task, async move {
             if flags == TIMER_ABSTIME {
-                if request < current {
+                if request <= current {
                     Duration::ZERO
                 } else {
-                    sleep_now(request - current).await
+                    sleep_now(request.saturating_sub(current)).await
                 }
             } else {
                 sleep_now(request).await
