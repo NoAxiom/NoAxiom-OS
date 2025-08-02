@@ -355,6 +355,10 @@ impl Syscall<'_> {
                     val2 => {
                         let val2 = UserPtr::<TimeSpec>::new(val2);
                         let time_spec = val2.read().await?;
+                        if !time_spec.is_valid() {
+                            error!("[sys_futex]: invalid timespec");
+                            return_errno!(Errno::EINVAL);
+                        }
                         let limit_time = Duration::from(time_spec);
                         info!("[sys_futex]: timeout {:?}", limit_time);
                         Some(limit_time)

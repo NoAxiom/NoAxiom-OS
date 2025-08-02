@@ -55,7 +55,7 @@ impl<T: Future> TimeLimitedFuture<T> {
         Self {
             future: Box::pin(future),
             limit: match timeout {
-                Some(t) => t + get_time_duration(),
+                Some(t) => t.saturating_add(get_time_duration()),
                 None => Duration::MAX,
             },
             is_pushed: false,
