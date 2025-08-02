@@ -5,7 +5,6 @@ tmp/
 !.cargo/
 vendor/
 log/
-*-qemu
 *.img
 .vscode-ctags
 NoAxiom/user/bin/
@@ -14,7 +13,6 @@ test-2025/
 qemu.log
 NoAxiom/kernel/src/link_apps.S
 output/
-kernel-rv
-kernel-la
+kernel-*
 kernel.ui
 config.mk

@@ -23,6 +23,7 @@ export RELEASE ?= false
 export TOOLCHAIN_DIR := $(ROOT)/$(UTILS)/toolchain
 export FEAT_ON_QEMU ?= true
 export FINAL_CASES ?= false
+export DEBUG_UNALIGN=1
 
 # Arch config
 ifeq ($(ARCH_NAME),riscv64) # RISC-V64
@@ -183,7 +184,6 @@ gdb:
 	@$(GDB) $(GDB_FLAGS)
 
 clean:
-	@rm -f kernel-qemu
 	@rm -f $(FS_IMG)
 	@rm -rf $(TEST_DIR)/build
 	@rm -rf $(TEST_DIR)/riscv64
@@ -264,6 +264,17 @@ env: add-target git-update vendor
 build-all:
 	@make build ARCH_NAME=riscv64 LOG=OFF RELEASE=true INIT_PROC=runtests
 	@make build ARCH_NAME=loongarch64 LOG=OFF RELEASE=true INIT_PROC=runtests
+
+LA_QARGS=ARCH_NAME=loongarch64 LOG=DEBUG RELEASE=true INIT_PROC=runtests FEAT_ON_QEMU=false
+
+board-la:
+	@echo "Building LoongArch64 kernel for board..."
+	@make build $(LA_QARGS)
+	@cd $(UTILS)/scripts && sh la-board.sh
+
+board-la-asm:
+	@echo "Building LoongArch64 kernel for board..."
+	@make asm $(LA_QARGS)
 
 all: build-all
 	@echo "Kernel build finished. See output elf in kernel-rv & kernel-la"

@@ -1,5 +1,5 @@
 use arch::{Arch, ArchBoot, ArchInfo, ArchInt, _entry_other_hart, consts::KERNEL_ADDR_OFFSET};
-use device::device_init;
+use device::{device_init, dtb_init};
 
 use crate::{
     config::cpu::CPU_NUM,
@@ -45,21 +45,9 @@ pub extern "C" fn _other_hart_init(hart_id: usize, dtb: usize) -> ! {
     run_tasks()
 }
 
-// pub static BOOT_HART_ID: AtomicUsize = AtomicUsize::new(0);
-
-/// init bss, mm, console, and other drivers, then jump to rust_main,
-/// called by [`super::boot`]
-#[no_mangle]
-pub extern "C" fn _boot_hart_init(_hartid: usize, dtb: usize) -> ! {
-    // data init
-    bss_init();
-    heap_init();
-
-    // log init
-    Arch::arch_init();
-    log_init();
-
-    // print basic info
+fn hello_world() {
+    println!("{}", NOAXIOM_BANNER);
+    println!("\u{1B}[1;34m=============================================\u{1B}[0m\n");
     #[cfg(feature = "multicore")]
     println!(
         "[kernel] MULTICORE: CPU_NUM = {}, BOOT_HART = {}",
@@ -69,18 +57,37 @@ pub extern "C" fn _boot_hart_init(_hartid: usize, dtb: usize) -> ! {
     #[cfg(not(feature = "multicore"))]
     println!("[kernel] SINGLECORE: CPU_NUM = {}", CPU_NUM);
     println!("[kernel] ARCH = {}", Arch::ARCH_NAME);
-    info!(
-        "[first_init] entry init hart_id: {}, dtb_addr: {:#x}",
-        get_hartid(),
-        dtb as usize,
-    );
+}
+
+// pub static BOOT_HART_ID: AtomicUsize = AtomicUsize::new(0);
+
+/// init bss, mm, console, and other drivers, then jump to rust_main,
+/// called by [`super::boot`]
+#[no_mangle]
+pub extern "C" fn _boot_hart_init(
+    #[allow(unused)] arg0: usize,
+    #[allow(unused)] arg1: usize,
+    #[allow(unused)] arg2: usize,
+    #[allow(unused)] arg3: usize,
+) -> ! {
+    // data init
+    bss_init();
+    heap_init();
+
+    // log init
+    Arch::arch_init();
+    log_init();
+
+    // print basic info
+    hello_world();
 
     // kernel space init
     frame_init();
     kernel_space_init();
 
     // device init
-    device_init(dtb);
+    dtb_init(arg1);
+    device_init();
 
     // fs init
     Arch::enable_interrupt();
@@ -90,11 +97,6 @@ pub extern "C" fn _boot_hart_init(_hartid: usize, dtb: usize) -> ! {
     ktime_init();
     schedule_spawn_with_path();
     wake_other_hart(get_hartid());
-
-    // print hello message
-    println!("{}", NOAXIOM_BANNER);
-    // println!("=============================================");
-    println!("\u{1B}[1;34m=============================================\u{1B}[0m\n");
 
     // start task runner
     run_tasks()

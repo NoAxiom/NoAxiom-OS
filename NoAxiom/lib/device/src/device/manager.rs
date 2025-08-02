@@ -85,3 +85,9 @@ impl GeneralBus {
 }
 
 pub static DEV_BUS: GeneralBus = GeneralBus::new();
+
+pub fn handle_irq() {
+    if let Some(dev) = get_int_ctrl_dev() {
+        dev.handle_irq().expect("[driver] handle_irq failed");
+    }
+}

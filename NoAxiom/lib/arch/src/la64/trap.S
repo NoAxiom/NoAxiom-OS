@@ -22,7 +22,11 @@
     .endm
 
     .macro    KERNEL_SAVE_REG
+    csrwr     $sp, CSR_SAVE            # save sp since we will align it
+    csrrd     $sp, CSR_SAVE
     addi.d    $sp, $sp, -32*8
+    srli.d    $sp, $sp, 3              # align sp to avoid unaligned exception
+    slli.d    $sp, $sp, 3
     STORE_X   %1
     STORE_X   %2
     .set      n, 4
@@ -41,6 +45,7 @@
     .set      n, n+1
     .endr
     addi.d    $sp, $sp, 32*8
+    csrrd     $sp, CSR_SAVE
     .endm
 
     .section  .text.trampoline
@@ -116,6 +121,7 @@
     .endr
     ld.d      $sp, $sp, 3*8            # load sp finally
 
+    ibar      0                        # sync instruction cache
     ertn                               # la: exception return <> rv: sret
 
 # kernel -> kernel

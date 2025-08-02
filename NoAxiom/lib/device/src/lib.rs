@@ -4,12 +4,12 @@
 
 extern crate alloc;
 
-mod archs;
 mod bus;
 mod device;
+mod dtb;
 
-pub use archs::*;
 pub use device::{
-    basic::{device_init, handle_irq},
-    manager::{GeneralBus, DEV_BUS},
+    device_init,
+    manager::{handle_irq, GeneralBus, DEV_BUS},
 };
+pub use dtb::{devconf, init::dtb_init};

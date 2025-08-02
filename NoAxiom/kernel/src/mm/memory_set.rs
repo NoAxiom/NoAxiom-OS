@@ -128,13 +128,37 @@ impl MemorySet {
     /// create an new empty memory set without any allocation
     /// do not use this function directly, use [`Self::new_with_kernel`] instead
     fn new(page_table: PageTable) -> Self {
+        let page_table = SyncUnsafeCell::new(page_table);
+        trace!(
+            "[memory_set] new memory set with page table: {:#x}",
+            page_table.as_ref().root_ppn().raw()
+        );
+
+        let areas = Vec::new();
+        trace!("[memory_set] new memory set with {} areas", areas.len());
+
+        let stack = MapArea::new_bare();
+        trace!(
+            "[memory_set] new memory set with stack: {:#x}",
+            stack.vpn_range().start().raw()
+        );
+
+        let brk = BrkAreaInfo::new_bare();
+        trace!("[memory_set] new memory set with brk: {:#x}", brk.start);
+
+        let mmap_manager = MmapManager::new_bare();
+        trace!("[memory_set] new memory set with mmap manager");
+
+        let shm = ShmInfo::new();
+        trace!("[memory_set] new memory set with shm manager");
+
         Self {
-            page_table: SyncUnsafeCell::new(page_table),
-            areas: Vec::new(),
-            stack: MapArea::new_bare(),
-            brk: BrkAreaInfo::new_bare(),
-            mmap_manager: MmapManager::new_bare(),
-            shm: ShmInfo::new(),
+            page_table,
+            areas,
+            stack,
+            brk,
+            mmap_manager,
+            shm,
         }
     }
 

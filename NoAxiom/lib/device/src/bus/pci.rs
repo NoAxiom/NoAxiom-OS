@@ -14,8 +14,8 @@ use virtio_drivers::transport::{
 
 use super::pci_driver::PciRangeAllocator;
 use crate::{
-    archs::devconf::{PCI_BUS_END, PCI_RANGE},
     device::manager::DEV_BUS,
+    dtb::devconf::{PCI_BUS_END, PCI_RANGE},
 };
 
 const PCI_BAR_NUM: u8 = 6;

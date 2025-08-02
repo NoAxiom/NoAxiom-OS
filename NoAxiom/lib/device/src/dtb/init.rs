@@ -3,13 +3,13 @@ use alloc::string::String;
 use driver::basic::{DeviceType, InterruptDeviceType};
 use fdt::{node::FdtNode, Fdt};
 
-use crate::{
-    archs::dtb::translate_dtb,
-    device::{
-        basic::{
-            DeviceConfig, DeviceConfigManager, DeviceConfigType, MmioRegion, DEV_CONFIG_MANAGER,
-        },
-        compatible::{OF_PCI_ECAM_TYPE, OF_PLIC_TYPE, OF_VIRTIO_MMIO_TYPE},
+use crate::dtb::{
+    compatible::{OF_PCI_ECAM_TYPE, OF_PLIC_TYPE, OF_VIRTIO_MMIO_TYPE},
+    dtb::get_dtb_initializer,
+    dtb_addr::init_dtb_addr,
+    info::{
+        DeviceConfig, DeviceConfigManager, DeviceConfigType, DtbInitializerType, MmioRegion,
+        DEV_CONFIG_MANAGER,
     },
 };
 
@@ -68,11 +68,7 @@ pub(crate) fn dtb_init_one(node: &FdtNode, info: &mut DeviceConfigManager) -> bo
     false
 }
 
-pub fn dtb_init(dtb: usize) {
-    let dtb = translate_dtb(dtb) | arch::consts::KERNEL_ADDR_OFFSET;
-    log::debug!("[platform] init with dtb: {:#x}", dtb);
-
-    let fdt = unsafe { Fdt::from_ptr(dtb as *const u8).unwrap() };
+fn fdt_init(fdt: Fdt<'static>) {
     let mut info = DeviceConfigManager::new_bare();
     for node in fdt.all_nodes() {
         if let Some(compatible) = node.compatible() {
@@ -84,6 +80,29 @@ pub fn dtb_init(dtb: usize) {
             log::warn!("[platform] no initializer for node {}", node.name,);
         }
     }
-
     DEV_CONFIG_MANAGER.call_once(|| info);
+}
+
+pub fn dtb_init(dtb: usize) {
+    init_dtb_addr(dtb);
+    match get_dtb_initializer() {
+        DtbInitializerType::Ptr(dtb_ptr) => {
+            log::info!("[platform] using pointer initializer: {:#x}", dtb_ptr);
+            let fdt = unsafe { Fdt::from_ptr(dtb_ptr as *const u8).unwrap() };
+            fdt_init(fdt);
+        }
+        DtbInitializerType::Ref(dtb_ref) => {
+            log::info!("[platform] using reference initializer");
+            let fdt = Fdt::new(dtb_ref).unwrap();
+            fdt_init(fdt);
+        }
+        DtbInitializerType::Fdt(fdt) => {
+            log::info!("[platform] using Fdt initializer");
+            fdt_init(fdt)
+        }
+        DtbInitializerType::Config(config) => {
+            log::info!("[platform] using config initializer");
+            DEV_CONFIG_MANAGER.call_once(|| DeviceConfigManager::new(config));
+        }
+    }
 }

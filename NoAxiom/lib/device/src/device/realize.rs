@@ -7,10 +7,8 @@ use virtio_drivers::transport::{DeviceType as VirtioDevType, Transport};
 
 use crate::{
     bus::pci::probe_pci_bus,
-    device::{
-        basic::{DeviceConfig, DeviceConfigType, DEV_CONFIG_MANAGER},
-        manager::{get_int_ctrl_dev, set_int_ctrl_dev, DEV_BUS},
-    },
+    dtb::info::{DeviceConfig, DeviceConfigType, DEV_CONFIG_MANAGER},
+    device::manager::{get_int_ctrl_dev, set_int_ctrl_dev, DEV_BUS},
 };
 
 fn virtio_mmio_realize(config: &DeviceConfig) {

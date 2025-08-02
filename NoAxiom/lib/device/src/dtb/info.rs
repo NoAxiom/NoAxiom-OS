@@ -2,10 +2,9 @@ use alloc::vec::Vec;
 use core::ptr::NonNull;
 
 use driver::basic::DeviceType;
+use fdt::Fdt;
 use ksync::Once;
 use virtio_drivers::transport::mmio::{MmioError, MmioTransport, VirtIOHeader};
-
-use crate::device::manager::get_int_ctrl_dev;
 
 pub struct MmioRegion {
     pub addr: usize,
@@ -46,17 +45,16 @@ impl DeviceConfigManager {
             devices: Vec::new(),
         }
     }
+    pub fn new(devices: Vec<DeviceConfig>) -> Self {
+        Self { devices }
+    }
 }
 
 pub static DEV_CONFIG_MANAGER: Once<DeviceConfigManager> = Once::new();
 
-pub fn device_init(dtb: usize) {
-    crate::device::dtb::dtb_init(dtb);
-    crate::device::realize::device_realize();
-}
-
-pub fn handle_irq() {
-    if let Some(dev) = get_int_ctrl_dev() {
-        dev.handle_irq().expect("[driver] handle_irq failed");
-    }
+pub enum DtbInitializerType {
+    Ptr(usize),
+    Ref(&'static [u8]),
+    Fdt(Fdt<'static>),
+    Config(Vec<DeviceConfig>),
 }

@@ -7,3 +7,7 @@ pub const PCI_BUS_END: usize = 0x7F;
 //     (0x2000_0000, 0x1000_0000), // PCI
 //     (0x4000_0000, 0x0002_0000), // PCI RANGES
 // ];
+
+// pub fn get_mmio_regions() -> &'static [(usize, usize)] {
+//     MMIO_REGIONS
+// }

@@ -28,7 +28,7 @@ impl ArchTime for LA64 {
     }
     fn set_timer(interval: u64) {
         ticlr::clear_timer_interrupt();
-        tcfg::set_init_val(interval as usize);
+        tcfg::set_init_val((interval & !0b11) as usize);
         tcfg::set_en(true);
     }
 }
