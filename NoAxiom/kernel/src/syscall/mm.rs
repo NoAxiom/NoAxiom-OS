@@ -117,7 +117,10 @@ impl Syscall<'_> {
         assert!(size % PAGE_SIZE == 0);
         let new_key = match key {
             IPC_PRIVATE => SHM_MANAGER.lock().create(key, size, shmflg),
-            _ => unimplemented!(),
+            _ => {
+                error!("[shmget] key {:#x} is not IPC_PRIVATE", key);
+                return Err(Errno::ENOSYS);
+            }
         };
         Ok(new_key as isize)
     }
