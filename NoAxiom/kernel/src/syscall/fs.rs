@@ -419,7 +419,7 @@ impl Syscall<'_> {
         stat_buf: usize,
         flags: i32,
     ) -> SyscallResult {
-        let flags = FileFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
+        let flags = FileFlags::from_bits_retain(flags);
         let path = get_path(self.task.clone(), path, dirfd, "sys_newfstat")?;
         info!(
             "[sys_newfstat] dirfd: {}, path: {:?}, stat_buf: {:#x}, flags: {:?}",
