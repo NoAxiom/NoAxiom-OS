@@ -1,5 +1,5 @@
 use arch::ArchMemory;
-use driver::{block::virtio_block::VirtioBlockDevice, hal::VirtioHalImpl, DevResult};
+use driver::{basic::DevResult, block::virtio_block::VirtioBlockDevice, hal::VirtioHalImpl};
 use include::errno::Errno;
 use virtio_drivers::transport::{
     pci::{

@@ -2,7 +2,7 @@ use arch::{Arch, ArchTime};
 use ksync::AsyncMutex;
 
 use crate::{
-    basic::{BlockDeviceType, Device, DeviceType},
+    basic::{BlockDeviceType, DevResult, Device, DeviceType},
     block::{
         vf2_sdcard::{
             register::{get_sdio_pbase, set_sdio_base},
@@ -11,7 +11,6 @@ use crate::{
         BlockDevice,
     },
     interrupt::InterruptDevice,
-    DevResult,
 };
 
 // time need to fix

@@ -16,5 +16,3 @@ pub mod interrupt;
 mod macros;
 pub mod net;
 pub mod power;
-
-pub type DevResult<T> = Result<T, include::errno::Errno>;

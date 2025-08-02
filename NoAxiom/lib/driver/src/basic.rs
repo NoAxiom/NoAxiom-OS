@@ -1,3 +1,5 @@
+pub type DevResult<T> = Result<T, include::errno::Errno>;
+
 pub trait Device: Sync {
     fn device_name(&self) -> &'static str {
         "Unknown Device"
@@ -62,5 +64,7 @@ pub enum DeviceType {
     Interrupt(InterruptDeviceType),
     Char(CharDeviceType),
     Power(PowerDeviceType),
+    Kernel,
+    Pending,
     Unknown,
 }

@@ -34,12 +34,12 @@ fn device_init(
 pub const OF_INITIALIZERS: &[(&str, DeviceType, DeviceConfigType)] = &[
     (
         OF_PCI_ECAM_TYPE,
-        DeviceType::Unknown,
+        DeviceType::Pending,
         DeviceConfigType::PciEcam,
     ),
     (
         OF_VIRTIO_MMIO_TYPE,
-        DeviceType::Unknown,
+        DeviceType::Pending,
         DeviceConfigType::VirtioMmio,
     ),
     (
