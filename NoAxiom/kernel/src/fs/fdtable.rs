@@ -1,9 +1,13 @@
 use alloc::{sync::Arc, vec::Vec};
+use core::intrinsics::unlikely;
 
 use super::vfs::{basic::file::File, TTYFILE};
 use crate::{
     constant::fs::{RLIMIT_HARD_MAX, RLIMIT_SOFT_MAX},
-    include::{fs::FcntlArgFlags, result::Errno},
+    include::{
+        fs::{FcntlArgFlags, FileFlags},
+        result::Errno,
+    },
     net::socketfile::SocketFile,
     syscall::{SysResult, SyscallResult},
 };
@@ -133,18 +137,21 @@ impl FdTable {
     }
 
     /// Get the `fd` socket slot, None if `fd` > `table.len()`
-    pub fn get_socketfile(&self, fd: usize) -> Option<Arc<SocketFile>> {
+    pub fn get_socketfile(&self, fd: usize) -> Result<Arc<SocketFile>, Errno> {
         if fd < self.table.len() {
             if let Some(entry) = &self.table[fd] {
                 let socket_file = entry.file.clone();
+                let file_flags = socket_file.flags();
                 let socket = socket_file.downcast_arc::<SocketFile>();
                 if let Ok(socket) = socket {
-                    return Some(socket);
+                    return Ok(socket);
+                } else if unlikely(!file_flags.contains(FileFlags::O_PATH)) {
+                    return Err(Errno::ENOTSOCK);
                 }
             }
         }
 
-        None
+        Err(Errno::EBADF)
     }
 
     /// Set the `fd` slot
@@ -167,6 +174,14 @@ impl FdTable {
         if fd < self.table.len() {
             if let Some(entry) = &mut self.table[fd] {
                 entry.flags = flags.clone();
+            }
+        }
+    }
+
+    pub fn set_nonblock(&self, fd: usize) {
+        if fd < self.table.len() {
+            if let Some(entry) = &self.table[fd] {
+                entry.file.meta().set_nonblock();
             }
         }
     }

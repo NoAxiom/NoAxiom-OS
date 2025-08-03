@@ -5,6 +5,9 @@ use strum::FromRepr;
 use super::result::Errno;
 use crate::syscall::SysResult;
 
+pub const SOCK_NONBLOCK: i32 = 0x800;
+pub const SOCK_CLOEXEC: i32 = 0x80000;
+
 bitflags! {
     /// @brief 用于指定socket的关闭类型
     /// 参考：https://code.dragonos.org.cn/xref/linux-6.1.9/include/net/sock.h?fi=SHUTDOWN_MASK#1573
@@ -410,6 +413,10 @@ pub enum PosixIpProtocol {
     RAW = 255,
     /// Multipath TCP connection
     MPTCP = 262,
+    /// Packet socket
+    SOLPACKET = 263,
+    /// Generic Algorithm
+    SOLALG = 279,
 }
 
 #[repr(i32)]
@@ -512,4 +519,24 @@ impl TryFrom<usize> for SocketLevel {
             }
         }
     }
+}
+
+///为每个level建立一个配置enum
+#[repr(usize)]
+#[allow(non_camel_case_types)]
+#[derive(FromRepr, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IpOption {
+    //设置多播数据的发送出口网络接口,设置多播接口中从哪个接口发送对应数据包
+    IP_MULTICAST_IF = 32,
+    //设置多播数据包的生存时间（TTL），控制其传播范围
+    IP_MULTICAST_TTL = 33,
+    ///控制多播数据的本地环回
+    /// 启用（1）：发送的多播数据会被同一主机上的接收套接字收到。
+    /// 禁用（0）：发送的数据不环回，仅其他主机接收。
+    IP_MULTICAST_LOOP = 34,
+    ///加入一个多播组，开始接收发送到该组地址的数据
+    IP_ADD_MEMBERSHIP = 35,
+    IP_PKTINFO = 11,
+    MCAST_JOIN_GROUP = 42,
+    MCAST_LEAVE_GROUP = 45,
 }

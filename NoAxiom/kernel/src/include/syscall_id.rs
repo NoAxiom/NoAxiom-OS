@@ -12,6 +12,7 @@ pub enum SyscallID {
     SYS_IOCTL = 29,
     SYS_MKDIRAT = 34,
     SYS_UNLINKAT = 35,
+    SYS_SYMLINKAT = 36,
     SYS_LINKAT = 37,
     SYS_UMOUNT2 = 39,
     SYS_MOUNT = 40,

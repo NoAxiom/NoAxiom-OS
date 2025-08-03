@@ -72,6 +72,12 @@ impl FileMeta {
     pub fn set_flags(&self, flags: FileFlags) {
         self.flags.store(flags.bits(), Ordering::SeqCst);
     }
+    pub fn set_nonblock(&self) {
+        let mut flags =
+            FileFlags::from_bits(self.flags.load(Ordering::SeqCst)).unwrap_or(FileFlags::empty());
+        flags |= FileFlags::O_NONBLOCK;
+        self.set_flags(flags);
+    }
 }
 
 #[async_trait]

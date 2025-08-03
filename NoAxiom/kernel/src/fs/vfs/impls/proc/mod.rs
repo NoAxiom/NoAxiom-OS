@@ -116,5 +116,15 @@ pub async fn init(fs_root: Arc<dyn Dentry>) -> SysResult<()> {
     status_dentry.set_inode(status_inode);
     self_dentry.add_child_directly(status_dentry);
 
+    info!("[fs] create /proc/self/maps");
+    let maps_dentry = Arc::new(RamFsDentry::new(
+        Some(fs_root.clone()),
+        "maps",
+        fs_root.super_block(),
+    ));
+    let maps_inode = Arc::new(RamFsFileInode::new(fs_root.super_block(), 0));
+    maps_dentry.set_inode(maps_inode);
+    self_dentry.add_child_directly(maps_dentry);
+
     Ok(())
 }

@@ -1,4 +1,4 @@
-use alloc::{boxed::Box, sync::Arc};
+use alloc::{boxed::Box, string::String, sync::Arc};
 use core::sync::atomic::{AtomicU32, Ordering};
 
 use async_trait::async_trait;
@@ -43,6 +43,7 @@ pub struct InodeMeta {
 
     uid: AtomicU32,
     gid: AtomicU32,
+    symlink: Mutex<Option<String>>, // for symlink, the target path
 }
 
 // todo: Drop for the InodeMeta, sync the page cache according to the state
@@ -71,8 +72,9 @@ impl InodeMeta {
             inode_mode: AtomicU32::new(inode_mode.bits()),
             super_block,
             page_cache,
-            uid: AtomicU32::new(0), // default user id
-            gid: AtomicU32::new(0), // default group id
+            uid: AtomicU32::new(0),    // default user id
+            gid: AtomicU32::new(0),    // default group id
+            symlink: Mutex::new(None), // default no symlink
         }
     }
 }
@@ -156,8 +158,22 @@ impl dyn Inode {
         let inode_mode = inode_mode & PRIVILEGE_MASK;
         InodeMode::from_bits(inode_mode).expect("Invalid inode privilege!")
     }
-    pub fn set_permission(&self, mode: u32) {
+    pub fn set_permission(&self, task: &Arc<Task>, mode: u32) {
+        const S_ISGID: u32 = InodeMode::SET_GID.bits();
         let inode_mode = self.meta().inode_mode.load(Ordering::SeqCst);
+        let mut mode = mode;
+        if mode & S_ISGID != 0 {
+            let (fsuid, fsgid) = (task.fsuid(), task.fsgid());
+            if fsuid != 0 && fsgid != self.gid() as u32 {
+                warn!(
+                    "[set_permission] S_ISGID clear! fsuid: {}, fsgid: {}, gid: {}",
+                    fsuid,
+                    fsgid,
+                    self.gid()
+                );
+                mode &= !S_ISGID;
+            }
+        }
         self.meta().inode_mode.store(
             (inode_mode & !ALL_PERMISSIONS_MASK) | (mode & ALL_PERMISSIONS_MASK),
             Ordering::SeqCst,
@@ -232,7 +248,7 @@ impl dyn Inode {
         // ROOT
         if euid == 0 {
             if uid_change {
-                if mode.other_permissions() != 0 && mode.contains(InodeMode::FILE) {
+                if mode.bits() & 0o111 != 0 && mode.contains(InodeMode::FILE) {
                     warn!("[chown] Root User changes the owner");
                     if mode.contains(InodeMode::GROUP_EXEC) {
                         // clear setuid and setgid
@@ -290,6 +306,39 @@ impl dyn Inode {
             self.set_gid(gid);
         }
         Ok(())
+    }
+
+    pub fn check_search_permission(&self, task: &Arc<Task>) -> bool {
+        let euid = task.fsuid();
+        let egid = task.fsgid();
+        if euid == 0 {
+            return true;
+        }
+        let mode = self.inode_mode();
+        debug!(
+            "[check_search_permission] i_mode: {:o}, euid: {}, egid: {}",
+            mode, euid, egid
+        );
+
+        let perm = if euid == self.uid() {
+            mode.user_permissions()
+        } else if egid == self.gid() {
+            mode.group_permissions()
+        } else {
+            mode.other_permissions()
+        };
+
+        if perm & 0o111 == 0 {
+            error!("[check_search_permission] No search permission !!");
+            false
+        } else {
+            true
+        }
+    }
+
+    pub fn symlink(&self, target: String) {
+        let mut symlink = self.meta().symlink.lock();
+        *symlink = Some(target);
     }
 }
 

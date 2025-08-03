@@ -17,7 +17,7 @@ use crate::{
     constant::net::TCP_CONSTANTS,
     include::{
         io::PollEvent,
-        net::{ShutdownType, SocketOptions, SocketType},
+        net::{PosixIpProtocol, ShutdownType, SocketOptions, SocketType},
         result::Errno,
     },
     sched::utils::yield_now,
@@ -338,7 +338,8 @@ impl Socket for TcpSocket {
     fn bind(&mut self, local: IpEndpoint, fd: usize) -> SysResult<()> {
         debug!("[Tcp {}] bind to {:?}", self.handles[0], local);
         let mut port_manager = TCP_PORT_MANAGER.lock();
-        let port = port_manager.resolve_port(&local)?;
+        let mut local = local;
+        let port = port_manager.resolve_port(&mut local)?;
         port_manager.bind_port_with_fd(port, fd)?;
         self.local_endpoint = Some(IpEndpoint::new(local.addr, port));
         self.state = TcpState::Closed;
@@ -392,8 +393,6 @@ impl Socket for TcpSocket {
         assert_ne!(remote.port, 0, "[Tcp {}] remote port is 0", self.handles[0]);
 
         let temp_port = self.local_endpoint.unwrap().port;
-
-        yield_now().await; // amazing yield maybe
 
         let driver_write_guard = NET_DEVICES.write();
         let iface = *driver_write_guard.get(&0).unwrap(); // now we only have one net device
@@ -450,37 +449,31 @@ impl Socket for TcpSocket {
                             tcp::ConnectError::InvalidState => Errno::EISCONN,
                             tcp::ConnectError::Unaddressable => Errno::EADDRNOTAVAIL,
                         })?;
-
-                    for (handle, s) in sockets.iter() {
-                        match s {
-                            smoltcp::socket::Socket::Tcp(tcp) => {
-                                debug!(
-                                    "[Tcp {}] poll: socket handle {}, state {:?}",
-                                    self.handles[0],
-                                    handle,
-                                    tcp.state()
-                                );
-                            }
-                            _ => {}
-                        }
-                    }
                     drop(sockets);
                     drop(iface_inner);
                     yield_now().await;
                 }
                 tcp::State::SynSent => {
-                    intermit(Some(1000), None, || {
-                        debug!("[Tcp {}] connect loop: Synsent", self.handles[0])
-                    });
+                    debug!("[Tcp {}] connect loop: Synsent", self.handles[0]);
+                    retry_cnt += 1;
+                    if retry_cnt > 100 && is_ltp() {
+                        error!(
+                            "[Tcp {}] connect loop: Server doesn't accept!",
+                            self.handles[0]
+                        );
+                        return Err(Errno::ECONNREFUSED);
+                    }
                     drop(sockets);
-                    yield_now().await;
                 }
                 tcp::State::Established => {
                     debug!("[Tcp {}] connect loop: Established", self.handles[0]);
                     return Ok(());
                 }
-                _ => {
-                    error!("[Tcp {}] connect loop: InvalidState", self.handles[0]);
+                state => {
+                    error!(
+                        "[Tcp {}] connect loop: InvalidState: {:?}",
+                        self.handles[0], state
+                    );
                     return Err(Errno::ECONNREFUSED);
                 }
             }
@@ -503,6 +496,17 @@ impl Socket for TcpSocket {
             });
 
             if let Some(handle_index) = chosen_handle_index {
+                for (handle, socket) in sockets.iter() {
+                    if let smoltcp::socket::Socket::Tcp(tcp_socket) = socket {
+                        debug!(
+                            "[Tcp {}] accept: socket {}'s state: {:?}",
+                            self.handles[0],
+                            handle,
+                            tcp_socket.state()
+                        );
+                    }
+                }
+
                 // replace the handle vector
                 let new_socket = Self::new_socket();
                 let new_socket_handle = sockets.add(new_socket);

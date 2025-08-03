@@ -89,16 +89,16 @@ type ThreadOnly<T> = SyncUnsafeCell<T>;
 #[repr(C, align(64))]
 pub struct Task {
     // mutable
-    pcb: Mutable<PCB>,               // task control block inner, protected by lock
-    uid: AtomicU32,                  // user id
-    gid: AtomicU32,                  // group id
-    fsuid: AtomicU32,                // user id - file system
-    fsgid: AtomicU32,                // group id - file system
-    euid: AtomicU32,                 // user id - effective
-    egid: AtomicU32,                 // group id - effective
-    suid: AtomicU32,                 // user id - saved
-    sgid: AtomicU32,                 // group id - saved
-    sup_groups: SharedMut<Vec<u32>>, // supplementary groups
+    pcb: Mutable<PCB>,             // task control block inner, protected by lock
+    uid: AtomicU32,                // user id
+    gid: AtomicU32,                // group id
+    fsuid: AtomicU32,              // user id - file system
+    fsgid: AtomicU32,              // group id - file system
+    euid: AtomicU32,               // user id - effective
+    egid: AtomicU32,               // group id - effective
+    suid: AtomicU32,               // user id - saved
+    sgid: AtomicU32,               // group id - saved
+    sup_groups: Mutable<Vec<u32>>, // supplementary groups
 
     // thread only / once initialization
     tcb: ThreadOnly<TCB>,                  // thread control block
@@ -497,15 +497,15 @@ impl Task {
             }),
             futex: Shared::new(FutexQueue::new()),
             itimer: Shared::new(ITimerManager::new()),
-            uid: AtomicU32::new(0),              // default user id
-            gid: AtomicU32::new(0),              // default group id
-            fsuid: AtomicU32::new(0),            // default fs user id
-            fsgid: AtomicU32::new(0),            // default fs group id
-            euid: AtomicU32::new(0),             // default effective user id
-            egid: AtomicU32::new(0),             // default effective group id
-            suid: AtomicU32::new(0),             // default saved user id
-            sgid: AtomicU32::new(0),             // default saved group id
-            sup_groups: Shared::new(Vec::new()), // default supplementary groups
+            uid: AtomicU32::new(0),               // default user id
+            gid: AtomicU32::new(0),               // default group id
+            fsuid: AtomicU32::new(0),             // default fs user id
+            fsgid: AtomicU32::new(0),             // default fs group id
+            euid: AtomicU32::new(0),              // default effective user id
+            egid: AtomicU32::new(0),              // default effective group id
+            suid: AtomicU32::new(0),              // default saved user id
+            sgid: AtomicU32::new(0),              // default saved group id
+            sup_groups: Mutable::new(Vec::new()), // default supplementary groups
         });
         task.thread_group().insert(&task);
         TASK_MANAGER.insert(&task);
@@ -646,6 +646,8 @@ impl Task {
             Some(Arc::downgrade(self))
         };
 
+        let sup_groups = Mutable::new(self.sup_groups().clone());
+
         let res = if flags.contains(CloneFlags::THREAD) {
             // fork as a new thread
             let new_tid = tid_alloc();
@@ -679,7 +681,7 @@ impl Task {
                 egid: AtomicU32::new(self.egid()),
                 suid: AtomicU32::new(self.suid()),
                 sgid: AtomicU32::new(self.sgid()),
-                sup_groups: self.sup_groups.clone(),
+                sup_groups,
             });
             new_thread.thread_group.lock().insert(&new_thread);
             TASK_MANAGER.insert(&new_thread);
@@ -718,7 +720,7 @@ impl Task {
                 egid: AtomicU32::new(self.egid()),
                 suid: AtomicU32::new(self.suid()),
                 sgid: AtomicU32::new(self.sgid()),
-                sup_groups: self.sup_groups.clone(),
+                sup_groups,
             });
             new_process.thread_group().insert(&new_process);
             self.pcb().children.push(new_process.clone());

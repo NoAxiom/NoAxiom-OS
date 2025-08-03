@@ -43,6 +43,10 @@ impl Syscall<'_> {
             return Err(Errno::EINVAL);
         }
         let time_spec = ts.read().await?;
+        if !time_spec.is_valid() {
+            error!("[sys_nanosleep]: invalid timespec");
+            return Err(Errno::EINVAL);
+        }
         let remain_time = realtime(self.task, sleep_now(time_spec.into())).await;
         if !remain.is_null() {
             if remain_time > Duration::ZERO {

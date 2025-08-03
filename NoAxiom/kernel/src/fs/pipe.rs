@@ -33,11 +33,16 @@ use super::vfs::{
 };
 use crate::{
     config::fs::PIPE_BUF_SIZE,
+    cpu::current_task,
     fs::vfs::basic::inode::Inode,
     include::{
         fs::{FileFlags, InodeMode, Stat},
         io::PollEvent,
         result::Errno,
+    },
+    signal::{
+        sig_info::{SigCode, SigInfo},
+        signal::Signal,
     },
     syscall::{SysResult, SyscallResult},
     utils::global_alloc,
@@ -541,6 +546,12 @@ impl Future for PipeWriteFuture {
                 Poll::Pending
             }
         } else {
+            // No read end - send SIGPIPE to current process
+            warn!("[PipeWriteFile] no read end, sending SIGPIPE");
+            if let Some(task) = current_task() {
+                let siginfo = SigInfo::new_simple(Signal::SIGPIPE, SigCode::Kernel);
+                task.recv_siginfo(siginfo, false);
+            }
             Poll::Ready(Err(Errno::EPIPE))
         }
     }
