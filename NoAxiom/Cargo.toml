@@ -18,7 +18,6 @@ config = { path = "lib/config" }
 driver = { path = "lib/driver" }
 include = { path = "lib/include" }
 memory = { path = "lib/memory" }
-device = { path = "lib/device" }
 virtio-drivers-async = { git = "https://github.com/YuXuaann/virtio-drivers-async" }
 virtio-drivers = { git = "https://github.com/YuXuaann/virtio-drivers-async", branch = "virtio-driver-0.9.0-nightly" }
 # virtio-drivers = { git = "https://github.com/rcore-os/virtio-drivers", default-features = false, features = [

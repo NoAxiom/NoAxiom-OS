@@ -1,5 +1,5 @@
 use arch::{Arch, ArchBoot, ArchInfo, ArchInt, _entry_other_hart, consts::KERNEL_ADDR_OFFSET};
-use device::{device_init, dtb_init};
+use driver::probe::probe_device;
 
 use crate::{
     config::cpu::CPU_NUM,
@@ -83,8 +83,7 @@ pub extern "C" fn _boot_hart_init(
     kernel_space_init();
 
     // device init
-    dtb_init(arg1);
-    device_init();
+    probe_device(arg1);
 
     // fs init
     with_interrupt_on!(block_on(crate::fs::init()));

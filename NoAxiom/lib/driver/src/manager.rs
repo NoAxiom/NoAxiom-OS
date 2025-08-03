@@ -1,13 +1,14 @@
 use alloc::{boxed::Box, vec::Vec};
 
-use driver::{
+use ksync::mutex::SpinLock;
+
+use crate::{
     block::BlockDevice,
     device_cast,
     display::DisplayDevice,
     interrupt::{InterruptControllerDevice, InterruptDevice},
     net::NetWorkDevice,
 };
-use ksync::mutex::SpinLock;
 
 #[macro_export]
 macro_rules! define_global_device {

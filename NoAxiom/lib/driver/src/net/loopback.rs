@@ -12,9 +12,8 @@ use smoltcp::{
 };
 
 use super::NetWorkDevice;
-use crate::{
-    basic::{Device as BasicDevice, DeviceType as BasicDeviceType, NetDeviceType},
-    DevResult,
+use crate::basic::{
+    DevResult, Device as BasicDevice, DeviceType as BasicDeviceType, NetDeviceType,
 };
 
 pub struct LoopBackDev {

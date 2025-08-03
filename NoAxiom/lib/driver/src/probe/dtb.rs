@@ -1,17 +1,19 @@
 use alloc::string::String;
 
-use driver::basic::{DeviceType, InterruptDeviceType};
+use arch::consts::KERNEL_ADDR_OFFSET;
 use fdt::{node::FdtNode, Fdt};
+use ksync::Once;
 
-use crate::dtb::{
-    compatible::{OF_PCI_ECAM_TYPE, OF_PLIC_TYPE, OF_VIRTIO_MMIO_TYPE},
-    dtb::get_dtb_initializer,
-    dtb_addr::init_dtb_addr,
-    info::{
+use super::{
+    arch::dtb::get_dtb_initializer,
+    basic::{
         DeviceConfig, DeviceConfigManager, DeviceConfigType, DtbInitializerType, MmioRegion,
         DEV_CONFIG_MANAGER,
     },
 };
+use crate::{basic::DeviceType, probe::compatible::OF_INITIALIZERS};
+
+static DTB_ADDR: Once<usize> = Once::new();
 
 fn device_init(
     node: &FdtNode,
@@ -31,25 +33,7 @@ fn device_init(
     });
 }
 
-pub const OF_INITIALIZERS: &[(&str, DeviceType, DeviceConfigType)] = &[
-    (
-        OF_PCI_ECAM_TYPE,
-        DeviceType::Unknown,
-        DeviceConfigType::PciEcam,
-    ),
-    (
-        OF_VIRTIO_MMIO_TYPE,
-        DeviceType::Unknown,
-        DeviceConfigType::VirtioMmio,
-    ),
-    (
-        OF_PLIC_TYPE,
-        DeviceType::Interrupt(InterruptDeviceType::PLIC),
-        DeviceConfigType::Normal,
-    ),
-];
-
-pub(crate) fn dtb_init_one(node: &FdtNode, info: &mut DeviceConfigManager) -> bool {
+fn dtb_init_one(node: &FdtNode, info: &mut DeviceConfigManager) -> bool {
     if let Some(of) = node.compatible() {
         for cur_of in of.all().into_iter() {
             for (other_of, dev_type, conf_type) in OF_INITIALIZERS.iter() {
@@ -81,6 +65,15 @@ fn fdt_init(fdt: Fdt<'static>) {
         }
     }
     DEV_CONFIG_MANAGER.call_once(|| info);
+}
+
+pub fn init_dtb_addr(dtb: usize) {
+    DTB_ADDR.call_once(|| dtb | KERNEL_ADDR_OFFSET);
+}
+
+#[allow(unused)]
+pub fn get_dtb_addr() -> Option<usize> {
+    DTB_ADDR.get().map(|x| *x)
 }
 
 pub fn dtb_init(dtb: usize) {

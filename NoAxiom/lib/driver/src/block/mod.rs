@@ -2,7 +2,10 @@ pub mod vf2_sdcard;
 pub mod virtio_block;
 use alloc::boxed::Box;
 
-use crate::{basic::Device, interrupt::InterruptDevice, DevResult};
+use crate::{
+    basic::{DevResult, Device},
+    interrupt::InterruptDevice,
+};
 
 #[async_trait::async_trait]
 #[allow(unused_variables)]

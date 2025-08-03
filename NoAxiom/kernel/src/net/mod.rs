@@ -1,7 +1,9 @@
 use alloc::{collections::btree_map::BTreeMap, sync::Arc};
 
-use device::DEV_BUS;
-use driver::net::{loopback::LoopBackDev, NetWorkDevice};
+use driver::{
+    manager::DEV_BUS,
+    net::{loopback::LoopBackDev, NetWorkDevice},
+};
 use ksync::mutex::{RwLock, SpinLock};
 use port_manager::PortManager;
 use socket_set::SocketSet;

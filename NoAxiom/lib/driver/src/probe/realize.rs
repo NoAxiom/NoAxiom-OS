@@ -1,14 +1,14 @@
-use driver::{
+use virtio_drivers::transport::{DeviceType as VirtioDevType, Transport};
+
+use super::{
+    basic::{DeviceConfig, DeviceConfigType, DEV_CONFIG_MANAGER},
+    pci::probe_pci_bus,
+};
+use crate::{
     basic::{BlockDeviceType, DeviceType, InterruptDeviceType, NetDeviceType},
     block::virtio_block::VirtioBlockDevice,
     interrupt::plic::PlicDevice,
-};
-use virtio_drivers::transport::{DeviceType as VirtioDevType, Transport};
-
-use crate::{
-    bus::pci::probe_pci_bus,
-    dtb::info::{DeviceConfig, DeviceConfigType, DEV_CONFIG_MANAGER},
-    device::manager::{get_int_ctrl_dev, set_int_ctrl_dev, DEV_BUS},
+    manager::{get_int_ctrl_dev, set_int_ctrl_dev, DEV_BUS},
 };
 
 fn virtio_mmio_realize(config: &DeviceConfig) {
@@ -120,7 +120,7 @@ fn int_ctrl_realize() {
     }
 }
 
-pub fn dtb_realize() {
+fn dtb_realize() {
     let manager = DEV_CONFIG_MANAGER.get().unwrap();
     for config in manager.devices.iter() {
         match config.conf_type {

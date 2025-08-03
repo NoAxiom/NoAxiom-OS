@@ -12,9 +12,9 @@ pub mod char;
 pub mod debug;
 pub mod display;
 pub mod hal;
+pub mod probe;
 pub mod interrupt;
 mod macros;
+pub mod manager;
 pub mod net;
 pub mod power;
-
-pub type DevResult<T> = Result<T, include::errno::Errno>;

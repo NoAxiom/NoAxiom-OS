@@ -16,11 +16,10 @@ use virtio_drivers::{
 };
 
 use crate::{
-    basic::Device,
+    basic::{DevResult, Device},
     block::BlockDevice,
     hal::{dev_err, VirtioHalImpl},
     interrupt::InterruptDevice,
-    DevResult,
 };
 
 struct VirioBlkInner<T: Transport> {

@@ -1,4 +1,4 @@
-use crate::{basic::Device, DevResult};
+use crate::basic::{DevResult, Device};
 
 pub mod plic;
 

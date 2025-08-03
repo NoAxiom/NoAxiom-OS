@@ -1,4 +1,4 @@
-use crate::dtb::info::DtbInitializerType;
+use crate::probe::basic::DtbInitializerType;
 
 pub const FDT: &[u8] = include_bytes!("./2k1000.dtb");
 pub fn get_dtb_initializer() -> DtbInitializerType {

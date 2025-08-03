@@ -6,9 +6,8 @@ use log::debug;
 use plic::{Mode, PLIC};
 
 use crate::{
-    basic::Device,
+    basic::{DevResult, Device},
     interrupt::{InterruptControllerDevice, InterruptDevice},
-    DevResult,
 };
 
 pub struct PlicDevice {
@@ -21,7 +20,7 @@ impl Device for PlicDevice {
         "RISC-V PLIC Device"
     }
     fn device_type(&self) -> &'static crate::basic::DeviceType {
-        &crate::basic::DeviceType::Unknown
+        &crate::basic::DeviceType::Interrupt(crate::basic::InterruptDeviceType::PLIC)
     }
 }
 

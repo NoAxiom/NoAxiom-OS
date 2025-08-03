@@ -1,14 +1,18 @@
+pub type DevResult<T> = Result<T, include::errno::Errno>;
+
 pub trait Device: Sync {
     fn device_name(&self) -> &'static str {
         "Unknown Device"
     }
-    fn device_type(&self) -> &'static DeviceType;
+    fn device_type(&self) -> &'static DeviceType {
+        &DeviceType::Unknown
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BlockDeviceType {
     Virtio,
-    PhysRV,
+    VF2Sdcard,
     PhysLA,
 }
 
@@ -62,5 +66,7 @@ pub enum DeviceType {
     Interrupt(InterruptDeviceType),
     Char(CharDeviceType),
     Power(PowerDeviceType),
+    Kernel,
+    Pending,
     Unknown,
 }

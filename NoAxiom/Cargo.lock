@@ -282,22 +282,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "device"
-version = "0.1.0"
-dependencies = [
- "arch",
- "config",
- "driver",
- "fdt",
- "include",
- "ksync",
- "lazy_static",
- "log",
- "virtio-drivers",
- "virtio-drivers-async",
-]
-
-[[package]]
 name = "downcast-rs"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -313,6 +297,7 @@ dependencies = [
  "bitfield-struct",
  "bitflags 2.9.1",
  "config",
+ "fdt",
  "include",
  "kfuture",
  "ksync",
@@ -618,7 +603,6 @@ dependencies = [
  "bitflags 2.9.1",
  "config",
  "crate_interface",
- "device",
  "downcast-rs",
  "driver",
  "ext4_rs",

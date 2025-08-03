@@ -1,10 +1,11 @@
 use alloc::vec::Vec;
 use core::ptr::NonNull;
 
-use driver::basic::DeviceType;
 use fdt::Fdt;
 use ksync::Once;
 use virtio_drivers::transport::mmio::{MmioError, MmioTransport, VirtIOHeader};
+
+use crate::basic::DeviceType;
 
 pub struct MmioRegion {
     pub addr: usize,
@@ -52,7 +53,8 @@ impl DeviceConfigManager {
 
 pub static DEV_CONFIG_MANAGER: Once<DeviceConfigManager> = Once::new();
 
-pub enum DtbInitializerType {
+#[allow(unused)]
+pub(super) enum DtbInitializerType {
     Ptr(usize),
     Ref(&'static [u8]),
     Fdt(Fdt<'static>),
