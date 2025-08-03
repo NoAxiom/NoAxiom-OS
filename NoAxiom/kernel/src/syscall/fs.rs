@@ -1,4 +1,8 @@
-use alloc::{string::ToString, sync::Arc, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    sync::Arc,
+    vec::Vec,
+};
 
 use config::task::INIT_PROCESS_ID;
 use ksync::assert_no_lock;
@@ -10,8 +14,8 @@ use crate::{
     fs::{fdtable::RLimit, manager::FS_MANAGER, path::Path, pipe::PipeFile, vfs::root_dentry},
     include::{
         fs::{
-            FallocFlags, FcntlArgFlags, FcntlFlags, FileFlags, InodeMode, IoctlCmd, Iovec, Kstat,
-            MountFlags, NoAxiomIoctlCmd, RenameFlags, RtcIoctlCmd, SeekFrom, Statfs, Statx,
+            DevT, FallocFlags, FcntlArgFlags, FcntlFlags, FileFlags, InodeMode, IoctlCmd, Iovec,
+            Kstat, MountFlags, NoAxiomIoctlCmd, RenameFlags, RtcIoctlCmd, SeekFrom, Statfs, Statx,
             TtyIoctlCmd, Whence, EXT4_MAX_FILE_SIZE,
         },
         resource::Resource,
@@ -1353,10 +1357,51 @@ impl Syscall<'_> {
 
         Ok(0)
     }
+
+    pub fn sys_mknodat(&self, fd: isize, path: usize, mode: usize, dev: u64) -> SyscallResult {
+        let mode: InodeMode = InodeMode::from_bits(mode as u32).ok_or(Errno::EINVAL)?;
+        let (path, name) = get_path_at_parent(self.task, path, fd, "sys_mknodat")?;
+        info!(
+            "[sys_mknodat] dirfd: {}, path: {:?}, mode: {:?}, dev: {}",
+            fd, path, mode, dev
+        );
+        // 兼容旧的设备号格式(16位)
+        let dev_t = if dev < 0xffff {
+            let major = (dev >> 8) as u32 & 0xff;
+            let minor = (dev & 0xff) as u32;
+            DevT::new_encode_dev(major, minor)
+        } else {
+            DevT::new(dev)
+        };
+        let dentry = path.dentry().parent();
+        if let Some(parent) = dentry {
+            parent.mknodat_son(&name, dev_t, mode)?;
+        }
+        Ok(0)
+    }
+
+    // todo: implement the actual fadvise logic
+    pub fn sys_fadvise64(
+        &self,
+        fd: usize,
+        offset: usize,
+        len: usize,
+        advice: i32,
+    ) -> SyscallResult {
+        info!(
+            "[sys_fadvise64] fd: {}, offset: {}, len: {}, advice: {}",
+            fd, offset, len, advice
+        );
+        log::warn!("[sys_fadvise64] Unimplemented");
+        match advice {
+            0..=5 => {}
+            _ => return Err(Errno::EINVAL),
+        }
+        let _file = self.task.fd_table().get(fd).ok_or(Errno::EBADF)?;
+        Ok(0)
+    }
 }
 
-/// create if not exist
-/// and the created file/dir is NON-NEGATIVE
 async fn get_path_or_create(
     task: &Arc<Task>,
     rawpath: usize,
@@ -1420,4 +1465,59 @@ fn get_path(
     } else {
         Path::try_from(path_str)
     }
+}
+
+// todo: improve this
+pub fn get_path_at_parent(
+    task: &Arc<Task>,
+    rawpath: usize,
+    fd: isize,
+    debug_syscall_name: &str,
+) -> SysResult<(Path, String)> {
+    let ptr = UserPtr::<u8>::new(rawpath);
+    let mut path_str = ptr.get_string_from_ptr()?;
+
+    if path_str.ends_with("/") && path_str.len() > 1 {
+        path_str.pop();
+    }
+
+    let entry_name;
+    if let Some(last_slash_pos) = path_str.rfind('/') {
+        if last_slash_pos == 0 {
+            entry_name = path_str[1..].to_string();
+            path_str = "/".to_string();
+        } else {
+            entry_name = path_str[(last_slash_pos + 1)..].to_string();
+            path_str.truncate(last_slash_pos);
+        }
+    } else {
+        entry_name = path_str.clone();
+        path_str = ".".to_string();
+    }
+
+    debug!(
+        "[{debug_syscall_name}] parent path: {}, entry name: {}",
+        path_str, entry_name
+    );
+
+    let parent_path = if !path_str.starts_with('/') {
+        if fd == AT_FDCWD {
+            let cwd = task.cwd().clone();
+            trace!("[{debug_syscall_name}] cwd: {:?}", cwd);
+            cwd.from_cd(&path_str)?
+        } else {
+            let cwd = task
+                .fd_table()
+                .get(fd as usize)
+                .ok_or(Errno::EBADF)?
+                .dentry()
+                .path()?;
+            trace!("[{debug_syscall_name}] cwd: {:?}", cwd);
+            cwd.from_cd(&path_str)?
+        }
+    } else {
+        Path::try_from(path_str)?
+    };
+
+    Ok((parent_path, entry_name))
 }

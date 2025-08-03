@@ -41,8 +41,8 @@ pub struct InodeMeta {
     /// The page cache of the file, managed by the `Inode`
     pub page_cache: Option<()>,
 
-    uid: AtomicU32,
-    gid: AtomicU32,
+    uid: AtomicU32,                 // todo: add this to the stat
+    gid: AtomicU32,                 // todo: add this to the stat
     symlink: Mutex<Option<String>>, // for symlink, the target path
 }
 

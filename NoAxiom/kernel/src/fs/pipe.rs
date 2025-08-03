@@ -332,9 +332,6 @@ pub struct PipeFile {
 }
 
 impl PipeFile {
-    pub fn into_dyn(self: Arc<Self>) -> Arc<dyn File> {
-        self.clone()
-    }
     fn new_read_end(
         buffer: Arc<SpinLock<PipeBuffer>>,
         name: &str,
