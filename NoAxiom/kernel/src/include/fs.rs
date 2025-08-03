@@ -7,6 +7,8 @@ use strum::FromRepr;
 
 use crate::fs::vfs::basic::inode::Inode;
 
+pub const EXT4_MAX_FILE_SIZE: usize = 0x1000000000000;
+
 /// Type.
 pub const TYPE_MASK: u32 = 0o170000;
 /// All permissions.
@@ -796,5 +798,18 @@ impl Statfs {
     pub fn as_bytes(&self) -> &[u8] {
         let size = core::mem::size_of::<Self>();
         unsafe { core::slice::from_raw_parts(self as *const _ as usize as *const u8, size) }
+    }
+}
+
+bitflags::bitflags! {
+    #[derive(Debug, Clone, Copy, PartialEq)]
+    pub struct FallocFlags: i32 {
+        const KEEP_SIZE = 0x1;
+        const PUNCH_HOLE = 0x2;
+        const NO_HIDE_STALE = 0x4;
+        const COLLAPSE_RANGE = 0x8;
+        const ZERO_RANGE = 0x10;
+        const INSERT_RANGE = 0x20;
+        const UNSHARE_RANGE = 0x40;
     }
 }

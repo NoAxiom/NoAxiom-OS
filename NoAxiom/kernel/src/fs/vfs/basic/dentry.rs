@@ -465,6 +465,14 @@ impl dyn Dentry {
         }
         Ok(())
     }
+
+    pub fn symlink(self: Arc<Self>, tar_name: String) -> SysResult<()> {
+        assert!(!self.is_negative());
+        let inode = self.inode()?;
+        assert_eq!(inode.file_type(), InodeMode::LINK);
+        inode.symlink(tar_name);
+        Ok(())
+    }
 }
 
 pub struct EmptyDentry {

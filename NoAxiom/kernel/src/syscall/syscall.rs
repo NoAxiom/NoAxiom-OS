@@ -39,6 +39,7 @@ impl<'a> Syscall<'a> {
             SYS_MKDIRAT =>          self.sys_mkdirat(args[0] as isize, args[1], args[2] as u32).await,
             SYS_OPENAT =>           self.sys_openat(args[0] as isize, args[1], args[2] as i32, args[3] as u32).await,
             SYS_CHDIR =>            self.sys_chdir(args[0]),
+            SYS_CHROOT =>           self.sys_chroot(args[0]),
             SYS_GETCWD =>           self.sys_getcwd(args[0], args[1]).await,
             SYS_DUP =>              self.sys_dup(args[0]),
             SYS_DUP3 =>             self.sys_dup3(args[0], args[1]),
@@ -48,6 +49,7 @@ impl<'a> Syscall<'a> {
             SYS_MOUNT =>            self.sys_mount(args[0], args[1], args[2], args[3], args[4]).await,
             SYS_UMOUNT2 =>          self.sys_umount2(args[0], args[1]),
             SYS_LINKAT =>           self.sys_linkat(args[0] as isize,args[1],args[2] as isize,args[3],args[4] as i32).await,
+            SYS_SYMLINKAT =>        self.sys_symlinkat(args[0], args[1] as isize, args[2]).await,
             SYS_UNLINKAT =>         self.sys_unlinkat(args[0] as isize, args[1], args[2] as i32).await,
             SYS_PRLIMIT64 =>        self.sys_prlimit64(args[0], args[1] as u32, args[2], args[3]).await,
             SYS_FCNTL =>            self.sys_fcntl(args[0], args[1], args[2]),
@@ -64,7 +66,7 @@ impl<'a> Syscall<'a> {
             SYS_STATFS =>           self.sys_statfs(args[0], args[1]).await,
             SYS_SPLICE =>           self.sys_splice(args[0], args[1], args[2], args[3], args[4], args[5]).await,
             SYS_STATX =>            self.sys_statx(args[0] as isize, args[1], args[2] as u32, args[3] as u32, args[4]).await,
-            // SYS_FCHOWNAT =>         self.sys_fchownat(args[0], args[1], args[2], args[3]),
+            SYS_FALLOCATE =>        self.sys_fallocate(args[0], args[1] as i32, args[2] as isize, args[3] as isize),
 
             // io
             SYS_PPOLL =>    self.sys_ppoll(args[0], args[1], args[2], args[3]).await,

@@ -9,7 +9,7 @@ use ksync::Once;
 
 use crate::{
     fs::{blockcache::get_block_cache, manager::FS_MANAGER, path::Path},
-    include::fs::{FileFlags, InodeMode, MountFlags, ALL_PERMISSIONS_MASK},
+    include::fs::{FileFlags, InodeMode, MountFlags},
 };
 pub mod basic;
 pub mod impls;
@@ -56,10 +56,6 @@ pub async fn fs_init() {
         .load_dir()
         .await
         .expect("load root dir failed");
-    root_dentry()
-        .inode()
-        .unwrap()
-        .set_permission(ALL_PERMISSIONS_MASK);
 
     // let passwd = Path::from_or_create(String::from("/etc/passwd"),
     // InodeMode::FILE).await; passwd.dentry().open().expect("open /etc/passwd
