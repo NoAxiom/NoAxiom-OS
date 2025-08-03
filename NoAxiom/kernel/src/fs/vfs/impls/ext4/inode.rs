@@ -46,6 +46,7 @@ impl Inode for Ext4FileInode {
             .meta
             .inode_mode
             .load(core::sync::atomic::Ordering::SeqCst);
+        debug!("[Ext4FileInode] mode: {:#o}", mode);
         Ok(Stat {
             st_dev: 0,
             st_ino: self.meta.id as u64,
@@ -125,6 +126,7 @@ impl Inode for Ext4DirInode {
             .meta
             .inode_mode
             .load(core::sync::atomic::Ordering::SeqCst);
+        debug!("[Ext4FileInode] mode: {:#o}", mode);
         Ok(Stat {
             st_dev: 0,
             st_ino: self.meta.id as u64,

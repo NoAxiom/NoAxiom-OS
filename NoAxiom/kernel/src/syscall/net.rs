@@ -6,10 +6,10 @@ use super::SyscallResult;
 use crate::{
     fs::pipe::PipeFile,
     include::{
-        fs::FileFlags,
+        fs::{FcntlArgFlags, FileFlags},
         net::{
             AddressFamily, PosixSocketOption, PosixSocketType, PosixTcpSocketOptions, ShutdownType,
-            SockAddr, SocketLevel,
+            SockAddr, SocketLevel, SOCK_CLOEXEC, SOCK_NONBLOCK,
         },
         result::Errno,
     },
@@ -50,9 +50,7 @@ impl Syscall<'_> {
         let sock_addr = SockAddr::new(addr, addr_len)?;
 
         let fd_table = self.task.fd_table();
-        let socket_file = fd_table
-            .get_socketfile(sockfd as usize)
-            .ok_or(Errno::EBADF)?;
+        let socket_file = fd_table.get_socketfile(sockfd as usize)?;
         drop(fd_table);
 
         let mut socket = socket_file.socket().await;
@@ -82,9 +80,7 @@ impl Syscall<'_> {
     pub async fn sys_listen(&self, sockfd: usize, backlog: usize) -> SyscallResult {
         debug!("[sys_listen] sockfd: {}, backlog: {}", sockfd, backlog);
         let fd_table = self.task.fd_table();
-        let socket_file = fd_table
-            .get_socketfile(sockfd as usize)
-            .ok_or(Errno::EBADF)?;
+        let socket_file = fd_table.get_socketfile(sockfd as usize)?;
         drop(fd_table);
 
         let mut socket = socket_file.socket().await;
@@ -98,9 +94,7 @@ impl Syscall<'_> {
         let sock_addr = SockAddr::new(addr, addr_len)?;
 
         let fd_table = self.task.fd_table();
-        let socket_file = fd_table
-            .get_socketfile(sockfd as usize)
-            .ok_or(Errno::EBADF)?;
+        let socket_file = fd_table.get_socketfile(sockfd as usize)?;
         drop(fd_table);
 
         let mut socket = socket_file.socket().await;
@@ -112,14 +106,14 @@ impl Syscall<'_> {
     pub async fn sys_accept(&self, sockfd: usize, addr: usize, _addrlen: usize) -> SyscallResult {
         info!("[sys_accept] sockfd: {}, addr: {}", sockfd, addr);
         let fd_table = self.task.fd_table();
-        let socket_file = fd_table
-            .get_socketfile(sockfd as usize)
-            .ok_or(Errno::EBADF)?;
+        let socket_file = fd_table.get_socketfile(sockfd as usize)?;
         drop(fd_table);
 
         let mut socket = socket_file.socket().await;
         let (new_tcp_socket, endpoint) =
             interruptable(self.task, socket.accept(), None, None).await??;
+
+        // yield_now().await; // change to the process that just connect and yield
 
         let sockaddr = SockAddr::from_endpoint(endpoint);
         let user_ptr = UserPtr::<SockAddr>::new(addr);
@@ -135,6 +129,44 @@ impl Syscall<'_> {
         Ok(new_fd as isize)
     }
 
+    pub async fn sys_accept4(
+        &self,
+        sockfd: usize,
+        addr: usize,
+        _addrlen: usize,
+        flags: i32,
+    ) -> SyscallResult {
+        info!("[sys_accept4] sockfd: {}, addr: {}", sockfd, addr);
+        let fd_table = self.task.fd_table();
+        let socket_file = fd_table.get_socketfile(sockfd as usize)?;
+        drop(fd_table);
+
+        let mut socket = socket_file.socket().await;
+        let (new_tcp_socket, endpoint) =
+            interruptable(self.task, socket.accept(), None, None).await??;
+
+        // yield_now().await; // change to the process that just connect and yield
+
+        let sockaddr = SockAddr::from_endpoint(endpoint);
+        let user_ptr = UserPtr::<SockAddr>::new(addr);
+        debug!("[sys_accept] succeed endpoint: {:?}", endpoint);
+        user_ptr.write(sockaddr).await?;
+
+        let new_socket_file =
+            SocketFile::new_from_socket(socket_file.clone(), Sock::Tcp(new_tcp_socket));
+        let mut fd_table = self.task.fd_table();
+        let new_fd = fd_table.alloc_fd()?;
+        fd_table.set(new_fd as usize, Arc::new(new_socket_file));
+        if flags & SOCK_CLOEXEC != 0 {
+            fd_table.set_fdflag(new_fd, &FcntlArgFlags::from_arg(FileFlags::O_CLOEXEC));
+        }
+        if flags & SOCK_NONBLOCK != 0 {
+            fd_table.set_nonblock(new_fd);
+        }
+
+        Ok(new_fd as isize)
+    }
+
     pub async fn sys_getsockname(
         &self,
         sockfd: usize,
@@ -143,9 +175,7 @@ impl Syscall<'_> {
     ) -> SyscallResult {
         info!("[sys_getsockname] sockfd: {}, addr: {}", sockfd, addr);
         let fd_table = self.task.fd_table();
-        let socket_file = fd_table
-            .get_socketfile(sockfd as usize)
-            .ok_or(Errno::EBADF)?;
+        let socket_file = fd_table.get_socketfile(sockfd as usize)?;
         drop(fd_table);
 
         let socket = socket_file.socket().await;
@@ -168,9 +198,7 @@ impl Syscall<'_> {
     ) -> SyscallResult {
         info!("[sys_getpeername] sockfd: {}, addr: {}", sockfd, addr);
         let fd_table = self.task.fd_table();
-        let socket_file = fd_table
-            .get_socketfile(sockfd as usize)
-            .ok_or(Errno::EBADF)?;
+        let socket_file = fd_table.get_socketfile(sockfd as usize)?;
         drop(fd_table);
 
         let socket = socket_file.socket().await;
@@ -194,17 +222,16 @@ impl Syscall<'_> {
         optval_ptr: usize,
         optlen: usize,
     ) -> SyscallResult {
+        // let level = PosixIpProtocol::from_repr(level as
+        // u16).ok_or(Errno::ENOPROTOOPT)?;
         info!(
-            "[sys_setsockopt] sockfd: {:?}, level: {:?}, optname: {:?}, optval_ptr: {:?}, optlen: {:?}",
+            "[sys_setsockopt] sockfd: {}, level: {:?}, optname: {}, optval_ptr: {}, optlen: {}",
             sockfd, level, optname, optval_ptr, optlen
         );
 
         let fd_table = self.task.fd_table();
-        let socket_file = fd_table
-            .get_socketfile(sockfd as usize)
-            .ok_or(Errno::EBADF)?;
+        let socket_file = fd_table.get_socketfile(sockfd as usize)?;
         drop(fd_table);
-
         let mut socket = socket_file.socket().await;
 
         let user_ptr = UserPtr::<u8>::new(optval_ptr);
@@ -315,9 +342,7 @@ impl Syscall<'_> {
         );
 
         let fd_table = self.task.fd_table();
-        let socket_file = fd_table
-            .get_socketfile(sockfd as usize)
-            .ok_or(Errno::EBADF)?;
+        let socket_file = fd_table.get_socketfile(sockfd as usize)?;
         drop(fd_table);
 
         let mut socket = socket_file.socket().await;
@@ -363,9 +388,7 @@ impl Syscall<'_> {
         );
 
         let fd_table = self.task.fd_table();
-        let socket_file = fd_table
-            .get_socketfile(sockfd as usize)
-            .ok_or(Errno::EBADF)?;
+        let socket_file = fd_table.get_socketfile(sockfd as usize)?;
         drop(fd_table);
 
         let mut socket = socket_file.socket().await;
@@ -392,9 +415,7 @@ impl Syscall<'_> {
         info!("[sys_shutdown] sockfd: {}, how: {}", sockfd, how);
 
         let fd_table = self.task.fd_table();
-        let socket_file = fd_table
-            .get_socketfile(sockfd as usize)
-            .ok_or(Errno::EBADF)?;
+        let socket_file = fd_table.get_socketfile(sockfd as usize)?;
         drop(fd_table);
 
         let mut socket = socket_file.socket().await;

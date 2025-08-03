@@ -131,7 +131,8 @@ impl Syscall<'_> {
         if cmd == IPC_RMID {
             SHM_MANAGER.lock().remove(key);
         } else {
-            unimplemented!();
+            error!("[shmctl] cmd {:#x} is not IPC_RMID", cmd);
+            return Err(Errno::ENOSYS);
         }
         Ok(0)
     }

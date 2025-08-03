@@ -9,9 +9,9 @@ use crate::{
     fs::{fdtable::RLimit, manager::FS_MANAGER, path::Path, pipe::PipeFile, vfs::root_dentry},
     include::{
         fs::{
-            FcntlArgFlags, FcntlFlags, FileFlags, InodeMode, IoctlCmd, Iovec, Kstat, MountFlags,
-            NoAxiomIoctlCmd, RenameFlags, RtcIoctlCmd, SeekFrom, Statfs, Statx, TtyIoctlCmd,
-            Whence,
+            FallocFlags, FcntlArgFlags, FcntlFlags, FileFlags, InodeMode, IoctlCmd, Iovec, Kstat,
+            MountFlags, NoAxiomIoctlCmd, RenameFlags, RtcIoctlCmd, SeekFrom, Statfs, Statx,
+            TtyIoctlCmd, Whence, EXT4_MAX_FILE_SIZE,
         },
         resource::Resource,
         result::Errno,
@@ -127,6 +127,28 @@ impl Syscall<'_> {
         Ok(0)
     }
 
+    /// Change the root directory of the process
+    pub fn sys_chroot(&self, path: usize) -> SyscallResult {
+        let path = get_path(self.task, path, 0, "sys_chroot")?;
+        info!("[sys_chroot] path: {:?}", path,);
+        let dentry = path.dentry();
+        let inode = dentry.inode()?;
+        if inode.file_type() != InodeMode::DIR {
+            error!("[sys_chroot] chroot path must be a dir");
+            return Err(Errno::ENOTDIR);
+        }
+        if !inode.check_search_permission(self.task) {
+            error!("[sys_chroot] chroot path must be searchable");
+            return Err(Errno::EACCES);
+        }
+        if self.task.fsuid() != 0 {
+            error!("[sys_chroot] only root can chroot");
+            return Err(Errno::EPERM);
+        }
+        // todo: task should set root
+        Ok(0)
+    }
+
     /// Open or create a file
     pub async fn sys_openat(
         &self,
@@ -136,7 +158,9 @@ impl Syscall<'_> {
         mode: u32,
     ) -> SyscallResult {
         let path_str = UserPtr::<u8>::new(filename).get_string_from_ptr()?;
-        let mode = InodeMode::from_bits_truncate(mode);
+        // Only allow permission bits for file creation, filter out SET_UID, SET_GID,
+        // STICKY
+        let mode = InodeMode::from_bits_truncate(mode & 0o777);
         let flags = FileFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
         info!(
             "[sys_openat] dirfd {}, flags {:?}, filename {}, mode {:?}",
@@ -147,12 +171,12 @@ impl Syscall<'_> {
             info!("[sys_openat] O_CREATE");
             // check if the file already exists, ignore it currently
             // if flags.contains(FileFlags::O_EXCL) {
-            //     if get_path(self.task.clone(), filename, fd, "sys_openat").is_ok() {
+            //     if get_path(self.task, filename, fd, "sys_openat").is_ok() {
             //         return Err(Errno::EEXIST);
             //     }
             // }
             get_path_or_create(
-                self.task.clone(),
+                self.task,
                 filename,
                 fd,
                 mode.union(InodeMode::FILE),
@@ -160,7 +184,7 @@ impl Syscall<'_> {
             )
             .await?
         } else {
-            get_path(self.task.clone(), filename, fd, "sys_openat")?
+            get_path(self.task, filename, fd, "sys_openat")?
         };
 
         // fixme: now if has O_CREATE flag, and the file already exists, we just open it
@@ -345,14 +369,8 @@ impl Syscall<'_> {
     /// Create a directory
     pub async fn sys_mkdirat(&self, dirfd: isize, path: usize, mode: u32) -> SyscallResult {
         let mode = InodeMode::from_bits_truncate(mode);
-        let path = get_path_or_create(
-            self.task.clone(),
-            path,
-            dirfd,
-            InodeMode::DIR | mode,
-            "sys_mkdirat",
-        )
-        .await?;
+        let path = get_path_or_create(self.task, path, dirfd, InodeMode::DIR | mode, "sys_mkdirat")
+            .await?;
         assert_eq!(
             path.dentry().inode()?.file_type(),
             InodeMode::DIR,
@@ -397,7 +415,7 @@ impl Syscall<'_> {
         mask: u32,
         buf: usize,
     ) -> SyscallResult {
-        let path = get_path(self.task.clone(), path, dirfd, "sys_statx")?;
+        let path = get_path(self.task, path, dirfd, "sys_statx")?;
         let flags = FcntlArgFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
         info!(
             "[sys_statx] dirfd: {}, path: {:?}, flags: {:?}",
@@ -417,8 +435,8 @@ impl Syscall<'_> {
         stat_buf: usize,
         flags: i32,
     ) -> SyscallResult {
-        let flags = FileFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
-        let path = get_path(self.task.clone(), path, dirfd, "sys_newfstat")?;
+        let flags = FileFlags::from_bits_retain(flags);
+        let path = get_path(self.task, path, dirfd, "sys_newfstat")?;
         info!(
             "[sys_newfstat] dirfd: {}, path: {:?}, stat_buf: {:#x}, flags: {:?}",
             dirfd, path, stat_buf, flags
@@ -597,7 +615,7 @@ impl Syscall<'_> {
         Ok(0)
     }
 
-    // todo: fix the linkat
+    // todo: fix the linkat, now just set the same inode
     /// Create a hard link
     pub async fn sys_linkat(
         &self,
@@ -610,18 +628,11 @@ impl Syscall<'_> {
         let task = self.task;
         let cwd = task.cwd().clone();
         let cwd = cwd.as_str();
-        let old_path = get_path(task.clone(), oldpath, olddirfd, "sys_linkat")?;
+        let old_path = get_path(task, oldpath, olddirfd, "sys_linkat")?;
         let new_path = if cwd == "/" {
-            get_path_or_create(
-                task.clone(),
-                newpath,
-                newdirfd,
-                InodeMode::LINK,
-                "sys_linkat",
-            )
-            .await?
+            get_path_or_create(task, newpath, newdirfd, InodeMode::LINK, "sys_linkat").await?
         } else {
-            get_path(task.clone(), newpath, newdirfd, "sys_linkat")?
+            get_path(task, newpath, newdirfd, "sys_linkat")?
         };
         info!(
             "[sys_linkat] old_path: {:?}, new_path: {:?}",
@@ -640,6 +651,35 @@ impl Syscall<'_> {
         new_dentry.link_to(old_dentry).await
     }
 
+    /// todo: now just set the same inode
+    pub async fn sys_symlinkat(
+        &self,
+        target: usize,
+        newdirfd: isize,
+        linkpath: usize,
+    ) -> SyscallResult {
+        // let new_path = get_path_or_create(
+        //     self.task,
+        //     linkpath,
+        //     newdirfd,
+        //     InodeMode::LINK,
+        //     "sys_symlinkat",
+        // )
+        // .await?;
+
+        // let ptr = UserPtr::<u8>::new(target);
+        // let target = ptr.get_string_from_ptr()?;
+
+        // info!(
+        //     "[sys_symlinkat] target: {:?}, newdirfd: {}, linkpath: {:?}",
+        //     target, newdirfd, new_path
+        // );
+
+        // let new_dentry = new_path.dentry();
+        // new_dentry.inode()?.symlink(target);
+        Ok(0)
+    }
+
     // todo: AT_SYMLINK_NOFOLLOW
     /// Read link file, error if the file is not a link
     pub async fn sys_readlinkat(
@@ -649,7 +689,7 @@ impl Syscall<'_> {
         buf: usize,
         buflen: usize,
     ) -> SyscallResult {
-        let path = get_path(self.task.clone(), path, dirfd, "sys_readlinkat")?;
+        let path = get_path(self.task, path, dirfd, "sys_readlinkat")?;
         info!(
             "[sys_readlinkat] dirfd: {}, path: {:?}, buf: {:#x}, bufsize: {}",
             dirfd, path, buf, buflen,
@@ -670,7 +710,7 @@ impl Syscall<'_> {
         let flags = FileFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
         info!("[sys_unlinkat] dirfd: {}, flags: {:?}", dirfd, flags);
         let task = self.task;
-        let path = get_path(task.clone(), path, dirfd, "sys_unlinkat")?;
+        let path = get_path(task, path, dirfd, "sys_unlinkat")?;
         let dentry = path.dentry();
         dentry.unlink(&flags).await?;
         debug!("[sys_unlinkat] unlink ok");
@@ -805,14 +845,29 @@ impl Syscall<'_> {
         let mut buf = vec![0u8; count];
         let read_len = if !offset_ptr.is_null() {
             let offset = offset_ptr.read().await?;
-            let read_len = in_file.read_at(offset, &mut buf).await? as usize;
+            let read_fut = in_file.read_at(offset, &mut buf);
+            let read_len = if in_file.is_interruptable() {
+                interruptable(self.task, read_fut, None, None).await?
+            } else {
+                read_fut.await
+            }? as usize;
             offset_ptr.write(offset + read_len).await?;
             read_len
         } else {
-            in_file.read(&mut buf).await? as usize
+            let read_fut = in_file.read(&mut buf);
+            if in_file.is_interruptable() {
+                interruptable(self.task, read_fut, None, None).await?
+            } else {
+                read_fut.await
+            }? as usize
         };
 
-        out_file.write(&buf[..read_len]).await
+        let write_fut = out_file.write(&buf[..read_len]);
+        if out_file.is_interruptable() {
+            interruptable(self.task, write_fut, None, None).await?
+        } else {
+            write_fut.await
+        }
     }
 
     /// Modify timestamp of a file
@@ -841,7 +896,7 @@ impl Syscall<'_> {
                     .inode(),
             }
         } else {
-            let path = get_path(self.task.clone(), path, dirfd, "sys_utimensat")?;
+            let path = get_path(self.task, path, dirfd, "sys_utimensat")?;
             path.dentry().inode()?
         };
 
@@ -912,8 +967,8 @@ impl Syscall<'_> {
         new_path: usize,
         flags: i32,
     ) -> SyscallResult {
-        let old_path = get_path(self.task.clone(), old_path, old_dirfd, "sys_renameat2")?;
-        let new_path = get_path(self.task.clone(), new_path, new_dirfd, "sys_renameat2")?;
+        let old_path = get_path(self.task, old_path, old_dirfd, "sys_renameat2")?;
+        let new_path = get_path(self.task, new_path, new_dirfd, "sys_renameat2")?;
         let flags = RenameFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
         info!(
             "[sys_renameat2] old_path: {:?}, new_path: {:?}",
@@ -1041,21 +1096,21 @@ impl Syscall<'_> {
     }
 
     pub fn sys_fchmod(&self, fd: usize, path: usize, mode: usize) -> SyscallResult {
-        let path = get_path(self.task.clone(), path, fd as isize, "sys_fchmod")?;
+        let path = get_path(self.task, path, fd as isize, "sys_fchmod")?;
         info!("[sys_fchmod] set {:o} mode to {:?}", mode, path);
 
         let inode = path.dentry().inode()?;
-        inode.set_permission(mode as u32);
+        inode.set_permission(self.task, mode as u32);
         Ok(0)
     }
 
     pub fn sys_fchmodat(&self, fd: usize, path: usize, mode: usize, _flag: i32) -> SyscallResult {
         // todo: support flag
-        let path = get_path(self.task.clone(), path, fd as isize, "sys_fchmodat")?;
+        let path = get_path(self.task, path, fd as isize, "sys_fchmodat")?;
         info!("[sys_fchmodat] set {:o} mode to {:?}", mode, path);
 
         let inode = path.dentry().inode()?;
-        inode.set_permission(mode as u32);
+        inode.set_permission(self.task, mode as u32);
         Ok(0)
     }
 
@@ -1079,7 +1134,7 @@ impl Syscall<'_> {
         group: u32,
         _flag: i32,
     ) -> SyscallResult {
-        let path = get_path(self.task.clone(), path, fd as isize, "sys_fchownat")?;
+        let path = get_path(self.task, path, fd as isize, "sys_fchownat")?;
         info!(
             "[sys_fchownat] set owner: {:?}, group: {:?} for {:?}",
             owner, group, path
@@ -1099,7 +1154,7 @@ impl Syscall<'_> {
         const R_OK: i32 = 4;
         const AT_EACCESS: i32 = 0x200;
         const UID_ROOT: u32 = 0;
-        let path = get_path(self.task.clone(), path, fd as isize, "sys_faccessat")?;
+        let path = get_path(self.task, path, fd as isize, "sys_faccessat")?;
         let dentry = path.dentry();
         let inode = dentry.inode()?;
         let pri = inode.privilege();
@@ -1268,12 +1323,44 @@ impl Syscall<'_> {
 
         Ok(ret_len as isize)
     }
+
+    /// Allocate space for a file, similar to fallocate
+    /// todo: implement the actual allocation logic
+    /// Currently, it only checks the parameters and returns success.
+    pub fn sys_fallocate(&self, fd: usize, mode: i32, offset: isize, len: isize) -> SyscallResult {
+        if offset < 0 || len <= 0 {
+            error!("[sys_fallocate] negative offset or len");
+            return Err(Errno::EINVAL);
+        }
+        if (offset + len) as usize > EXT4_MAX_FILE_SIZE {
+            error!("[sys_fallocate] too big !!");
+            return Err(Errno::EFBIG);
+        }
+
+        let mode = FallocFlags::from_bits(mode).ok_or(Errno::EINVAL)?;
+        info!(
+            "[sys_fallocate] fd: {}, mode: {:?}, offset: {}, len: {}",
+            fd, mode, offset, len
+        );
+
+        let file = self.task.fd_table().get(fd).ok_or(Errno::EBADF)?;
+        let inode = file.inode();
+
+        if inode.file_type() == InodeMode::DIR {
+            return Err(Errno::EISDIR);
+        }
+        if !file.meta().writable() {
+            return Err(Errno::EBADF);
+        }
+
+        Ok(0)
+    }
 }
 
 /// create if not exist
 /// and the created file/dir is NON-NEGATIVE
 async fn get_path_or_create(
-    task: Arc<Task>,
+    task: &Arc<Task>,
     rawpath: usize,
     fd: isize,
     mode: InodeMode,
@@ -1306,7 +1393,7 @@ async fn get_path_or_create(
 }
 
 fn get_path(
-    task: Arc<Task>,
+    task: &Arc<Task>,
     rawpath: usize,
     fd: isize,
     debug_syscall_name: &str,

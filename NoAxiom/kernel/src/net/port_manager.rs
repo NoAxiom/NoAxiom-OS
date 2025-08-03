@@ -85,17 +85,18 @@ impl PortManager {
         }
     }
 
-    pub fn resolve_port(&self, endpoint: &IpEndpoint) -> SysResult<u16> {
-        if endpoint.addr.is_unspecified() {
-            let port = if endpoint.port == 0 {
-                self.get_ephemeral_port()?
-            } else {
-                endpoint.port
-            };
-            Ok(port)
+    pub fn resolve_port(&self, endpoint: &mut IpEndpoint) -> SysResult<u16> {
+        // if endpoint.addr.is_unspecified() {
+        let port = if endpoint.port == 0 {
+            self.get_ephemeral_port()?
         } else {
-            assert_ne!(endpoint.port, 0);
-            Ok(endpoint.port)
-        }
+            endpoint.port
+        };
+        endpoint.port = port;
+        Ok(port)
+        // } else {
+        //     assert_ne!(endpoint.port, 0);
+        //     Ok(endpoint.port)
+        // }
     }
 }

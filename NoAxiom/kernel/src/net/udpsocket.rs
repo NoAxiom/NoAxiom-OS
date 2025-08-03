@@ -202,7 +202,8 @@ impl Socket for UdpSocket {
     fn bind(&mut self, local: IpEndpoint, fd: usize) -> SysResult<()> {
         debug!("[Udp {}] bind to: {:?}", self.handle, local);
         let mut port_manager = UDP_PORT_MANAGER.lock();
-        let port = port_manager.resolve_port(&local)?;
+        let mut local = local;
+        let port = port_manager.resolve_port(&mut local)?;
         let port = port_manager.bind_port_with_fd(port, fd)?;
         drop(port_manager);
 

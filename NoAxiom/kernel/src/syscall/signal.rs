@@ -220,7 +220,11 @@ impl Syscall<'_> {
     pub async fn sys_sigtimedwait(&self, set: usize, info: usize, timeout: usize) -> SyscallResult {
         let set = UserPtr::new(set).read().await?;
         let info = UserPtr::new(info);
-        let timeout = UserPtr::new(timeout).read().await?;
+        let timeout: TimeSpec = UserPtr::new(timeout).read().await?;
+        if !timeout.is_valid() {
+            error!("[sys_sigtimedwait]: timeout is negative");
+            return Err(Errno::EINVAL);
+        }
         self.__sys_sigtimedwait(set, info, timeout).await
     }
 

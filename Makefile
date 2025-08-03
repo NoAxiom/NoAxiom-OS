@@ -105,14 +105,14 @@ config:
 	@echo "using config: $(CONFIG)"
 	@cp $(CONFIG_DIR)/$(CONFIG).mk $(ROOT)/config.mk
 
-build: build-user build-kernel
+build: build-kernel
 	@cp $(KERNEL_FILE) ./kernel-$(SIMPLE_ARCH_NAME)
 
-build-kernel:
-	@cd $(PROJECT)/kernel && make build
+build-kernel: build-user
+	+@cd $(PROJECT)/kernel && $(MAKE) build
 
 build-user:
-	@cd $(USER_PROJECT) && make build
+	+@cd $(USER_PROJECT) && make build
 
 asm: info
 	@echo -e $(NORMAL)"Building Kernel and Generating Assembly..."$(RESET)
@@ -120,18 +120,18 @@ asm: info
 	@echo -e $(NORMAL)"Assembly saved to $(ROOT)/log/kernel.asm"$(RESET)
 
 asm-user:
-	@echo -e "Building User and Generating Assembly..."
-	@cd $(USER_PROJECT) && make asm
+	@echo -e $(NORMAL)"Building User and Generating Assembly..."$(RESET)
+	+@cd $(USER_PROJECT) && $(MAKE) asm
 
 asm-all: asm asm-user
 
 $(RAW_FS_IMG):
 	@echo -e $(NORMAL)"Building FS Image..."$(RESET)
-	cd $(TEST_DIR) && make
+	+cd $(TEST_DIR) && $(MAKE)
 
 backup: $(RAW_FS_IMG)
 	@echo -e $(NORMAL)"Backing up FS Image..."$(RESET)
-	@cd $(TEST_DIR) && make check
+	+@cd $(TEST_DIR) && $(MAKE) check
 
 LOG_SAVE_PATH := log/$(shell date +%m_%d-%H_%M).log
 RUN_OPTION := 

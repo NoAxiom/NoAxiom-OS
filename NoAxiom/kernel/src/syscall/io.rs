@@ -32,7 +32,15 @@ impl Syscall<'_> {
         let timeout = UserPtr::<TimeSpec>::new(timeout_ptr)
             .try_read()
             .await?
-            .map(|x| Duration::from(x));
+            .map(|x| {
+                if !x.is_valid() {
+                    error!("[sys_pselect6]: timeout is negative");
+                    Err(Errno::EINVAL)
+                } else {
+                    Ok(Duration::from(x))
+                }
+            })
+            .transpose()?;
 
         let mut poll_fds = Vec::new();
         let mut fd_ptrs = Vec::new();
@@ -107,7 +115,15 @@ impl Syscall<'_> {
         let timeout = UserPtr::<TimeSpec>::new(timeout_ptr)
             .try_read()
             .await?
-            .map(|x| Duration::from(x));
+            .map(|x| {
+                if !x.is_valid() {
+                    error!("[sys_pselect6]: timeout is negative");
+                    Err(Errno::EINVAL)
+                } else {
+                    Ok(Duration::from(x))
+                }
+            })
+            .transpose()?;
         let read_fds = UserPtr::<FdSet>::new(readfds_ptr);
         let mut read_fds = read_fds.get_ref_mut().await?;
         let write_fds = UserPtr::<FdSet>::new(writefds_ptr);
