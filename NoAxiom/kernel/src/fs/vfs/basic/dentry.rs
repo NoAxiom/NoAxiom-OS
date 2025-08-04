@@ -11,6 +11,16 @@ use async_trait::async_trait;
 use downcast_rs::DowncastSync;
 use ksync::mutex::{SpinLock, SpinLockGuard};
 
+use crate::fs::vfs::impls::devfs::{
+    loop_control::{dentry::LoopControlDentry, inode::LoopControlInode},
+    loopdev::{dentry::LoopDevDentry, inode::LoopDevInode},
+    null::NullDentry,
+    rtc::{dentry::RtcDentry, inode::RtcInode},
+    tty::dentry::TtyDentry,
+    urandom::dentry::UrandomDentry,
+    zero::{dentry::ZeroDentry, inode::ZeroInode},
+};
+
 type Mutex<T> = SpinLock<T>;
 type MutexGuard<'a, T> = SpinLockGuard<'a, T>;
 
@@ -20,9 +30,16 @@ use super::{
     superblock::{EmptySuperBlock, SuperBlock},
 };
 use crate::{
-    fs::{path::Path, vfs::basic::inode::InodeState},
+    fs::{
+        path::Path,
+        pipe::PipeInode,
+        vfs::{
+            basic::inode::InodeState,
+            impls::devfs::{null::NullInode, tty::inode::TtyInode, urandom::inode::UrandomInode},
+        },
+    },
     include::{
-        fs::{FileFlags, InodeMode, RenameFlags},
+        fs::{DevT, FileFlags, InodeMode, RenameFlags},
         result::Errno,
     },
     sched::utils::block_on,
@@ -472,6 +489,130 @@ impl dyn Dentry {
         assert_eq!(inode.file_type(), InodeMode::LINK);
         inode.symlink(tar_name);
         Ok(())
+    }
+
+    // todo: improve this
+    pub fn mknodat_son(
+        self: &Arc<Self>,
+        name: &str,
+        dev_t: DevT,
+        mode: InodeMode,
+    ) -> SysResult<()> {
+        let inode = self.inode()?;
+        let file_type = inode.file_type();
+        let super_block = self.super_block();
+        match file_type {
+            InodeMode::FIFO => {
+                self.set_inode(Arc::new(PipeInode::new()));
+                Ok(())
+            }
+            InodeMode::CHAR => {
+                match dev_t.new_decode_dev() {
+                    (1, 3) => {
+                        // /dev/null
+                        let son_dentry =
+                            NullDentry::new(Some(self.clone()), name, super_block.clone());
+                        let son_inode = NullInode::new(super_block);
+                        son_dentry.set_inode(Arc::new(son_inode));
+                        son_dentry.inode().unwrap().set_inode_mode(mode);
+                        self.add_child_directly(Arc::new(son_dentry));
+                        Ok(())
+                    }
+                    (1, 5) => {
+                        // /dev/zero
+                        let son_dentry =
+                            ZeroDentry::new(Some(self.clone()), name, super_block.clone());
+                        let son_inode = ZeroInode::new(super_block);
+                        son_dentry.set_inode(Arc::new(son_inode));
+                        son_dentry.inode().unwrap().set_inode_mode(mode);
+                        self.add_child_directly(Arc::new(son_dentry));
+                        Ok(())
+                    }
+                    (1, 9) => {
+                        // /dev/urandom
+                        let son_dentry =
+                            UrandomDentry::new(Some(self.clone()), name, super_block.clone());
+                        let son_inode = UrandomInode::new(super_block);
+                        son_dentry.set_inode(Arc::new(son_inode));
+                        son_dentry.inode().unwrap().set_inode_mode(mode);
+                        self.add_child_directly(Arc::new(son_dentry));
+                        Ok(())
+                    }
+                    (5, 0) => {
+                        // /dev/tty
+                        let son_dentry =
+                            TtyDentry::new(Some(self.clone()), name, super_block.clone());
+                        let son_inode = TtyInode::new(super_block);
+                        son_dentry.set_inode(Arc::new(son_inode));
+                        son_dentry.inode().unwrap().set_inode_mode(mode);
+                        self.add_child_directly(Arc::new(son_dentry));
+                        Ok(())
+                    }
+                    (10, 0) => {
+                        // /dev/rtc
+                        let son_dentry = Arc::new(RtcDentry::new(
+                            Some(self.clone()),
+                            name,
+                            super_block.clone(),
+                        ));
+                        let son_inode = Arc::new(RtcInode::new(super_block));
+                        son_dentry.set_inode(son_inode);
+                        son_dentry.inode().unwrap().set_inode_mode(mode);
+                        self.add_child_directly(son_dentry);
+                        Ok(())
+                    }
+                    (10, 237) => {
+                        // /dev/loop-control
+                        let son_dentry = Arc::new(LoopControlDentry::new(
+                            Some(self.clone()),
+                            name,
+                            super_block.clone(),
+                        ));
+                        let son_inode = Arc::new(LoopControlInode::new(super_block));
+                        son_dentry.set_inode(son_inode);
+                        son_dentry.inode().unwrap().set_inode_mode(mode);
+                        self.add_child_directly(son_dentry);
+                        Ok(())
+                    }
+                    (x, y) => {
+                        error!(
+                            "[mknodat] Unsupported char device: major {}, minor {}",
+                            x, y
+                        );
+                        return Err(Errno::ENOSYS);
+                    }
+                }
+            }
+            InodeMode::BLOCK => {
+                match dev_t.new_decode_dev() {
+                    (7, y) => {
+                        // /dev/loop{y}
+                        let son_dentry = LoopDevDentry::new(
+                            Some(self.clone()),
+                            &format!("loop{}", y),
+                            super_block.clone(),
+                        );
+                        let son_inode = LoopDevInode::new(super_block);
+                        son_dentry.set_inode(Arc::new(son_inode));
+                        son_dentry.inode().unwrap().set_inode_mode(mode);
+                        self.add_child_directly(Arc::new(son_dentry));
+                        debug!("[mknodat] create loop device: loop{}", y);
+                        Ok(())
+                    }
+                    (x, y) => {
+                        error!(
+                            "[mknodat] Unsupported char device: major {}, minor {}",
+                            x, y
+                        );
+                        Err(Errno::ENOSYS)
+                    }
+                }
+            }
+            _ => {
+                error!("[mknodat] Unsupported inode type for mknodat");
+                Err(Errno::EINVAL)
+            }
+        }
     }
 }
 

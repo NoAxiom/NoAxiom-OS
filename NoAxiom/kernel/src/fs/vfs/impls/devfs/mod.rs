@@ -10,7 +10,11 @@ use crate::{
     fs::vfs::{
         basic::{dentry::Dentry, file::File},
         impls::{
-            devfs::null::{NullDentry, NullInode},
+            devfs::{
+                loop_control::{dentry::LoopControlDentry, inode::LoopControlInode},
+                loopdev::{dentry::LoopDevDentry, inode::LoopDevInode},
+                null::{NullDentry, NullInode},
+            },
             ramfs::{dentry::RamFsDentry, inode::RamFsDirInode},
         },
     },
@@ -18,14 +22,16 @@ use crate::{
     syscall::SysResult,
 };
 
-mod cpu_dma_latency;
+pub mod cpu_dma_latency;
 pub mod filesystem;
-mod null;
-mod rtc;
-mod superblock;
-mod tty;
-mod urandom;
-mod zero;
+pub mod loop_control;
+pub mod loopdev;
+pub mod null;
+pub mod rtc;
+pub mod superblock;
+pub mod tty;
+pub mod urandom;
+pub mod zero;
 
 pub static TTYFILE: Once<Arc<dyn File>> = Once::new();
 
@@ -107,6 +113,26 @@ pub async fn init(fs_root: Arc<dyn Dentry>) -> SysResult<()> {
     fs_root.add_child_directly(shm_dentry.clone());
 
     //todo: add /dev/misc
+
+    info!("[fs] create /dev/loop-control");
+    let loop_control_dentry = Arc::new(LoopControlDentry::new(
+        Some(fs_root.clone()),
+        "loop-control",
+        fs_root.super_block(),
+    ));
+    let loop_control_inode = Arc::new(LoopControlInode::new(fs_root.super_block()));
+    loop_control_dentry.set_inode(loop_control_inode);
+    fs_root.add_child_directly(loop_control_dentry);
+
+    info!("[fs] create /dev/loop0");
+    let loopdev_dentry = Arc::new(LoopDevDentry::new(
+        Some(fs_root.clone()),
+        "loop0",
+        fs_root.super_block(),
+    ));
+    let loopdev_inode = Arc::new(LoopDevInode::new(fs_root.super_block()));
+    loopdev_dentry.set_inode(loopdev_inode);
+    fs_root.add_child_directly(loopdev_dentry);
 
     Ok(())
 }
