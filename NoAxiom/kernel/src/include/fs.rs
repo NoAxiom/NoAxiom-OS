@@ -813,3 +813,66 @@ bitflags::bitflags! {
         const UNSHARE_RANGE = 0x40;
     }
 }
+
+/// sys_mknod ref: RocketOS
+pub struct DevT(pub u64);
+
+impl DevT {
+    pub fn tty_devt() -> Self {
+        Self::new_encode_dev(5, 0)
+    }
+    pub fn rtc_devt() -> Self {
+        Self::new_encode_dev(10, 0)
+    }
+    pub fn null_devt() -> Self {
+        Self::new_encode_dev(1, 3)
+    }
+    pub fn zero_devt() -> Self {
+        Self::new_encode_dev(1, 5)
+    }
+    pub fn urandom_devt() -> Self {
+        Self::new_encode_dev(1, 9)
+    }
+    pub fn loop_control_devt() -> Self {
+        Self::new_encode_dev(10, 237)
+    }
+    pub fn loopx_devt(id: usize) -> Self {
+        Self::new_encode_dev(7, id as u32)
+    }
+}
+
+impl DevT {
+    pub fn new(dev: u64) -> Self {
+        Self(dev)
+    }
+    pub fn new_encode_dev(major: u32, minor: u32) -> Self {
+        Self(((major as u64) << 20) | (minor as u64 & 0xFFFFF))
+    }
+    pub fn new_encode_dev_old(major: u32, minor: u32) -> Self {
+        Self(((major as u64) << 3) | (minor as u64 & 0xFFFFF))
+    }
+    /// 从dev_t中获取设备号
+    // pub fn major(&self) -> u32 {
+    //     ((self.0 >> 20) & 0xfff) as u32
+    // }
+    // pub fn minor(&self) -> u32 {
+    //     (self.0 & 0xfffff) as u32
+    // }
+    pub fn new_decode_dev(&self) -> (u32, u32) {
+        let major = ((self.0 >> 20) & 0xfff) as u32;
+        let minor = (self.0 & 0xfffff) as u32;
+        debug!("[dev_t] new_decode_dev: major: {}, minor: {}", major, minor);
+        (major, minor)
+    }
+    pub fn old_decode_dev(&self) -> (u32, u32) {
+        let major = ((self.0 >> 8) & 0xff) as u32;
+        let minor = (self.0 & 0xff) as u32;
+        (major, minor)
+    }
+}
+
+impl From<DevT> for u64 {
+    fn from(dev: DevT) -> Self {
+        dev.0
+    }
+}
