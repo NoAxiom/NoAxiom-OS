@@ -7,13 +7,13 @@ use crate::{
     config::cpu::CPU_NUM,
     constant::banner::NOAXIOM_BANNER,
     cpu::get_hartid,
-    entry::init_proc::schedule_spawn_with_path,
+    entry::{init_proc::schedule_spawn_with_path, main::boot_broadcast},
     mm::{
         frame_init,
         heap::heap_init,
         memory_set::{kernel_space_activate, kernel_space_init},
     },
-    sched::{runtime::run_tasks, utils::block_on},
+    sched::utils::block_on,
     time::clock::ktime_init,
     utils::log::log_init,
     with_interrupt_on,
@@ -44,7 +44,7 @@ pub extern "C" fn _other_hart_init(hart_id: usize, dtb: usize) -> ! {
         hart_id, dtb as usize,
     );
     Arch::enable_interrupt();
-    run_tasks()
+    crate::no_axiom_main()
 }
 
 fn hello_world() {
@@ -94,5 +94,6 @@ pub extern "C" fn _boot_hart_init(_: usize, dtb: usize) -> ! {
     wake_other_hart(get_hartid());
 
     // start task runner
-    run_tasks()
+    boot_broadcast();
+    crate::no_axiom_main()
 }

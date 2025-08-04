@@ -60,9 +60,7 @@ fn fdt_init(fdt: Fdt<'static>) {
         } else {
             log::info!("   {}", node.name);
         }
-        if !dtb_init_one(&node, &mut info) {
-            log::warn!("[platform] no initializer for node {}", node.name,);
-        }
+        let _ = dtb_init_one(&node, &mut info);
     }
     DEV_CONFIG_MANAGER.call_once(|| info);
 }

@@ -69,4 +69,4 @@ mod time;
 mod trap;
 mod utils;
 
-use entry::init::_boot_hart_init as main;
+use entry::main::rust_main as no_axiom_main;

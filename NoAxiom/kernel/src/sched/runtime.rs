@@ -1,7 +1,9 @@
 use alloc::{collections::vec_deque::VecDeque, sync::Arc};
+use core::time::Duration;
 
 use arch::{Arch, ArchInt};
 use async_task::{Builder, Runnable, WithInfo};
+use config::task::INIT_PROCESS_ID;
 use ksync::mutex::SpinLock;
 use lazy_static::lazy_static;
 
@@ -11,7 +13,6 @@ use super::{
     vsched::{Runtime, Scheduler},
 };
 use crate::{
-    cpu::get_hartid,
     task::Task,
     time::{
         time_slice::{set_next_trigger, TimeSliceInfo},
@@ -79,31 +80,17 @@ lazy_static! {
     pub static ref RUNTIME: RuntimeImpl = RuntimeImpl::new();
 }
 
-/// run_tasks: only act as a task runner
-#[no_mangle]
-pub fn run_tasks() -> ! {
-    info!("[kernel] hart {} has been booted", get_hartid());
-    // unsafe { register_hartid() };
-    loop {
-        timer_handler();
-        // todo: can we improve the following interrupt check code?
-        Arch::enable_interrupt();
-        Arch::enable_external_interrupt();
-        #[cfg(feature = "debug_sig")]
-        {
-            use core::time::Duration;
-
-            use config::task::INIT_PROCESS_ID;
-
-            use crate::utils::crossover::intermit;
-            intermit(Some(10000000), Some(Duration::from_millis(500)), || {
-                memory::utils::print_mem_info();
-                if let Some(manager) = crate::task::manager::TASK_MANAGER.0.try_lock() {
-                    for (id, task) in manager.iter() {
-                        if let Some(task) = task.upgrade() {
-                            assert!(task.tid() == *id);
-                            let pcb = task.pcb();
-                            warn!(
+#[allow(unused)]
+fn debug() {
+    use crate::utils::crossover::intermit;
+    intermit(Some(10000000), Some(Duration::from_millis(500)), || {
+        memory::utils::print_mem_info();
+        if let Some(manager) = crate::task::manager::TASK_MANAGER.0.try_lock() {
+            for (id, task) in manager.iter() {
+                if let Some(task) = task.upgrade() {
+                    assert!(task.tid() == *id);
+                    let pcb = task.pcb();
+                    warn!(
                                 "[main] tid{} in {:?}, pending_sig: {:?}, pending_set: {}, should_wake: {}, mask: {}",
                                 task.tid(),
                                 task.tcb().current_syscall,
@@ -116,18 +103,27 @@ pub fn run_tasks() -> ! {
                                 pcb.signals.should_wake.debug_info_short(),
                                 task.sig_mask().debug_info_short(),
                             );
-                        } else {
-                            error!("[main] tid{} NOT FOUND!!!", id);
-                        }
-                    }
                 } else {
-                    error!("[main] task manager got locked!");
+                    error!("[main] tid{} NOT FOUND!!!", id);
                 }
-                if let Some(init_proc) = crate::task::manager::TASK_MANAGER.get(INIT_PROCESS_ID) {
-                    init_proc.print_child_tree();
-                }
-            });
+            }
+        } else {
+            error!("[main] task manager got locked!");
         }
-        RUNTIME.run();
-    }
+        if let Some(init_proc) = crate::task::manager::TASK_MANAGER.get(INIT_PROCESS_ID) {
+            init_proc.print_child_tree();
+        }
+    });
+}
+
+/// run_tasks: only act as a task runner
+#[no_mangle]
+pub fn run_task() {
+    timer_handler();
+    // todo: can we improve the following interrupt check code?
+    Arch::enable_interrupt();
+    Arch::enable_external_interrupt();
+    #[cfg(feature = "debug_sig")]
+    debug();
+    RUNTIME.run();
 }
