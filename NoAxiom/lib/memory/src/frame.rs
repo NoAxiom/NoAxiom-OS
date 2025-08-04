@@ -5,15 +5,11 @@ use alloc::{
 };
 use core::fmt::{self, Debug, Formatter};
 
-use arch::consts::KERNEL_PHYS_MEMORY_END;
 use ksync::mutex::SpinLock;
 use lazy_static::lazy_static;
 
 use super::address::{PhysPageNum, VirtPageNum};
-use crate::{
-    address::PhysAddr,
-    utils::{kernel_ppn_to_vpn, kernel_va_to_pa},
-};
+use crate::{address::PhysAddr, utils::kernel_ppn_to_vpn};
 
 /// frame tracker inner
 pub struct FrameTrackerInner {
@@ -216,7 +212,11 @@ impl StackFrameAllocator {
         );
         log::debug!(
             "[frame] peak: {}, now: {}, total: {}, peak ratio: {}%, current ratio: {}%",
-            peak, remained, total, peak_ratio, remained_ratio
+            peak,
+            remained,
+            total,
+            peak_ratio,
+            remained_ratio
         );
     }
 }
@@ -316,14 +316,10 @@ pub fn frame_refcount(ppn: PhysPageNum) -> usize {
 }
 
 /// init frame allocator
-pub fn frame_init() {
-    extern "C" {
-        fn ekernel(); // virt address
-    }
-    FRAME_ALLOCATOR.lock().init(
-        PhysAddr::from(kernel_va_to_pa(ekernel as usize)).ceil(),
-        PhysAddr::from(KERNEL_PHYS_MEMORY_END).floor(),
-    );
+pub fn global_frame_init(start: usize, end: usize) {
+    FRAME_ALLOCATOR
+        .lock()
+        .init(PhysAddr::from(start).ceil(), PhysAddr::from(end).floor());
     info!("[frame_init] frame allocator init success.");
 }
 

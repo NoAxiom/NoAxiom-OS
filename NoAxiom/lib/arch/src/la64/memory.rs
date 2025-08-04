@@ -10,9 +10,6 @@ use crate::{ArchMemory, ArchPageTable, ArchPageTableEntry, MappingFlags};
 const PA_WIDTH: usize = 48;
 const VA_WIDTH: usize = 48;
 const INDEX_LEVELS: usize = 4;
-const PHYS_MEMORY_START: usize = 0x9000_0000;
-const MEMORY_SIZE: usize = 0x2000_0000;
-const PHYS_MEMORY_END: usize = PHYS_MEMORY_START + MEMORY_SIZE;
 pub(crate) const KERNEL_ADDR_OFFSET: usize = 0x9000_0000_0000_0000;
 const IO_ADDR_OFFSET: usize = 0x8000_0000_0000_0000;
 
@@ -218,8 +215,6 @@ pub(crate) fn user_trampoline_init() {
 }
 
 impl ArchMemory for LA64 {
-    const PHYS_MEMORY_START: usize = PHYS_MEMORY_START;
-    const PHYS_MEMORY_END: usize = PHYS_MEMORY_END;
     const KERNEL_ADDR_OFFSET: usize = KERNEL_ADDR_OFFSET;
     const IO_ADDR_OFFSET: usize = IO_ADDR_OFFSET;
     type PageTable = PageTable;

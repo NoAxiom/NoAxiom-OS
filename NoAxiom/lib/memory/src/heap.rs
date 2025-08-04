@@ -6,8 +6,8 @@ use core::{
 };
 
 use buddy_system_allocator::Heap;
-use config::mm::KERNEL_HEAP_SIZE;
 use ksync::mutex::SpinLock;
+use platform::memory::KERNEL_HEAP_SIZE;
 
 #[global_allocator]
 static HEAP_ALLOCATOR: HeapAllocator = HeapAllocator::empty();

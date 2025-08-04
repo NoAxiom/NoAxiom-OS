@@ -3,8 +3,7 @@ use crate::probe::basic::DtbInitializerType;
 pub fn get_dtb_initializer() -> DtbInitializerType {
     #[cfg(feature = "qemu")]
     {
-        use crate::probe::dtb_addr::get_dtb_addr;
-        match get_dtb_addr() {
+        match crate::probe::dtb::get_dtb_addr() {
             Some(addr) => DtbInitializerType::Ptr(addr),
             None => panic!("DTB address not initialized"),
         }

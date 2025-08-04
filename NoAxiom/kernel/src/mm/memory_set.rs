@@ -222,8 +222,9 @@ impl MemorySet {
         let mut memory_set = MemorySet::new_allocated();
         #[cfg(target_arch = "riscv64")]
         {
-            use arch::consts::{IO_ADDR_OFFSET, KERNEL_VIRT_MEMORY_END};
+            use arch::consts::{IO_ADDR_OFFSET, KERNEL_ADDR_OFFSET};
             use driver::probe::devconf::get_mmio_regions;
+            use platform::memory::PHYS_MEMORY_END;
             macro_rules! kernel_push_area {
                 ($($start:expr, $end:expr, $permission:expr)*) => {
                     $(
@@ -240,6 +241,7 @@ impl MemorySet {
                     )*
                 };
             }
+            const KERNEL_VIRT_MEMORY_END: usize = PHYS_MEMORY_END | KERNEL_ADDR_OFFSET;
             info!(
                 "[kernel].text [{:#x}, {:#x})",
                 stext as usize, etext as usize

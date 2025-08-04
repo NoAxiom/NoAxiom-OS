@@ -1,9 +1,7 @@
 use alloc::{collections::vec_deque::VecDeque, sync::Arc};
-use core::time::Duration;
 
 use arch::{Arch, ArchInt};
 use async_task::{Builder, Runnable, WithInfo};
-use config::task::INIT_PROCESS_ID;
 use ksync::mutex::SpinLock;
 use lazy_static::lazy_static;
 
@@ -85,6 +83,7 @@ lazy_static! {
 #[no_mangle]
 pub fn run_tasks() -> ! {
     info!("[kernel] hart {} has been booted", get_hartid());
+    // unsafe { register_hartid() };
     loop {
         timer_handler();
         // todo: can we improve the following interrupt check code?
@@ -92,6 +91,10 @@ pub fn run_tasks() -> ! {
         Arch::enable_external_interrupt();
         #[cfg(feature = "debug_sig")]
         {
+            use core::time::Duration;
+
+            use config::task::INIT_PROCESS_ID;
+
             use crate::utils::crossover::intermit;
             intermit(Some(10000000), Some(Duration::from_millis(500)), || {
                 memory::utils::print_mem_info();

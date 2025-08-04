@@ -1,5 +1,7 @@
-use arch::{Arch, ArchBoot, ArchInfo, ArchInt, _entry_other_hart, consts::KERNEL_ADDR_OFFSET};
+use arch::{consts::KERNEL_ADDR_OFFSET, Arch, ArchBoot, ArchInfo, ArchInt, _entry_other_hart};
 use driver::probe::probe_device;
+use memory::bss::bss_init;
+use platform::memory::VALID_PHYS_CPU_MASK;
 
 use crate::{
     config::cpu::CPU_NUM,
@@ -7,8 +9,7 @@ use crate::{
     cpu::get_hartid,
     entry::init_proc::schedule_spawn_with_path,
     mm::{
-        bss::bss_init,
-        frame::frame_init,
+        frame_init,
         heap::heap_init,
         memory_set::{kernel_space_activate, kernel_space_init},
     },
@@ -27,7 +28,7 @@ pub fn wake_other_hart(forbid_hart_id: usize) {
         forbid_hart_id, entry
     );
     for i in 0..CPU_NUM {
-        if i != forbid_hart_id {
+        if i != forbid_hart_id && (1 << i) & VALID_PHYS_CPU_MASK != 0 {
             Arch::hart_start(i, entry);
         }
     }
@@ -56,18 +57,16 @@ fn hello_world() {
         get_hartid()
     );
     #[cfg(not(feature = "multicore"))]
-    println!("[kernel] SINGLECORE: CPU_NUM = {}", CPU_NUM);
+    println!(
+        "[kernel] SINGLECORE: CPU_NUM = {}, BOOT_HART = {}",
+        CPU_NUM,
+        get_hartid()
+    );
     println!("[kernel] ARCH = {}", Arch::ARCH_NAME);
 }
 
 #[no_mangle]
-pub extern "C" fn _boot_hart_init(
-    #[allow(unused)] arg0: usize,
-    #[allow(unused)] arg1: usize,
-    #[allow(unused)] arg2: usize,
-    #[allow(unused)] arg3: usize,
-) -> ! {
-    // data init
+pub extern "C" fn _boot_hart_init(_: usize, dtb: usize) -> ! {
     bss_init();
     heap_init();
 
@@ -83,7 +82,7 @@ pub extern "C" fn _boot_hart_init(
     kernel_space_init();
 
     // device init
-    probe_device(arg1);
+    probe_device(dtb);
 
     // fs init
     with_interrupt_on!(block_on(crate::fs::init()));
@@ -91,6 +90,7 @@ pub extern "C" fn _boot_hart_init(
     // spawn init_proc and wake other harts
     ktime_init();
     schedule_spawn_with_path();
+    #[cfg(feature = "multicore")]
     wake_other_hart(get_hartid());
 
     // start task runner

@@ -38,9 +38,7 @@ pub enum InterruptDeviceType {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CharDeviceType {
-    Virtio,
-    PhysRV,
-    PhysLA,
+    Serial,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

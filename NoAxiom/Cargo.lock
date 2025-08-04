@@ -152,9 +152,9 @@ checksum = "1b8e56985ec62d17e9c1001dc89c88ecd7dc08e47eba5ec7c29c7b5eeecde967"
 
 [[package]]
 name = "buddy_system_allocator"
-version = "0.11.0"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a1a0108968a3a2dab95b089c0fc3f1afa7759aa5ebe6f1d86d206d6f7ba726eb"
+checksum = "d44d578cadd17312c75e7d0ef489361f160ace58f7139aa32001fee1a51b89b5"
 dependencies = [
  "spin 0.9.8",
 ]
@@ -623,6 +623,7 @@ dependencies = [
  "num-traits",
  "paste",
  "pin-project-lite",
+ "platform",
  "ringbuffer",
  "smoltcp",
  "spin 0.7.1",
@@ -734,6 +735,7 @@ dependencies = [
  "ksync",
  "lazy_static",
  "log",
+ "platform",
 ]
 
 [[package]]
@@ -803,6 +805,10 @@ name = "pin-utils"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
+
+[[package]]
+name = "platform"
+version = "0.1.0"
 
 [[package]]
 name = "plic"

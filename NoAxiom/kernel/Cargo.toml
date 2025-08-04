@@ -7,7 +7,7 @@ version = "0.1.0"
 multicore = ["config/multicore"]
 busybox = []
 runtests = []
-qemu = ["driver/qemu"]
+qemu = ["driver/qemu", "platform/qemu"]
 debug_sig = [] #["console/debug_sig"]
 log_print = ["debug_sig"]
 default = []
@@ -66,3 +66,4 @@ config = { workspace = true }
 driver = { workspace = true }
 include = { workspace = true }
 memory = { workspace = true }
+platform = { workspace = true }
