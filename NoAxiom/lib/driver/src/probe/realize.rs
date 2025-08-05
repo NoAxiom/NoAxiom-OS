@@ -68,7 +68,7 @@ fn pci_realize(config: &DeviceConfig) {
     probe_pci_bus(pci_ecam_base);
 }
 
-fn normal_realize(config: &DeviceConfig) {
+fn of_realize(config: &DeviceConfig) {
     log::info!(
         "[platform] realize normal device: type {:?} @ addr: {:#x}, size: {:#x}",
         config.dev_type,
@@ -144,7 +144,7 @@ fn dtb_realize() {
         match config.conf_type {
             DeviceConfigType::VirtioMmio => virtio_mmio_realize(config),
             DeviceConfigType::PciEcam => pci_realize(config),
-            DeviceConfigType::Normal => normal_realize(config),
+            DeviceConfigType::DeviceTree => of_realize(config),
         }
     }
 }

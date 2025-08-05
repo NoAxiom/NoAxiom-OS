@@ -27,7 +27,7 @@ impl MmioRegion {
 pub enum DeviceConfigType {
     VirtioMmio,
     PciEcam,
-    Normal,
+    DeviceTree,
 }
 
 pub struct DeviceConfig {

@@ -7,7 +7,7 @@ pub type DevResult<T> = Result<T, Errno>;
 pub trait DeviceTreeInfo: Device {
     const OF_TYPE: &'static str;
     const DEVICE_TYPE: &'static DeviceType;
-    const DEVICE_CONFIG_TYPE: &'static DeviceConfigType = &DeviceConfigType::Normal;
+    const DEVICE_CONFIG_TYPE: &'static DeviceConfigType = &DeviceConfigType::DeviceTree;
 }
 
 pub trait Device: Sync {
