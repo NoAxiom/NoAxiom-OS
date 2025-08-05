@@ -54,7 +54,7 @@ fn fifo_filled_cnt<T: SDIo>(io: &mut T) -> usize {
 
 fn send_cmd<T: SDIo, S: SleepOps>(
     io: &mut T,
-    cmd_type: Cmd,
+    _cmd_type: Cmd,
     cmd: CmdReg,
     arg: CmdArg,
     data_trans_type: DataTransType,
@@ -70,7 +70,7 @@ fn send_cmd<T: SDIo, S: SleepOps>(
     write_reg(io, *ARG_REG, arg.into());
     write_reg(io, *CMD_REG, cmd.into());
     // Wait for cmd accepted
-    let command_accept = wait_ms_util_can_send_cmd::<_, S>(io);
+    // let command_accept = wait_ms_util_can_send_cmd::<_, S>(io);
     // info!("command accepted {}", command_accept);
 
     if cmd.response_expect() {
@@ -105,11 +105,11 @@ fn send_cmd<T: SDIo, S: SleepOps>(
                     }
                     raw_int_status.dto() || raw_int_status.have_error()
                 });
-                // info!(
-                //     "buf_offset:{}, receive {} bytes",
-                //     buf_offset,
-                //     buf_offset * 8
-                // );
+                info!(
+                    "buf_offset:{}, receive {} bytes",
+                    buf_offset,
+                    buf_offset * 8
+                );
             }
             DataTransType::Write(buffer) => {
                 let mut buf_offset = 0;
@@ -131,8 +131,7 @@ fn send_cmd<T: SDIo, S: SleepOps>(
                     }
                     raw_int_status.dto() || raw_int_status.have_error()
                 });
-                // info!("buf_offset:{}, send {} bytes", buf_offset, buf_offset
-                // * 8);
+                info!("buf_offset:{}, send {} bytes", buf_offset, buf_offset * 8);
             }
             _ => {
                 panic!("Not implemented")
@@ -225,7 +224,7 @@ fn set_transaction_size<T: SDIo>(io: &mut T, blk_size: u32, byte_count: u32) {
     let blk_size = BlkSizeReg::new(blk_size);
     write_reg(io, *BLK_SIZE_REG, blk_size.into());
     let byte_count = ByteCountReg::new(byte_count);
-    write_reg(io, *BLK_SIZE_REG, byte_count.into());
+    write_reg(io, *BYTE_CNT_REG, byte_count.into());
 }
 
 fn test_read<T: SDIo, S: SleepOps>(io: &mut T) {
@@ -484,7 +483,7 @@ fn init_sdcard<T: SDIo, S: SleepOps>(io: &mut T) {
     select_card::<_, S>(io, rca);
 
     let status = StatusReg::from(read_reg(io, *STATUS_REG));
-    // info!("Now FIFO Count is {}", status.fifo_count());
+    info!("Now FIFO Count is {}", status.fifo_count());
 
     // check bus width
     check_bus_width::<_, S>(io, rca);

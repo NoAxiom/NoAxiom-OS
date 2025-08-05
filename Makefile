@@ -275,7 +275,7 @@ build-all:
 	@make build ARCH_NAME=riscv64 LOG=OFF RELEASE=true INIT_PROC=runtests
 	@make build ARCH_NAME=loongarch64 LOG=OFF RELEASE=true INIT_PROC=runtests
 
-LA_BOARD_QARGS=ARCH_NAME=loongarch64 LOG=DEBUG RELEASE=true INIT_PROC=runtests FEAT_ON_QEMU=false MULTICORE=2
+LA_BOARD_QARGS=ARCH_NAME=loongarch64 RELEASE=true FEAT_ON_QEMU=false
 board-la:
 	@echo "Building LoongArch64 kernel for board..."
 	@make build $(LA_BOARD_QARGS)
@@ -285,7 +285,7 @@ board-la-asm:
 	@echo "Building LoongArch64 kernel for board..."
 	@make asm $(LA_BOARD_QARGS)
 
-RV_BOARD_QARGS=ARCH_NAME=riscv64 LOG=DEBUG RELEASE=true INIT_PROC=runtests FEAT_ON_QEMU=false MULTICORE=2
+RV_BOARD_QARGS=ARCH_NAME=riscv64 RELEASE=true FEAT_ON_QEMU=false
 board-rv:
 	@echo "Building RISC-V64 kernel for board..."
 	@make build $(RV_BOARD_QARGS)

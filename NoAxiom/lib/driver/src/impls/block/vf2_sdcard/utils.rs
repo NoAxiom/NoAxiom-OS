@@ -1,19 +1,19 @@
-const SDIO_BASE: usize = 0x16020000;
+use crate::block::vf2_sdcard::register::get_sdio_phys_base;
 
 pub fn read_fifo<T: SDIo>(io: &T, addr: usize) -> u64 {
-    io.read_data_at(addr - SDIO_BASE)
+    io.read_data_at(addr - get_sdio_phys_base())
 }
 
 pub fn write_fifo<T: SDIo>(io: &mut T, addr: usize, val: u64) {
-    io.write_data_at(addr - SDIO_BASE, val);
+    io.write_data_at(addr - get_sdio_phys_base(), val);
 }
 
 pub fn write_reg<T: SDIo>(io: &mut T, addr: usize, val: u32) {
-    io.write_reg_at(addr - SDIO_BASE, val);
+    io.write_reg_at(addr - get_sdio_phys_base(), val);
 }
 
 pub fn read_reg<T: SDIo>(io: &T, addr: usize) -> u32 {
-    io.read_reg_at(addr - SDIO_BASE)
+    io.read_reg_at(addr - get_sdio_phys_base())
 }
 
 pub trait SDIo {

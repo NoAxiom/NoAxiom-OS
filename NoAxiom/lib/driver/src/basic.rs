@@ -1,6 +1,8 @@
+use include::errno::Errno;
+
 use crate::probe::basic::DeviceConfigType;
 
-pub type DevResult<T> = Result<T, include::errno::Errno>;
+pub type DevResult<T> = Result<T, Errno>;
 
 pub trait DeviceTreeInfo: Device {
     const OF_TYPE: &'static str;

@@ -11,6 +11,14 @@ use crate::{
     time::gettime::get_time_ms,
 };
 
+fn safe_shutdown() -> ! {
+    println!("[kernel] poweroff");
+    #[cfg(feature = "debug_sig")]
+    driver::base_dev::debug_shutdown();
+    #[cfg(not(feature = "debug_sig"))]
+    driver::base_dev::shutdown();
+}
+
 lazy_static::lazy_static! {
     static ref PANIC_FLAG: spin::Mutex<bool> = spin::Mutex::new(false);
 }
@@ -51,8 +59,5 @@ fn panic(info: &PanicInfo) -> ! {
     }
     print_frame_info();
     print_heap_info();
-    #[cfg(feature = "debug_sig")]
-    driver::base_dev::debug_shutdown();
-    #[cfg(not(feature = "debug_sig"))]
-    driver::base_dev::shutdown();
+    safe_shutdown()
 }

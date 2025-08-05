@@ -1,12 +1,11 @@
 use arch::{Arch, ArchTime};
-use include::errno::Errno;
 use ksync::AsyncMutex;
 
 use crate::{
     basic::{BlockDeviceType, DevResult, Device, DeviceTreeInfo, DeviceType},
     block::{
         vf2_sdcard::{
-            register::{get_sdio_pbase, set_sdio_base},
+            register::{get_sdio_virt_base, set_sdio_base},
             SDIo, SleepOps, Vf2SdDriver,
         },
         BlockDevice,
@@ -35,19 +34,19 @@ pub fn sleep_ms_until(ms: usize, mut f: impl FnMut() -> bool) {
 pub struct SdIoImpl;
 impl SDIo for SdIoImpl {
     fn read_data_at(&self, offset: usize) -> u64 {
-        let addr = (get_sdio_pbase() + offset) as *mut u64;
+        let addr = (get_sdio_virt_base() + offset) as *mut u64;
         unsafe { addr.read_volatile() }
     }
     fn read_reg_at(&self, offset: usize) -> u32 {
-        let addr = (get_sdio_pbase() + offset) as *mut u32;
+        let addr = (get_sdio_virt_base() + offset) as *mut u32;
         unsafe { addr.read_volatile() }
     }
     fn write_data_at(&mut self, offset: usize, val: u64) {
-        let addr = (get_sdio_pbase() + offset) as *mut u64;
+        let addr = (get_sdio_virt_base() + offset) as *mut u64;
         unsafe { addr.write_volatile(val) }
     }
     fn write_reg_at(&mut self, offset: usize, val: u32) {
-        let addr = (get_sdio_pbase() + offset) as *mut u32;
+        let addr = (get_sdio_virt_base() + offset) as *mut u32;
         unsafe { addr.write_volatile(val) }
     }
 }
@@ -69,11 +68,10 @@ pub struct VF2SdcardDevice {
 }
 
 impl VF2SdcardDevice {
-    // compatible: starfive,jh7110-sdio
-    // name: sdio0 / sdio1 (depends on 你插的卡槽)
-    pub fn new(base_addr: usize) -> DevResult<Self> {
-        if base_addr != 0x16020000 {
-            return Err(Errno::EINVAL);
+    pub fn new(base_addr: usize) -> Result<Self, ()> {
+        const SDIO_BASE: usize = 0x16020000;
+        if base_addr != SDIO_BASE {
+            return Err(());
         }
         // 8.13 M
         set_sdio_base(base_addr);
