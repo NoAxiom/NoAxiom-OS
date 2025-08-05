@@ -1,6 +1,5 @@
 mod arch;
-mod basic;
-mod compatible;
+pub(crate) mod basic;
 mod dtb;
 mod pci;
 mod realize;

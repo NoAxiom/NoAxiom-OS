@@ -11,7 +11,7 @@ use super::{
         DEV_CONFIG_MANAGER,
     },
 };
-use crate::{basic::DeviceType, probe::compatible::OF_INITIALIZERS};
+use crate::{basic::DeviceType, of::OF_INITIALIZERS};
 
 static DTB_ADDR: Once<usize> = Once::new();
 
@@ -43,7 +43,7 @@ fn dtb_init_one(node: &FdtNode, info: &mut DeviceConfigManager) -> bool {
                         node.name,
                         other_of,
                     );
-                    device_init(node, info, *dev_type, *conf_type);
+                    device_init(node, info, **dev_type, **conf_type);
                     return true;
                 }
             }

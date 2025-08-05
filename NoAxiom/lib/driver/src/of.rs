@@ -1,0 +1,34 @@
+use crate::{
+    basic::{DeviceTreeInfo, DeviceType},
+    block::vf2_sdcard::sdcard::VF2SdcardDevice,
+    interrupt::plic::PlicDevice,
+    probe::basic::DeviceConfigType,
+};
+
+pub(super) const OF_PCI_ECAM_TYPE: &str = "pci-host-ecam-generic";
+pub(super) const OF_VIRTIO_MMIO_TYPE: &str = "virtio,mmio";
+
+macro_rules! device {
+    ($device:ty) => {
+        (
+            <$device>::OF_TYPE,
+            <$device>::DEVICE_TYPE,
+            <$device>::DEVICE_CONFIG_TYPE,
+        )
+    };
+}
+
+pub(super) const OF_INITIALIZERS: &[(&str, &DeviceType, &DeviceConfigType)] = &[
+    (
+        OF_PCI_ECAM_TYPE,
+        &DeviceType::Probe,
+        &DeviceConfigType::PciEcam,
+    ),
+    (
+        OF_VIRTIO_MMIO_TYPE,
+        &DeviceType::Probe,
+        &DeviceConfigType::VirtioMmio,
+    ),
+    device!(PlicDevice),
+    device!(VF2SdcardDevice),
+];

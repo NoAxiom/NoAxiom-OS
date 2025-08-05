@@ -54,7 +54,7 @@ impl DeviceConfigManager {
 pub static DEV_CONFIG_MANAGER: Once<DeviceConfigManager> = Once::new();
 
 #[allow(unused)]
-pub(super) enum DtbInitializerType {
+pub(crate) enum DtbInitializerType {
     Ptr(usize),
     Ref(&'static [u8]),
     Fdt(Fdt<'static>),

@@ -2,7 +2,7 @@ use arch::{Arch, ArchTime};
 use ksync::AsyncMutex;
 
 use crate::{
-    basic::{BlockDeviceType, DevResult, Device, DeviceType},
+    basic::{BlockDeviceType, DevResult, Device, DeviceTreeInfo, DeviceType},
     block::{
         vf2_sdcard::{
             register::{get_sdio_pbase, set_sdio_base},
@@ -85,13 +85,20 @@ impl VF2SdcardDevice {
     }
 }
 
+const DEVICE_TYPE: DeviceType = DeviceType::Block(BlockDeviceType::VF2Sdcard);
+
 impl Device for VF2SdcardDevice {
     fn device_name(&self) -> &'static str {
         "VF2SdcardDevice"
     }
     fn device_type(&self) -> &'static DeviceType {
-        &DeviceType::Block(BlockDeviceType::VF2Sdcard)
+        &DEVICE_TYPE
     }
+}
+
+impl DeviceTreeInfo for VF2SdcardDevice {
+    const OF_TYPE: &'static str = "starfive,jh7110-sdio";
+    const DEVICE_TYPE: &'static DeviceType = &DEVICE_TYPE;
 }
 
 impl InterruptDevice for VF2SdcardDevice {

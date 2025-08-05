@@ -1,4 +1,12 @@
+use crate::probe::basic::DeviceConfigType;
+
 pub type DevResult<T> = Result<T, include::errno::Errno>;
+
+pub trait DeviceTreeInfo: Device {
+    const OF_TYPE: &'static str;
+    const DEVICE_TYPE: &'static DeviceType;
+    const DEVICE_CONFIG_TYPE: &'static DeviceConfigType = &DeviceConfigType::Normal;
+}
 
 pub trait Device: Sync {
     fn device_name(&self) -> &'static str {
@@ -65,6 +73,6 @@ pub enum DeviceType {
     Char(CharDeviceType),
     Power(PowerDeviceType),
     Kernel,
-    Pending,
+    Probe,
     Unknown,
 }

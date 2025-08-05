@@ -10,6 +10,7 @@ pub mod hal;
 mod impls;
 mod macros;
 pub mod manager;
+mod of;
 pub mod probe;
 
 pub use impls::*;
