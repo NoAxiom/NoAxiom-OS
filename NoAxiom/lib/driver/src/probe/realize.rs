@@ -6,7 +6,7 @@ use super::{
 };
 use crate::{
     basic::{BlockDeviceType, DeviceType, InterruptDeviceType, NetDeviceType},
-    block::virtio_block::VirtioBlockDevice,
+    block::{vf2_sdcard::sdcard::VF2SdcardDevice, virtio_block::VirtioBlockDevice},
     interrupt::plic::PlicDevice,
     manager::{get_int_ctrl_dev, set_int_ctrl_dev, DEV_BUS},
 };
@@ -17,32 +17,32 @@ fn virtio_mmio_realize(config: &DeviceConfig) {
         Ok(transport) => match transport.device_type() {
             VirtioDevType::Block => {
                 log::info!(
-                        "[platform] realize virtio mmio block device: type {:?} @ addr: {:#x}, size: {:#x}",
-                        transport.device_type(),
-                        config.region.addr,
-                        config.region.size
-                    );
+                    "[platform] realize virtio mmio block device: type {:?} @ addr: {:#x}, size: {:#x}",
+                    transport.device_type(),
+                    config.region.addr,
+                    config.region.size
+                );
                 let blk = VirtioBlockDevice::new(transport);
                 DEV_BUS.add_block_device(blk);
             }
             VirtioDevType::Network => {
                 log::info!(
-                        "[platform] realize virtio mmio net device: type {:?} @ addr: {:#x}, size: {:#x}",
-                        transport.device_type(),
-                        config.region.addr,
-                        config.region.size
-                    );
+                    "[platform] realize virtio mmio net device: type {:?} @ addr: {:#x}, size: {:#x}",
+                    transport.device_type(),
+                    config.region.addr,
+                    config.region.size
+                );
                 log::warn!(
-                        "[platform] virtio mmio net device is not implemented yet, skipping realization."
-                    );
+                    "[platform] virtio mmio net device is not implemented yet, skipping realization."
+                );
             }
             _ => {
                 log::warn!(
-                        "[platform] realize virtio mmio device: unknown type {:?} @ addr: {:#x}, size: {:#x}",
-                        transport.device_type(),
-                        config.region.addr,
-                        config.region.size
-                    );
+                    "[platform] realize virtio mmio device: unknown type {:?} @ addr: {:#x}, size: {:#x}",
+                    transport.device_type(),
+                    config.region.addr,
+                    config.region.size
+                );
             }
         },
         Err(err) => {
@@ -76,16 +76,34 @@ fn normal_realize(config: &DeviceConfig) {
         config.region.size
     );
     match config.dev_type {
-        DeviceType::Block(blk_type) => {
-            match blk_type {
-                BlockDeviceType::Virtio => {
-                    log::warn!("[platform] UNEXPECTED realize virtio block device!!! SKIP device realization");
-                }
-                _ => {
-                    log::warn!("[platform] UNKNOWN block device!!!");
+        DeviceType::Block(blk_type) => match blk_type {
+            BlockDeviceType::Virtio => {
+                log::warn!(
+                    "[platform] UNEXPECTED realize virtio block device!!! SKIP device realization"
+                );
+            }
+            BlockDeviceType::VF2Sdcard => {
+                log::info!(
+                    "[platform] realize VF2 SD card device: type {:?} @ addr: {:#x}, size: {:#x}",
+                    blk_type,
+                    config.region.addr,
+                    config.region.size
+                );
+                if let Ok(sdcard) = VF2SdcardDevice::new(config.region.addr) {
+                    DEV_BUS.add_block_device(sdcard);
+                } else {
+                    log::warn!(
+                        "[platform] failed to realize VF2 SD card device: type {:?} @ addr: {:#x}, size: {:#x}",
+                        blk_type,
+                        config.region.addr,
+                        config.region.size
+                    );
                 }
             }
-        }
+            _ => {
+                log::warn!("[platform] UNKNOWN block device!!!");
+            }
+        },
         DeviceType::Net(net_type) => {
             match net_type {
                 NetDeviceType::Virtio => {

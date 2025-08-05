@@ -1,4 +1,5 @@
 use arch::{Arch, ArchTime};
+use include::errno::Errno;
 use ksync::AsyncMutex;
 
 use crate::{
@@ -70,7 +71,10 @@ pub struct VF2SdcardDevice {
 impl VF2SdcardDevice {
     // compatible: starfive,jh7110-sdio
     // name: sdio0 / sdio1 (depends on 你插的卡槽)
-    pub fn new(base_addr: usize) -> Self {
+    pub fn new(base_addr: usize) -> DevResult<Self> {
+        if base_addr != 0x16020000 {
+            return Err(Errno::EINVAL);
+        }
         // 8.13 M
         set_sdio_base(base_addr);
         let sd = Vf2SdDriver::<_, SleepOpsImpl>::new(SdIoImpl);
@@ -78,7 +82,7 @@ impl VF2SdcardDevice {
             inner: AsyncMutex::new(sd),
         };
         ret.init();
-        ret
+        Ok(ret)
     }
     pub fn init(&self) {
         self.inner.spin_lock().init();

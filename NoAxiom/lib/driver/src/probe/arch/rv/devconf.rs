@@ -8,6 +8,7 @@ const MMIO_REGIONS: &[(usize, usize)] = &[
     (0x1000_1000, 0x8000),      // VirtIO
     (0x3000_0000, 0x1000_0000), // PCI config space
     (0x4000_0000, 0x4000_0000), // PCI memory ranges (ranges 1: 32-bit MMIO space)
+    (0x16000000, 0x30000),      // SDIO
 ];
 
 pub fn get_mmio_regions() -> &'static [(usize, usize)] {
