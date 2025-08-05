@@ -1,4 +1,4 @@
-use arch::{Arch, ArchTrap, ExceptionType, InterruptType, PageFaultType, TrapType};
+use arch::{Arch, ArchTrap, ExceptionType, InterruptType, PageFaultType, TrapContext, TrapType};
 use kfuture::block::block_on;
 
 use crate::{
@@ -10,9 +10,10 @@ use crate::{
 
 /// kernel trap handler
 #[no_mangle]
-pub fn kernel_trap_handler() {
+pub fn kernel_trap_handler(cx_ptr: *mut TrapContext) {
     current_cpu().add_trap_depth();
-    let trap_type = Arch::read_trap_type(None);
+    let cx = unsafe { &mut *(cx_ptr) };
+    let trap_type = Arch::read_trap_type(Some(cx));
     match trap_type {
         TrapType::Exception(exception) => kernel_exception_handler(exception),
         TrapType::Interrupt(interrupt) => kernel_interrupt_handler(interrupt),

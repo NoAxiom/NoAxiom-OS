@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 use core::arch::global_asm;
 
-use loongArch64::register::badv;
+use loongArch64::register::{badv, era};
 
 use super::context::TrapContext;
 
@@ -132,7 +132,7 @@ pub unsafe fn write_bytes(addr: u64, value: u64, n: usize) {
 }
 
 #[allow(unused_assignments)]
-pub unsafe fn emulate_load_store_insn(pt_regs: &mut TrapContext) {
+pub unsafe fn emulate_load_store_insn(pt_regs: &mut TrapContext) -> Result<(), ()> {
     let la_inst: u32;
     let addr: u64;
     let rd: usize;
@@ -140,12 +140,13 @@ pub unsafe fn emulate_load_store_insn(pt_regs: &mut TrapContext) {
     let mut value: u64 = 0;
     let mut res: i32 = 0;
 
+    let era = era::read().pc();
     // debug!("Unaligned Access PC @ {:#x} ", pt_regs.era);
 
     unsafe {
         core::arch::asm!(
             "ld.w {val}, {addr}, 0 ",
-             addr = in(reg) pt_regs.era as u64,
+             addr = in(reg) era as u64,
              val = out(reg) la_inst,
         )
     }
@@ -232,5 +233,7 @@ pub unsafe fn emulate_load_store_insn(pt_regs: &mut TrapContext) {
         panic!("Address Error @ {:#x}", addr)
     }
 
-    pt_regs.era += 4;
+    era::set_pc(era + 4);
+
+    Ok(())
 }

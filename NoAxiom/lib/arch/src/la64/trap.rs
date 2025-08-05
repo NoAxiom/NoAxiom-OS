@@ -135,8 +135,14 @@ fn get_trap_type(tf: Option<&mut TrapContext>) -> TrapType {
             match e {
                 Exception::Breakpoint => TrapType::Exception(ExceptionType::Breakpoint),
                 Exception::AddressNotAligned => {
-                    unsafe { emulate_load_store_insn(tf.unwrap()) }
-                    TrapType::None
+                    if let Some(tf) = tf {
+                        match unsafe { emulate_load_store_insn(tf) } {
+                            Ok(()) => TrapType::None,
+                            Err(()) => TrapType::Unknown,
+                        }
+                    } else {
+                        TrapType::Unknown
+                    }
                 }
                 Exception::Syscall => TrapType::Exception(ExceptionType::Syscall),
                 Exception::StorePageFault | Exception::PageModifyFault => TrapType::Exception(

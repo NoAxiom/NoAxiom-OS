@@ -1,4 +1,5 @@
     .equ      CSR_SAVE, 0x30
+    .equ      CSR_SAVE1, 0x31
     .equ      CSR_ERA, 0x6
     .equ      CSR_PRMD, 0x1
     .equ      CSR_PGDL, 0x19
@@ -22,8 +23,8 @@
     .endm
 
     .macro    KERNEL_SAVE_REG
-    csrwr     $sp, CSR_SAVE            # save sp since we will align it
-    csrrd     $sp, CSR_SAVE
+    csrwr     $sp, CSR_SAVE1           # save sp since we will align it
+    csrrd     $sp, CSR_SAVE1
     addi.d    $sp, $sp, -32*8
     srli.d    $sp, $sp, 3              # align sp to avoid unaligned exception
     slli.d    $sp, $sp, 3
@@ -34,6 +35,7 @@
     STORE_X   %n
     .set      n, n+1
     .endr
+    or        $a0, $sp, $zero          # set a0 = sp to pass trapframe ptr to kernel
     .endm
 
     .macro    KERNEL_LOAD_REG
@@ -44,8 +46,7 @@
     LOAD_X    %n
     .set      n, n+1
     .endr
-    addi.d    $sp, $sp, 32*8
-    csrrd     $sp, CSR_SAVE
+    csrrd     $sp, CSR_SAVE1
     .endm
 
     .section  .text.trampoline
