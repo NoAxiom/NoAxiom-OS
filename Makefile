@@ -119,8 +119,7 @@ LINKER_ROOT = $(ROOT)/$(PROJECT)/lib
 LINKER_DIR = $(LINKER_ROOT)/.ld
 build-kernel: build-user
 	sh $(UTILS)/scripts/mk_ld.sh $(LINKER_ROOT) $(PLATFORM) $(SIMPLE_ARCH_NAME)
-	cd $(PROJECT)/kernel && make build
-# +@cd $(PROJECT)/kernel && $(MAKE) build
+	+@cd $(PROJECT)/kernel && $(MAKE) build
 
 build-user:
 	+@cd $(USER_PROJECT) && make build

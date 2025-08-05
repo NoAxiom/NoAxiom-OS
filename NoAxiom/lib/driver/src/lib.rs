@@ -5,16 +5,11 @@
 
 extern crate alloc;
 
-pub mod base_dev;
 pub mod basic;
-pub mod block;
-pub mod char;
-pub mod debug;
-pub mod display;
 pub mod hal;
-pub mod probe;
-pub mod interrupt;
+mod impls;
 mod macros;
 pub mod manager;
-pub mod net;
-pub mod power;
+pub mod probe;
+
+pub use impls::*;
