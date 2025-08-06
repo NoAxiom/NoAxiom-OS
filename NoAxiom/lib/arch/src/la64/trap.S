@@ -1,9 +1,10 @@
-    .equ      CSR_SAVE, 0x30
-    .equ      CSR_SAVE1, 0x31
-    .equ      CSR_ERA, 0x6
     .equ      CSR_PRMD, 0x1
+    .equ      CSR_ESTAT, 0x5
+    .equ      CSR_ERA, 0x6
     .equ      CSR_PGDL, 0x19
     .equ      CSR_PGD, 0x1b
+    .equ      CSR_SAVE, 0x30
+    .equ      CSR_SAVE1, 0x31
 
     .altmacro
     .macro    STORE_X n                # store user regs
@@ -22,39 +23,13 @@
     ld.d      $s\n, $sp, \offset*8
     .endm
 
-    .macro    KERNEL_SAVE_REG
-    csrwr     $sp, CSR_SAVE1           # save sp since we will align it
-    csrrd     $sp, CSR_SAVE1
-    addi.d    $sp, $sp, -32*8
-    srli.d    $sp, $sp, 3              # align sp to avoid unaligned exception
-    slli.d    $sp, $sp, 3
-    STORE_X   %1
-    STORE_X   %2
-    .set      n, 4
-    .rept     28
-    STORE_X   %n
-    .set      n, n+1
-    .endr
-    or        $a0, $sp, $zero          # set a0 = sp to pass trapframe ptr to kernel
-    .endm
-
-    .macro    KERNEL_LOAD_REG
-    LOAD_X    %1
-    LOAD_X    %2
-    .set      n, 4
-    .rept     28
-    LOAD_X    %n
-    .set      n, n+1
-    .endr
-    csrrd     $sp, CSR_SAVE1
-    .endm
-
     .section  .text.trampoline
     .globl    __user_trapvec
     .globl    __user_trapret
     .globl    __kernel_trapvec
     .globl    __kernel_user_ptr_vec
     .align    4
+
 
 # user -> kernel
     __user_trapvec:
@@ -88,6 +63,7 @@
     ld.d      $tp, $sp, 49*8           # load kernel tp
     ld.d      $sp, $sp, 34*8           # load kernel sp
     jirl      $zero, $ra, 0            # return to kernel ra
+
 
 # kernel -> user
     __user_trapret:
@@ -125,20 +101,98 @@
     ibar      0                        # sync instruction cache
     ertn                               # la: exception return <> rv: sret
 
+
 # kernel -> kernel
 # only need to save caller-saved regs
 # note that we don't save ERA & ECFG or other csrs here
     __kernel_trapvec:
-    KERNEL_SAVE_REG
-    bl        kernel_trap_handler
-    KERNEL_LOAD_REG
+    csrwr     $sp, CSR_SAVE1           # save sp since we will align it
+    csrrd     $sp, CSR_SAVE1
+    addi.d    $sp, $sp, -64*8          # reserve enough space for trap frame (currently use 512 bytes)
+    srli.d    $sp, $sp, 3              # align sp to avoid unaligned exception
+    slli.d    $sp, $sp, 3
+
+# save kernel general registers
+    STORE_X   %1
+    STORE_X   %2
+    .set      n, 4
+    .rept     28
+    STORE_X   %n
+    .set      n, n+1
+    .endr
+
+# save kernel csr registers
+    csrrd     $t0, CSR_PRMD
+    csrrd     $t1, CSR_ERA
+    csrrd     $t2, CSR_SAVE1           # use SAVE1 to represent sp, we've already saved it
+    st.d      $t0, $sp, 32*8
+    st.d      $t1, $sp, 33*8
+    st.d      $t2, $sp, 3*8            # store sp (x3 in la64)
+
+# check ecode
+    csrrd     $t0, CSR_ESTAT
+    srli.d    $t0, $t0, 16             # ecode begin with 16 bit
+    andi      $t0, $t0, 0x3F           # ecode mask (21:16 bits)
+    li.d      $t1, 0x9                 # ecode 0x9 => ALE, unaligned access
+    beq       $t0, $t1, 2f             # if ecode == ECODE_UNALIGN, goto unaligned_handler
+
+    bl        kernel_trap_handler      # handle other traps
+
+# restore kernel registers
+    1:
+    ld.d      $t0, $sp, 32*8
+    ld.d      $t1, $sp, 33*8
+    csrwr     $t0, CSR_PRMD            # PRMD
+    csrwr     $t1, CSR_ERA             # ERA, note that: we use trap_frame.era to restore it, since it could be modified
+    LOAD_X    %1
+    LOAD_X    %2
+    .set      n, 4
+    .rept     28
+    LOAD_X    %n
+    .set      n, n+1
+    .endr
+    ld.d      $sp, $sp, 3*8
     ertn
 
+# unaligned handler
+    2:
+    or        $a0, $sp, $zero          # set a0 = sp to pass trapframe ptr to kernel
+    bl        unaligned_handler        # goto handle unaligned access
+    b         1b
+
+
     __kernel_user_ptr_vec:
-    KERNEL_SAVE_REG
+# save sp and align sp
+    csrwr     $sp, CSR_SAVE1           # save sp since we will align it, use CSR_SAVE1 to avoid conflict
+    csrrd     $sp, CSR_SAVE1
+    addi.d    $sp, $sp, -32*8
+    srli.d    $sp, $sp, 3              # align sp to avoid unaligned exception
+    slli.d    $sp, $sp, 3
+
+# save kernel registers
+    STORE_X   %1
+    STORE_X   %2
+    .set      n, 4
+    .rept     28
+    STORE_X   %n
+    .set      n, n+1
+    .endr
+
+# call user ptr handler and update trap_type
+# assume that we won't trap again
     bl        kernel_user_ptr_handler
-    KERNEL_LOAD_REG
+
+# load kernel registers
+    LOAD_X    %1
+    LOAD_X    %2
+    .set      n, 4
+    .rept     28
+    LOAD_X    %n
+    .set      n, n+1
+    .endr
+    csrrd     $sp, CSR_SAVE1
     ertn
+
 
 # float registers store & load macros
     FP_START  = 0
@@ -185,6 +239,7 @@
     st.b      $t0, $a0, FP_END*8+4     # offset: 32*freg+1*fcsr
     ret
 
+
 # load float registers
     __load_freg:
     .set      n, 0
@@ -215,6 +270,7 @@
     srli.w    $t0, $t0, 1
     movgr2cf  $fcc7, $t0
     ret
+
 
     .section  .text.signal
     .globl    user_sigreturn

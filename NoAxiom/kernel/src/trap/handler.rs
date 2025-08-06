@@ -4,11 +4,11 @@ use alloc::sync::Arc;
 use core::intrinsics::unlikely;
 
 use arch::{
-    consts::KERNEL_ADDR_OFFSET, Arch, ArchInt, ExceptionType, InterruptType, PageFaultType, TrapArgs,
-    TrapType,
+    consts::KERNEL_ADDR_OFFSET, Arch, ArchInt, ExceptionType, InterruptType, PageFaultType,
+    TrapArgs, TrapType,
 };
 
-use super::{ext_int::ext_int_handler, ipi::ipi_handler};
+use super::{ext_int::ext_int_handler, soft_int::soft_int_handler};
 use crate::{
     fs::vfs::inc_interrupts_count,
     signal::{
@@ -140,7 +140,7 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
                     //     task.tid(),
                     // );
                     inc_interrupts_count(id);
-                    ipi_handler();
+                    soft_int_handler();
                 }
             };
         }

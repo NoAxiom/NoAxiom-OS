@@ -70,7 +70,7 @@ pub fn send_ipi(to_hartid: usize, ipi_type: IpiType) {
     Arch::send_ipi(to_hartid);
 }
 
-pub fn ipi_handler() {
+fn ipi_handler() {
     let info = current_ipi_info();
     trace!("ipi handler, from_hartid: {}", info.from_hartid);
     match info.ipi_type {
@@ -86,6 +86,10 @@ pub fn ipi_handler() {
         }
     }
     Arch::clear_ipi();
+}
+
+pub fn soft_int_handler() {
+    unimplemented!()
 }
 
 #[allow(unused)]

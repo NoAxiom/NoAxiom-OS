@@ -4,6 +4,7 @@
 # reference: https://gitlab.eduxiji.net/educg-group-22027-2376549/T202410699992496-1562/-/blob/NPUcore-FF/os/src/arch/la64/trap/mod.rs#L43
 # notes: some consts are added to make the code more readable
 
+    .equ      LA_CSR_CRMD,          0x00 # Current mode
     .equ      LA_CSR_TLBEHI,        0x11 # TLB entry high
     .equ      LA_CSR_TLBELO0,       0x12 # TLB entry low 0
     .equ      LA_CSR_TLBELO1,       0x13 # TLB entry low 1
@@ -25,68 +26,44 @@
     csrwr     $t0, LA_CSR_TLBRSAVE
     csrrd     $t0, LA_CSR_PGD
     lddir     $t0, $t0, 3
-    # beqz      $t0, 1f
+    beqz      $t0, 1f
     lddir     $t0, $t0, 2
-    # beqz      $t0, 1f
+    beqz      $t0, 1f
     lddir     $t0, $t0, 1
-    # beqz      $t0, 1f
+    beqz      $t0, 1f
+
     ldpte     $t0, 0
     ldpte     $t0, 1
-    # 1:
+    csrrd     $t0, LA_CSR_TLBRELO0
+    csrrd     $t0, LA_CSR_TLBRELO1
+    csrrd     $t0, LA_CSR_CRMD
+
+    2:
     tlbfill
+    csrrd     $t0, LA_CSR_TLBRBADV
+    srli.d    $t0, $t0, 13
+    slli.d    $t0, $t0, 13
+    csrwr     $t0, LA_CSR_TLBEHI
+    tlbsrch
+    tlbrd
+    csrrd     $t0, LA_CSR_TLBELO0
+    csrrd     $t0, LA_CSR_TLBELO1
     csrrd     $t0, LA_CSR_TLBRSAVE
     ertn
 
-# csrwr     $t0, 0x8b
+    1:
+    csrrd     $t0, LA_CSR_TLBREHI
+    ori       $t0, $t0, 0xC
+    csrwr     $t0, LA_CSR_TLBREHI
 
-# csrrd     $t0, 0x1b
-# lddir     $t0, $t0, 3
-# andi      $t0, $t0, 1
-# beqz      $t0, 1f
+    rotri.d   $t0, $t0, 61
+    ori       $t0, $t0, 3
+    rotri.d   $t0, $t0, 3
 
-# csrrd     $t0, 0x1b
-# lddir     $t0, $t0, 3
-# addi.d    $t0, $t0, -1
-# lddir     $t0, $t0, 1
-# andi      $t0, $t0, 1
-# beqz      $t0, 1f
-
-# csrrd     $t0, 0x1b
-# lddir     $t0, $t0, 3
-# addi.d    $t0, $t0, -1
-# lddir     $t0, $t0, 1
-# addi.d    $t0, $t0, -1
-
-# ldpte     $t0, 0
-# ldpte     $t0, 1
-# csrrd     $t0, 0x8c
-# csrrd     $t0, 0x8d
-# csrrd     $t0, 0x0
-# 2:
-# tlbfill
-# csrrd     $t0, 0x89
-# srli.d    $t0, $t0, 13
-# slli.d    $t0, $t0, 13
-# csrwr     $t0, 0x11
-# tlbsrch
-# tlbrd
-# csrrd     $t0, 0x12
-# csrrd     $t0, 0x13
-# csrrd     $t0, 0x8b
-# ertn
-# 1:
-# csrrd  $t0, 0x8e
-# ori       $t0, $t0, 0xC
-# csrwr     $t0, 0x8e
-
-# rotri.d   $t0, $t0, 61
-# ori       $t0, $t0, 3
-# rotri.d   $t0, $t0, 3
-
-# csrwr     $t0, 0x8c
-# csrrd     $t0, 0x8c
-# csrwr     $t0, 0x8d
-# b         2b
+    csrwr     $t0, LA_CSR_TLBRELO0
+    csrrd     $t0, LA_CSR_TLBRELO0
+    csrwr     $t0, LA_CSR_TLBRELO1
+    b         2b
 
 #     __tlb_refill:
 #     csrwr     $t0, LA_CSR_TLBRSAVE     # store temporary data

@@ -116,7 +116,12 @@ pub fn get_interrupt_number(int: &Interrupt) -> InterruptNumber {
     }
 }
 
-fn get_trap_type(tf: Option<&mut TrapContext>) -> TrapType {
+#[no_mangle]
+fn unaligned_handler(tf: &mut TrapContext) {
+    unsafe { emulate_load_store_insn(tf) };
+}
+
+fn get_trap_type(_: Option<&mut TrapContext>) -> TrapType {
     let estat = estat::read();
     let badv = badv::read().vaddr();
     match estat.cause() {
@@ -134,16 +139,11 @@ fn get_trap_type(tf: Option<&mut TrapContext>) -> TrapType {
         Trap::Exception(e) => {
             match e {
                 Exception::Breakpoint => TrapType::Exception(ExceptionType::Breakpoint),
-                Exception::AddressNotAligned => {
-                    if let Some(tf) = tf {
-                        match unsafe { emulate_load_store_insn(tf) } {
-                            Ok(()) => TrapType::None,
-                            Err(()) => TrapType::Unknown,
-                        }
-                    } else {
-                        TrapType::Unknown
-                    }
-                }
+                Exception::AddressNotAligned => panic!(
+                    "[AddressNotAligned] unexpected, badv: {:#x}, pc: {:#x}",
+                    badv,
+                    era::read().pc()
+                ),
                 Exception::Syscall => TrapType::Exception(ExceptionType::Syscall),
                 Exception::StorePageFault | Exception::PageModifyFault => TrapType::Exception(
                     ExceptionType::PageFault(PageFaultType::StorePageFault(badv)),

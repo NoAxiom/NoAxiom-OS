@@ -55,6 +55,8 @@ impl ArchInfo for LA64 {
         log::info!("[LA64] pgdl: {:?}", pgdl::read());
         log::info!("[LA64] pgdh: {:?}", pgdh::read());
 
+        log::info!("[LA64] save num: {}", prcfg1::read().save_num());
+
         // let save: usize;
         // unsafe { asm!("csrrd {}, 0x30", out(reg) save) };
         // log::info!("[LA64] SAVE: {:#x}", save);

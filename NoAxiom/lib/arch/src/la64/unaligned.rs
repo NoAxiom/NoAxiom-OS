@@ -1,7 +1,7 @@
 #![allow(dead_code)]
-use core::arch::global_asm;
+use core::{arch::global_asm, ptr::NonNull};
 
-use loongArch64::register::{badv, era};
+use loongArch64::register::badv;
 
 use super::context::TrapContext;
 
@@ -132,28 +132,20 @@ pub unsafe fn write_bytes(addr: u64, value: u64, n: usize) {
 }
 
 #[allow(unused_assignments)]
-pub unsafe fn emulate_load_store_insn(pt_regs: &mut TrapContext) -> Result<(), ()> {
-    let la_inst: u32;
+pub unsafe fn emulate_load_store_insn(pt_regs: &mut TrapContext) {
     let addr: u64;
     let rd: usize;
 
     let mut value: u64 = 0;
     let mut res: i32 = 0;
-
-    let era = era::read().pc();
-    // debug!("Unaligned Access PC @ {:#x} ", pt_regs.era);
-
-    unsafe {
-        core::arch::asm!(
-            "ld.w {val}, {addr}, 0 ",
-             addr = in(reg) era as u64,
-             val = out(reg) la_inst,
-        )
-    }
+    let la_inst = NonNull::new(pt_regs.era as *mut u32).unwrap().read();
     addr = badv::read().vaddr() as u64;
-    // debug!("badv is {:#x}", addr);
     rd = (la_inst & 0x1f) as usize;
-    // debug!("rd: {}  inst: {:#x}", rd, la_inst);
+
+    // log::debug!("{:#x?}", pt_regs);
+    // log::debug!("Unaligned Access PC @ {:#x} ", pt_regs.era);
+    // log::debug!("badv is {:#x}", addr);
+    // log::debug!("rd: {}  inst: {:#x}", rd, la_inst);
 
     if (la_inst >> 22) == LDD_OP || (la_inst >> 24) == LDPTRD_OP || (la_inst >> 15) == LDXD_OP {
         res = unaligned_read(addr, &mut value, 8, 1);
@@ -233,7 +225,5 @@ pub unsafe fn emulate_load_store_insn(pt_regs: &mut TrapContext) -> Result<(), (
         panic!("Address Error @ {:#x}", addr)
     }
 
-    era::set_pc(era + 4);
-
-    Ok(())
+    pt_regs.era += 4;
 }

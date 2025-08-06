@@ -5,7 +5,7 @@ use crate::{
     cpu::current_cpu,
     fs::vfs::inc_interrupts_count,
     syscall::utils::current_syscall,
-    trap::{ext_int::ext_int_handler, ipi::ipi_handler, ktimer::kernel_timer_trap_handler},
+    trap::{ext_int::ext_int_handler, soft_int::soft_int_handler, ktimer::kernel_timer_trap_handler},
 };
 
 /// kernel trap handler
@@ -64,7 +64,7 @@ fn kernel_interrupt_handler(interrupt: InterruptType) {
         }
         SupervisorSoft(id) => {
             inc_interrupts_count(id);
-            ipi_handler()
+            soft_int_handler()
         }
     }
 }
