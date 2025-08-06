@@ -25,6 +25,7 @@ use super::{
     tcb::TCB,
 };
 use crate::{
+    entry::init_proc::INIT_PROC_NAME,
     fs::{
         fdtable::FdTable,
         vfs::{
@@ -33,7 +34,6 @@ use crate::{
         },
     },
     include::{
-        fs::{FileFlags, InodeMode},
         process::{
             auxv::{AuxEntry, AT_NULL, AT_RANDOM},
             CloneFlags, TaskFlags,
@@ -117,6 +117,7 @@ pub struct Task {
     // shared
     fd_table: SharedMut<FdTable>,         // file descriptor table
     cwd: SharedMut<Arc<dyn Dentry>>,      // current work directory
+    exe: SharedMut<String>,               // executable file path
     root: SharedMut<Arc<dyn Dentry>>,     // root directory
     sa_list: SharedMut<SigActionList>,    // signal action list, saves signal handler
     memory_set: SharedMut<MemorySet>,     // memory set for the task
@@ -273,6 +274,10 @@ impl Task {
     #[inline(always)]
     pub fn cwd(&self) -> SpinLockGuard<Arc<dyn Dentry>> {
         self.cwd.lock()
+    }
+    #[inline(always)]
+    pub fn exe(&self) -> SpinLockGuard<String> {
+        self.exe.lock()
     }
     /// get root
     #[inline(always)]
@@ -497,6 +502,7 @@ impl Task {
             sched_entity: ThreadOnly::new(SchedEntity::default()),
             fd_table: Shared::new(FdTable::new()),
             cwd: Shared::new(root_dentry()),
+            exe: Shared::new(format!("/{}", INIT_PROC_NAME)), // executable path
             root: Shared::new(root_dentry()),
             sa_list: Shared::new(SigActionList::new()),
             tcb: ThreadOnly::new(TCB {
@@ -675,6 +681,7 @@ impl Task {
                 sched_entity: ThreadOnly::new(SchedEntity::default()),
                 fd_table,
                 cwd: self.cwd.clone(),
+                exe: self.exe.clone(),
                 root: self.root.clone(),
                 sa_list,
                 tcb: ThreadOnly::new(TCB {
@@ -715,6 +722,7 @@ impl Task {
                 sched_entity: ThreadOnly::new(SchedEntity::default()),
                 fd_table,
                 cwd: Shared::new(self.cwd().clone()),
+                exe: Shared::new(self.exe().clone()),
                 root: Shared::new(self.root().clone()),
                 sa_list,
                 tcb: ThreadOnly::new(TCB {
@@ -756,6 +764,7 @@ impl Task {
             mut auxs,
         } = MemorySet::load_elf(&elf_file).await?;
         memory_set.memory_activate();
+        *self.exe() = elf_file.path();
         self.terminate_threads();
         self.change_memory_set(memory_set);
         let (user_sp, _argc, _argv_base, _envp_base) =

@@ -7,7 +7,7 @@ use config::task::BUSYBOX;
 use super::{Syscall, SyscallResult};
 use crate::{
     constant::fs::AT_FDCWD,
-    fs::path::{get_dentry, kopen},
+    fs::path::get_dentry,
     include::{
         fs::{FcntlArgFlags, FileFlags},
         futex::{
@@ -146,6 +146,10 @@ impl Syscall<'_> {
         debug!("[sys_execve] path: {:?}", path);
 
         // args and envs init
+        // FIXME: MENTION that maybe can use the task.exe path or the path from function
+        // parameters directly
+        //
+        // like: args.push(path)
         if path.ends_with(".sh") {
             info!("[execve] executing .sh script, path: {:?}", path);
             path = BUSYBOX.to_string();
