@@ -15,7 +15,10 @@ use crate::{
         },
         impls::rust_fat32::fs_err,
     },
-    include::{fs::{FileFlags, InodeMode}, result::Errno},
+    include::{
+        fs::{FileFlags, InodeMode},
+        result::Errno,
+    },
     syscall::SysResult,
 };
 
@@ -33,10 +36,6 @@ impl Fat32Dentry {
             meta: DentryMeta::new(parent, name, super_block),
         }
     }
-
-    pub fn into_dyn(self: Arc<Self>) -> Arc<dyn Dentry> {
-        self.clone()
-    }
 }
 
 #[async_trait]
@@ -51,7 +50,7 @@ impl Dentry for Fat32Dentry {
     }
 
     fn open(self: Arc<Self>, file_flags: &FileFlags) -> SysResult<Arc<dyn File>> {
-        let inode = self.inode()?;
+        let inode = self.into_dyn().inode()?;
         match inode.file_type() {
             InodeMode::DIR => Ok(Arc::new(Fat32Dir::new(
                 self.clone(),
@@ -72,7 +71,7 @@ impl Dentry for Fat32Dentry {
     }
 
     async fn create(self: Arc<Self>, name: &str, mode: InodeMode) -> SysResult<Arc<dyn Dentry>> {
-        let inode = self.inode()?;
+        let inode = self.into_dyn().inode()?;
         let super_block = &self.meta().super_block;
         assert!(inode.file_type() == InodeMode::DIR);
         if mode.contains(InodeMode::FILE) {
@@ -88,7 +87,9 @@ impl Dentry for Fat32Dentry {
                 .await
                 .map_err(fs_err)?;
             let new_inode = Fat32FileInode::new(super_block.clone(), new_file);
-            Ok(self.into_dyn().add_child(name, Arc::new(new_inode)))
+            Ok(self
+                .into_dyn()
+                .add_child_with_inode(name, Arc::new(new_inode)))
         } else if mode.contains(InodeMode::DIR) {
             assert_no_lock!();
             let dir = inode
@@ -104,7 +105,9 @@ impl Dentry for Fat32Dentry {
                 .map_err(fs_err)?;
             debug!("create dir ok");
             let new_inode = Fat32DirInode::new(super_block.clone(), new_dir);
-            Ok(self.into_dyn().add_child(name, Arc::new(new_inode)))
+            Ok(self
+                .into_dyn()
+                .add_child_with_inode(name, Arc::new(new_inode)))
         } else {
             Err(Errno::EINVAL)
         }

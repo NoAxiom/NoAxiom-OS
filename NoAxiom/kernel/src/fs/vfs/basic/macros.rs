@@ -47,7 +47,7 @@ macro_rules! dentry_default {
                 fn open(self: Arc<Self>, file_flags: &FileFlags) -> SysResult<Arc<dyn File>> {
                     Ok(Arc::new($file_struct::new(FileMeta::new(
                         self.clone(),
-                        self.inode()?,
+                        self.into_dyn().inode()?,
                         file_flags,
                     ))))
                 }

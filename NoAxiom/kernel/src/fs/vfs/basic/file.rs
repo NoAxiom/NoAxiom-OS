@@ -1,6 +1,11 @@
 // ! **File** is the file system file instance opened in memory
 
-use alloc::{boxed::Box, string::String, sync::Arc, vec::Vec};
+use alloc::{
+    boxed::Box,
+    string::{String, ToString},
+    sync::Arc,
+    vec::Vec,
+};
 use core::{
     hash::{Hash, Hasher},
     sync::atomic::{AtomicI32, AtomicUsize, Ordering},
@@ -339,7 +344,7 @@ impl dyn File {
         Ok(len)
     }
     pub fn name(&self) -> String {
-        self.dentry().name()
+        self.dentry().name().to_string()
     }
     pub fn pos(&self) -> usize {
         self.meta().pos.load(Ordering::SeqCst)

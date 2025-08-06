@@ -1,145 +1,177 @@
-use alloc::{
-    string::{String, ToString},
-    sync::Arc,
-    vec::Vec,
-};
-use core::fmt::Debug;
+use alloc::{string::String, sync::Arc, vec::Vec};
 
 use hashbrown::HashMap;
-use ksync::{assert_no_lock, mutex::SpinLock};
+use include::errno::Errno;
+use kfuture::block::block_on;
+use ksync::mutex::SpinLock;
 
-use super::vfs::{basic::dentry::Dentry, root_dentry};
-use crate::{include::fs::InodeMode, syscall::SysResult, task::Task};
+use super::vfs::basic::dentry::Dentry;
+use crate::{
+    constant::fs::AT_FDCWD,
+    fs::vfs::root_dentry,
+    include::fs::{FcntlArgFlags, InodeMode},
+    syscall::SysResult,
+    task::Task,
+};
 
 lazy_static::lazy_static! {
-    pub static ref PATH_CACHE: SpinLock<HashMap<String, Path>> = SpinLock::new(HashMap::new());
+    pub static ref PATH_CACHE: SpinLock<HashMap<String, Arc<dyn Dentry>>> = SpinLock::new(HashMap::new());
 }
 
-#[derive(Clone)]
-pub struct Path {
-    inner: String,
-    dentry: Arc<dyn Dentry>,
+const MAX_NAME_LEN: usize = 255;
+
+/// Open a file by path for kernel use by sync
+///
+/// return PANIC for not found or any fault
+///
+/// MENTION:
+/// - make sure the file existed
+/// - only support Absolute path
+/// - only support open the normal file, cannot open the dir
+/// - don't support CREATE
+/// - don't check the access
+/// - can handle the symlink
+pub fn kopen(path: &str) -> Arc<dyn Dentry> {
+    debug_assert!(path.starts_with('/'), "kopen only support absolute path");
+    let paths = resolve_path(path).expect("resolve path failed");
+    root_dentry()
+        .walk_path(&paths)
+        .expect("kopen failed, please check the path")
 }
 
-impl Path {
-    /// Get the path from string with cwd or absolute path
-    pub fn from_string(path: String, task: &Arc<Task>) -> SysResult<Self> {
-        if !path.starts_with('/') {
-            let cwd = task.cwd().clone();
-            cwd.from_cd(path.as_str())
+/// Create a file by path for kernel use by sync
+///
+/// return PANIC for not found or any fault
+///
+/// MENTION:
+/// - make sure the path throght dir existed
+/// - only support Absolute path
+/// - support FILE / DIR creation
+/// - don't check the access
+/// - can handle the symlink
+pub fn kcreate(path: &str, mode: InodeMode) -> Arc<dyn Dentry> {
+    debug_assert!(path.starts_with('/'), "kcreate only support absolute path");
+    let (paths, last) = resolve_path2(path).expect("resolve path failed");
+    let name = last.expect("kcreate must have a name at the end");
+    let parent = root_dentry().walk_path(&paths).expect("walk path failed");
+    assert_no_lock!();
+    block_on(parent.create(name, mode)).unwrap()
+}
+
+/// split a path string into components
+/// just string operation
+///
+/// return the components as a vector of strings
+pub fn resolve_path(path: &str) -> SysResult<Vec<&str>> {
+    let paths = path
+        .split('/')
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<&str>>();
+    for path in &paths {
+        if path.len() > MAX_NAME_LEN {
+            return Err(Errno::ENAMETOOLONG);
+        }
+    }
+    Ok(paths)
+}
+
+/// split a path string into components
+/// just string operation
+///
+/// return the components as a vector of strings, the last component is special
+/// listed
+fn resolve_path2<'a>(path: &'a str) -> SysResult<(Vec<&'a str>, Option<&'a str>)> {
+    let mut paths = resolve_path(path)?;
+    let last = paths.pop();
+    Ok((paths, last))
+}
+
+/// lookup a file from dirfd and path with AtFlags
+///
+/// return the dentry if existed or any fault
+///
+/// Mention:
+/// - AtFlags support AT_SYMLINK_NOFOLLOW only currently
+/// - ignore the access
+pub fn get_dentry(
+    task: &Arc<Task>,
+    dirfd: isize,
+    path: &str,
+    flags: &FcntlArgFlags,
+) -> SysResult<Arc<dyn Dentry>> {
+    let abs = path.starts_with('/');
+    let components = resolve_path(path)?;
+    __get_dentry(task, dirfd, abs, &components, flags)
+}
+
+/// lookup a file from dirfd and path with AtFlags
+///
+/// return the PARENT dentry and the final NAME if existed or any fault
+///
+/// Mention:
+/// - AtFlags support AT_SYMLINK_NOFOLLOW only currently
+/// - ignore the access
+pub fn get_dentry_parent<'a>(
+    task: &Arc<Task>,
+    dirfd: isize,
+    path: &'a str,
+    flags: &FcntlArgFlags,
+) -> SysResult<(Arc<dyn Dentry>, &'a str)> {
+    let abs = path.starts_with('/');
+    let (components, last) = resolve_path2(path)?;
+    debug_assert!(
+        last.is_some(),
+        "get_dentry_parent must have a name at the end"
+    );
+    Ok((
+        __get_dentry(task, dirfd, abs, &components, flags)?,
+        last.unwrap(),
+    ))
+}
+
+fn __get_dentry(
+    task: &Arc<Task>,
+    dirfd: isize,
+    abs: bool,
+    components: &Vec<&str>,
+    flags: &FcntlArgFlags,
+) -> SysResult<Arc<dyn Dentry>> {
+    let cwd = if !abs {
+        // relative path
+        if dirfd == AT_FDCWD {
+            task.cwd().clone()
         } else {
-            Path::try_from(path)
+            task.fd_table()
+                .get(dirfd as usize)
+                .ok_or(Errno::EBADF)?
+                .dentry()
         }
-    }
+    } else {
+        // absolute path
+        task.root().clone()
+    };
 
-    /// Get the path from absolute path, the path should exist
-    pub fn try_from(abs_path: String) -> SysResult<Self> {
-        assert!(
-            abs_path.starts_with('/'),
-            "{} is not absolute path!",
-            abs_path
-        );
-        trace!("Path::from: {}", abs_path);
+    let mut this = cwd.walk_path(components)?;
 
-        if let Some(path) = PATH_CACHE.lock().get(&abs_path) {
-            return Ok(path.clone());
-        }
-
-        let mut split_path = abs_path.split('/').collect::<Vec<&str>>();
-        if split_path.ends_with(&[""]) {
-            split_path.pop();
-        }
-        let dentry = root_dentry().find_path(&split_path)?;
-        let res = Self {
-            inner: abs_path.clone(),
-            dentry,
-        };
-        PATH_CACHE.lock().insert(abs_path, res.clone());
-        Ok(res)
-    }
-
-    /// Get the path from absolute path, create the path if not exist
-    pub async fn from_or_create(abs_path: String, mode: InodeMode) -> SysResult<Self> {
-        assert!(
-            abs_path.starts_with('/'),
-            "{} is not absolute path!",
-            abs_path
-        );
-        trace!("Path::from_or_create: {}", abs_path);
-        let mut split_path = abs_path.split('/').collect::<Vec<&str>>();
-        if split_path.ends_with(&[""]) {
-            split_path.pop();
-        }
-        let dentry = root_dentry().find_path_or_create(&split_path, mode).await?; // todo: don't walk from root
-        Ok(Self {
-            inner: abs_path,
-            dentry,
-        })
-    }
-
-    fn cd(&self, path: &str) -> String {
-        assert!(!path.starts_with('/'));
-        let mut new_path = self.inner.to_string();
-        if new_path.ends_with('/') {
-            new_path.pop();
-        }
-
-        let path_parts: Vec<&str> = path.split('/').collect();
-        let mut result_parts: Vec<String> = new_path.split('/').map(String::from).collect();
-
-        for part in path_parts {
-            match part {
-                "" | "." => continue,
-                ".." => {
-                    if result_parts.len() > 1 {
-                        result_parts.pop();
-                    } else {
-                        panic!("Path::from_cd: path underflow");
-                    }
-                }
-                _ => result_parts.push(part.to_string()),
+    // special case for the last component
+    // if the last component is a symlink, we need to follow it
+    if let Ok(inode) = this.inode() {
+        if !flags.contains(FcntlArgFlags::AT_SYMLINK_NOFOLLOW) {
+            if let Some(symlink_path) = inode.symlink() {
+                debug!("[get_dentry] Following symlink: {}", symlink_path);
+                this = this.symlink_jump(&symlink_path)?;
+            } else {
+                warn!(
+                    "[get_dentry] AT_SYMLINK_NOFOLLOW is set, but Dentry {} has no symlink",
+                    this.name()
+                );
             }
-        }
-
-        if result_parts.len() == 1 {
-            "/".to_string()
         } else {
-            result_parts.join("/")
+            debug!("[get_dentry] AT_SYMLINK_NOFOLLOW is set, not following symlink");
         }
+    } else {
+        warn!("[get_dentry] Son Dentry is a negative dentry!");
     }
 
-    /// Get the path from relative path, the path should exist
-    #[inline(always)]
-    pub fn from_cd(&self, path: &str) -> SysResult<Self> {
-        assert_no_lock!();
-        Self::try_from(self.cd(path))
-    }
-
-    /// Get the path from relative path, create the path if not exist
-    #[inline(always)]
-    pub async fn from_cd_or_create(&self, path: &str, mode: InodeMode) -> SysResult<Self> {
-        Self::from_or_create(self.cd(path), mode).await
-    }
-
-    /// Get dentry
-    #[inline(always)]
-    pub fn dentry(&self) -> Arc<dyn Dentry> {
-        self.dentry.clone()
-    }
-
-    #[inline(always)]
-    pub fn as_string(&self) -> String {
-        self.inner.clone()
-    }
-
-    #[inline(always)]
-    pub fn as_str(&self) -> &str {
-        self.inner.as_str()
-    }
-}
-
-impl Debug for Path {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{}", self.inner)
-    }
+    Ok(this)
 }

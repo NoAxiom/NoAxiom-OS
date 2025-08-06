@@ -8,7 +8,7 @@ use impls::{
 use ksync::Once;
 
 use crate::{
-    fs::{blockcache::get_block_cache, manager::FS_MANAGER, path::Path},
+    fs::{blockcache::get_block_cache, manager::FS_MANAGER},
     include::fs::{FileFlags, InodeMode, MountFlags},
 };
 pub mod basic;
@@ -63,26 +63,13 @@ pub async fn fs_init() {
 
     #[cfg(feature = "debug_sig")]
     {
-        let ls = Path::from_or_create(format!("/ls"), InodeMode::FILE)
-            .await
-            .unwrap();
-        ls.dentry()
-            .open(&FileFlags::empty())
-            .expect("open ls failed");
+        use crate::fs::path::kcreate;
 
-        let logon = Path::from_or_create(format!("/logon"), InodeMode::FILE)
-            .await
-            .unwrap();
-        logon
-            .dentry()
-            .open(&FileFlags::empty())
-            .expect("open logon failed");
+        let logon = kcreate("/logon", InodeMode::FILE);
+        logon.open(&FileFlags::empty()).expect("open logon failed");
 
-        let logoff = Path::from_or_create(format!("/logoff"), InodeMode::FILE)
-            .await
-            .unwrap();
+        let logoff = kcreate("/logoff", InodeMode::FILE);
         logoff
-            .dentry()
             .open(&FileFlags::empty())
             .expect("open logoff failed");
     }

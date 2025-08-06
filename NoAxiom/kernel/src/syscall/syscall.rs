@@ -21,10 +21,10 @@ impl<'a> Syscall<'a> {
         use SyscallID::*;
         match id {
             // fs
-            SYS_FCHMOD =>           self.sys_fchmod(args[0], args[1], args[2]),
-            SYS_FCHMODAT =>         self.sys_fchmodat(args[0], args[1], args[2], args[3] as i32),
+            SYS_FCHMOD =>           self.sys_fchmod(args[0], args[1]),
+            SYS_FCHMODAT =>         self.sys_fchmodat(args[0], args[1], args[2], args[3] as u32),
             SYS_FCHOWN =>           self.sys_fchown(args[0], args[1] as u32, args[2] as u32),
-            SYS_FCHOWNAT =>         self.sys_fchownat(args[0], args[1], args[2] as u32, args[3] as u32, args[4] as i32),
+            SYS_FCHOWNAT =>         self.sys_fchownat(args[0], args[1], args[2] as u32, args[3] as u32, args[4] as u32),
             SYS_UMASK =>            Self::empty_syscall("umask", 0x777),
             SYS_SYNC =>             Self::empty_syscall("sync", 0),
             SYS_FSYNC =>            Self::empty_syscall("fsync", 0),
@@ -55,10 +55,10 @@ impl<'a> Syscall<'a> {
             SYS_FCNTL =>            self.sys_fcntl(args[0], args[1], args[2]),
             SYS_READLINKAT =>       self.sys_readlinkat(args[0] as isize, args[1], args[2], args[3]).await,
             SYS_IOCTL =>            self.sys_ioctl(args[0], args[1], args[2]).await,
-            SYS_NEWFSTATAT =>       self.sys_newfstatat(args[0] as isize, args[1], args[2], args[3] as i32).await,
+            SYS_NEWFSTATAT =>       self.sys_newfstatat(args[0] as isize, args[1], args[2], args[3] as u32).await,
             SYS_SENDFILE =>         self.sys_sendfile(args[0], args[1], args[2], args[3]).await,
             SYS_FACCESSAT =>        self.sys_faccessat(args[0], args[1], args[2]as i32, args[3] as i32),
-            SYS_UTIMENSAT =>        self.sys_utimensat(args[0] as isize, args[1], args[2], args[3] as i32).await,
+            SYS_UTIMENSAT =>        self.sys_utimensat(args[0] as isize, args[1], args[2], args[3] as u32).await,
             SYS_LSEEK =>            self.sys_lseek(args[0], args[1] as isize, args[2]),
             SYS_RENAMEAT2 =>        self.sys_renameat2(args[0] as isize, args[1], args[2] as isize, args[3], args[4] as i32).await,
             SYS_COPY_FILE_RANGE =>  self.sys_copy_file_range(args[0], args[1], args[2], args[3], args[4], args[5] as i32).await,

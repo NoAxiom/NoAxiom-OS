@@ -220,7 +220,7 @@ impl File for Ext4Dir {
                     child_name, file_type
                 );
             };
-            self.dentry().add_child(&child_name, inode);
+            self.dentry().add_child_with_inode(&child_name, inode);
         }
         unsafe {
             if FIRST {

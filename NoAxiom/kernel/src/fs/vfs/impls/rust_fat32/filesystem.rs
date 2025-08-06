@@ -63,10 +63,10 @@ impl FileSystem for AsyncSmpFat32 {
             fs_super_block.clone(),
             fs_super_block.clone().inner.root_dir(),
         ));
-        root_dentry.set_inode(root_inode);
+        root_dentry.into_dyn().set_inode(root_inode);
 
         if let Some(parent) = parent {
-            parent.add_child_directly(root_dentry.clone());
+            parent.add_child(root_dentry.clone());
         }
 
         root_dentry

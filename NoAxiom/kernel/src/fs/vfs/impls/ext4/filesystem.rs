@@ -68,10 +68,10 @@ impl FileSystem for AsyncSmpExt4 {
             ext4.get_inode_ref(ROOT_INODE).await,
             InodeMode::from_bits(mode as u32).unwrap(),
         ));
-        root_dentry.set_inode(root_inode);
+        root_dentry.into_dyn().set_inode(root_inode);
 
         if let Some(parent) = parent {
-            parent.add_child_directly(root_dentry.clone());
+            parent.add_child(root_dentry.clone());
         }
         root_dentry
     }

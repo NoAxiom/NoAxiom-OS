@@ -29,7 +29,7 @@ impl File for ExeFile {
     }
 
     async fn base_readlink(&self, buf: &mut [u8]) -> SyscallResult {
-        let exe = current_task().unwrap().cwd().as_string();
+        let exe = current_task().unwrap().cwd().path();
         if buf.len() < exe.len() + 1 {
             warn!("readlink buf not big enough");
             return Err(Errno::EINVAL);

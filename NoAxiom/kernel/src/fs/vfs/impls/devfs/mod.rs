@@ -45,8 +45,8 @@ pub async fn init(fs_root: Arc<dyn Dentry>) -> SysResult<()> {
         fs_root.super_block(),
     ));
     let null_inode = Arc::new(NullInode::new(fs_root.super_block()));
-    null_dentry.set_inode(null_inode);
-    fs_root.add_child_directly(null_dentry);
+    null_dentry.into_dyn().set_inode(null_inode);
+    fs_root.add_child(null_dentry);
 
     info!("[fs] create /dev/zero");
     let zero_dentry = Arc::new(zero::dentry::ZeroDentry::new(
@@ -55,8 +55,8 @@ pub async fn init(fs_root: Arc<dyn Dentry>) -> SysResult<()> {
         fs_root.super_block(),
     ));
     let zero_inode = Arc::new(zero::inode::ZeroInode::new(fs_root.super_block()));
-    zero_dentry.set_inode(zero_inode);
-    fs_root.add_child_directly(zero_dentry);
+    zero_dentry.into_dyn().set_inode(zero_inode);
+    fs_root.add_child(zero_dentry);
 
     info!("[fs] create /dev/tty");
     let tty_dentry = Arc::new(TtyDentry::new(
@@ -65,8 +65,8 @@ pub async fn init(fs_root: Arc<dyn Dentry>) -> SysResult<()> {
         fs_root.super_block(),
     ));
     let tty_inode = Arc::new(TtyInode::new(fs_root.super_block()));
-    tty_dentry.set_inode(tty_inode);
-    fs_root.add_child_directly(tty_dentry.clone());
+    tty_dentry.into_dyn().set_inode(tty_inode);
+    fs_root.add_child(tty_dentry.clone());
 
     let tty_file = tty_dentry.open(&FileFlags::O_RDWR)?;
     TTYFILE.call_once(|| tty_file);
@@ -78,8 +78,8 @@ pub async fn init(fs_root: Arc<dyn Dentry>) -> SysResult<()> {
         fs_root.super_block(),
     ));
     let rtc_inode = Arc::new(RtcInode::new(fs_root.super_block()));
-    rtc_dentry.set_inode(rtc_inode);
-    fs_root.add_child_directly(rtc_dentry);
+    rtc_dentry.into_dyn().set_inode(rtc_inode);
+    fs_root.add_child(rtc_dentry);
 
     info!("[fs] create /dev/cpu_dma_latency");
     let cpu_dma_latency_dentry = Arc::new(CpuDmaLatencyDentry::new(
@@ -88,8 +88,10 @@ pub async fn init(fs_root: Arc<dyn Dentry>) -> SysResult<()> {
         fs_root.super_block(),
     ));
     let cpu_dma_latency_inode = Arc::new(CpuDmaLatencyInode::new(fs_root.super_block()));
-    cpu_dma_latency_dentry.set_inode(cpu_dma_latency_inode);
-    fs_root.add_child_directly(cpu_dma_latency_dentry);
+    cpu_dma_latency_dentry
+        .into_dyn()
+        .set_inode(cpu_dma_latency_inode);
+    fs_root.add_child(cpu_dma_latency_dentry);
 
     info!("[fs] create /dev/urandom");
     let urandom_dentry = Arc::new(UrandomDentry::new(
@@ -98,8 +100,8 @@ pub async fn init(fs_root: Arc<dyn Dentry>) -> SysResult<()> {
         fs_root.super_block(),
     ));
     let urandom_inode = Arc::new(UrandomInode::new(fs_root.super_block()));
-    urandom_dentry.set_inode(urandom_inode);
-    fs_root.add_child_directly(urandom_dentry);
+    urandom_dentry.into_dyn().set_inode(urandom_inode);
+    fs_root.add_child(urandom_dentry);
 
     //todo: add /dev/shm
     info!("[fs] create /dev/shm");
@@ -109,8 +111,8 @@ pub async fn init(fs_root: Arc<dyn Dentry>) -> SysResult<()> {
         fs_root.super_block(),
     ));
     let shm_inode = Arc::new(RamFsDirInode::new(fs_root.super_block(), 0));
-    shm_dentry.set_inode(shm_inode);
-    fs_root.add_child_directly(shm_dentry.clone());
+    shm_dentry.into_dyn().set_inode(shm_inode);
+    fs_root.add_child(shm_dentry.clone());
 
     //todo: add /dev/misc
 
@@ -121,8 +123,8 @@ pub async fn init(fs_root: Arc<dyn Dentry>) -> SysResult<()> {
         fs_root.super_block(),
     ));
     let loop_control_inode = Arc::new(LoopControlInode::new(fs_root.super_block()));
-    loop_control_dentry.set_inode(loop_control_inode);
-    fs_root.add_child_directly(loop_control_dentry);
+    loop_control_dentry.into_dyn().set_inode(loop_control_inode);
+    fs_root.add_child(loop_control_dentry);
 
     info!("[fs] create /dev/loop0");
     let loopdev_dentry = Arc::new(LoopDevDentry::new(
@@ -131,8 +133,8 @@ pub async fn init(fs_root: Arc<dyn Dentry>) -> SysResult<()> {
         fs_root.super_block(),
     ));
     let loopdev_inode = Arc::new(LoopDevInode::new(fs_root.super_block()));
-    loopdev_dentry.set_inode(loopdev_inode);
-    fs_root.add_child_directly(loopdev_dentry);
+    loopdev_dentry.into_dyn().set_inode(loopdev_inode);
+    fs_root.add_child(loopdev_dentry);
 
     Ok(())
 }

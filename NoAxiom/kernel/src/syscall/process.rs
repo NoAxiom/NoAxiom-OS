@@ -6,8 +6,10 @@ use config::task::BUSYBOX;
 
 use super::{Syscall, SyscallResult};
 use crate::{
-    fs::path::Path,
+    constant::fs::AT_FDCWD,
+    fs::path::{get_dentry, kopen},
     include::{
+        fs::{FcntlArgFlags, FileFlags},
         futex::{
             FUTEX_BITSET_MATCH_ANY, FUTEX_CLOCK_REALTIME, FUTEX_CMD_MASK, FUTEX_REQUEUE,
             FUTEX_WAIT, FUTEX_WAIT_BITSET, FUTEX_WAKE, FUTEX_WAKE_BITSET,
@@ -163,7 +165,11 @@ impl Syscall<'_> {
             }
         }
 
-        let file_path = Path::from_string(path, self.task)?;
+        let searchflags = FcntlArgFlags::empty();
+        let dentry = get_dentry(self.task, AT_FDCWD, &path, &searchflags)?;
+        let file_path = dentry.path();
+        let elf_file = dentry.open(&FileFlags::empty())?;
+
         // append args and envs from user provided
         args.append(&mut UserPtr::<UserPtr<u8>>::new(argv).get_string_vec().await?);
         envs.append(&mut UserPtr::<UserPtr<u8>>::new(envp).get_string_vec().await?);
@@ -177,7 +183,7 @@ impl Syscall<'_> {
             args,
             envs,
         );
-        self.task.execve(file_path, args, envs).await?;
+        self.task.execve(elf_file, args, envs).await?;
 
         // On success, execve() does not return, on error -1 is returned, and errno is
         // set to indicate the error.

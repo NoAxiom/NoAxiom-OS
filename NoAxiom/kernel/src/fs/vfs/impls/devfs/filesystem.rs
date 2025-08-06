@@ -53,10 +53,10 @@ impl FileSystem for DevFs {
             fs_super_block.clone(),
         ));
         let root_inode = Arc::new(RamFsDirInode::new(fs_super_block.clone(), 0));
-        root_dentry.set_inode(root_inode);
+        root_dentry.into_dyn().set_inode(root_inode);
 
         if let Some(parent) = parent.clone() {
-            parent.add_child_directly(root_dentry.clone());
+            parent.add_child(root_dentry.clone());
         }
 
         init(root_dentry.clone())

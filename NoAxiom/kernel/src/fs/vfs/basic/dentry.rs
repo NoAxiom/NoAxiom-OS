@@ -5,20 +5,29 @@ use alloc::{
     sync::{Arc, Weak},
     vec::Vec,
 };
-use core::{intrinsics::unlikely, panic};
+use core::{intrinsics::unlikely, panic, usize};
 
 use async_trait::async_trait;
 use downcast_rs::DowncastSync;
 use ksync::mutex::{SpinLock, SpinLockGuard};
 
-use crate::fs::vfs::impls::devfs::{
-    loop_control::{dentry::LoopControlDentry, inode::LoopControlInode},
-    loopdev::{dentry::LoopDevDentry, inode::LoopDevInode},
-    null::NullDentry,
-    rtc::{dentry::RtcDentry, inode::RtcInode},
-    tty::dentry::TtyDentry,
-    urandom::dentry::UrandomDentry,
-    zero::{dentry::ZeroDentry, inode::ZeroInode},
+use crate::{
+    fs::{
+        path,
+        vfs::{
+            impls::devfs::{
+                loop_control::{dentry::LoopControlDentry, inode::LoopControlInode},
+                loopdev::{dentry::LoopDevDentry, inode::LoopDevInode},
+                null::NullDentry,
+                rtc::{dentry::RtcDentry, inode::RtcInode},
+                tty::dentry::TtyDentry,
+                urandom::dentry::UrandomDentry,
+                zero::{dentry::ZeroDentry, inode::ZeroInode},
+            },
+            root_dentry,
+        },
+    },
+    include::fs::ALL_PERMISSIONS_MASK,
 };
 
 type Mutex<T> = SpinLock<T>;
@@ -31,7 +40,6 @@ use super::{
 };
 use crate::{
     fs::{
-        path::Path,
         pipe::PipeInode,
         vfs::{
             basic::inode::InodeState,
@@ -47,7 +55,6 @@ use crate::{
 };
 
 pub struct DentryMeta {
-    // todo: dentry states
     /// The name of the dentry
     name: String,
 
@@ -60,6 +67,7 @@ pub struct DentryMeta {
     children: Mutex<BTreeMap<String, Arc<dyn Dentry>>>,
     /// The inode of the dentry, None if it is negative
     /// Now it holds the inode of the file the whole life time
+    /// todo: delete the Mutex
     inode: Mutex<Option<Arc<dyn Inode>>>,
 }
 
@@ -81,6 +89,7 @@ impl DentryMeta {
 }
 
 #[async_trait]
+// todo: Arc can be &Arc to reduce the Arc clone?
 pub trait Dentry: Send + Sync + DowncastSync {
     /// Get the meta of the dentry
     fn meta(&self) -> &DentryMeta;
@@ -92,8 +101,23 @@ pub trait Dentry: Send + Sync + DowncastSync {
     async fn create(self: Arc<Self>, name: &str, mode: InodeMode) -> SysResult<Arc<dyn Dentry>>;
     /// Create a sym link to `tar_name` in the dentry
     async fn symlink(self: Arc<Self>, name: &str, tar_name: &str) -> SysResult<()>;
+    /// Into dyn
+    fn into_dyn(self: &Arc<Self>) -> Arc<dyn Dentry>
+    where
+        Self: Sized,
+    {
+        self.clone()
+    }
+}
+
+impl dyn Dentry {
+    /// Get the name of the dentry
+    #[inline(always)]
+    pub fn name(&self) -> &str {
+        &self.meta().name
+    }
     /// Get the inode of the dentry
-    fn inode(&self) -> SysResult<Arc<dyn Inode>> {
+    pub fn inode(&self) -> SysResult<Arc<dyn Inode>> {
         if let Some(inode) = self.meta().inode.lock().as_ref() {
             Ok(inode.clone())
         } else {
@@ -101,12 +125,8 @@ pub trait Dentry: Send + Sync + DowncastSync {
             Err(Errno::ENOENT)
         }
     }
-    /// Get the name of the dentry
-    fn name(&self) -> String {
-        self.meta().name.clone()
-    }
     /// Set the inode of the dentry
-    fn set_inode(&self, inode: Arc<dyn Inode>) {
+    pub fn set_inode(&self, inode: Arc<dyn Inode>) {
         if self.meta().inode.lock().is_some() {
             assert_eq!(
                 inode.file_type(),
@@ -122,24 +142,32 @@ pub trait Dentry: Send + Sync + DowncastSync {
         }
         *self.meta().inode.lock() = Some(inode);
     }
-    fn set_inode_none(&self) {
+    pub fn set_inode_none(&self) {
         *self.meta().inode.lock() = None;
     }
-}
-
-impl dyn Dentry {
     /// Check if the dentry is negative
+    #[inline(always)]
     pub fn is_negative(&self) -> bool {
         self.inode().is_err()
     }
 
-    /// Create a negetive child dentry with `name`.
-    pub fn new_child(self: &Arc<Self>, name: &str) -> Arc<dyn Dentry> {
-        let child = self.clone().from_name(name);
-        child
+    /// Get the path of the dentry, panic if the dentry is deleted.
+    pub fn path(self: &Arc<Self>) -> String {
+        let mut path = self.name().to_string();
+        let mut current = self.clone();
+        while let Some(parent) = current.parent() {
+            path = format!("{}/{}", parent.name(), path);
+            current = parent;
+        }
+        if path.len() > 1 {
+            path.remove(0);
+        }
+        debug_assert!(path.starts_with('/'));
+        path
     }
 
     /// Get the parent of the dentry
+    /// todo: use Arc directly, not Weak
     pub fn parent(self: &Arc<Self>) -> Option<Arc<dyn Dentry>> {
         self.meta().parent.as_ref().and_then(|p| p.upgrade())
     }
@@ -153,9 +181,19 @@ impl dyn Dentry {
         self.meta().children.lock().get(name).cloned()
     }
 
+    /// Get super block of the dentry
+    pub fn super_block(&self) -> Arc<dyn SuperBlock> {
+        self.meta().super_block.clone()
+    }
+
     /// use self.create() to generate child dentry
     /// Add a child dentry with `name` and `child_inode`, for realfs only.
-    pub fn add_child(self: &Arc<Self>, name: &str, child_inode: Arc<dyn Inode>) -> Arc<dyn Dentry> {
+    /// todo: delete this method
+    pub fn add_child_with_inode(
+        self: &Arc<Self>,
+        name: &str,
+        child_inode: Arc<dyn Inode>,
+    ) -> Arc<dyn Dentry> {
         let mut children = self.meta().children.lock();
 
         let res = if let Some(child) = children.get(name) {
@@ -163,7 +201,7 @@ impl dyn Dentry {
             child.set_inode(child_inode);
             child.clone()
         } else {
-            let child = self.new_child(name);
+            let child = self.clone().from_name(name);
             child.set_inode(child_inode);
             children.insert(name.to_string(), child.clone());
             child
@@ -173,11 +211,10 @@ impl dyn Dentry {
 
     /// use child dentry directly
     /// Add a child dentry with `child` directly, for fs which doesn't
-    /// support create or used in different type fs (like mount). Basicly like
-    /// `add_dir_child`.
-    pub fn add_child_directly(self: &Arc<Self>, child: Arc<dyn Dentry>) {
+    /// support create or used in different type fs (like mount).
+    pub fn add_child(self: &Arc<Self>, child: Arc<dyn Dentry>) {
         let mut children = self.meta().children.lock();
-        let name = child.name();
+        let name = child.name().to_string();
         if let Some(old) = children.insert(name.clone(), child) {
             warn!(
                 "add child {} to {} already has child {}, replace it",
@@ -188,183 +225,166 @@ impl dyn Dentry {
         }
     }
 
-    // pub fn delete_self(self: &Arc<Self>) {
-    //     if let Some(parent) = self.parent() {
-    //         parent.remove_child(&self.name());
-    //     }
-    //     let mut inode = self.meta().inode.lock();
-    //     if let Some(inode_arc) = inode.take() {
-    //         drop(inode_arc);
-    //         *inode = None;
-    //     }
-    // }
-
     /// Remove a child dentry with `name`.
     pub fn remove_child(self: &Arc<Self>, name: &str) -> Option<Arc<dyn Dentry>> {
-        let path = self.clone().path().unwrap().as_string();
+        let path = self.clone().path();
         crate::fs::path::PATH_CACHE.lock().remove(&path);
-        self.meta().children.lock().remove(name)
+        self.children().remove(name)
     }
 
-    /// Get super block of the dentry
-    pub fn super_block(&self) -> Arc<dyn SuperBlock> {
-        self.meta().super_block.clone()
+    /// walk through the path, return ENOENT when not found.
+    /// follow the symlink at a limited time
+    /// use recursion
+    /// todo: add path_cache!!
+    pub fn walk_path(self: &Arc<Self>, path: &Vec<&str>) -> SysResult<Arc<dyn Dentry>> {
+        Ok(self.__walk_path(path, 0, 0)?.0)
     }
 
-    /// Get the path of the dentry, panic if the dentry is deleted.
-    pub fn path(self: Arc<Self>) -> SysResult<Path> {
-        let mut path = self.name();
-        let mut current = self.clone();
-        while let Some(parent) = current.parent() {
-            path = format!("{}/{}", parent.name(), path);
-            current = parent;
+    /// Must ensure the inode has symlink
+    /// symlink jump, follow the symlink path
+    pub fn symlink_jump(self: &Arc<Self>, symlink_path: &str) -> SysResult<Arc<dyn Dentry>> {
+        debug_assert!(self
+            .inode()
+            .expect("should have inode!")
+            .symlink()
+            .is_some());
+        Ok(self.__symlink_jump(symlink_path, 0)?.0)
+    }
+
+    fn __symlink_jump(
+        self: &Arc<Self>,
+        symlink_path: &str,
+        jumps: usize,
+    ) -> SysResult<(Arc<dyn Dentry>, usize)> {
+        let abs = symlink_path.starts_with('/');
+        let components = path::resolve_path(symlink_path)?;
+        if abs {
+            root_dentry().__walk_path(&components, 0, jumps)
+        } else {
+            self.__walk_path(&components, 0, jumps)
         }
-        if path.len() > 1 {
-            path.remove(0);
-        }
-        assert!(path.starts_with('/'));
-        Path::try_from(path)
     }
 
-    /// Find the dentry with `path`, Error if not found.
-    ///
-    /// - all the mid dentry should be NON-NEGATIVE and DIR
-    /// - the file dentry can be negative
-    pub fn find_path(self: Arc<Self>, path: &Vec<&str>) -> SysResult<Arc<dyn Dentry>> {
-        let mut idx = 0;
-        let max_idx = path.len() - 1;
-        let mut current = self.clone();
+    fn __walk_path(
+        self: &Arc<Self>,
+        path: &Vec<&str>,
+        step: usize,
+        jumps: usize,
+    ) -> SysResult<(Arc<dyn Dentry>, usize)> {
+        const SYMLINK_MAX_STEP: usize = 12;
+        if unlikely(jumps >= SYMLINK_MAX_STEP) {
+            error!("[walk_path] symlink too many times, jumps: {}", jumps);
+            return Err(Errno::ELOOP);
+        }
+        if step == path.len() {
+            return Ok((self.clone(), jumps));
+        }
+        if unlikely(self.is_negative()) {
+            error!("[walk_path] {} is negative", self.name());
+            return Err(Errno::ENOENT);
+        }
 
-        while idx <= max_idx {
-            let name = path[idx];
-            if name.is_empty() || name == "." {
-                idx += 1;
-                continue;
-            }
-            assert!(current.clone().inode().unwrap().file_type() == InodeMode::DIR);
-            if current.clone().children().is_empty() {
-                if let Ok(current_dir) = current.clone().open(&FileFlags::empty()) {
-                    warn!(
-                        "[find_path] the {} is not open! Now open it.",
-                        current.name()
-                    );
-                    assert_no_lock!();
-                    block_on(current_dir.load_dir()).unwrap();
+        let inode = self.inode().expect("should have inode!");
+        // the mid dentry MUST have a inode
+        if inode.file_type() != InodeMode::DIR {
+            error!("[walk_path] {} is not a dir", self.name());
+            return Err(Errno::ENOTDIR);
+        }
+
+        let entry = path[step];
+        match entry {
+            "." => self.__walk_path(path, step + 1, jumps),
+            ".." => {
+                if let Some(parent) = self.parent() {
+                    parent.__walk_path(path, step + 1, jumps)
+                } else {
+                    error!("[walk_path] {} has no parent", self.name());
+                    Err(Errno::ENOENT)
                 }
             }
-            if let Some(child) = current.clone().meta().children.lock().get(name) {
-                if idx < max_idx {
-                    let inode = child.inode()?;
-                    let file_type = inode.file_type();
-                    if file_type != InodeMode::DIR {
+            name => {
+                if let Some(symlink_path) = inode.symlink() {
+                    let (tar, new_jumps) = self.__symlink_jump(&symlink_path, jumps + 1)?;
+                    return tar.__walk_path(path, step + 1, new_jumps);
+                }
+                if let Some(child) = self.get_child(name) {
+                    return child.__walk_path(path, step + 1, jumps);
+                }
+                match self.clone().open(&FileFlags::empty()) {
+                    Ok(file) => {
+                        assert_no_lock!();
+                        // todo: add sync fn load_dir method
+                        warn!("[walk_path] {} is not open! Now open it.", self.name());
+                        block_on(file.load_dir()).expect("can not load dir!");
+                    }
+                    Err(e) => {
                         error!(
-                            "[kernel] [find_path] {} which is {:?} is not a dir",
-                            name, file_type
+                            "[walk_path] {} open failed with {:?}, not found!",
+                            e,
+                            self.name()
                         );
-                        return Err(Errno::ENOTDIR);
+                        return Err(Errno::ENOENT);
                     }
                 }
-                current = child.clone();
-                idx += 1;
-            } else {
-                #[cfg(feature = "debug_sig")]
-                {
-                    let path_str = path.join("/");
-                    warn!("[kernel] [find_path] {} not exist", path_str);
+                if let Some(child) = self.get_child(name) {
+                    return child.__walk_path(path, step + 1, jumps);
                 }
-                return Err(Errno::ENOENT);
-            }
-        }
-
-        Ok(current)
-    }
-
-    /// Find the dentry with `path`, create negative dentry if not found.
-    /// if just open a file, and the path is invalid, all the path dentry will
-    /// be created and will write to the disk. If the path isvalid, or `create`
-    /// the file, it's ok.
-    ///
-    /// todo: path cache
-    pub async fn find_path_or_create(
-        self: Arc<Self>,
-        path: &Vec<&str>,
-        mode: InodeMode,
-    ) -> SysResult<Arc<dyn Dentry>> {
-        use arch::ArchInt;
-
-        let mut idx = 0;
-        let max_idx = path.len() - 1;
-        let mut current = self.clone();
-        while idx <= max_idx {
-            let name = path[idx];
-            if !current
-                .clone()
-                .inode()
-                .unwrap()
-                .file_type()
-                .contains(InodeMode::DIR)
-            {
                 error!(
-                    "[dentry::find_path_or_create] {} is not a dir, return ENOTDIR",
-                    current.name()
+                    "[walk_path] {} not found in {}, step: {}",
+                    name,
+                    self.name(),
+                    step
                 );
-                return Err(Errno::ENOTDIR);
+                Err(Errno::ENOENT)
             }
-            debug!("[find_path_or_create] {}: {}", idx, name);
-            if name.is_empty() || name == "." {
-                idx += 1;
-                continue;
-            }
-            if current.clone().children().is_empty() {
-                if let Ok(current_dir) = current.clone().open(&FileFlags::empty()) {
-                    assert_no_lock!();
-                    current_dir.load_dir().await.unwrap();
-                }
-            }
-            if let Some(child) = current.clone().get_child(name) {
-                // unlikely
-                if child.is_negative() {
-                    warn!("[find_path_or_create] {} is negative", child.name());
-                } else {
-                    current = child.clone();
-                    idx += 1;
-                    continue;
-                }
-            }
-
-            if idx < max_idx {
-                debug!("[find_path_or_create] create dir {}", name);
-                assert_no_lock!();
-                assert!(arch::Arch::is_interrupt_enabled());
-                // default is 0o755（rwxr-xr-x）
-                current = current
-                    .create(name, InodeMode::dir_default())
-                    .await
-                    .unwrap();
-            } else {
-                debug!("[find_path_or_create] create file {}", name);
-                assert_no_lock!();
-                assert!(arch::Arch::is_interrupt_enabled());
-                current = current.create(name, mode).await.unwrap();
-            }
-            idx += 1;
         }
-        Ok(current)
     }
 
-    /// Hard link, link self to `target`.
-    pub async fn link_to(self: Arc<Self>, target: Arc<dyn Dentry>) -> SysResult<isize> {
-        if !self.is_negative() {
-            return Err(Errno::EEXIST);
+    /// Hard link, create a son and link it to `target`
+    /// todo: real fs support
+    pub async fn create_link(
+        self: &Arc<Self>,
+        target: Arc<dyn Dentry>,
+        name: &str,
+    ) -> SysResult<isize> {
+        debug_assert!(!target.is_negative());
+        if self.inode()?.file_type() != InodeMode::DIR {
+            error!("[Vfs::link] {} is not a dir", self.name());
+            return Err(Errno::ENOTDIR);
         }
-        let name = self.name();
+
         let inode = target.inode()?;
-        debug!("[Vfs::linkto] set_inode {} to xxx", name);
-        self.set_inode(inode.clone());
+        let son = self.clone().from_name(name);
+        son.set_inode(inode.clone());
+        debug!("[Vfs::linkto] set_inode {} to {}", name, target.name());
+
         let nlink = inode.meta().inner.lock().nlink;
         inode.meta().inner.lock().nlink += 1;
+
+        self.add_child(son);
+
         Ok(nlink as isize)
-        // self.symlink(&name, &target.name()).await
+    }
+
+    /// Symlink, create a son and set its inode's symlink to `target`
+    /// todo: real fs support
+    pub async fn create_symlink(self: &Arc<Self>, target: String, name: &str) -> SysResult<()> {
+        if self.inode()?.file_type() != InodeMode::DIR {
+            error!("[Vfs::symlink] {} is not a dir", self.name());
+            return Err(Errno::ENOTDIR);
+        }
+
+        let son = self
+            .clone()
+            .create(
+                name,
+                InodeMode::LINK | InodeMode::from_bits(ALL_PERMISSIONS_MASK).unwrap(),
+            )
+            .await?;
+        son.inode()?.set_symlink(target.clone());
+        debug!("[Vfs::symlink] set_symlink {} to {}", name, target);
+
+        Ok(())
     }
 
     /// Unlink, unlink self and delete the inner file if nlink is 0.
@@ -447,16 +467,14 @@ impl dyn Dentry {
             tar_parent
                 .clone()
                 .open(&FileFlags::empty())?
-                .delete_child(tar_name.as_str())
+                .delete_child(tar_name)
                 .await?;
         }
 
-        let target = tar_parent.remove_child(target.name().as_str()).unwrap();
+        let target = tar_parent.remove_child(target.name()).unwrap();
 
         // copy
-        tar_parent
-            .create(self.name().as_str(), self_file_type)
-            .await?;
+        tar_parent.create(self.name(), self_file_type).await?;
 
         if flags.contains(RenameFlags::RENAME_EXCHANGE) {
             self.set_inode(target.inode()?);
@@ -483,14 +501,6 @@ impl dyn Dentry {
         Ok(())
     }
 
-    pub fn symlink(self: Arc<Self>, tar_name: String) -> SysResult<()> {
-        assert!(!self.is_negative());
-        let inode = self.inode()?;
-        assert_eq!(inode.file_type(), InodeMode::LINK);
-        inode.symlink(tar_name);
-        Ok(())
-    }
-
     // todo: improve this
     pub fn mknodat_son(
         self: &Arc<Self>,
@@ -510,42 +520,58 @@ impl dyn Dentry {
                 match dev_t.new_decode_dev() {
                     (1, 3) => {
                         // /dev/null
-                        let son_dentry =
-                            NullDentry::new(Some(self.clone()), name, super_block.clone());
-                        let son_inode = NullInode::new(super_block);
-                        son_dentry.set_inode(Arc::new(son_inode));
+                        let son_dentry = Arc::new(NullDentry::new(
+                            Some(self.clone()),
+                            name,
+                            super_block.clone(),
+                        ))
+                        .into_dyn();
+                        let son_inode = Arc::new(NullInode::new(super_block));
+                        son_dentry.set_inode(son_inode);
                         son_dentry.inode().unwrap().set_inode_mode(mode);
-                        self.add_child_directly(Arc::new(son_dentry));
+                        self.add_child(son_dentry);
                         Ok(())
                     }
                     (1, 5) => {
                         // /dev/zero
-                        let son_dentry =
-                            ZeroDentry::new(Some(self.clone()), name, super_block.clone());
-                        let son_inode = ZeroInode::new(super_block);
-                        son_dentry.set_inode(Arc::new(son_inode));
+                        let son_dentry = Arc::new(ZeroDentry::new(
+                            Some(self.clone()),
+                            name,
+                            super_block.clone(),
+                        ))
+                        .into_dyn();
+                        let son_inode = Arc::new(ZeroInode::new(super_block));
+                        son_dentry.set_inode(son_inode);
                         son_dentry.inode().unwrap().set_inode_mode(mode);
-                        self.add_child_directly(Arc::new(son_dentry));
+                        self.add_child(son_dentry);
                         Ok(())
                     }
                     (1, 9) => {
                         // /dev/urandom
-                        let son_dentry =
-                            UrandomDentry::new(Some(self.clone()), name, super_block.clone());
-                        let son_inode = UrandomInode::new(super_block);
-                        son_dentry.set_inode(Arc::new(son_inode));
+                        let son_dentry = Arc::new(UrandomDentry::new(
+                            Some(self.clone()),
+                            name,
+                            super_block.clone(),
+                        ))
+                        .into_dyn();
+                        let son_inode = Arc::new(UrandomInode::new(super_block));
+                        son_dentry.set_inode(son_inode);
                         son_dentry.inode().unwrap().set_inode_mode(mode);
-                        self.add_child_directly(Arc::new(son_dentry));
+                        self.add_child(son_dentry);
                         Ok(())
                     }
                     (5, 0) => {
                         // /dev/tty
-                        let son_dentry =
-                            TtyDentry::new(Some(self.clone()), name, super_block.clone());
-                        let son_inode = TtyInode::new(super_block);
-                        son_dentry.set_inode(Arc::new(son_inode));
+                        let son_dentry = Arc::new(TtyDentry::new(
+                            Some(self.clone()),
+                            name,
+                            super_block.clone(),
+                        ))
+                        .into_dyn();
+                        let son_inode = Arc::new(TtyInode::new(super_block));
+                        son_dentry.set_inode(son_inode);
                         son_dentry.inode().unwrap().set_inode_mode(mode);
-                        self.add_child_directly(Arc::new(son_dentry));
+                        self.add_child(son_dentry);
                         Ok(())
                     }
                     (10, 0) => {
@@ -554,11 +580,12 @@ impl dyn Dentry {
                             Some(self.clone()),
                             name,
                             super_block.clone(),
-                        ));
+                        ))
+                        .into_dyn();
                         let son_inode = Arc::new(RtcInode::new(super_block));
                         son_dentry.set_inode(son_inode);
                         son_dentry.inode().unwrap().set_inode_mode(mode);
-                        self.add_child_directly(son_dentry);
+                        self.add_child(son_dentry);
                         Ok(())
                     }
                     (10, 237) => {
@@ -567,11 +594,12 @@ impl dyn Dentry {
                             Some(self.clone()),
                             name,
                             super_block.clone(),
-                        ));
+                        ))
+                        .into_dyn();
                         let son_inode = Arc::new(LoopControlInode::new(super_block));
                         son_dentry.set_inode(son_inode);
                         son_dentry.inode().unwrap().set_inode_mode(mode);
-                        self.add_child_directly(son_dentry);
+                        self.add_child(son_dentry);
                         Ok(())
                     }
                     (x, y) => {
@@ -587,15 +615,16 @@ impl dyn Dentry {
                 match dev_t.new_decode_dev() {
                     (7, y) => {
                         // /dev/loop{y}
-                        let son_dentry = LoopDevDentry::new(
+                        let son_dentry = Arc::new(LoopDevDentry::new(
                             Some(self.clone()),
                             &format!("loop{}", y),
                             super_block.clone(),
-                        );
-                        let son_inode = LoopDevInode::new(super_block);
-                        son_dentry.set_inode(Arc::new(son_inode));
+                        ))
+                        .into_dyn();
+                        let son_inode = Arc::new(LoopDevInode::new(super_block));
+                        son_dentry.set_inode(son_inode);
                         son_dentry.inode().unwrap().set_inode_mode(mode);
-                        self.add_child_directly(Arc::new(son_dentry));
+                        self.add_child(son_dentry);
                         debug!("[mknodat] create loop device: loop{}", y);
                         Ok(())
                     }
@@ -635,7 +664,7 @@ impl Dentry for EmptyDentry {
         &self.meta
     }
 
-    fn open(self: Arc<Self>, file_flags: &FileFlags) -> SysResult<Arc<dyn File>> {
+    fn open(self: Arc<Self>, _file_flags: &FileFlags) -> SysResult<Arc<dyn File>> {
         unreachable!()
     }
 

@@ -38,10 +38,6 @@ impl Ext4Dentry {
             meta: DentryMeta::new(parent, name, super_block),
         }
     }
-
-    pub fn into_dyn(self: Arc<Self>) -> Arc<dyn Dentry> {
-        self.clone()
-    }
 }
 
 #[async_trait]
@@ -57,7 +53,7 @@ impl Dentry for Ext4Dentry {
     }
 
     fn open(self: Arc<Self>, file_flags: &FileFlags) -> SysResult<Arc<dyn File>> {
-        let inode = self.inode()?;
+        let inode = self.into_dyn().inode()?;
         match inode.file_type() {
             InodeMode::DIR => Ok(Arc::new(Ext4Dir::new(
                 self.clone(),
@@ -87,7 +83,7 @@ impl Dentry for Ext4Dentry {
     async fn create(self: Arc<Self>, name: &str, mode: InodeMode) -> SysResult<Arc<dyn Dentry>> {
         assert_no_lock!();
         assert!(Arch::is_interrupt_enabled());
-        let inode = self.inode()?;
+        let inode = self.into_dyn().inode()?;
         assert!(inode.file_type() == InodeMode::DIR);
         let downcast_inode = inode
             .clone()
@@ -102,7 +98,7 @@ impl Dentry for Ext4Dentry {
             .get_fs()
             .await;
         trace!("[ext4] get lock super block succeed!");
-        let self_path = self.clone().into_dyn().path()?.as_string();
+        let self_path = self.into_dyn().path();
         let child_path = if self_path != "/" {
             format!("{}/{}", self_path, name)
         } else {
@@ -138,7 +134,9 @@ impl Dentry for Ext4Dentry {
             // let inode_type = new_file_inode.inode.file_type();
             // debug!("new file inode type: {:?}", inode_type);
             let new_inode = Ext4FileInode::new(super_block.clone(), new_file_inode, mode);
-            Ok(self.into_dyn().add_child(name, Arc::new(new_inode)))
+            Ok(self
+                .into_dyn()
+                .add_child_with_inode(name, Arc::new(new_inode)))
         } else if mode.contains(InodeMode::DIR) {
             debug!("[ext4] create dir: {}, mode: {:?}", child_path, mode);
             ext4.dir_mk(&child_path).await.map_err(fs_err)?;
@@ -147,14 +145,16 @@ impl Dentry for Ext4Dentry {
             trace!("[ext4] drop ext4");
             drop(ext4);
             let new_inode = Ext4DirInode::new(super_block.clone(), new_dir_inode, mode);
-            Ok(self.into_dyn().add_child(name, Arc::new(new_inode)))
+            Ok(self
+                .into_dyn()
+                .add_child_with_inode(name, Arc::new(new_inode)))
         } else {
             Err(Errno::EINVAL)
         }
     }
     async fn symlink(self: Arc<Self>, name: &str, tar_name: &str) -> SysResult<()> {
         debug!("[ext4] create link: {}", name);
-        let inode = self.inode()?;
+        let inode = self.into_dyn().inode()?;
         assert!(inode.file_type() == InodeMode::FILE);
 
         let inode = self.clone().into_dyn().parent().unwrap().inode()?;

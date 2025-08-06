@@ -175,7 +175,8 @@ impl File for Fat32Dir {
             } else {
                 unreachable!();
             };
-            self.dentry().add_child(&entry.file_name(), child_inode);
+            self.dentry()
+                .add_child_with_inode(&entry.file_name(), child_inode);
         }
         Ok(())
     }

@@ -18,8 +18,10 @@ use super::{
 };
 use crate::{
     config::mm::{PAGE_SIZE, PAGE_WIDTH, USER_STACK_SIZE},
-    cpu::current_task,
-    fs::{path::Path, vfs::basic::file::File},
+    fs::{
+        path::kopen,
+        vfs::basic::{dentry::Dentry, file::File},
+    },
     include::{fs::FileFlags, mm::MmapFlags, process::auxv::*},
     map_permission,
     mm::{
@@ -68,7 +70,7 @@ pub struct RawElfInfo {
     ph_count: usize,
     ph_entry_size: usize,
     entry_point: usize,
-    dl_interp: Option<Path>,
+    dl_interp: Option<Arc<dyn Dentry>>,
 }
 
 /// elf load result
@@ -432,7 +434,7 @@ impl MemorySet {
                     // }
                     info!("[load_elf] find interp path: {}", path);
                     assert!(Arch::is_external_interrupt_enabled());
-                    dl_interp = Some(Path::from_string(path, current_task().unwrap()).unwrap());
+                    dl_interp = Some(kopen(&path));
                 }
                 _ => {}
             }
@@ -514,9 +516,9 @@ impl MemorySet {
         auxs.push(AuxEntry(AT_PHENT, elf.ph_entry_size as usize)); // ELF64 header 64bytes
         auxs.push(AuxEntry(AT_PHNUM, elf.ph_count as usize));
         auxs.push(AuxEntry(AT_PAGESZ, PAGE_SIZE as usize));
-        if let Some(path) = elf.dl_interp {
+        if let Some(dentry) = elf.dl_interp {
             auxs.push(AuxEntry(AT_BASE, DL_INTERP_OFFSET));
-            let dl_interp_file = path.dentry().open(&FileFlags::O_RDWR)?;
+            let dl_interp_file = dentry.open(&FileFlags::O_RDWR)?;
             let dl_interp_info = memory_set
                 .map_elf(&dl_interp_file, DL_INTERP_OFFSET, true)
                 .await?;
