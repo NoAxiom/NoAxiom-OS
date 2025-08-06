@@ -91,13 +91,11 @@ impl Dentry for Ext4Dentry {
             .map_err(|_| Errno::EIO)?;
         let this_inode_num = downcast_inode.get_inode().lock().inode_num;
         let super_block = self.clone().into_dyn().super_block();
-        trace!("[ext4] try to get lock super block");
         let ext4 = super_block
             .downcast_ref::<Ext4SuperBlock>()
             .unwrap()
             .get_fs()
             .await;
-        trace!("[ext4] get lock super block succeed!");
         let self_path = self.into_dyn().path();
         let child_path = if self_path != "/" {
             format!("{}/{}", self_path, name)
@@ -149,6 +147,10 @@ impl Dentry for Ext4Dentry {
                 .into_dyn()
                 .add_child_with_inode(name, Arc::new(new_inode)))
         } else {
+            error!(
+                "[ext4] create file: {}, mode: {:?} not supported",
+                child_path, mode
+            );
             Err(Errno::EINVAL)
         }
     }

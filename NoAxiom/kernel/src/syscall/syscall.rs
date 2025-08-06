@@ -25,7 +25,7 @@ impl<'a> Syscall<'a> {
             SYS_FCHMODAT =>         self.sys_fchmodat(args[0], args[1], args[2], args[3] as u32),
             SYS_FCHOWN =>           self.sys_fchown(args[0], args[1] as u32, args[2] as u32),
             SYS_FCHOWNAT =>         self.sys_fchownat(args[0], args[1], args[2] as u32, args[3] as u32, args[4] as u32),
-            SYS_UMASK =>            Self::empty_syscall("umask", 0x777),
+            SYS_UMASK =>            Self::empty_syscall("umask", 0xfff),
             SYS_SYNC =>             Self::empty_syscall("sync", 0),
             SYS_FSYNC =>            Self::empty_syscall("fsync", 0),
             SYS_MSYNC =>            Self::empty_syscall("msync", 0),

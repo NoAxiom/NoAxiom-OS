@@ -343,15 +343,23 @@ impl dyn File {
         self.meta().pos.fetch_add(len as usize, Ordering::Release);
         Ok(len)
     }
+    #[inline(always)]
     pub fn name(&self) -> String {
         self.dentry().name().to_string()
     }
+    #[inline(always)]
+    pub fn path(&self) -> String {
+        self.dentry().path().to_string()
+    }
+    #[inline(always)]
     pub fn pos(&self) -> usize {
         self.meta().pos.load(Ordering::SeqCst)
     }
+    #[inline(always)]
     pub fn flags(&self) -> FileFlags {
         FileFlags::from_bits(self.meta().flags.load(Ordering::SeqCst)).unwrap_or(FileFlags::empty())
     }
+    #[inline(always)]
     pub fn inode(&self) -> Arc<dyn Inode> {
         self.meta().inode.clone()
     }

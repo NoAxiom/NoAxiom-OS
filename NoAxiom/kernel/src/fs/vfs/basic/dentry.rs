@@ -310,6 +310,12 @@ impl dyn Dentry {
                 if let Some(child) = self.get_child(name) {
                     return child.__walk_path(path, step + 1, jumps);
                 }
+                debug!(
+                    "[walk_path] {} not found in {}, step: {}",
+                    name,
+                    self.name(),
+                    step
+                );
                 match self.clone().open(&FileFlags::empty()) {
                     Ok(file) => {
                         assert_no_lock!();

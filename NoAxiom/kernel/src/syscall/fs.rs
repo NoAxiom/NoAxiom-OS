@@ -18,7 +18,6 @@ use crate::{
             Kstat, MountFlags, NoAxiomIoctlCmd, RenameFlags, RtcIoctlCmd, SeekFrom, Statfs, Statx,
             TtyIoctlCmd, Whence, EXT4_MAX_FILE_SIZE,
         },
-        info,
         resource::Resource,
         result::Errno,
         time::TimeSpec,
@@ -155,7 +154,7 @@ impl Syscall<'_> {
     /// Open or create a file
     pub async fn sys_openat(&self, fd: isize, path: usize, flags: i32, mode: u32) -> SyscallResult {
         let path_str = UserPtr::<u8>::new(path).get_string_from_ptr()?;
-        let mode = InodeMode::from_bits_truncate(mode & 0o777);
+        let mode = InodeMode::from_bits(mode).ok_or(Errno::EINVAL)?;
         let flags = FileFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
         info!(
             "[sys_openat] dirfd {}, flags {:?}, filename {}, mode {:?}",
@@ -171,7 +170,7 @@ impl Syscall<'_> {
                 error!("[sys_openat] file already exists: {}", name);
                 Err(Errno::EEXIST)
             } else {
-                dentry.clone().create(name, mode).await
+                dentry.clone().create(name, mode | InodeMode::FILE).await
             }
         } else {
             get_dentry(self.task, fd, &path, &searchflags)
@@ -366,7 +365,7 @@ impl Syscall<'_> {
             error!("[sys_mkdirat] dir already exists: {}", name);
             return Err(Errno::EEXIST);
         } else {
-            dentry.clone().create(name, mode | InodeMode::DIR);
+            dentry.clone().create(name, mode | InodeMode::DIR).await?;
         }
         Ok(0)
     }
@@ -458,12 +457,9 @@ impl Syscall<'_> {
         } else {
             return Err(Errno::EINVAL);
         };
-        trace!(
+        debug!(
             "[sys_ioctl]: fd: {}, request: {:#x}, argp: {:#x}, cmd: {:?}",
-            fd,
-            request,
-            arg,
-            cmd
+            fd, request, arg, cmd
         );
         match cmd {
             IoctlCmd::Tty(_x) => {

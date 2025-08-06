@@ -1,4 +1,5 @@
 use alloc::{string::String, sync::Arc, vec::Vec};
+use core::intrinsics::unlikely;
 
 use hashbrown::HashMap;
 use include::errno::Errno;
@@ -34,6 +35,7 @@ const MAX_NAME_LEN: usize = 255;
 pub fn kopen(path: &str) -> Arc<dyn Dentry> {
     debug_assert!(path.starts_with('/'), "kopen only support absolute path");
     let paths = resolve_path(path).expect("resolve path failed");
+    debug!("[kopen] paths: {:?}", paths);
     root_dentry()
         .walk_path(&paths)
         .expect("kopen failed, please check the path")
@@ -52,6 +54,7 @@ pub fn kopen(path: &str) -> Arc<dyn Dentry> {
 pub fn kcreate(path: &str, mode: InodeMode) -> Arc<dyn Dentry> {
     debug_assert!(path.starts_with('/'), "kcreate only support absolute path");
     let (paths, last) = resolve_path2(path).expect("resolve path failed");
+    debug!("[kcreate] paths: {:?}, last: {:?}", paths, last);
     let name = last.expect("kcreate must have a name at the end");
     let parent = root_dentry().walk_path(&paths).expect("walk path failed");
     assert_no_lock!();
@@ -101,6 +104,10 @@ pub fn get_dentry(
 ) -> SysResult<Arc<dyn Dentry>> {
     let abs = path.starts_with('/');
     let components = resolve_path(path)?;
+    debug!(
+        "[get_dentry] dirfd: {}, abs: {}, components: {:?}",
+        dirfd, abs, components
+    );
     __get_dentry(task, dirfd, abs, &components, flags)
 }
 
@@ -119,6 +126,13 @@ pub fn get_dentry_parent<'a>(
 ) -> SysResult<(Arc<dyn Dentry>, &'a str)> {
     let abs = path.starts_with('/');
     let (components, last) = resolve_path2(path)?;
+    debug!(
+        "[get_dentry_parent] dirfd: {}, abs: {}, components: {:?}, last: {:?}",
+        dirfd, abs, components, last
+    );
+    if unlikely(last.is_none()) {
+        return Err(Errno::EEXIST);
+    }
     debug_assert!(
         last.is_some(),
         "get_dentry_parent must have a name at the end"
@@ -162,7 +176,7 @@ fn __get_dentry(
                 this = this.symlink_jump(&symlink_path)?;
             } else {
                 warn!(
-                    "[get_dentry] AT_SYMLINK_NOFOLLOW is set, but Dentry {} has no symlink",
+                    "[get_dentry] AT_SYMLINK_NOFOLLOW is not set, but Dentry {} has no symlink",
                     this.name()
                 );
             }
