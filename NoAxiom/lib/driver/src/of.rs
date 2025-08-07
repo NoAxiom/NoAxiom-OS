@@ -1,6 +1,6 @@
 use crate::{
     basic::{DeviceTreeInfo, DeviceType},
-    block::vf2_sdcard::sdcard::VF2SdcardDevice,
+    block::{ls_ahci::LsAhciDevice, vf2_sdcard::sdcard::VF2SdcardDevice},
     interrupt::plic::PlicDevice,
     probe::basic::DeviceConfigType,
 };
@@ -31,4 +31,5 @@ pub(super) const OF_INITIALIZERS: &[(&str, &DeviceType, &DeviceConfigType)] = &[
     ),
     device!(PlicDevice),
     device!(VF2SdcardDevice),
+    device!(LsAhciDevice),
 ];

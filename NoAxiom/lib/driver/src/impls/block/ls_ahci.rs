@@ -8,6 +8,7 @@
 //!     dma-mask = <0x00000000 0xffffffff>;
 //! };
 
+use config::mm::PAGE_WIDTH;
 use driver_ahci::libahci::AhciDevice;
 
 use crate::{
@@ -53,12 +54,17 @@ impl InterruptDevice for LsAhciDevice {
 
 impl BlockDevice for LsAhciDevice {
     fn sync_read(&self, id: usize, buf: &mut [u8]) -> DevResult<usize> {
-        unimplemented!()
-        // self.device.ahci_sata_read_common(blknr, blkcnt, buffer)
+        let blknr = id as u64;
+        let blkcnt = (buf.len() >> PAGE_WIDTH) as u32;
+        let buffer = buf.as_ptr() as *mut u8;
+        self.device.ahci_sata_read_common(blknr, blkcnt, buffer);
+        Ok(buf.len())
     }
-
     fn sync_write(&self, id: usize, buf: &[u8]) -> DevResult<usize> {
-        unimplemented!()
-        // self.device.ahci_sata_write_common(blknr, blkcnt, buffer)
+        let blknr = id as u64;
+        let blkcnt = (buf.len() >> PAGE_WIDTH) as u32;
+        let buffer = buf.as_ptr() as *mut u8;
+        self.device.ahci_sata_write_common(blknr, blkcnt, buffer);
+        Ok(buf.len())
     }
 }
