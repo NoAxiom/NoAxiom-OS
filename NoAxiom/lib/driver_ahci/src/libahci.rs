@@ -148,8 +148,6 @@ pub struct AhciCmdHdr {
     pub reserved: [u32; 4],
 }
 
-unsafe impl Sync for AhciCmdHdr {}
-
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct AhciSg {

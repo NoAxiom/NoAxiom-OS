@@ -37,7 +37,7 @@ pub fn ahci_malloc_align(size: u64, align: u32) -> u64 {
     assert!(align.is_power_of_two() && (PAGE_SIZE & (align - 1) as usize) == 0);
     let frame = memory::frame::frame_alloc().unwrap();
     let frame = Box::leak(Box::new(frame));
-    let addr = frame.ppn().into_pa().raw() as u64;
+    let addr = frame.kernel_vpn().as_va_usize() as u64;
     addr
 }
 
