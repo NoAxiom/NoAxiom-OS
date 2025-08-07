@@ -451,7 +451,6 @@ impl Syscall<'_> {
         Ok(0)
     }
 
-    /// Get file io control
     pub async fn sys_ioctl(&self, fd: usize, request: usize, arg: usize) -> SyscallResult {
         info!(
             "[sys_ioctl] fd: {}, request: {:#x}, arg: {:#x}",
@@ -481,17 +480,9 @@ impl Syscall<'_> {
             cmd
         );
         match cmd {
-            IoctlCmd::Tty(x) => match x {
-                TtyIoctlCmd::TCGETS => {}
-                TtyIoctlCmd::TCSETS => {}
-                TtyIoctlCmd::TIOCGPGRP => arg_ptr.write(INIT_PROCESS_ID as u8).await?,
-                TtyIoctlCmd::TIOCSPGRP => {}
-                TtyIoctlCmd::TIOCGWINSZ => arg_ptr.write(0).await?,
-                _ => {
-                    error!("[sys_ioctl] request {} is not supported", request);
-                    return Err(Errno::EINVAL);
-                }
-            },
+            IoctlCmd::Tty(_x) => {
+                return file.ioctl(request, arg);
+            }
             IoctlCmd::Rtc(x) => match x {
                 RtcIoctlCmd::RTCRDTIME => {
                     return file.ioctl(request, arg);
