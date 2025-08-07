@@ -176,4 +176,9 @@ impl ArchMemory for RV64 {
         satp::write(8usize << 60 | ppn);
         sfence_vma_all();
     }
+    #[inline(always)]
+    fn sync_dcache() {
+        // this impl might be incorrect
+        riscv::asm::fence();
+    }
 }

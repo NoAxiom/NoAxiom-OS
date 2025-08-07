@@ -1,7 +1,7 @@
 //! kernel trap handler
 //! [`kernel_trap_handler`] is used by [`arch`]
 
-use arch::{Arch, ArchInt, ArchTime, ExceptionType, InterruptType, PageFaultType, TrapType};
+use arch::{Arch, ArchTime, ExceptionType, InterruptType, PageFaultType, TrapType};
 use kfuture::block::block_on;
 
 use crate::{
@@ -14,12 +14,11 @@ use crate::{
 /// kernel trap handler
 #[no_mangle]
 pub fn kernel_trap_handler(trap_type: &TrapType) {
-    assert!(!Arch::is_interrupt_enabled());
     current_cpu().add_trap_depth();
     match *trap_type {
         TrapType::Exception(exception) => kernel_exception_handler(exception),
         TrapType::Interrupt(interrupt) => kernel_interrupt_handler(interrupt),
-        TrapType::None => {}
+        TrapType::None | TrapType::Handled => {}
         TrapType::Unknown => panic!("unsupported trap type"),
     }
     current_cpu().sub_trap_depth();

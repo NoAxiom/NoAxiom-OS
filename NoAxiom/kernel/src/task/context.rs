@@ -32,7 +32,7 @@ impl Task {
         task.time_stat_mut().record_trap_in();
         let cx = task.trap_context_mut();
         Arch::trap_restore(cx); // restore context and return to user mode
-        let trap_type = Arch::read_trap_type();
+        let trap_type = Arch::read_trap_type(cx);
         task.time_stat_mut().record_trap_out();
         trap_type
     }

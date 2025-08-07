@@ -16,6 +16,7 @@ fatfs = { path = "lib/fatfs", default-features = false, features = [
 ] }
 config = { path = "lib/config" }
 driver = { path = "lib/driver" }
+driver_ahci = { path = "lib/driver_ahci" }
 include = { path = "lib/include" }
 memory = { path = "lib/memory" }
 platform = { path = "lib/platform" }
