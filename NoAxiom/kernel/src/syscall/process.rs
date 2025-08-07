@@ -9,7 +9,7 @@ use crate::{
     constant::fs::AT_FDCWD,
     fs::path::get_dentry,
     include::{
-        fs::{FcntlArgFlags, FileFlags},
+        fs::{FileFlags, SearchFlags},
         futex::{
             FUTEX_BITSET_MATCH_ANY, FUTEX_CLOCK_REALTIME, FUTEX_CMD_MASK, FUTEX_REQUEUE,
             FUTEX_WAIT, FUTEX_WAIT_BITSET, FUTEX_WAKE, FUTEX_WAKE_BITSET,
@@ -169,7 +169,7 @@ impl Syscall<'_> {
             }
         }
 
-        let searchflags = FcntlArgFlags::empty();
+        let searchflags = SearchFlags::empty();
         let dentry = get_dentry(self.task, AT_FDCWD, &path, &searchflags)?;
         let file_path = dentry.path();
         let elf_file = dentry.open(&FileFlags::empty())?;

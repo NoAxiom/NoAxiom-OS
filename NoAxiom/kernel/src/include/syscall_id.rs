@@ -37,7 +37,7 @@ pub enum SyscallID {
     SYS_PPOLL = 73,
     SYS_SPLICE = 76,
     SYS_READLINKAT = 78,
-    SYS_NEWFSTATAT = 79,
+    SYS_FSTATAT = 79,
     SYS_FSTAT = 80,
     SYS_SYNC = 81,
     SYS_FSYNC = 82,

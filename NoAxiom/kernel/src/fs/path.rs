@@ -10,7 +10,7 @@ use super::vfs::basic::dentry::Dentry;
 use crate::{
     constant::fs::AT_FDCWD,
     fs::vfs::root_dentry,
-    include::fs::{FcntlArgFlags, InodeMode},
+    include::fs::{InodeMode, SearchFlags},
     syscall::SysResult,
     task::Task,
 };
@@ -61,6 +61,17 @@ pub fn kcreate(path: &str, mode: InodeMode) -> Arc<dyn Dentry> {
     block_on(parent.create(name, mode)).unwrap()
 }
 
+/// the async version of kcreate
+pub async fn kcreate_async(path: &str, mode: InodeMode) -> Arc<dyn Dentry> {
+    debug_assert!(path.starts_with('/'), "kcreate only support absolute path");
+    let (paths, last) = resolve_path2(path).expect("resolve path failed");
+    debug!("[kcreate] paths: {:?}, last: {:?}", paths, last);
+    let name = last.expect("kcreate must have a name at the end");
+    let parent = root_dentry().walk_path(&paths).expect("walk path failed");
+    assert_no_lock!();
+    parent.create(name, mode).await.unwrap()
+}
+
 /// split a path string into components
 /// just string operation
 ///
@@ -100,7 +111,7 @@ pub fn get_dentry(
     task: &Arc<Task>,
     dirfd: isize,
     path: &str,
-    flags: &FcntlArgFlags,
+    flags: &SearchFlags,
 ) -> SysResult<Arc<dyn Dentry>> {
     let abs = path.starts_with('/');
     let components = resolve_path(path)?;
@@ -122,7 +133,7 @@ pub fn get_dentry_parent<'a>(
     task: &Arc<Task>,
     dirfd: isize,
     path: &'a str,
-    flags: &FcntlArgFlags,
+    flags: &SearchFlags,
 ) -> SysResult<(Arc<dyn Dentry>, &'a str)> {
     let abs = path.starts_with('/');
     let (components, last) = resolve_path2(path)?;
@@ -148,7 +159,7 @@ fn __get_dentry(
     dirfd: isize,
     abs: bool,
     components: &Vec<&str>,
-    flags: &FcntlArgFlags,
+    flags: &SearchFlags,
 ) -> SysResult<Arc<dyn Dentry>> {
     let cwd = if !abs {
         // relative path
@@ -170,7 +181,7 @@ fn __get_dentry(
     // special case for the last component
     // if the last component is a symlink, we need to follow it
     if let Ok(inode) = this.inode() {
-        if !flags.contains(FcntlArgFlags::AT_SYMLINK_NOFOLLOW) {
+        if !flags.contains(SearchFlags::AT_SYMLINK_NOFOLLOW) {
             if let Some(symlink_path) = inode.symlink() {
                 debug!("[get_dentry] Following symlink: {}", symlink_path);
                 this = this.symlink_jump(&symlink_path)?;

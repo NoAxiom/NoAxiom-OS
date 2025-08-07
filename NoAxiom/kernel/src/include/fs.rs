@@ -472,26 +472,45 @@ bitflags! {
     }
 
     #[derive(PartialEq, Eq, Debug, Clone)]
-    pub struct FcntlArgFlags: u32 {
+    pub struct FdFlags: usize {
         const FD_CLOEXEC = 1;
-        const AT_EMPTY_PATH = 1 << 0;
-        const AT_SYMLINK_NOFOLLOW = 1 << 8;
-        const AT_EACCESS = 1 << 9;
-        const AT_NO_AUTOMOUNT = 1 << 11;
-        const AT_DUMMY = 1 << 12;
+    }
+
+    pub struct SearchFlags: i32 {
+        const AT_SYMLINK_NOFOLLOW = 0x100;
+    }
+
+    #[derive(PartialEq, Eq, Debug)]
+    pub struct AtFlags: i32 {
+        const AT_FDCWD		        = -100;
+        const AT_SYMLINK_NOFOLLOW   = 0x100;
+        const AT_SYMLINK_FOLLOW     = 0x400;
+        const AT_NO_AUTOMOUNT		= 0x800;
+        const AT_EMPTY_PATH			= 0x1000;
+        const AT_STATX_SYNC_TYPE	= 0x6000;
+        const AT_STATX_SYNC_AS_STAT	= 0x0000;
+        const AT_STATX_FORCE_SYNC   = 0x2000;
+        const AT_STATX_DONT_SYNC	= 0x4000;
+        const AT_RECURSIVE			= 0x8000;
     }
 }
 
-impl FcntlArgFlags {
-    pub fn from_arg(arg: &FileFlags) -> Self {
-        let mut ret = FcntlArgFlags::empty();
-        if arg.contains(FileFlags::O_CLOEXEC) {
-            ret |= FcntlArgFlags::FD_CLOEXEC;
+impl From<AtFlags> for SearchFlags {
+    fn from(flags: AtFlags) -> Self {
+        match flags {
+            AtFlags::AT_SYMLINK_NOFOLLOW => SearchFlags::AT_SYMLINK_NOFOLLOW,
+            _ => SearchFlags::empty(),
         }
-        if arg.contains(FileFlags::O_NOFOLLOW) {
-            ret |= FcntlArgFlags::AT_SYMLINK_NOFOLLOW;
+    }
+}
+
+impl FdFlags {
+    pub fn from(flags: &FileFlags) -> Self {
+        if flags.contains(FileFlags::O_CLOEXEC) {
+            Self::FD_CLOEXEC
+        } else {
+            Self::empty()
         }
-        ret
     }
 }
 

@@ -5,7 +5,7 @@ use super::vfs::{basic::file::File, TTYFILE};
 use crate::{
     constant::fs::{RLIMIT_HARD_MAX, RLIMIT_SOFT_MAX},
     include::{
-        fs::{FcntlArgFlags, FileFlags},
+        fs::{FdFlags, FileFlags},
         result::Errno,
     },
     net::socketfile::SocketFile,
@@ -32,7 +32,7 @@ impl Default for RLimit {
 
 #[derive(Clone)]
 pub struct FdTableEntry {
-    flags: FcntlArgFlags,
+    flags: FdFlags,
     pub file: Arc<dyn File>,
 }
 
@@ -42,13 +42,13 @@ impl FdTableEntry {
     }
     pub fn std_in() -> Self {
         Self {
-            flags: FcntlArgFlags::empty(),
+            flags: FdFlags::empty(),
             file: Self::tty_file(),
         }
     }
     pub fn std_out() -> Self {
         Self {
-            flags: FcntlArgFlags::empty(),
+            flags: FdFlags::empty(),
             file: Self::tty_file(),
         }
     }
@@ -58,7 +58,7 @@ impl FdTableEntry {
     pub fn from_file(file: Arc<dyn File>) -> Self {
         let file_flag = file.flags();
         Self {
-            flags: FcntlArgFlags::from_arg(&file_flag),
+            flags: FdFlags::from(&file_flag),
             file: file.clone(),
         }
     }
@@ -160,7 +160,7 @@ impl FdTable {
     }
 
     /// Get the `flags` of the `fd` slot
-    pub fn get_fdflag(&self, fd: usize) -> Option<FcntlArgFlags> {
+    pub fn get_fdflag(&self, fd: usize) -> Option<FdFlags> {
         if fd < self.table.len() {
             if let Some(entry) = &self.table[fd] {
                 return Some(entry.flags.clone());
@@ -170,7 +170,7 @@ impl FdTable {
     }
 
     /// Set the `flags` of the `fd` slot
-    pub fn set_fdflag(&mut self, fd: usize, flags: &FcntlArgFlags) {
+    pub fn set_fdflag(&mut self, fd: usize, flags: &FdFlags) {
         if fd < self.table.len() {
             if let Some(entry) = &mut self.table[fd] {
                 entry.flags = flags.clone();
@@ -218,7 +218,7 @@ impl FdTable {
     pub fn close_on_exec(&mut self) {
         for table_entry in self.table.iter_mut() {
             if let Some(entry) = table_entry {
-                if entry.flags.contains(FcntlArgFlags::FD_CLOEXEC) {
+                if entry.flags.contains(FdFlags::FD_CLOEXEC) {
                     *table_entry = None;
                 }
             }

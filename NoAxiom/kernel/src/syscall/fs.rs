@@ -8,14 +8,14 @@ use crate::{
     constant::fs::{AT_FDCWD, UTIME_NOW, UTIME_OMIT},
     fs::{
         fdtable::RLimit,
-        path::{get_dentry, get_dentry_parent},
+        path::{get_dentry, get_dentry_parent, kcreate_async},
         pipe::PipeFile,
     },
     include::{
         fs::{
-            DevT, FallocFlags, FcntlArgFlags, FcntlFlags, FileFlags, InodeMode, IoctlCmd, Iovec,
-            Kstat, MountFlags, NoAxiomIoctlCmd, RenameFlags, RtcIoctlCmd, SeekFrom, Statfs, Statx,
-            TtyIoctlCmd, Whence, EXT4_MAX_FILE_SIZE,
+            AtFlags, DevT, FallocFlags, FcntlFlags, FdFlags, FileFlags, InodeMode, IoctlCmd, Iovec,
+            Kstat, MountFlags, NoAxiomIoctlCmd, RenameFlags, RtcIoctlCmd, SearchFlags, SeekFrom,
+            Statfs, Statx, TtyIoctlCmd, Whence, EXT4_MAX_FILE_SIZE,
         },
         resource::Resource,
         result::Errno,
@@ -26,6 +26,7 @@ use crate::{
     signal::interruptable::interruptable,
     time::gettime::get_time_duration,
     utils::{
+        global_alloc,
         hack::{switch_into_ltp, switch_outof_ltp},
         log::{switch_log_off, switch_log_on},
     },
@@ -64,7 +65,7 @@ impl Syscall<'_> {
     pub async fn sys_pipe2(&self, pipe: usize, flags: i32) -> SyscallResult {
         let flags = FileFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
         let (read_end, write_end) = PipeFile::new_pipe(&flags);
-        let flags = FcntlArgFlags::from_arg(&flags);
+        let flags = FdFlags::from(&flags);
 
         let user_ptr = UserPtr::<i32>::new(pipe);
         let buf_slice = user_ptr.as_slice_mut_checked(2).await?;
@@ -115,7 +116,7 @@ impl Syscall<'_> {
         let path = read_path(path)?;
         info!("[sys_chdir] path: {}", path);
 
-        let searchflags = FcntlArgFlags::empty();
+        let searchflags = SearchFlags::empty();
         let dentry = get_dentry(self.task, AT_FDCWD, &path, &searchflags)?;
         let inode = dentry.inode()?;
         if inode.file_type() != InodeMode::DIR {
@@ -131,7 +132,7 @@ impl Syscall<'_> {
     pub fn sys_chroot(&self, path: usize) -> SyscallResult {
         let path = read_path(path)?;
         info!("[sys_chroot] path: {:?}", path);
-        let searchflags = FcntlArgFlags::empty();
+        let searchflags = SearchFlags::empty();
         let dentry = get_dentry(self.task, AT_FDCWD, &path, &searchflags)?;
         let inode = dentry.inode()?;
         if inode.file_type() != InodeMode::DIR {
@@ -154,6 +155,7 @@ impl Syscall<'_> {
     pub async fn sys_openat(&self, fd: isize, path: usize, flags: i32, mode: u32) -> SyscallResult {
         let path_str = UserPtr::<u8>::new(path).get_string_from_ptr()?;
         let mode = InodeMode::from_bits(mode).ok_or(Errno::EINVAL)?;
+        let searchflags = SearchFlags::from_bits_truncate(flags);
         let flags = FileFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
         info!(
             "[sys_openat] dirfd {}, flags {:?}, filename {}, mode {:?}",
@@ -161,9 +163,18 @@ impl Syscall<'_> {
         );
 
         let path = read_path(path)?;
-        let searchflags = FcntlArgFlags::from_arg(&flags);
+        let fd_flags = FdFlags::from(&flags);
 
-        let dentry = if flags.contains(FileFlags::O_CREATE) {
+        let dentry = if flags.contains(FileFlags::O_TMPFILE) {
+            let this = get_dentry(self.task, fd, &path, &searchflags)?;
+            if this.inode()?.file_type() != InodeMode::DIR {
+                error!("[sys_openat] O_TMPFILE can only be used on directories");
+                return Err(Errno::ENOTDIR);
+            }
+            let tmpname = format!("/tmp/kernel_O_TMPFILE_{}", global_alloc());
+            let dentry = kcreate_async(&tmpname, mode | InodeMode::FILE).await;
+            Ok(dentry)
+        } else if flags.contains(FileFlags::O_CREATE) {
             let (dentry, name) = get_dentry_parent(self.task, fd, &path, &searchflags)?;
             if let Some(dentry) = dentry.get_child(name) {
                 Ok(dentry)
@@ -184,6 +195,7 @@ impl Syscall<'_> {
         let mut fd_table = self.task.fd_table();
         let fd = fd_table.alloc_fd()?;
         fd_table.set(fd, file);
+        fd_table.set_fdflag(fd, &fd_flags);
 
         info!("[sys_openat] succeed fd: {}, path: {:?}", fd, file_path);
         Ok(fd as isize)
@@ -350,14 +362,14 @@ impl Syscall<'_> {
 
     /// Create a directory
     pub async fn sys_mkdirat(&self, dirfd: isize, path: usize, mode: u32) -> SyscallResult {
-        let mode = InodeMode::from_bits_truncate(mode);
+        let mode = InodeMode::from_bits_truncate(mode); // todo: is the mode correct?
         let path = read_path(path)?;
         info!(
             "[sys_mkdirat] dirfd: {}, path: {:?}, mode: {:?}",
             dirfd, path, mode
         );
 
-        let searchflags = FcntlArgFlags::AT_SYMLINK_NOFOLLOW;
+        let searchflags = SearchFlags::AT_SYMLINK_NOFOLLOW;
         let (dentry, name) = get_dentry_parent(self.task, dirfd, &path, &searchflags)?;
         if let Some(_) = dentry.get_child(name) {
             error!("[sys_mkdirat] dir already exists: {}", name);
@@ -396,17 +408,17 @@ impl Syscall<'_> {
         &self,
         dirfd: isize,
         path: usize,
-        flags: u32,
+        flags: i32,
         mask: u32,
         buf: usize,
     ) -> SyscallResult {
         let path = read_path(path)?;
-        let flags = FcntlArgFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
+        let flags = AtFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
         info!(
             "[sys_statx] dirfd: {}, path: {:?}, flags: {:?}",
             dirfd, path, flags,
         );
-        let dentry = get_dentry(self.task, dirfd, &path, &flags)?;
+        let dentry = get_dentry(self.task, dirfd, &path, &flags.into())?;
         let statx = dentry.inode()?.statx(mask)?;
         let ptr = UserPtr::<Statx>::new(buf);
         ptr.write(statx).await?;
@@ -414,20 +426,20 @@ impl Syscall<'_> {
     }
 
     /// Get file status
-    pub async fn sys_newfstatat(
+    pub async fn sys_fstatat(
         &self,
         dirfd: isize,
         path: usize,
         stat_buf: usize,
-        flags: u32,
+        flags: i32,
     ) -> SyscallResult {
         let path = read_path(path)?;
-        let flags = FcntlArgFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
-        let dentry = get_dentry(self.task, dirfd, &path, &flags)?;
+        let flags = AtFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
         info!(
             "[sys_newfstat] dirfd: {}, path: {:?}, stat_buf: {:#x}, flags: {:?}",
             dirfd, path, stat_buf, flags
         );
+        let dentry = get_dentry(self.task, dirfd, &path, &flags.into())?;
         let kstat = Kstat::from_stat(dentry.inode()?)?;
         let ptr = UserPtr::<Kstat>::new(stat_buf);
         ptr.write(kstat).await?;
@@ -550,7 +562,6 @@ impl Syscall<'_> {
         Ok(0)
     }
 
-    // todo: fix the linkat, now just set the same inode
     /// Create a hard link
     pub async fn sys_linkat(
         &self,
@@ -560,13 +571,11 @@ impl Syscall<'_> {
         newpath: usize,
         flags: i32,
     ) -> SyscallResult {
-        const AT_EMPTY_PATH: i32 = 0x1000;
-        const AT_SYMLINK_FOLLOW: i32 = 0x400;
-
+        let flags = AtFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
         let old_path = read_path(oldpath)?;
         let new_path = read_path(newpath)?;
         info!(
-            "[sys_linkat] olddirfd: {}, oldpath: {}, newdirfd: {}, newpath: {}, flags: {}",
+            "[sys_linkat] olddirfd: {}, oldpath: {}, newdirfd: {}, newpath: {}, flags: {:?}",
             olddirfd, old_path, newdirfd, new_path, flags
         );
 
@@ -575,15 +584,16 @@ impl Syscall<'_> {
             return Err(Errno::EXDEV);
         }
 
-        if flags & !(AT_SYMLINK_FOLLOW | AT_EMPTY_PATH) != 0 {
-            error!("[sys_linkat] invalid flags: {}", flags);
+        if flags.bits() & !(AtFlags::AT_SYMLINK_FOLLOW.bits() | AtFlags::AT_EMPTY_PATH.bits()) != 0
+        {
+            error!("[sys_linkat] invalid flags: {:?}", flags);
             return Err(Errno::EINVAL);
         }
 
-        let searchflags = if flags & AT_SYMLINK_FOLLOW != 0 {
-            FcntlArgFlags::empty()
+        let searchflags = if flags.contains(AtFlags::AT_SYMLINK_FOLLOW) {
+            SearchFlags::empty()
         } else {
-            FcntlArgFlags::AT_SYMLINK_NOFOLLOW
+            SearchFlags::AT_SYMLINK_NOFOLLOW
         };
 
         let old_dentry = get_dentry(self.task, olddirfd, &old_path, &searchflags)?;
@@ -593,13 +603,12 @@ impl Syscall<'_> {
         }
 
         let target_dentry = old_dentry;
-        let searchflags = FcntlArgFlags::empty();
+        let searchflags = SearchFlags::AT_SYMLINK_NOFOLLOW;
         let (parent, name) = get_dentry_parent(self.task, newdirfd, &new_path, &searchflags)?;
         // todo: check parent W_OK permission
         parent.create_link(target_dentry, name).await
     }
 
-    /// todo: now just set the same inode
     pub async fn sys_symlinkat(
         &self,
         target: usize,
@@ -613,7 +622,7 @@ impl Syscall<'_> {
             target_path, newdirfd, link_path
         );
 
-        let searchflags = FcntlArgFlags::empty();
+        let searchflags = SearchFlags::AT_SYMLINK_NOFOLLOW;
         let (parent, name) = get_dentry_parent(self.task, newdirfd, &link_path, &searchflags)?;
         parent.create_symlink(target_path, name).await?;
         Ok(0)
@@ -632,7 +641,7 @@ impl Syscall<'_> {
             return Err(Errno::EINVAL);
         }
         let path = read_path(path)?;
-        let searchflags = FcntlArgFlags::AT_SYMLINK_NOFOLLOW;
+        let searchflags = SearchFlags::AT_SYMLINK_NOFOLLOW;
         let dentry = get_dentry(self.task, dirfd, &path, &searchflags)?;
         info!(
             "[sys_readlinkat] dirfd: {}, path: {:?}, buf: {:#x}, bufsize: {}",
@@ -657,7 +666,7 @@ impl Syscall<'_> {
         }
         let path = read_path(path)?;
         let flags = FileFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
-        let searchflags = FcntlArgFlags::from_arg(&flags);
+        let searchflags = SearchFlags::AT_SYMLINK_NOFOLLOW;
         info!(
             "[sys_unlinkat] dirfd: {}, path: {}, flags: {:?}",
             dirfd, path, flags
@@ -739,7 +748,7 @@ impl Syscall<'_> {
             }
             FcntlFlags::F_SETFD => {
                 let arg = FileFlags::from_bits_retain(arg as i32);
-                let fd_flags = FcntlArgFlags::from_arg(&arg);
+                let fd_flags = FdFlags::from(&arg);
                 fd_table.set_fdflag(fd, &fd_flags);
                 Ok(0)
             }
@@ -759,7 +768,7 @@ impl Syscall<'_> {
             FcntlFlags::F_DUPFD_CLOEXEC => {
                 let new_fd = fd_table.alloc_fd_after(arg)?;
                 assert!(new_fd > fd);
-                fd_table.set_fdflag(new_fd, &FcntlArgFlags::FD_CLOEXEC);
+                fd_table.set_fdflag(new_fd, &FdFlags::FD_CLOEXEC);
                 fd_table.copyfrom(fd, new_fd)
             }
             _ => {
@@ -826,9 +835,9 @@ impl Syscall<'_> {
         dirfd: isize,
         path: usize,
         times: usize,
-        flags: u32,
+        flags: i32,
     ) -> SyscallResult {
-        let flags = FcntlArgFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
+        let flags = AtFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
         info!(
             "[sys_utimensat] dirfd: {}, times: {:#x}, flags: {:?}",
             dirfd, times, flags
@@ -850,7 +859,7 @@ impl Syscall<'_> {
             }
         } else {
             let path = read_path(path)?;
-            let dentry = get_dentry(self.task, dirfd, &path, &flags)?;
+            let dentry = get_dentry(self.task, dirfd, &path, &flags.into())?;
             dentry.inode()?
         };
 
@@ -937,7 +946,7 @@ impl Syscall<'_> {
             return Err(Errno::EINVAL);
         }
 
-        let searchflags = FcntlArgFlags::AT_SYMLINK_NOFOLLOW;
+        let searchflags = SearchFlags::empty();
         let old_dentry = get_dentry(self.task, old_dirfd, &old_path, &searchflags)?;
         let (new_dentry_parent, new_name) =
             get_dentry_parent(self.task, new_dirfd, &new_path, &searchflags)?;
@@ -1144,12 +1153,15 @@ impl Syscall<'_> {
         Ok(0)
     }
 
-    pub fn sys_fchmodat(&self, fd: usize, path: usize, mode: usize, flags: u32) -> SyscallResult {
+    pub fn sys_fchmodat(&self, fd: usize, path: usize, mode: usize, flags: i32) -> SyscallResult {
         let path = read_path(path)?;
-        info!("[sys_fchmodat] set {:o} mode to {:?}", mode, path);
+        let flags = AtFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
+        info!(
+            "[sys_fchmodat] set {:o} mode to {:?}, flags: {:?}",
+            mode, path, flags
+        );
 
-        let searchflags = FcntlArgFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
-        let dentry = get_dentry(self.task, fd as isize, &path, &searchflags)?;
+        let dentry = get_dentry(self.task, fd as isize, &path, &flags.into())?;
         let inode = dentry.inode()?;
         inode.set_permission(self.task, mode as u32);
         Ok(0)
@@ -1173,16 +1185,16 @@ impl Syscall<'_> {
         path: usize,
         owner: u32,
         group: u32,
-        flags: u32,
+        flags: i32,
     ) -> SyscallResult {
         let path = read_path(path)?;
+        let flags = AtFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
         info!(
-            "[sys_fchownat] set owner: {:?}, group: {:?} for {:?}",
-            owner, group, path
+            "[sys_fchownat] set owner: {:?}, group: {:?} for {:?}, flags: {:?}",
+            owner, group, path, flags
         );
 
-        let searchflags = FcntlArgFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
-        let dentry = get_dentry(self.task, fd as isize, &path, &searchflags)?;
+        let dentry = get_dentry(self.task, fd as isize, &path, &flags.into())?;
         let inode = dentry.inode()?;
         inode.chown(self.task, owner, group)?;
         Ok(0)
@@ -1200,19 +1212,15 @@ impl Syscall<'_> {
 
         let is_fs = flags & AT_EACCESS != 0;
         let path = read_path(path)?;
-        let searchflags = FcntlArgFlags::from_bits(flags as u32).ok_or(Errno::EINVAL)?;
-        let dentry = get_dentry(self.task, fd as isize, &path, &searchflags)?;
+        let flags = AtFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
+        info!(
+            "[sys_faccessat] fd: {}, path: {:?}, mode: {}, flags: {:?}",
+            fd, path, mode, flags
+        );
+
+        let dentry = get_dentry(self.task, fd as isize, &path, &flags.into())?;
         let inode = dentry.inode()?;
         let pri = inode.privilege();
-
-        log::info!(
-            "[sys_faccessat] fd: {}, path: {:?}, mode: {}, flags: {}, file_pri: {:?}",
-            fd,
-            path,
-            mode,
-            flags,
-            pri
-        );
 
         if mode & !(F_OK | R_OK | W_OK | X_OK) != 0 {
             error!("[sys_faccessat] shouldn't have mode: {:?}", mode);
@@ -1410,7 +1418,7 @@ impl Syscall<'_> {
     ) -> SyscallResult {
         let mode = InodeMode::from_bits(mode as u32).ok_or(Errno::EINVAL)?;
         let path = read_path(path)?;
-        let searchflags = FcntlArgFlags::AT_SYMLINK_NOFOLLOW;
+        let searchflags = SearchFlags::AT_SYMLINK_NOFOLLOW;
         let (parent, name) = get_dentry_parent(self.task, fd, &path, &searchflags)?;
         info!(
             "[sys_mknodat] dirfd: {}, path: {:?}, mode: {:?}, dev: {}",
