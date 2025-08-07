@@ -7,9 +7,9 @@ use super::{
 };
 use crate::{ArchMemory, ArchPageTable, ArchPageTableEntry, MappingFlags};
 
-const PA_WIDTH: usize = 48;
-const VA_WIDTH: usize = 48;
-const INDEX_LEVELS: usize = 4;
+const PA_WIDTH: usize = 39;
+const VA_WIDTH: usize = 39;
+const INDEX_LEVELS: usize = 3;
 pub(crate) const KERNEL_ADDR_OFFSET: usize = 0x9000_0000_0000_0000;
 const IO_ADDR_OFFSET: usize = 0x8000_0000_0000_0000;
 
