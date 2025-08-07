@@ -447,7 +447,6 @@ impl Syscall<'_> {
         // let file_name = file.dentry().path()?;
         // info!("[sys_ioctl] file_name: {:?}", file_name);
 
-        let arg_ptr = UserPtr::<u8>::new(arg);
         let cmd = if let Some(cmd) = TtyIoctlCmd::from_repr(request) {
             IoctlCmd::Tty(cmd)
         } else if let Some(cmd) = RtcIoctlCmd::from_repr(request) {
@@ -462,7 +461,7 @@ impl Syscall<'_> {
             fd, request, arg, cmd
         );
         match cmd {
-            IoctlCmd::Tty(_x) => {
+            IoctlCmd::Tty(_) => {
                 return file.ioctl(request, arg);
             }
             IoctlCmd::Rtc(x) => match x {
