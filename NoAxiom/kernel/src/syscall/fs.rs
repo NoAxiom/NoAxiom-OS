@@ -413,7 +413,7 @@ impl Syscall<'_> {
         buf: usize,
     ) -> SyscallResult {
         let path = read_path(path)?;
-        let flags = AtFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
+        let flags = AtFlags::from_bits_truncate(flags);
         info!(
             "[sys_statx] dirfd: {}, path: {:?}, flags: {:?}",
             dirfd, path, flags,
@@ -434,7 +434,7 @@ impl Syscall<'_> {
         flags: i32,
     ) -> SyscallResult {
         let path = read_path(path)?;
-        let flags = AtFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
+        let flags = AtFlags::from_bits_truncate(flags);
         info!(
             "[sys_newfstat] dirfd: {}, path: {:?}, stat_buf: {:#x}, flags: {:?}",
             dirfd, path, stat_buf, flags
@@ -571,7 +571,7 @@ impl Syscall<'_> {
         newpath: usize,
         flags: i32,
     ) -> SyscallResult {
-        let flags = AtFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
+        let flags = AtFlags::from_bits_truncate(flags);
         let old_path = read_path(oldpath)?;
         let new_path = read_path(newpath)?;
         info!(
@@ -837,7 +837,7 @@ impl Syscall<'_> {
         times: usize,
         flags: i32,
     ) -> SyscallResult {
-        let flags = AtFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
+        let flags = AtFlags::from_bits_truncate(flags);
         info!(
             "[sys_utimensat] dirfd: {}, times: {:#x}, flags: {:?}",
             dirfd, times, flags
@@ -1155,7 +1155,7 @@ impl Syscall<'_> {
 
     pub fn sys_fchmodat(&self, fd: usize, path: usize, mode: usize, flags: i32) -> SyscallResult {
         let path = read_path(path)?;
-        let flags = AtFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
+        let flags = AtFlags::from_bits_truncate(flags);
         info!(
             "[sys_fchmodat] set {:o} mode to {:?}, flags: {:?}",
             mode, path, flags
@@ -1188,7 +1188,7 @@ impl Syscall<'_> {
         flags: i32,
     ) -> SyscallResult {
         let path = read_path(path)?;
-        let flags = AtFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
+        let flags = AtFlags::from_bits_truncate(flags);
         info!(
             "[sys_fchownat] set owner: {:?}, group: {:?} for {:?}, flags: {:?}",
             owner, group, path, flags
@@ -1212,7 +1212,7 @@ impl Syscall<'_> {
 
         let is_fs = flags & AT_EACCESS != 0;
         let path = read_path(path)?;
-        let flags = AtFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
+        let flags = AtFlags::from_bits_truncate(flags);
         info!(
             "[sys_faccessat] fd: {}, path: {:?}, mode: {}, flags: {:?}",
             fd, path, mode, flags
