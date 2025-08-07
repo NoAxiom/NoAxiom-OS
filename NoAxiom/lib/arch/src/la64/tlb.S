@@ -25,8 +25,8 @@
     __tlb_refill:
     csrwr     $t0, LA_CSR_TLBRSAVE
     csrrd     $t0, LA_CSR_PGD
-    lddir     $t0, $t0, 3
-    beqz      $t0, 1f
+# lddir     $t0, $t0, 3
+# beqz      $t0, 1f
     lddir     $t0, $t0, 2
     beqz      $t0, 1f
     lddir     $t0, $t0, 1

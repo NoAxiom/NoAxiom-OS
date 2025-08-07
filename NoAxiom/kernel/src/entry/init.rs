@@ -65,14 +65,6 @@ fn hello_world() {
     println!("[kernel] ARCH = {}", Arch::ARCH_NAME);
 }
 
-#[allow(unused)]
-fn interrupt_test() {
-    info!("interrupt test start");
-    Arch::enable_interrupt();
-    info!("interrupt test done!");
-    Arch::disable_interrupt();
-}
-
 #[no_mangle]
 pub extern "C" fn _boot_hart_init(_: usize, dtb: usize) -> ! {
     bss_init();
@@ -81,6 +73,7 @@ pub extern "C" fn _boot_hart_init(_: usize, dtb: usize) -> ! {
     // log init
     Arch::arch_init();
     log_init();
+    Arch::arch_info_print();
 
     // print basic info
     hello_world();
@@ -88,9 +81,6 @@ pub extern "C" fn _boot_hart_init(_: usize, dtb: usize) -> ! {
     // kernel space init
     frame_init();
     kernel_space_init();
-
-    // test interrupt
-    // interrupt_test();
 
     // device init
     probe_device(dtb);

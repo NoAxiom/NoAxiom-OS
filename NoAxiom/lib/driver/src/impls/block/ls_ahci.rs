@@ -60,9 +60,23 @@ impl BlockDevice for LsAhciDevice {
         let blknr = id as u64;
         let blkcnt = (buf.len() / BLOCK_SIZE) as u32;
         let buffer = buf.as_ptr() as *mut u8;
+        log::info!(
+            "ls-ahci read, blknr: {}, blkcnt: {}, buf: {:p}",
+            blknr,
+            blkcnt,
+            buffer
+        );
         let res = self.device.ahci_sata_read_common(blknr, blkcnt, buffer);
         match res {
-            0 => Err(Errno::EIO),
+            0 => {
+                log::error!(
+                    "ls-ahci read error, blknr: {}, blkcnt: {}, buf: {:p}",
+                    blknr,
+                    blkcnt,
+                    buffer
+                );
+                Err(Errno::EIO)
+            }
             _ => Ok(buf.len()),
         }
     }
@@ -70,9 +84,23 @@ impl BlockDevice for LsAhciDevice {
         let blknr = id as u64;
         let blkcnt = (buf.len() / BLOCK_SIZE) as u32;
         let buffer = buf.as_ptr() as *mut u8;
+        log::info!(
+            "ls-ahci write, blknr: {}, blkcnt: {}, buf: {:p}",
+            blknr,
+            blkcnt,
+            buffer
+        );
         let res = self.device.ahci_sata_write_common(blknr, blkcnt, buffer);
         match res {
-            0 => Err(Errno::EIO),
+            0 => {
+                log::error!(
+                    "ls-ahci write error, blknr: {}, blkcnt: {}, buf: {:p}",
+                    blknr,
+                    blkcnt,
+                    buffer
+                );
+                Err(Errno::EIO)
+            }
             _ => Ok(buf.len()),
         }
     }

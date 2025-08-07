@@ -65,8 +65,8 @@ pub fn tlb_init_inner() {
     pwcl::set_dir1_width(9);
     pwcl::set_dir2_base(30);
     pwcl::set_dir2_width(9);
-    pwch::set_dir3_base(39);
-    pwch::set_dir3_width(9);
+    // pwch::set_dir3_base(39);
+    // pwch::set_dir3_width(9);
 
     set_tlb_refill_entry(__tlb_refill as usize);
 }

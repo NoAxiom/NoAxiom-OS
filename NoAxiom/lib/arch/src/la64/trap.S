@@ -23,15 +23,10 @@
     ld.d      $s\n, $sp, \offset*8
     .endm
 
-    .section  .text.trampoline
-    .globl    __user_trapvec
-    .globl    __user_trapret
-    .globl    __kernel_trapvec
-    .globl    __kernel_user_ptr_vec
-    .align    4
-
-
 # user -> kernel
+    .section  .text
+    .globl    __user_trapvec
+    .align    12
     __user_trapvec:
     csrwr     $sp, CSR_SAVE            # take the kernel sp
 
@@ -66,6 +61,8 @@
 
 
 # kernel -> user
+    .globl    __user_trapret
+    .align    12
     __user_trapret:
     csrwr     $a0, CSR_SAVE
     csrrd     $a0, CSR_SAVE            # to use correct a0
@@ -103,8 +100,8 @@
 
 
 # kernel -> kernel
-# only need to save caller-saved regs
-# note that we don't save ERA & ECFG or other csrs here
+    .globl    __kernel_trapvec
+    .align    12
     __kernel_trapvec:
     csrwr     $sp, CSR_SAVE1           # save sp since we will align it
     csrrd     $sp, CSR_SAVE1
@@ -145,6 +142,8 @@
     ertn
 
 
+    .globl    __kernel_user_ptr_vec
+    .align    12
     __kernel_user_ptr_vec:
 # save sp and align sp
     csrwr     $sp, CSR_SAVE1           # save sp since we will align it, use CSR_SAVE1 to avoid conflict
@@ -190,9 +189,10 @@
 
     .globl    __save_freg
     .globl    __load_freg
-    .align    4
+    .align    12
 
 # save float registers
+    .align    12
     __save_freg:
     .set      n, 0
     .set      m, FP_START
@@ -225,6 +225,7 @@
 
 
 # load float registers
+    .align    12
     __load_freg:
     .set      n, 0
     .set      m, FP_START
