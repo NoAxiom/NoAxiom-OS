@@ -39,14 +39,11 @@ fn ahci_print_info(ahci_dev: &AhciDevice) {
     let speed: u32 = (ahci_dev.cap >> 20) & 0xf;
 
     let scc_s = "SATA";
-    let mut speed_s = if speed == 1 {
-        "1.5"
-    } else if speed == 2 {
-        "3"
-    } else if speed == 3 {
-        "6"
-    } else {
-        "?"
+    let mut speed_s = match speed {
+        1 => "1.5",
+        2 => "3",
+        3 => "6",
+        _ => "?",
     };
 
     log::debug!(
@@ -61,6 +58,7 @@ fn ahci_print_info(ahci_dev: &AhciDevice) {
         impl_0,
         scc_s,
     );
+
     log::debug!(
         "flags: {}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}",
         if cap & HOST_CAP_64 != 0 { "64bit " } else { "" },

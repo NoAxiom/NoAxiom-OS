@@ -96,7 +96,7 @@ pub unsafe extern "C" fn la_kernel_trap_handler(tf: &mut TrapContext) {
     let badv = badv::read().vaddr();
     match estat.cause() {
         Trap::Exception(Exception::AddressNotAligned) => emulate_load_store_insn(tf),
-        _ => kernel_trap_handler(&get_trap_type(estat, badv)),
+        _ => kernel_trap_handler(&get_trap_type(Some(tf), estat, badv)),
     }
 }
 
@@ -107,10 +107,10 @@ pub unsafe extern "C" fn la_kernel_user_ptr_handler() {
     era::set_pc(pc + 4);
     let estat = estat::read();
     let badv = badv::read().vaddr();
-    USER_PTR_TRAP_TYPE[hartid] = Wrapper(get_trap_type(estat, badv));
+    USER_PTR_TRAP_TYPE[hartid] = Wrapper(get_trap_type(None, estat, badv));
 }
 
-fn get_trap_type(estat: Estat, badv: usize) -> TrapType {
+fn get_trap_type(tf: Option<&mut TrapContext>, estat: Estat, badv: usize) -> TrapType {
     match estat.cause() {
         Trap::Exception(Exception::Syscall) | Trap::Interrupt(_) => {}
         _ => {
@@ -126,11 +126,10 @@ fn get_trap_type(estat: Estat, badv: usize) -> TrapType {
         Trap::Exception(e) => {
             match e {
                 Exception::Breakpoint => TrapType::Exception(ExceptionType::Breakpoint),
-                Exception::AddressNotAligned => panic!(
-                    "[AddressNotAligned] unexpected, badv: {:#x}, pc: {:#x}",
-                    badv,
-                    era::read().pc()
-                ),
+                Exception::AddressNotAligned => {
+                    unsafe { emulate_load_store_insn(tf.unwrap()) };
+                    return TrapType::None;
+                }
                 Exception::Syscall => TrapType::Exception(ExceptionType::Syscall),
                 Exception::StorePageFault | Exception::PageModifyFault => TrapType::Exception(
                     ExceptionType::PageFault(PageFaultType::StorePageFault(badv)),
@@ -222,10 +221,10 @@ pub(crate) fn trap_init() {
 
 impl ArchTrap for LA64 {
     type TrapContext = TrapContext;
-    fn read_trap_type() -> crate::TrapType {
+    fn read_trap_type(cx: &mut TrapContext) -> crate::TrapType {
         let estat = estat::read();
         let badv = badv::read().vaddr();
-        get_trap_type(estat, badv)
+        get_trap_type(Some(cx), estat, badv)
     }
     fn trap_init() {
         trap_init();

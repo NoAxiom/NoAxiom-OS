@@ -34,6 +34,7 @@ pub enum TrapType {
     Exception(ExceptionType),
     Interrupt(InterruptType),
     Unknown, // unknown trap type
+    Handled, // trap has been handled
     None,    // no trap type, implying the trap has been handled
 }
 
@@ -62,9 +63,9 @@ pub type UserPtrResult = Result<(), TrapType>;
 pub trait ArchTrap {
     type TrapContext: ArchTrapContext;
     fn trap_init();
-    fn trap_restore(_cx: &mut <Self as ArchTrap>::TrapContext);
+    fn trap_restore(cx: &mut <Self as ArchTrap>::TrapContext);
     fn read_epc() -> usize;
-    fn read_trap_type() -> TrapType;
+    fn read_trap_type(cx: &mut <Self as ArchTrap>::TrapContext) -> TrapType;
     fn check_read(addr: usize) -> UserPtrResult;
     fn check_write(addr: usize) -> UserPtrResult;
 }

@@ -18,10 +18,11 @@ unsafe extern "C" {
 
 // 等待数毫秒
 pub fn ahci_mdelay(ms: u32) {
+    const MS_PER_SEC: usize = 1000;
     let time = Arch::get_time();
     let freq = Arch::get_freq();
-    let target = time + (freq * ms as usize) / 1000;
-    while Arch::get_time() < target {}
+    let expire = time + (freq * ms as usize) / MS_PER_SEC;
+    while Arch::get_time() < expire {}
 }
 
 // 同步dcache中所有cached和uncached访存请求
