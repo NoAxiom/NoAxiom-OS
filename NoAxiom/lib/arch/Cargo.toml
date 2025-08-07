@@ -3,6 +3,9 @@ name = "arch"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+qemu = []
+
 [dependencies]
 log = { workspace = true }
 config = { workspace = true }

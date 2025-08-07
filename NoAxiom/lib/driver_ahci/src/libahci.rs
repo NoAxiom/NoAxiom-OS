@@ -138,7 +138,6 @@ pub const SATA_FLAG_WCACHE: u32 = 256;
 pub const READ_CMD: u32 = 0;
 pub const WRITE_CMD: u32 = 1;
 
-#[derive(Copy, Clone)]
 #[repr(C)]
 pub struct AhciCmdHdr {
     pub opts: u32,
@@ -148,7 +147,6 @@ pub struct AhciCmdHdr {
     pub reserved: [u32; 4],
 }
 
-#[derive(Copy, Clone)]
 #[repr(C)]
 pub struct AhciSg {
     pub addr_lo: u32,
@@ -157,7 +155,6 @@ pub struct AhciSg {
     pub flags_size: u32,
 }
 
-#[derive(Copy, Clone)]
 #[repr(C)]
 pub struct AhciIoport {
     pub port_mmio: u64,
@@ -173,7 +170,6 @@ pub struct AhciIoport {
 unsafe impl Sync for AhciIoport {}
 unsafe impl Send for AhciIoport {}
 
-#[derive(Copy, Clone)]
 #[repr(C)]
 pub struct AhciBlkDev {
     pub lba48: bool,
@@ -185,7 +181,6 @@ pub struct AhciBlkDev {
     pub revision: [u8; (ATA_ID_FW_REV_LEN + 1) as usize],
 }
 
-#[derive(Copy, Clone)]
 #[repr(C)]
 pub struct AhciDevice {
     pub mmio_base: u64,

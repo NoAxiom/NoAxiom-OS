@@ -6,7 +6,9 @@ use super::{
 };
 use crate::{
     basic::{BlockDeviceType, DeviceType, InterruptDeviceType, NetDeviceType},
-    block::{vf2_sdcard::sdcard::VF2SdcardDevice, virtio_block::VirtioBlockDevice},
+    block::{
+        ls_ahci::LsAhciDevice, vf2_sdcard::sdcard::VF2SdcardDevice, virtio_block::VirtioBlockDevice,
+    },
     interrupt::plic::PlicDevice,
     manager::{get_int_ctrl_dev, set_int_ctrl_dev, DEV_BUS},
 };
@@ -94,6 +96,24 @@ fn of_realize(config: &DeviceConfig) {
                 } else {
                     log::warn!(
                         "[platform] failed to realize VF2 SD card device: type {:?} @ addr: {:#x}, size: {:#x}",
+                        blk_type,
+                        config.region.addr,
+                        config.region.size
+                    );
+                }
+            }
+            BlockDeviceType::LS2k1000Ahci => {
+                log::info!(
+                    "[platform] realize LS2K1000 AHCI device: type {:?} @ addr: {:#x}, size: {:#x}",
+                    blk_type,
+                    config.region.addr,
+                    config.region.size
+                );
+                if let Ok(ahci) = LsAhciDevice::new(config.region.addr) {
+                    DEV_BUS.add_block_device(ahci);
+                } else {
+                    log::warn!(
+                        "[platform] failed to realize LS2K1000 AHCI device: type {:?} @ addr: {:#x}, size: {:#x}",
                         blk_type,
                         config.region.addr,
                         config.region.size

@@ -40,9 +40,11 @@ impl DeviceTreeInfo for LsAhciDevice {
 }
 
 impl LsAhciDevice {
-    pub fn new(mut device: AhciDevice) -> Self {
-        device.ahci_init();
-        LsAhciDevice { device }
+    pub fn new(base_addr: usize) -> Result<Self, ()> {
+        const BASE_ADDR: usize = 0x400e0000;
+        assert!(BASE_ADDR == base_addr);
+        let device = AhciDevice::new(base_addr)?;
+        Ok(LsAhciDevice { device })
     }
 }
 

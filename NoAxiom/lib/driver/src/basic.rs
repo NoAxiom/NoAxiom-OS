@@ -24,6 +24,7 @@ pub enum BlockDeviceType {
     Virtio,
     VF2Sdcard,
     LS2k1000Ahci,
+    Unknown,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -812,24 +812,29 @@ impl AhciDevice {
 
     // ahci初始化函数
     #[no_mangle]
-    pub fn ahci_init(self: &mut AhciDevice) -> i32 {
-        let ahci_dev = self;
-        ahci_dev.mmio_base = unsafe { ahci_phys_to_uncached(0x400e0000) };
+    pub fn new(base_pa: usize) -> Result<Self, ()> {
+        let mut dev = Self::new_bare();
+        let mut ahci_dev = &mut dev;
+        ahci_dev.mmio_base = unsafe { ahci_phys_to_uncached(base_pa as _) };
 
         let mut ret: i32 = ahci_host_init(ahci_dev);
         if ret != 0 {
-            return -1;
+            return Err(());
         }
 
         ret = ahci_port_scan(ahci_dev);
         if ret != 0 {
-            return -1;
+            return Err(());
         }
 
         ahci_print_info(ahci_dev);
 
         ahci_sata_scan(ahci_dev);
 
-        return 0;
+        Ok(dev)
+    }
+
+    fn new_bare() -> Self {
+        unsafe { core::mem::zeroed() }
     }
 }

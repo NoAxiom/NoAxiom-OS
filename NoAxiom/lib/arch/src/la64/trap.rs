@@ -17,9 +17,8 @@ use super::{
     LA64,
 };
 use crate::{
-    la64::interrupt::is_interrupt_enabled, ArchAsm, ArchInt, ArchTrap, ArchTrapContext,
-    ArchUserFloatContext, ExceptionType, InterruptNumber, InterruptType, PageFaultType, TrapType,
-    UserPtrResult,
+    ArchAsm, ArchInt, ArchTrap, ArchTrapContext, ArchUserFloatContext, ExceptionType,
+    InterruptNumber, InterruptType, PageFaultType, TrapType, UserPtrResult,
 };
 
 global_asm!(include_str!("./trap.S"));

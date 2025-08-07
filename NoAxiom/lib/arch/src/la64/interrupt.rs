@@ -45,31 +45,33 @@ pub(crate) fn interrupt_init() {
 }
 
 // fake impl for 2k1000
-// impl ArchInt for LA64 {
-//     fn is_interrupt_enabled() -> bool {
-//         true
-//     }
-//     fn enable_interrupt() {}
-//     fn disable_interrupt() {}
-//     fn disable_external_interrupt() {}
-//     fn enable_external_interrupt() {}
-//     fn enable_software_interrupt() {}
-//     fn enable_timer_interrupt() {
-//         enable_timer_interrupt();
-//     }
-//     fn is_external_interrupt_enabled() -> bool {
-//         true
-//     }
-//     // user memory access is riscv specific
-//     fn enable_user_memory_access() {}
-//     fn disable_user_memory_access() {}
-//     // ipi
-//     fn send_ipi(hartid: usize) {
-//         send_ipi_single(hartid, 1);
-//     }
-//     fn clear_ipi() {}
-// }
+#[cfg(not(feature = "qemu"))]
+impl ArchInt for LA64 {
+    fn is_interrupt_enabled() -> bool {
+        true
+    }
+    fn enable_interrupt() {}
+    fn disable_interrupt() {}
+    fn disable_external_interrupt() {}
+    fn enable_external_interrupt() {}
+    fn enable_software_interrupt() {}
+    fn enable_timer_interrupt() {
+        enable_timer_interrupt();
+    }
+    fn is_external_interrupt_enabled() -> bool {
+        true
+    }
+    // user memory access is riscv specific
+    fn enable_user_memory_access() {}
+    fn disable_user_memory_access() {}
+    // ipi
+    fn send_ipi(hartid: usize) {
+        send_ipi_single(hartid, 1);
+    }
+    fn clear_ipi() {}
+}
 
+#[cfg(feature = "qemu")]
 impl ArchInt for LA64 {
     fn is_interrupt_enabled() -> bool {
         is_interrupt_enabled()
