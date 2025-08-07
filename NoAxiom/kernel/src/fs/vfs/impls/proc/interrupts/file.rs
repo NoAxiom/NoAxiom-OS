@@ -1,13 +1,16 @@
-use alloc::collections::btree_map::BTreeMap;
 use core::sync::atomic::AtomicUsize;
 
-use ksync::mutex::SpinLock;
-use num_traits::abs;
+use arch::InterruptNumber;
+use array_init::array_init;
 
 use crate::file_default;
 
+const INTERRUPT_NUM: usize = 128;
+
 lazy_static::lazy_static! {
-    static ref INTERRUPTS_COUNT: SpinLock<BTreeMap<isize, AtomicUsize>> = SpinLock::new(BTreeMap::new());
+    static ref INTERRUPTS_COUNT: [AtomicUsize; INTERRUPT_NUM] = {
+        array_init(|_| AtomicUsize::new(0))
+    };
 }
 
 /*
@@ -16,25 +19,22 @@ lazy_static::lazy_static! {
 10:        397
 */
 
-pub fn inc_interrupts_count(id: isize) {
-    let id = abs(id);
-    INTERRUPTS_COUNT
-        .lock()
-        .entry(id)
-        .or_insert_with(|| AtomicUsize::new(0))
-        .fetch_add(1, core::sync::atomic::Ordering::Relaxed);
+pub fn inc_interrupts_count(id: InterruptNumber) {
+    INTERRUPTS_COUNT[id].fetch_add(1, core::sync::atomic::Ordering::SeqCst);
 }
 
 file_default!(
     InterruptsFile,
     async fn base_read(&self, offset: usize, buf: &mut [u8]) -> SyscallResult {
-        let interrupts = super::INTERRUPTS_COUNT.lock();
         debug!("[Interrupts] offset: {}", offset);
 
         let mut written = 0;
         let mut read_buf = alloc::vec::Vec::new();
-        for (&id, counter) in interrupts.iter() {
+        for (id, counter) in super::INTERRUPTS_COUNT.iter().enumerate() {
             let count = counter.load(core::sync::atomic::Ordering::Relaxed);
+            if count == 0 {
+                continue;
+            }
             let line = alloc::format!("{}: {}\n", id, count);
             debug!(
                 "[Interrupts] interrupts: id: {}, count: {}, line: {}",
