@@ -21,7 +21,7 @@ lazy_static::lazy_static! {
 }
 
 /// Create the root dentry, mount multiple fs
-pub async fn fs_init() {
+pub async fn vfs_init() {
     type RootRealFs = AsyncSmpExt4;
 
     info!("[vfs] fs initial, register file systems");

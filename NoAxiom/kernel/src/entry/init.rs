@@ -1,5 +1,5 @@
 use arch::{consts::KERNEL_ADDR_OFFSET, Arch, ArchBoot, ArchInfo, ArchInt, _entry_other_hart};
-use driver::probe::probe_device;
+use driver::probe::{probe_device, realize_device};
 use memory::bss::bss_init;
 use platform::memory::VALID_PHYS_CPU_MASK;
 
@@ -8,6 +8,7 @@ use crate::{
     constant::banner::NOAXIOM_BANNER,
     cpu::get_hartid,
     entry::{init_proc::schedule_spawn_with_path, main::boot_broadcast},
+    fs::fs_init,
     mm::{
         frame_init,
         heap::heap_init,
@@ -16,7 +17,6 @@ use crate::{
     sched::utils::block_on,
     time::clock::ktime_init,
     utils::log::log_init,
-    with_interrupt_on,
 };
 
 /// awake other core
@@ -65,6 +65,14 @@ fn hello_world() {
     println!("[kernel] ARCH = {}", Arch::ARCH_NAME);
 }
 
+#[allow(unused)]
+fn interrupt_test() {
+    info!("interrupt test start");
+    Arch::enable_interrupt();
+    info!("interrupt test done!");
+    Arch::disable_interrupt();
+}
+
 #[no_mangle]
 pub extern "C" fn _boot_hart_init(_: usize, dtb: usize) -> ! {
     bss_init();
@@ -81,11 +89,15 @@ pub extern "C" fn _boot_hart_init(_: usize, dtb: usize) -> ! {
     frame_init();
     kernel_space_init();
 
+    // test interrupt
+    // interrupt_test();
+
     // device init
     probe_device(dtb);
+    realize_device();
 
     // fs init
-    with_interrupt_on!(block_on(crate::fs::init()));
+    block_on(fs_init());
 
     // spawn init_proc and wake other harts
     ktime_init();

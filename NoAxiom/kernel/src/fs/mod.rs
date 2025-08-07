@@ -12,13 +12,15 @@ pub mod vfs;
 use arch::{Arch, ArchInt};
 use driver::manager::DEV_BUS;
 
-pub async fn init() {
+pub async fn fs_init() {
+    info!("[fs] fs_init start");
+    Arch::enable_interrupt();
     info!(
         "[fs] interrupt: {}, external interrupt: {}",
         Arch::is_interrupt_enabled(),
         Arch::is_external_interrupt_enabled()
     );
-    vfs::fs_init().await;
+    vfs::vfs_init().await;
 }
 
 #[allow(unused)]
