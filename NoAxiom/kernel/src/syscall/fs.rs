@@ -939,21 +939,82 @@ impl Syscall<'_> {
 
         let searchflags = FcntlArgFlags::AT_SYMLINK_NOFOLLOW;
         let old_dentry = get_dentry(self.task, old_dirfd, &old_path, &searchflags)?;
-        let new_dentry = get_dentry(self.task, new_dirfd, &new_path, &searchflags)?;
+        let (new_dentry_parent, new_name) =
+            get_dentry_parent(self.task, new_dirfd, &new_path, &searchflags)?;
 
-        if flags.contains(RenameFlags::RENAME_NOREPLACE) {
-            error!("[sys_renameat2] newpath already exists with NOREPLACE flag");
-            return Err(Errno::EINVAL);
+        if old_dentry.is_negative() {
+            error!("[sys_renameat2] oldpath does not exist");
+            return Err(Errno::ENOENT);
         }
-        // if flags.contains(RenameFlags::RENAME_EXCHANGE) {
-        //     // 进行ancestor检查
-        //     if new_dentry.is_ancestor(&old_dentry) {
-        //         error!("[sys_renameat2] newpath is ancestor of oldpath with EXCHANGE
-        // flag");         return Err(Errno::EINVAL);
-        //     }
-        // }
 
-        old_dentry.rename_to(new_dentry, flags).await?;
+        if let Some(new_dentry) = new_dentry_parent.get_child(new_name) {
+            // new dentry must not exist if NOREPLACE is set
+            if flags.contains(RenameFlags::RENAME_NOREPLACE) {
+                error!("[sys_renameat2] newpath already exists with NOREPLACE flag");
+                return Err(Errno::EINVAL);
+            }
+
+            // check if newpath is an ancestor of oldpath
+            if flags.contains(RenameFlags::RENAME_EXCHANGE) {
+                let mut current = old_dentry.clone();
+                loop {
+                    if let Some(parent) = current.parent() {
+                        if core::ptr::addr_eq(Arc::as_ptr(&parent), Arc::as_ptr(&new_dentry)) {
+                            error!("[sys_renameat2] newpath is an ancestor of oldpath");
+                            return Err(Errno::EINVAL);
+                        }
+                        current = parent;
+                    } else {
+                        break;
+                    }
+                }
+            }
+
+            let new_inode = new_dentry.inode().expect("should have inode");
+
+            // fixme: if old_dentry is a dir, new_dentry must not exist or be an empty dir
+            // currently doesn't check if it is an empty dir
+            if old_dentry.inode().unwrap().file_type() == InodeMode::DIR {
+                error!("[sys_renameat2] new_dentry is not an empty directory");
+                return Err(Errno::ENOTEMPTY);
+            }
+
+            // check if old_dentry and new_dentry are the same hard link
+            if Arc::ptr_eq(&old_dentry.inode().unwrap(), &new_inode) {
+                warn!(
+                    "[sys_renameat2] old_dentry and new_dentry are the hard links of the same file"
+                );
+                return Ok(0);
+            }
+        } else {
+            // new_path does not exist, but if EXCHANGE is set
+            if flags.contains(RenameFlags::RENAME_EXCHANGE) {
+                error!("[sys_renameat2] newpath must exist with EXCHANGE flag");
+                return Err(Errno::EINVAL);
+            }
+        }
+
+        // rename: currently just create a new file with the same inode and delete the
+        // old one
+        // todo: support the real fs rename, mention that ext4_rs doesn't support rename
+        let parent = old_dentry.parent().ok_or(Errno::ENOENT)?;
+        let old_inode = old_dentry.inode().unwrap();
+        parent
+            .clone()
+            .create(new_name, old_inode.inode_mode())
+            .await?;
+        let new_dentry = parent.get_child(new_name).unwrap();
+        new_dentry.set_inode(old_inode);
+
+        let old_name = old_dentry.name();
+        parent
+            .clone()
+            .open(&FileFlags::empty())
+            .unwrap()
+            .delete_child(old_name)
+            .await?;
+        parent.remove_child(old_dentry.name()).unwrap();
+
         Ok(0)
     }
 

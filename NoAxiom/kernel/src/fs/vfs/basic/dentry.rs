@@ -47,7 +47,7 @@ use crate::{
         },
     },
     include::{
-        fs::{DevT, FileFlags, InodeMode, RenameFlags},
+        fs::{DevT, FileFlags, InodeMode},
         result::Errno,
     },
     sched::utils::block_on,
@@ -142,9 +142,6 @@ impl dyn Dentry {
         }
         *self.meta().inode.lock() = Some(inode);
     }
-    pub fn set_inode_none(&self) {
-        *self.meta().inode.lock() = None;
-    }
     /// Check if the dentry is negative
     #[inline(always)]
     pub fn is_negative(&self) -> bool {
@@ -226,6 +223,8 @@ impl dyn Dentry {
     }
 
     /// Remove a child dentry with `name`.
+    /// Mention: this will remove the dentry from the path cache,
+    /// but not remove the dentry in the real fs!
     pub fn remove_child(self: &Arc<Self>, name: &str) -> Option<Arc<dyn Dentry>> {
         let path = self.clone().path();
         crate::fs::path::PATH_CACHE.lock().remove(&path);
@@ -335,12 +334,35 @@ impl dyn Dentry {
                 if let Some(child) = self.get_child(name) {
                     return child.__walk_path(path, step + 1, jumps);
                 }
-                error!(
-                    "[walk_path] {} not found in {}, step: {}",
-                    name,
-                    self.name(),
-                    step
-                );
+                #[cfg(feature = "debug_sig")]
+                {
+                    match name {
+                        "localtime" => {}
+                        "riscv64-linux-gnu" => {}
+                        "ld.so.preload" | "ld.so.cache" => {}
+                        "usr" | "tls" | "smaps" | "tmp" => {}
+                        "var" => {}
+                        "iozone.tmp.DUMMY" | "iozone.DUMMY" | "iozone.DUMMY.0"
+                        | "iozone.DUMMY.1" | "iozone.DUMMY.2" | "iozone.DUMMY.3" => {}
+                        other => {
+                            error!(
+                                "[walk_path] {} not found in {}, step: {}",
+                                other,
+                                self.name(),
+                                step
+                            );
+                        }
+                    }
+                }
+                #[cfg(not(feature = "debug_sig"))]
+                {
+                    warn!(
+                        "[walk_path] {} not found in {}, step: {}",
+                        name,
+                        self.name(),
+                        step
+                    );
+                }
                 Err(Errno::ENOENT)
             }
         }
@@ -403,6 +425,7 @@ impl dyn Dentry {
         let inode = if let Ok(inode) = self.inode() {
             inode
         } else {
+            warn!("[Vfs::unlink] {} is negative", self.name());
             return Ok(0);
         };
         let mut nlink = inode.meta().inner.lock().nlink;
@@ -418,9 +441,8 @@ impl dyn Dentry {
             let file = self.clone().open(file_flags)?;
             w_guard.mark_deleted(&file);
             drop(w_guard);
-            self.set_inode_none();
             inode.set_state(InodeState::Deleted).await;
-            // parent.remove_child(&self.name()).unwrap();
+            parent.remove_child(&self.name()).unwrap();
             parent
                 .open(&FileFlags::empty())
                 .unwrap()
@@ -428,67 +450,6 @@ impl dyn Dentry {
                 .await?;
         }
         Ok(0)
-    }
-
-    pub async fn rename_to(
-        self: Arc<Self>,
-        target: Arc<dyn Dentry>,
-        flags: RenameFlags,
-    ) -> SysResult<()> {
-        if flags.contains(RenameFlags::RENAME_EXCHANGE)
-            && (flags.contains(RenameFlags::RENAME_NOREPLACE)
-                || flags.contains(RenameFlags::RENAME_WHITEOUT))
-        {
-            return Err(Errno::EINVAL);
-        }
-        // FIXME: i don't think should check if descendant
-        if target.is_negative() && flags.contains(RenameFlags::RENAME_EXCHANGE) {
-            return Err(Errno::ENOENT);
-        } else if flags.contains(RenameFlags::RENAME_NOREPLACE) {
-            return Err(Errno::EEXIST);
-        }
-
-        // ext4_rs doesn't support mv or rename methods
-        // so we delete the target and copy from self
-
-        let tar_parent = target.parent().unwrap_or_else(|| {
-            panic!("rename_to: target parent is None");
-        });
-        let self_file_type = self.inode()?.file_type();
-        let tar_name = target.name();
-
-        // delete
-        if !target.is_negative() {
-            let tar_file_type = target.inode()?.file_type();
-            if self_file_type != tar_file_type {
-                return Err(Errno::EINVAL);
-            }
-            match tar_file_type {
-                InodeMode::DIR => {
-                    warn!("[rename_to] delete dir {}", target.name());
-                }
-                InodeMode::FILE => {}
-                _ => unimplemented!("rename at not dir/file"),
-            }
-            tar_parent
-                .clone()
-                .open(&FileFlags::empty())?
-                .delete_child(tar_name)
-                .await?;
-        }
-
-        let target = tar_parent.remove_child(target.name()).unwrap();
-
-        // copy
-        tar_parent.create(self.name(), self_file_type).await?;
-
-        if flags.contains(RenameFlags::RENAME_EXCHANGE) {
-            self.set_inode(target.inode()?);
-        } else {
-            self.set_inode_none();
-        }
-
-        Ok(())
     }
 
     /// Check if the dentry has access to the file.
