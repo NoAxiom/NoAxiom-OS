@@ -766,75 +766,70 @@ fn ahci_sata_scan(ahci_dev: &mut AhciDevice) {
     ahci_sata_print_info(&ahci_dev.blk_dev);
 }
 
-// ahci sata读函数
-// blknr 开始的sector/block偏移
-// blkcnt 读取的sector/block总数
-#[no_mangle]
-pub unsafe extern "C" fn ahci_sata_read_common(
-    ahci_dev: &AhciDevice,
-    blknr: u64,
-    blkcnt: u32,
-    buffer: *mut u8,
-) -> u64 {
-    let pdev: &AhciBlkDev = &ahci_dev.blk_dev;
-    let mut rc: u32 = 0;
+impl AhciDevice {
+    // ahci sata读函数
+    // blknr 开始的sector/block偏移
+    // blkcnt 读取的sector/block总数
+    #[no_mangle]
+    pub fn ahci_sata_read_common(&self, blknr: u64, blkcnt: u32, buffer: *mut u8) -> u64 {
+        let ahci_dev = self;
+        let pdev: &AhciBlkDev = &ahci_dev.blk_dev;
+        let mut rc: u32 = 0;
 
-    if pdev.lba48 {
-        rc = ata_low_level_rw_lba48(ahci_dev, blknr, blkcnt, buffer, READ_CMD);
-    } else {
-        rc = ata_low_level_rw_lba28(ahci_dev, blknr, blkcnt, buffer, READ_CMD);
-    }
-
-    return rc as u64;
-}
-
-// ahci sata写函数
-// blknr 开始的sector/block偏移
-// blkcnt 写入的sector/block总数
-#[no_mangle]
-pub unsafe extern "C" fn ahci_sata_write_common(
-    ahci_dev: &AhciDevice,
-    blknr: u64,
-    blkcnt: u32,
-    buffer: *mut u8,
-) -> u64 {
-    let pdev: &AhciBlkDev = &ahci_dev.blk_dev;
-    let mut flags: u32 = ahci_dev.flags;
-    let mut rc: u32 = 0;
-
-    if pdev.lba48 {
-        rc = ata_low_level_rw_lba48(ahci_dev, blknr, blkcnt, buffer, WRITE_CMD);
-        if flags & SATA_FLAG_WCACHE != 0 && flags & SATA_FLAG_FLUSH_EXT != 0 {
-            ahci_sata_flush_cache_ext(ahci_dev);
+        if pdev.lba48 {
+            rc = ata_low_level_rw_lba48(ahci_dev, blknr, blkcnt, buffer, READ_CMD);
+        } else {
+            rc = ata_low_level_rw_lba28(ahci_dev, blknr, blkcnt, buffer, READ_CMD);
         }
-    } else {
-        rc = ata_low_level_rw_lba28(ahci_dev, blknr, blkcnt, buffer, WRITE_CMD);
-        if flags & SATA_FLAG_WCACHE != 0 && flags & SATA_FLAG_FLUSH != 0 {
-            ahci_sata_flush_cache(ahci_dev);
+
+        return rc as u64;
+    }
+
+    // ahci sata写函数
+    // blknr 开始的sector/block偏移
+    // blkcnt 写入的sector/block总数
+    #[no_mangle]
+    pub fn ahci_sata_write_common(&self, blknr: u64, blkcnt: u32, buffer: *mut u8) -> u64 {
+        let ahci_dev = self;
+        let pdev: &AhciBlkDev = &ahci_dev.blk_dev;
+        let mut flags: u32 = ahci_dev.flags;
+        let mut rc: u32 = 0;
+
+        if pdev.lba48 {
+            rc = ata_low_level_rw_lba48(ahci_dev, blknr, blkcnt, buffer, WRITE_CMD);
+            if flags & SATA_FLAG_WCACHE != 0 && flags & SATA_FLAG_FLUSH_EXT != 0 {
+                ahci_sata_flush_cache_ext(ahci_dev);
+            }
+        } else {
+            rc = ata_low_level_rw_lba28(ahci_dev, blknr, blkcnt, buffer, WRITE_CMD);
+            if flags & SATA_FLAG_WCACHE != 0 && flags & SATA_FLAG_FLUSH != 0 {
+                ahci_sata_flush_cache(ahci_dev);
+            }
         }
+
+        return rc as u64;
     }
 
-    return rc as u64;
-}
+    // ahci初始化函数
+    #[no_mangle]
+    pub fn ahci_init(self: &mut AhciDevice) -> i32 {
+        let ahci_dev = self;
+        ahci_dev.mmio_base = unsafe { ahci_phys_to_uncached(0x400e0000) };
 
-// ahci初始化函数
-#[no_mangle]
-pub unsafe extern "C" fn ahci_init(ahci_dev: &mut AhciDevice) -> i32 {
-    ahci_dev.mmio_base = unsafe { ahci_phys_to_uncached(0x400e0000) };
+        let mut ret: i32 = ahci_host_init(ahci_dev);
+        if ret != 0 {
+            return -1;
+        }
 
-    let mut ret: i32 = ahci_host_init(ahci_dev);
-    if ret != 0 {
-        return -1;
+        ret = ahci_port_scan(ahci_dev);
+        if ret != 0 {
+            return -1;
+        }
+
+        ahci_print_info(ahci_dev);
+
+        ahci_sata_scan(ahci_dev);
+
+        return 0;
     }
-
-    ret = ahci_port_scan(ahci_dev);
-    if ret != 0 {
-        return -1;
-    }
-
-    ahci_print_info(ahci_dev);
-
-    ahci_sata_scan(ahci_dev);
-
-    return 0;
 }
