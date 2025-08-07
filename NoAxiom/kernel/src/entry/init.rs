@@ -73,7 +73,6 @@ pub extern "C" fn _boot_hart_init(_: usize, dtb: usize) -> ! {
     // log init
     Arch::arch_init();
     log_init();
-    Arch::arch_info_print();
 
     // print basic info
     hello_world();
