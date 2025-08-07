@@ -1,5 +1,5 @@
-use driver::manager::handle_irq;
+//! external interrupt handler
 
 pub fn ext_int_handler() {
-    handle_irq();
+    driver::manager::handle_irq();
 }

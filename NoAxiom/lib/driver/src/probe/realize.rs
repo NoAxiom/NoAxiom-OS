@@ -150,6 +150,8 @@ fn dtb_realize() {
 }
 
 pub fn device_realize() {
+    log::info!("[device_realize] realizing devices...");
     dtb_realize();
+    log::info!("[device_realize] realizing interrupt controller...");
     int_ctrl_realize();
 }

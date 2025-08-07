@@ -1,4 +1,5 @@
-//! trap handler
+//! user trap handler
+//! [`user_trap_handler`] is used by [`arch`]
 
 use alloc::sync::Arc;
 use core::intrinsics::unlikely;

@@ -103,7 +103,7 @@ impl StackFrameAllocator {
         self.start = l.0;
         self.current = l.0;
         self.end = r.0;
-        log::debug!(
+        log::info!(
             "[kernel] FRAME: init {} physical frames, range: [{:#x}, {:#x}]",
             (self.end - self.start) as isize,
             self.start,

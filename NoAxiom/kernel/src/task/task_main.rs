@@ -13,7 +13,7 @@ use crate::{
     mm::memory_set::kernel_space_activate,
     sched::utils::suspend_now,
     task::{status::TaskStatus, Task},
-    trap::handler::user_trap_handler,
+    trap::utrap_handler::user_trap_handler,
     with_interrupt_off,
 };
 

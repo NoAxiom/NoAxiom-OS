@@ -160,6 +160,9 @@ run: backup
 TEST_2K1000_DIR := $(ROOT)/$(UTILS)/la-2k1000-sim
 test_2k1000:
 	@echo -e $(NORMAL)"Running 2k-1000 tests..."$(RESET)
+	@cd $(TEST_2K1000_DIR) && make
+
+update_2k1000:
 	@echo -e $(NORMAL)"Checking la-2k1000-sim submodule..."$(RESET)
 	@cd $(ROOT)/$(UTILS) && \
 	if [ -d "la-2k1000-sim/.git" ] || [ -f "la-2k1000-sim/.git" ]; then \
@@ -169,7 +172,6 @@ test_2k1000:
 		echo -e $(NORMAL)"Submodule not found, initializing and updating..."$(RESET); \
 		git submodule update --init la-2k1000-sim; \
 	fi
-	@cd $(TEST_2K1000_DIR) && make
 
 QEMU_DTB = log/qemu-$(ARCH_NAME).dtb
 QEMU_DTS = log/qemu-$(ARCH_NAME).dts

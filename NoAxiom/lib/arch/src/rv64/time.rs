@@ -24,4 +24,7 @@ impl ArchTime for RV64 {
     fn set_timer(interval: u64) {
         set_timer(time::read() as u64 + interval).expect("set timer failed");
     }
+    fn clear_timer_interrupt() {
+        set_timer(u64::MAX).expect("clear timer interrupt failed");
+    }
 }

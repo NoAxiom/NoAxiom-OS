@@ -28,6 +28,15 @@ extern "C" {
     fn __user_trapret(cx: *mut TrapContext);
     fn __kernel_trapvec();
     fn __kernel_user_ptr_vec();
+    fn kernel_trap_handler(trap_type: &TrapType);
+}
+
+#[no_mangle]
+pub extern "C" fn rv_kernel_trap_handler() {
+    let scause = scause::read();
+    let stval = stval::read();
+    let trap_type = get_trap_type(scause, stval);
+    unsafe { kernel_trap_handler(&trap_type) };
 }
 
 pub fn get_trap_type(scause: Scause, stval: usize) -> TrapType {
@@ -50,11 +59,11 @@ pub fn get_trap_type(scause: Scause, stval: usize) -> TrapType {
             PageFaultType::LoadPageFault(stval),
         )),
         Trap::Interrupt(int) => match int {
-            Interrupt::SupervisorTimer => TrapType::Interrupt(InterruptType::Timer(-1)),
+            Interrupt::SupervisorTimer => TrapType::Interrupt(InterruptType::Timer(1)),
             Interrupt::SupervisorExternal => {
-                TrapType::Interrupt(InterruptType::SupervisorExternal(-1))
+                TrapType::Interrupt(InterruptType::SupervisorExternal(2))
             }
-            Interrupt::SupervisorSoft => TrapType::Interrupt(InterruptType::SupervisorSoft(-1)),
+            Interrupt::SupervisorSoft => TrapType::Interrupt(InterruptType::SupervisorSoft(3)),
             _ => TrapType::Unknown,
         },
         _ => panic!("unknown trap type: {:?}", scause.cause()),
@@ -132,7 +141,7 @@ unsafe fn check_write(ptr: usize) -> UserPtrResult {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn kernel_user_ptr_handler() {
+pub unsafe extern "C" fn rv_kernel_user_ptr_handler() {
     let hartid = RV64::get_hartid();
     let scause = scause::read();
     let stval = stval::read();
@@ -172,7 +181,7 @@ impl ArchTrap for RV64 {
         sepc::read()
     }
     /// translate scause and stval to common TrapType
-    fn read_trap_type(_: Option<&mut TrapContext>) -> TrapType {
+    fn read_trap_type() -> TrapType {
         let scause = scause::read();
         let stval = stval::read();
         get_trap_type(scause, stval)

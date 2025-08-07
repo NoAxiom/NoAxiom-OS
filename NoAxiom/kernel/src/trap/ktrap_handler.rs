@@ -1,20 +1,22 @@
-use arch::{Arch, ArchTrap, ExceptionType, InterruptType, PageFaultType, TrapContext, TrapType};
+//! kernel trap handler
+//! [`kernel_trap_handler`] is used by [`arch`]
+
+use arch::{Arch, ArchInt, ArchTime, ExceptionType, InterruptType, PageFaultType, TrapType};
 use kfuture::block::block_on;
 
 use crate::{
-    cpu::current_cpu,
+    cpu::{current_cpu, current_task},
     fs::vfs::inc_interrupts_count,
     syscall::utils::current_syscall,
-    trap::{ext_int::ext_int_handler, soft_int::soft_int_handler, ktimer::kernel_timer_trap_handler},
+    trap::{ext_int::ext_int_handler, soft_int::soft_int_handler},
 };
 
 /// kernel trap handler
 #[no_mangle]
-pub fn kernel_trap_handler(cx_ptr: *mut TrapContext) {
+pub fn kernel_trap_handler(trap_type: &TrapType) {
+    assert!(!Arch::is_interrupt_enabled());
     current_cpu().add_trap_depth();
-    let cx = unsafe { &mut *(cx_ptr) };
-    let trap_type = Arch::read_trap_type(Some(cx));
-    match trap_type {
+    match *trap_type {
         TrapType::Exception(exception) => kernel_exception_handler(exception),
         TrapType::Interrupt(interrupt) => kernel_interrupt_handler(interrupt),
         TrapType::None => {}
@@ -67,4 +69,16 @@ fn kernel_interrupt_handler(interrupt: InterruptType) {
             soft_int_handler()
         }
     }
+}
+
+pub fn kernel_timer_trap_handler() {
+    // mark the task as needing to yield
+    if let Some(task) = current_task() {
+        task.sched_entity_mut().set_pending_yield();
+    }
+    Arch::clear_timer_interrupt();
+    // if current_cpu().trap_depth() < 2 {
+    //     TIMER_MANAGER.check();
+    //     RUNTIME.handle_realtime();
+    // }
 }

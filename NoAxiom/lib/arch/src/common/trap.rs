@@ -1,8 +1,9 @@
 use core::ops::{Index, IndexMut};
 
 pub type PageFaultAddr = usize;
-pub type InterruptNumber = isize;
+pub type InterruptNumber = usize;
 
+#[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum InterruptType {
     Timer(InterruptNumber),
@@ -10,6 +11,7 @@ pub enum InterruptType {
     SupervisorSoft(InterruptNumber),
 }
 
+#[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum PageFaultType {
     StorePageFault(PageFaultAddr),
@@ -18,6 +20,7 @@ pub enum PageFaultType {
     IllegalInstruction(PageFaultAddr),
 }
 
+#[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ExceptionType {
     Breakpoint,
@@ -25,6 +28,7 @@ pub enum ExceptionType {
     PageFault(PageFaultType),
 }
 
+#[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TrapType {
     Exception(ExceptionType),
@@ -60,7 +64,7 @@ pub trait ArchTrap {
     fn trap_init();
     fn trap_restore(_cx: &mut <Self as ArchTrap>::TrapContext);
     fn read_epc() -> usize;
-    fn read_trap_type(cx: Option<&mut <Self as ArchTrap>::TrapContext>) -> TrapType;
+    fn read_trap_type() -> TrapType;
     fn check_read(addr: usize) -> UserPtrResult;
     fn check_write(addr: usize) -> UserPtrResult;
 }

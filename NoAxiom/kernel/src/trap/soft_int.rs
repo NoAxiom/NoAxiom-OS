@@ -1,4 +1,4 @@
-//! inter-process interrupt handler
+//! software interrupt handler
 
 use alloc::sync::Arc;
 use core::mem::swap;
@@ -57,6 +57,7 @@ pub fn current_ipi_info() -> IpiInfo {
     IPI_MANAGER[get_hartid()].lock().fetch()
 }
 
+#[allow(unused)]
 pub fn send_ipi(to_hartid: usize, ipi_type: IpiType) {
     match ipi_type {
         IpiType::None => {
@@ -70,6 +71,7 @@ pub fn send_ipi(to_hartid: usize, ipi_type: IpiType) {
     Arch::send_ipi(to_hartid);
 }
 
+#[allow(unused)]
 fn ipi_handler() {
     let info = current_ipi_info();
     trace!("ipi handler, from_hartid: {}", info.from_hartid);
@@ -89,7 +91,7 @@ fn ipi_handler() {
 }
 
 pub fn soft_int_handler() {
-    unimplemented!()
+    error!("soft int handler is not implemented yet!");
 }
 
 #[allow(unused)]

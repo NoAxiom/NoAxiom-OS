@@ -143,7 +143,7 @@ pub unsafe fn emulate_load_store_insn(pt_regs: &mut TrapContext) {
     rd = (la_inst & 0x1f) as usize;
 
     // log::debug!("{:#x?}", pt_regs);
-    // log::debug!("Unaligned Access PC @ {:#x} ", pt_regs.era);
+    log::debug!("Unaligned Access PC @ {:#x} ", pt_regs.era);
     // log::debug!("badv is {:#x}", addr);
     // log::debug!("rd: {}  inst: {:#x}", rd, la_inst);
 

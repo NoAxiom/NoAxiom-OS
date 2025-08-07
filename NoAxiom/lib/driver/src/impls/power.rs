@@ -8,7 +8,10 @@ mod la_virtio {
 
     use crate::{basic::Device, power::PowerDevice};
 
+    #[cfg(feature = "qemu")]
     const GED_PADDR: usize = 0x100E_001C;
+    #[cfg(not(feature = "qemu"))]
+    const GED_PADDR: usize = 0x1FE2_7014;
     fn get_ged_addr() -> usize {
         GED_PADDR | IO_ADDR_OFFSET
     }

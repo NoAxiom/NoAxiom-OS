@@ -112,7 +112,6 @@
     srli.d    $sp, $sp, 3              # align sp to avoid unaligned exception
     slli.d    $sp, $sp, 3
 
-# save kernel general registers
     STORE_X   %1
     STORE_X   %2
     .set      n, 4
@@ -121,7 +120,6 @@
     .set      n, n+1
     .endr
 
-# save kernel csr registers
     csrrd     $t0, CSR_PRMD
     csrrd     $t1, CSR_ERA
     csrrd     $t2, CSR_SAVE1           # use SAVE1 to represent sp, we've already saved it
@@ -129,21 +127,13 @@
     st.d      $t1, $sp, 33*8
     st.d      $t2, $sp, 3*8            # store sp (x3 in la64)
 
-# check ecode
-    csrrd     $t0, CSR_ESTAT
-    srli.d    $t0, $t0, 16             # ecode begin with 16 bit
-    andi      $t0, $t0, 0x3F           # ecode mask (21:16 bits)
-    li.d      $t1, 0x9                 # ecode 0x9 => ALE, unaligned access
-    beq       $t0, $t1, 2f             # if ecode == ECODE_UNALIGN, goto unaligned_handler
+    move      $a0, $sp                 # pass trap frame to handler
+    bl        la_kernel_trap_handler   # handle other traps
 
-    bl        kernel_trap_handler      # handle other traps
-
-# restore kernel registers
-    1:
     ld.d      $t0, $sp, 32*8
     ld.d      $t1, $sp, 33*8
     csrwr     $t0, CSR_PRMD            # PRMD
-    csrwr     $t1, CSR_ERA             # ERA, note that: we use trap_frame.era to restore it, since it could be modified
+    csrwr     $t1, CSR_ERA             # ERA
     LOAD_X    %1
     LOAD_X    %2
     .set      n, 4
@@ -153,12 +143,6 @@
     .endr
     ld.d      $sp, $sp, 3*8
     ertn
-
-# unaligned handler
-    2:
-    or        $a0, $sp, $zero          # set a0 = sp to pass trapframe ptr to kernel
-    bl        unaligned_handler        # goto handle unaligned access
-    b         1b
 
 
     __kernel_user_ptr_vec:
@@ -180,7 +164,7 @@
 
 # call user ptr handler and update trap_type
 # assume that we won't trap again
-    bl        kernel_user_ptr_handler
+    bl        la_kernel_user_ptr_handler
 
 # load kernel registers
     LOAD_X    %1

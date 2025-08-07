@@ -83,7 +83,10 @@ pub fn dtb_init(dtb: usize) {
             fdt_init(fdt);
         }
         DtbInitializerType::Ref(dtb_ref) => {
-            log::info!("[platform] using reference initializer");
+            log::info!(
+                "[platform] using reference initializer with addr: {:#x}",
+                dtb_ref.as_ptr() as usize
+            );
             let fdt = Fdt::new(dtb_ref).unwrap();
             fdt_init(fdt);
         }

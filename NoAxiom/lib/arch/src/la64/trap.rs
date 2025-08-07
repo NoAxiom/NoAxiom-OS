@@ -7,7 +7,7 @@ use config::cpu::CPU_NUM;
 use log::error;
 use loongArch64::register::{
     badi, badv, ecfg, eentry, era,
-    estat::{self, Exception, Interrupt, Trap},
+    estat::{self, Estat, Exception, Interrupt, Trap},
 };
 
 use super::{
@@ -28,6 +28,7 @@ extern "C" {
     fn __user_trapret(cx: *mut TrapContext);
     fn __kernel_trapvec();
     fn __kernel_user_ptr_vec();
+    fn kernel_trap_handler(trap_type: &TrapType);
 }
 
 #[inline]
@@ -91,39 +92,26 @@ unsafe fn check_write(ptr: usize) -> UserPtrResult {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn kernel_user_ptr_handler() {
-    let hartid = LA64::get_hartid();
-    let pc = era::read().pc();
-    era::set_pc(pc + 4);
-    USER_PTR_TRAP_TYPE[hartid] = Wrapper(get_trap_type(None));
-}
-
-pub fn get_interrupt_number(int: &Interrupt) -> InterruptNumber {
-    match int {
-        Interrupt::SWI0 => 0,
-        Interrupt::SWI1 => 1,
-        Interrupt::HWI0 => 2,
-        Interrupt::HWI1 => 3,
-        Interrupt::HWI2 => 4,
-        Interrupt::HWI3 => 5,
-        Interrupt::HWI4 => 6,
-        Interrupt::HWI5 => 7,
-        Interrupt::HWI6 => 8,
-        Interrupt::HWI7 => 9,
-        Interrupt::PMI => 10,
-        Interrupt::Timer => 11,
-        Interrupt::IPI => 12,
+pub unsafe extern "C" fn la_kernel_trap_handler(tf: &mut TrapContext) {
+    let estat = estat::read();
+    let badv = badv::read().vaddr();
+    match estat.cause() {
+        Trap::Exception(Exception::AddressNotAligned) => emulate_load_store_insn(tf),
+        _ => kernel_trap_handler(&get_trap_type(estat, badv)),
     }
 }
 
 #[no_mangle]
-fn unaligned_handler(tf: &mut TrapContext) {
-    unsafe { emulate_load_store_insn(tf) };
-}
-
-fn get_trap_type(_: Option<&mut TrapContext>) -> TrapType {
+pub unsafe extern "C" fn la_kernel_user_ptr_handler() {
+    let hartid = LA64::get_hartid();
+    let pc = era::read().pc();
+    era::set_pc(pc + 4);
     let estat = estat::read();
     let badv = badv::read().vaddr();
+    USER_PTR_TRAP_TYPE[hartid] = Wrapper(get_trap_type(estat, badv));
+}
+
+fn get_trap_type(estat: Estat, badv: usize) -> TrapType {
     match estat.cause() {
         Trap::Exception(Exception::Syscall) | Trap::Interrupt(_) => {}
         _ => {
@@ -171,19 +159,19 @@ fn get_trap_type(_: Option<&mut TrapContext>) -> TrapType {
                 }
                 _ => {
                     error!(
-                    "[get_trap_type] unhandled exception: {:?}, pc = {:#x}, BADV = {:#x}, BADI = {:#x}",
-                    e,
-                    era::read().pc(),
-                    badv,
-                    badi::read().inst(),
-                );
+                        "[get_trap_type] unhandled exception: {:?}, pc = {:#x}, BADV = {:#x}, BADI = {:#x}",
+                        e,
+                        era::read().pc(),
+                        badv,
+                        badi::read().inst(),
+                    );
                     // error!("[get_trap_type] trap_cx: {:#x?}", tf);
                     TrapType::Unknown
                 }
             }
         }
         Trap::Interrupt(int) => {
-            let int_num = get_interrupt_number(&int);
+            let int_num = int as InterruptNumber;
             match int {
                 Interrupt::Timer => TrapType::Interrupt(InterruptType::Timer(int_num)),
                 Interrupt::HWI0
@@ -235,8 +223,10 @@ pub(crate) fn trap_init() {
 
 impl ArchTrap for LA64 {
     type TrapContext = TrapContext;
-    fn read_trap_type(cx: Option<&mut TrapContext>) -> crate::TrapType {
-        get_trap_type(cx)
+    fn read_trap_type() -> crate::TrapType {
+        let estat = estat::read();
+        let badv = badv::read().vaddr();
+        get_trap_type(estat, badv)
     }
     fn trap_init() {
         trap_init();

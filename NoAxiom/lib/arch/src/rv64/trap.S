@@ -141,13 +141,13 @@
 # note that we don't save sepc & stvec here
     __kernel_trapvec:
     KERNEL_SAVE_REG
-    call      kernel_trap_handler
+    call      rv_kernel_trap_handler
     KERNEL_LOAD_REG
     sret
 
     __kernel_user_ptr_vec:
     KERNEL_SAVE_REG
-    call      kernel_user_ptr_handler
+    call      rv_kernel_user_ptr_handler
     KERNEL_LOAD_REG
     sret
 
