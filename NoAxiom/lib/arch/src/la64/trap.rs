@@ -242,7 +242,6 @@ impl ArchTrap for LA64 {
         unsafe { __user_trapret(cx) };
         set_kernel_trap_entry();
         cx.freg_mut().mark_save_if_needed();
-        assert!(!is_interrupt_enabled());
     }
     /// try read user ptr
     fn check_read(addr: usize) -> UserPtrResult {

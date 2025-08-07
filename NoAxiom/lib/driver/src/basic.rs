@@ -23,7 +23,7 @@ pub trait Device: Sync {
 pub enum BlockDeviceType {
     Virtio,
     VF2Sdcard,
-    PhysLA,
+    LS2k1000Ahci,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

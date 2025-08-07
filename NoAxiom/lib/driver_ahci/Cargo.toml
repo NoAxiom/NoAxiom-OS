@@ -1,0 +1,24 @@
+[package]
+name = "driver_ahci"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ffi = "0.1.1"
+libc = "0.2.174"
+log = { workspace = true }
+arch = { workspace = true }
+memory = { workspace = true }
+config = { workspace = true }
+
+[features]
+default = []
+
+[profile.dev]
+panic = "abort"
+relocation-model = "pic"
+
+[profile.release]
+panic = "abort"
+relocation-model = "pic"
+# RUSTFLAGS="-C target-feature=-ual,-lsx,-lasx,-lvz" cargo build --target=loongarch64-unknown-linux-musl --release

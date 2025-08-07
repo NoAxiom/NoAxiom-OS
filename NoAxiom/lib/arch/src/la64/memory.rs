@@ -224,6 +224,11 @@ impl ArchMemory for LA64 {
     fn tlb_flush() {
         tlb_flush_all();
     }
+    fn sync_dcache() {
+        unsafe {
+            core::arch::asm!("dbar 0");
+        }
+    }
     fn activate(ppn: usize, is_kernel: bool) {
         match is_kernel {
             true => high_activate_ppn(ppn),
