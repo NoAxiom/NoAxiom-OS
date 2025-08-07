@@ -8,8 +8,8 @@
 //!     dma-mask = <0x00000000 0xffffffff>;
 //! };
 
-use config::{fs::BLOCK_SIZE, mm::PAGE_WIDTH};
-use driver_ahci::libahci::AhciDevice;
+use config::fs::BLOCK_SIZE;
+use driver_ahci::AhciDevice;
 use include::errno::Errno;
 
 use crate::{

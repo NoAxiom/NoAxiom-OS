@@ -49,97 +49,93 @@ fn ahci_print_info(ahci_dev: &AhciDevice) {
         "?"
     };
 
-    unsafe {
-        log::debug!(
-            "AHCI vers {:02x}{:02x}.{:02x}{:02x}, {} slots, {} ports, {} Gbps, {:#x} impl, {} mode",
-            vers >> 24 & 0xff,
-            vers >> 16 & 0xff,
-            vers >> 8 & 0xff,
-            vers & 0xff,
-            (cap >> 8 & 0x1f) + 1,
-            (cap & 0x1f) + 1,
-            speed_s,
-            impl_0,
-            scc_s,
-        );
-        log::debug!(
-            "flags: {}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}",
-            if cap & HOST_CAP_64 != 0 { "64bit " } else { "" },
-            if cap & HOST_CAP_NCQ != 0 { "ncq " } else { "" },
-            if cap & HOST_CAP_SNTF != 0 {
-                "sntf "
-            } else {
-                ""
-            },
-            if cap & HOST_CAP_MPS != 0 { "ilck " } else { "" },
-            if cap & HOST_CAP_SSS != 0 { "stag " } else { "" },
-            if cap & HOST_CAP_ALPM != 0 { "pm " } else { "" },
-            if cap & HOST_CAP_LED != 0 { "led " } else { "" },
-            if cap & HOST_CAP_CLO != 0 { "clo " } else { "" },
-            if cap & HOST_CAP_ONLY != 0 {
-                "only "
-            } else {
-                ""
-            },
-            if cap & HOST_CAP_PMP != 0 { "pmp " } else { "" },
-            if cap & HOST_CAP_FBS != 0 { "fbs " } else { "" },
-            if cap & HOST_CAP_PIO_MULTI != 0 {
-                "pio "
-            } else {
-                ""
-            },
-            if cap & HOST_CAP_SSC != 0 { "slum " } else { "" },
-            if cap & HOST_CAP_PART != 0 {
-                "part "
-            } else {
-                ""
-            },
-            if cap & HOST_CAP_CCC != 0 { "ccc " } else { "" },
-            if cap & HOST_CAP_EMS != 0 { "ems " } else { "" },
-            if cap & HOST_CAP_SXS != 0 { "sxs " } else { "" },
-            if cap2 & HOST_CAP2_DESO != 0 {
-                "deso "
-            } else {
-                ""
-            },
-            if cap2 & HOST_CAP2_SADM != 0 {
-                "sadm "
-            } else {
-                ""
-            },
-            if cap2 & HOST_CAP2_SDS != 0 {
-                "sds "
-            } else {
-                ""
-            },
-            if cap2 & HOST_CAP2_APST != 0 {
-                "apst "
-            } else {
-                ""
-            },
-            if cap2 & HOST_CAP2_NVMHCI != 0 {
-                "nvmp "
-            } else {
-                ""
-            },
-            if cap2 & HOST_CAP2_BOH != 0 {
-                "boh "
-            } else {
-                ""
-            },
-        );
-    }
+    log::debug!(
+        "AHCI vers {:02x}{:02x}.{:02x}{:02x}, {} slots, {} ports, {} Gbps, {:#x} impl, {} mode",
+        vers >> 24 & 0xff,
+        vers >> 16 & 0xff,
+        vers >> 8 & 0xff,
+        vers & 0xff,
+        (cap >> 8 & 0x1f) + 1,
+        (cap & 0x1f) + 1,
+        speed_s,
+        impl_0,
+        scc_s,
+    );
+    log::debug!(
+        "flags: {}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}",
+        if cap & HOST_CAP_64 != 0 { "64bit " } else { "" },
+        if cap & HOST_CAP_NCQ != 0 { "ncq " } else { "" },
+        if cap & HOST_CAP_SNTF != 0 {
+            "sntf "
+        } else {
+            ""
+        },
+        if cap & HOST_CAP_MPS != 0 { "ilck " } else { "" },
+        if cap & HOST_CAP_SSS != 0 { "stag " } else { "" },
+        if cap & HOST_CAP_ALPM != 0 { "pm " } else { "" },
+        if cap & HOST_CAP_LED != 0 { "led " } else { "" },
+        if cap & HOST_CAP_CLO != 0 { "clo " } else { "" },
+        if cap & HOST_CAP_ONLY != 0 {
+            "only "
+        } else {
+            ""
+        },
+        if cap & HOST_CAP_PMP != 0 { "pmp " } else { "" },
+        if cap & HOST_CAP_FBS != 0 { "fbs " } else { "" },
+        if cap & HOST_CAP_PIO_MULTI != 0 {
+            "pio "
+        } else {
+            ""
+        },
+        if cap & HOST_CAP_SSC != 0 { "slum " } else { "" },
+        if cap & HOST_CAP_PART != 0 {
+            "part "
+        } else {
+            ""
+        },
+        if cap & HOST_CAP_CCC != 0 { "ccc " } else { "" },
+        if cap & HOST_CAP_EMS != 0 { "ems " } else { "" },
+        if cap & HOST_CAP_SXS != 0 { "sxs " } else { "" },
+        if cap2 & HOST_CAP2_DESO != 0 {
+            "deso "
+        } else {
+            ""
+        },
+        if cap2 & HOST_CAP2_SADM != 0 {
+            "sadm "
+        } else {
+            ""
+        },
+        if cap2 & HOST_CAP2_SDS != 0 {
+            "sds "
+        } else {
+            ""
+        },
+        if cap2 & HOST_CAP2_APST != 0 {
+            "apst "
+        } else {
+            ""
+        },
+        if cap2 & HOST_CAP2_NVMHCI != 0 {
+            "nvmp "
+        } else {
+            ""
+        },
+        if cap2 & HOST_CAP2_BOH != 0 {
+            "boh "
+        } else {
+            ""
+        },
+    );
 }
 
 // 输出sata硬盘信息
 fn ahci_sata_print_info(pdev: &AhciBlkDev) {
-    unsafe {
-        log::debug!("SATA Device Info:");
-        log::debug!("S/N: {:?}", pdev.serial);
-        log::debug!("Product model number: {:?}", pdev.product);
-        log::debug!("Firmware version: {:?}", pdev.revision);
-        log::debug!("Capacity: {} sectors", pdev.lba);
-    }
+    log::debug!("SATA Device Info:");
+    log::debug!("S/N: {:?}", pdev.serial);
+    log::debug!("Product model number: {:?}", pdev.product);
+    log::debug!("Firmware version: {:?}", pdev.revision);
+    log::debug!("Capacity: {} sectors", pdev.lba);
 }
 
 fn ahci_port_base(base: u64, port: u8) -> u64 {
@@ -160,7 +156,7 @@ fn ahci_host_init(ahci_dev: &mut AhciDevice) -> i32 {
     }
     // wait for reset done
     loop {
-        unsafe { ahci_mdelay(1) };
+        ahci_mdelay(1);
         tmp = ahci_readl(host_mmio + HOST_CTL);
         if tmp & HOST_RESET == 0 {
             break;
@@ -170,7 +166,7 @@ fn ahci_host_init(ahci_dev: &mut AhciDevice) -> i32 {
     // enable ahci
     tmp = ahci_readl(host_mmio + HOST_CTL);
     ahci_writel(tmp | HOST_AHCI_EN, host_mmio + HOST_CTL);
-    unsafe { ahci_mdelay(1) };
+    ahci_mdelay(1);
 
     // init cap and pi
     // beware if no firmware initialized before
@@ -198,7 +194,7 @@ fn ahci_host_init(ahci_dev: &mut AhciDevice) -> i32 {
         if tmp & (PORT_CMD_LIST_ON | PORT_CMD_FIS_ON | PORT_CMD_FIS_RX | PORT_CMD_START) != 0 {
             tmp &= !(PORT_CMD_START);
             ahci_writel(tmp, port_mmio + PORT_CMD);
-            unsafe { ahci_mdelay(500) };
+            ahci_mdelay(500);
             while ahci_readl(port_mmio + PORT_CMD) & PORT_CMD_LIST_ON != 0 {}
         }
 
@@ -209,7 +205,7 @@ fn ahci_host_init(ahci_dev: &mut AhciDevice) -> i32 {
         // wait for spin up
         timeout = 1000;
         loop {
-            unsafe { ahci_mdelay(1) };
+            ahci_mdelay(1);
             tmp = ahci_readl(port_mmio + PORT_CMD);
             timeout -= 1;
             if !(tmp | PORT_CMD_SPIN_UP == 0 && timeout != 0) {
@@ -224,7 +220,7 @@ fn ahci_host_init(ahci_dev: &mut AhciDevice) -> i32 {
         // wait for port link up
         timeout = 1000;
         loop {
-            unsafe { ahci_mdelay(1) };
+            ahci_mdelay(1);
             tmp = ahci_readl(port_mmio + PORT_SCR_STAT);
             tmp &= 0xf;
             timeout -= 1;
@@ -353,13 +349,13 @@ fn ahci_exec_ata_cmd(
 
     ahci_fill_cmd_slot(pp, cmd_slot, opts);
 
-    unsafe { ahci_sync_dcache() };
+    ahci_sync_dcache();
 
     ahci_writel((1 << cmd_slot) as u32, port_mmio + PORT_CMD_ISSUE);
 
     while ahci_readl(port_mmio + PORT_CMD_ISSUE) & (1 << cmd_slot) as u32 != 0 {}
 
-    unsafe { ahci_sync_dcache() };
+    ahci_sync_dcache();
 
     return buf_len;
 }
@@ -407,17 +403,17 @@ fn ahci_port_start(ahci_dev: &mut AhciDevice, port: u8) -> i32 {
     }
 
     pp.cmd_slot = mem as *mut AhciCmdHdr;
-    pp.cmd_slot_dma = unsafe { ahci_virt_to_phys(mem) };
+    pp.cmd_slot_dma = ahci_virt_to_phys(mem);
 
     mem += AHCI_CMD_SLOT_SZ as u64;
 
     pp.rx_fis = mem;
-    pp.rx_fis_dma = unsafe { ahci_virt_to_phys(mem) };
+    pp.rx_fis_dma = ahci_virt_to_phys(mem);
 
     mem += AHCI_RX_FIS_SZ as u64;
 
     pp.cmd_tbl = mem;
-    pp.cmd_tbl_dma = unsafe { ahci_virt_to_phys(mem) };
+    pp.cmd_tbl_dma = ahci_virt_to_phys(mem);
 
     mem += AHCI_CMD_TBL_HDR_SZ as u64;
 
@@ -446,7 +442,7 @@ fn ahci_port_start(ahci_dev: &mut AhciDevice, port: u8) -> i32 {
     let mut timeout: u32 = 200;
     let mut tmp: u32 = 0;
     loop {
-        unsafe { ahci_mdelay(1) };
+        ahci_mdelay(1);
         tmp = ahci_readl(port_mmio + PORT_TFDATA);
         tmp &= (ATA_ERR | ATA_DRQ | ATA_BUSY) as u32;
         timeout -= 1;
@@ -820,7 +816,7 @@ impl AhciDevice {
     pub fn new(base_pa: usize) -> Result<Self, ()> {
         let mut dev = Self::new_bare();
         let mut ahci_dev = &mut dev;
-        ahci_dev.mmio_base = unsafe { ahci_phys_to_uncached(base_pa as _) };
+        ahci_dev.mmio_base = ahci_phys_to_uncached(base_pa as _);
 
         let mut ret: i32 = ahci_host_init(ahci_dev);
         if ret != 0 {
