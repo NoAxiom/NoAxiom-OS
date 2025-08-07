@@ -755,6 +755,14 @@ fn ahci_sata_scan(ahci_dev: &mut AhciDevice) {
     pdev.lba48 = ata_id_has_lba48(&id);
     pdev.queue_depth = ata_id_queue_depth(&id);
 
+    log::debug!(
+        "sata device lba: {}, blksz: {}, lba48: {}, queue_depth: {}",
+        pdev.lba,
+        pdev.blksz,
+        pdev.lba48,
+        pdev.queue_depth
+    );
+
     ahci_sata_xfer_mode(ahci_dev, &id);
 
     ahci_sata_init_wcache(ahci_dev, &id);

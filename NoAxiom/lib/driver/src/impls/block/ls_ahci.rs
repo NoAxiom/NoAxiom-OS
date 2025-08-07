@@ -8,8 +8,9 @@
 //!     dma-mask = <0x00000000 0xffffffff>;
 //! };
 
-use config::mm::PAGE_WIDTH;
+use config::{fs::BLOCK_SIZE, mm::PAGE_WIDTH};
 use driver_ahci::libahci::AhciDevice;
+use include::errno::Errno;
 
 use crate::{
     basic::{BlockDeviceType, DevResult, Device, DeviceTreeInfo, DeviceType},
@@ -57,16 +58,22 @@ impl InterruptDevice for LsAhciDevice {
 impl BlockDevice for LsAhciDevice {
     fn sync_read(&self, id: usize, buf: &mut [u8]) -> DevResult<usize> {
         let blknr = id as u64;
-        let blkcnt = (buf.len() >> PAGE_WIDTH) as u32;
+        let blkcnt = (buf.len() / BLOCK_SIZE) as u32;
         let buffer = buf.as_ptr() as *mut u8;
-        self.device.ahci_sata_read_common(blknr, blkcnt, buffer);
-        Ok(buf.len())
+        let res = self.device.ahci_sata_read_common(blknr, blkcnt, buffer);
+        match res {
+            0 => Err(Errno::EIO),
+            _ => Ok(buf.len()),
+        }
     }
     fn sync_write(&self, id: usize, buf: &[u8]) -> DevResult<usize> {
         let blknr = id as u64;
-        let blkcnt = (buf.len() >> PAGE_WIDTH) as u32;
+        let blkcnt = (buf.len() / BLOCK_SIZE) as u32;
         let buffer = buf.as_ptr() as *mut u8;
-        self.device.ahci_sata_write_common(blknr, blkcnt, buffer);
-        Ok(buf.len())
+        let res = self.device.ahci_sata_write_common(blknr, blkcnt, buffer);
+        match res {
+            0 => Err(Errno::EIO),
+            _ => Ok(buf.len()),
+        }
     }
 }
