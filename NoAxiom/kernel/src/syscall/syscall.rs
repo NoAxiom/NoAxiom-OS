@@ -68,7 +68,7 @@ impl<'a> Syscall<'a> {
             SYS_STATX =>            self.sys_statx(args[0] as isize, args[1], args[2] as u32, args[3] as u32, args[4]).await,
             SYS_FALLOCATE =>        self.sys_fallocate(args[0], args[1] as i32, args[2] as isize, args[3] as isize),
             SYS_FADVISE64 =>        self.sys_fadvise64(args[0], args[1] , args[2], args[3] as i32),
-            SYS_MKNODAT =>          self.sys_mknodat(args[0] as isize, args[1], args[2], args[3] as u64),
+            SYS_MKNODAT =>          self.sys_mknodat(args[0] as isize, args[1], args[2], args[3] as u64).await,
 
             // io
             SYS_PPOLL =>    self.sys_ppoll(args[0], args[1], args[2], args[3]).await,

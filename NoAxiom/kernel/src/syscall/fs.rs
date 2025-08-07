@@ -1,6 +1,5 @@
 use alloc::{string::String, sync::Arc};
 
-use config::task::INIT_PROCESS_ID;
 use include::errno::SysResult;
 use ksync::assert_no_lock;
 
@@ -166,9 +165,8 @@ impl Syscall<'_> {
 
         let dentry = if flags.contains(FileFlags::O_CREATE) {
             let (dentry, name) = get_dentry_parent(self.task, fd, &path, &searchflags)?;
-            if let Some(_) = dentry.get_child(name) {
-                error!("[sys_openat] file already exists: {}", name);
-                Err(Errno::EEXIST)
+            if let Some(dentry) = dentry.get_child(name) {
+                Ok(dentry)
             } else {
                 dentry.clone().create(name, mode | InodeMode::FILE).await
             }
@@ -942,6 +940,19 @@ impl Syscall<'_> {
         let searchflags = FcntlArgFlags::AT_SYMLINK_NOFOLLOW;
         let old_dentry = get_dentry(self.task, old_dirfd, &old_path, &searchflags)?;
         let new_dentry = get_dentry(self.task, new_dirfd, &new_path, &searchflags)?;
+
+        if flags.contains(RenameFlags::RENAME_NOREPLACE) {
+            error!("[sys_renameat2] newpath already exists with NOREPLACE flag");
+            return Err(Errno::EINVAL);
+        }
+        // if flags.contains(RenameFlags::RENAME_EXCHANGE) {
+        //     // 进行ancestor检查
+        //     if new_dentry.is_ancestor(&old_dentry) {
+        //         error!("[sys_renameat2] newpath is ancestor of oldpath with EXCHANGE
+        // flag");         return Err(Errno::EINVAL);
+        //     }
+        // }
+
         old_dentry.rename_to(new_dentry, flags).await?;
         Ok(0)
     }
@@ -1329,7 +1340,13 @@ impl Syscall<'_> {
         Ok(0)
     }
 
-    pub fn sys_mknodat(&self, fd: isize, path: usize, mode: usize, dev: u64) -> SyscallResult {
+    pub async fn sys_mknodat(
+        &self,
+        fd: isize,
+        path: usize,
+        mode: usize,
+        dev: u64,
+    ) -> SyscallResult {
         let mode = InodeMode::from_bits(mode as u32).ok_or(Errno::EINVAL)?;
         let path = read_path(path)?;
         let searchflags = FcntlArgFlags::AT_SYMLINK_NOFOLLOW;
@@ -1348,7 +1365,7 @@ impl Syscall<'_> {
         };
 
         if mode.contains(InodeMode::FILE) {
-            parent.create(name, mode);
+            parent.create(name, mode).await?;
         } else {
             parent.mknodat_son(&name, dev_t, mode)?;
         }

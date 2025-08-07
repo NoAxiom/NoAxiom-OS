@@ -197,8 +197,8 @@ impl dyn Dentry {
         let mut children = self.meta().children.lock();
 
         let res = if let Some(child) = children.get(name) {
-            warn!("[add_child] {} already exists, replace it", name);
-            child.set_inode(child_inode);
+            trace!("[add_child] {} already exists, pass", name);
+            // child.set_inode(child_inode);
             child.clone()
         } else {
             let child = self.clone().from_name(name);

@@ -175,7 +175,7 @@ fn __get_dentry(
                 debug!("[get_dentry] Following symlink: {}", symlink_path);
                 this = this.symlink_jump(&symlink_path)?;
             } else {
-                warn!(
+                trace!(
                     "[get_dentry] AT_SYMLINK_NOFOLLOW is not set, but Dentry {} has no symlink",
                     this.name()
                 );
