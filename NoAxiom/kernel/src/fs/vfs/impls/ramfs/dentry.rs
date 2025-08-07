@@ -34,9 +34,6 @@ impl RamFsDentry {
             meta: DentryMeta::new(parent, name, super_block),
         }
     }
-    fn into_dyn(self: Arc<Self>) -> Arc<dyn Dentry> {
-        self.clone()
-    }
 }
 
 #[async_trait]
@@ -51,7 +48,7 @@ impl Dentry for RamFsDentry {
     }
 
     fn open(self: Arc<Self>, file_flags: &FileFlags) -> SysResult<Arc<dyn File>> {
-        let inode = self.inode()?;
+        let inode = self.into_dyn().inode()?;
         match inode.file_type() {
             InodeMode::DIR => Ok(Arc::new(RamFsDir::new(
                 self.clone(),
@@ -91,7 +88,7 @@ impl Dentry for RamFsDentry {
             unreachable!("create unknown inode type")
         };
 
-        Ok(self.into_dyn().add_child(name, sub_inode))
+        Ok(self.into_dyn().add_child_with_inode(name, sub_inode))
     }
 
     async fn symlink(self: Arc<Self>, _name: &str, _tar_name: &str) -> SysResult<()> {

@@ -8,8 +8,8 @@ use impls::{
 use ksync::Once;
 
 use crate::{
-    fs::{blockcache::get_block_cache, manager::FS_MANAGER, path::Path},
-    include::fs::{FileFlags, InodeMode, MountFlags},
+    fs::{blockcache::get_block_cache, manager::FS_MANAGER, path::kcreate},
+    include::fs::{FileFlags, InodeMode, MountFlags, ALL_PERMISSIONS_MASK},
 };
 pub mod basic;
 pub mod impls;
@@ -61,28 +61,27 @@ pub async fn vfs_init() {
     // InodeMode::FILE).await; passwd.dentry().open().expect("open /etc/passwd
     // failed");
 
+    info!("[fs] create /bin");
+    kcreate(
+        "/bin",
+        InodeMode::DIR | InodeMode::from_bits(ALL_PERMISSIONS_MASK).unwrap(),
+    );
+
     #[cfg(feature = "debug_sig")]
     {
-        let ls = Path::from_or_create(format!("/ls"), InodeMode::FILE)
-            .await
-            .unwrap();
-        ls.dentry()
-            .open(&FileFlags::empty())
-            .expect("open ls failed");
+        use crate::fs::path::kcreate;
 
-        let logon = Path::from_or_create(format!("/logon"), InodeMode::FILE)
-            .await
-            .unwrap();
-        logon
-            .dentry()
-            .open(&FileFlags::empty())
-            .expect("open logon failed");
+        let logon = kcreate(
+            "/logon",
+            InodeMode::FILE | InodeMode::from_bits(ALL_PERMISSIONS_MASK).unwrap(),
+        );
+        logon.open(&FileFlags::empty()).expect("open logon failed");
 
-        let logoff = Path::from_or_create(format!("/logoff"), InodeMode::FILE)
-            .await
-            .unwrap();
+        let logoff = kcreate(
+            "/logoff",
+            InodeMode::FILE | InodeMode::from_bits(ALL_PERMISSIONS_MASK).unwrap(),
+        );
         logoff
-            .dentry()
             .open(&FileFlags::empty())
             .expect("open logoff failed");
     }

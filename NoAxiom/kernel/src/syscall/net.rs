@@ -158,7 +158,7 @@ impl Syscall<'_> {
         let new_fd = fd_table.alloc_fd()?;
         fd_table.set(new_fd as usize, Arc::new(new_socket_file));
         if flags & SOCK_CLOEXEC != 0 {
-            fd_table.set_fdflag(new_fd, &FcntlArgFlags::from_arg(FileFlags::O_CLOEXEC));
+            fd_table.set_fdflag(new_fd, &FcntlArgFlags::from_arg(&FileFlags::O_CLOEXEC));
         }
         if flags & SOCK_NONBLOCK != 0 {
             fd_table.set_nonblock(new_fd);

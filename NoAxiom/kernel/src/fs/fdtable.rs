@@ -58,7 +58,7 @@ impl FdTableEntry {
     pub fn from_file(file: Arc<dyn File>) -> Self {
         let file_flag = file.flags();
         Self {
-            flags: FcntlArgFlags::from_arg(file_flag.clone()),
+            flags: FcntlArgFlags::from_arg(&file_flag),
             file: file.clone(),
         }
     }

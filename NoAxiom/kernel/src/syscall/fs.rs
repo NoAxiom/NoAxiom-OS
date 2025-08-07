@@ -1,16 +1,16 @@
-use alloc::{
-    string::{String, ToString},
-    sync::Arc,
-    vec::Vec,
-};
+use alloc::{string::String, sync::Arc};
 
-use config::task::INIT_PROCESS_ID;
+use include::errno::SysResult;
 use ksync::assert_no_lock;
 
-use super::{SysResult, Syscall, SyscallResult};
+use super::{Syscall, SyscallResult};
 use crate::{
     constant::fs::{AT_FDCWD, UTIME_NOW, UTIME_OMIT},
-    fs::{fdtable::RLimit, manager::FS_MANAGER, path::Path, pipe::PipeFile, vfs::root_dentry},
+    fs::{
+        fdtable::RLimit,
+        path::{get_dentry, get_dentry_parent},
+        pipe::PipeFile,
+    },
     include::{
         fs::{
             DevT, FallocFlags, FcntlArgFlags, FcntlFlags, FileFlags, InodeMode, IoctlCmd, Iovec,
@@ -24,7 +24,6 @@ use crate::{
     mm::user_ptr::UserPtr,
     return_errno,
     signal::interruptable::interruptable,
-    task::Task,
     time::gettime::get_time_duration,
     utils::{
         hack::{switch_into_ltp, switch_outof_ltp},
@@ -43,13 +42,16 @@ impl Syscall<'_> {
         }
 
         let cwd = self.task.cwd().clone();
-        let cwd_str = format!("{}\0", cwd.as_str());
+        let cwd_str = format!("{}\0", cwd.path());
         let cwd_bytes = cwd_str.as_bytes();
         if cwd_bytes.len() > size {
             return Err(Errno::ERANGE);
         }
 
-        info!("[sys_getcwd] buf: {:?}, size: {}, cwd:{:?}", buf, size, cwd);
+        info!(
+            "[sys_getcwd] buf: {:?}, size: {}, cwd:{:?}",
+            buf, size, cwd_str
+        );
 
         let user_ptr = UserPtr::<u8>::new(buf);
         let buf_slice = user_ptr.as_slice_mut_checked(size).await?;
@@ -62,7 +64,7 @@ impl Syscall<'_> {
     pub async fn sys_pipe2(&self, pipe: usize, flags: i32) -> SyscallResult {
         let flags = FileFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
         let (read_end, write_end) = PipeFile::new_pipe(&flags);
-        let flags = FcntlArgFlags::from_arg(flags);
+        let flags = FcntlArgFlags::from_arg(&flags);
 
         let user_ptr = UserPtr::<i32>::new(pipe);
         let buf_slice = user_ptr.as_slice_mut_checked(2).await?;
@@ -110,32 +112,27 @@ impl Syscall<'_> {
 
     /// Switch to a new work directory
     pub fn sys_chdir(&self, path: usize) -> SyscallResult {
-        let ptr = UserPtr::<u8>::new(path);
-        let path = ptr.get_string_from_ptr()?;
+        let path = read_path(path)?;
         info!("[sys_chdir] path: {}", path);
-        if path.len() > 255 {
-            return Err(Errno::ENAMETOOLONG);
-        }
 
-        if path.starts_with('/') {
-            let tar = Path::try_from(path)?;
-            let mut cwd_guard = self.task.cwd();
-            *cwd_guard = tar;
-        } else {
-            let cwd_guard = self.task.cwd();
-            let cwd = cwd_guard.clone();
-            drop(cwd_guard);
-            let new_cwd = cwd.from_cd(&path)?;
-            *self.task.cwd() = new_cwd;
+        let searchflags = FcntlArgFlags::empty();
+        let dentry = get_dentry(self.task, AT_FDCWD, &path, &searchflags)?;
+        let inode = dentry.inode()?;
+        if inode.file_type() != InodeMode::DIR {
+            error!("[sys_chdir] tar path must be a dir");
+            return Err(Errno::ENOTDIR);
         }
+        dentry.check_access()?;
+        *self.task.cwd() = dentry;
         Ok(0)
     }
 
     /// Change the root directory of the process
     pub fn sys_chroot(&self, path: usize) -> SyscallResult {
-        let path = get_path(self.task, path, 0, "sys_chroot")?;
-        info!("[sys_chroot] path: {:?}", path,);
-        let dentry = path.dentry();
+        let path = read_path(path)?;
+        info!("[sys_chroot] path: {:?}", path);
+        let searchflags = FcntlArgFlags::empty();
+        let dentry = get_dentry(self.task, AT_FDCWD, &path, &searchflags)?;
         let inode = dentry.inode()?;
         if inode.file_type() != InodeMode::DIR {
             error!("[sys_chroot] chroot path must be a dir");
@@ -149,51 +146,34 @@ impl Syscall<'_> {
             error!("[sys_chroot] only root can chroot");
             return Err(Errno::EPERM);
         }
-        // todo: task should set root
+        *self.task.root() = dentry;
         Ok(0)
     }
 
     /// Open or create a file
-    pub async fn sys_openat(
-        &self,
-        fd: isize,
-        filename: usize,
-        flags: i32,
-        mode: u32,
-    ) -> SyscallResult {
-        let path_str = UserPtr::<u8>::new(filename).get_string_from_ptr()?;
-        // Only allow permission bits for file creation, filter out SET_UID, SET_GID,
-        // STICKY
-        let mode = InodeMode::from_bits_truncate(mode & 0o777);
+    pub async fn sys_openat(&self, fd: isize, path: usize, flags: i32, mode: u32) -> SyscallResult {
+        let path_str = UserPtr::<u8>::new(path).get_string_from_ptr()?;
+        let mode = InodeMode::from_bits(mode).ok_or(Errno::EINVAL)?;
         let flags = FileFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
         info!(
             "[sys_openat] dirfd {}, flags {:?}, filename {}, mode {:?}",
             fd, flags, path_str, mode
         );
 
-        let path = if flags.contains(FileFlags::O_CREATE) {
-            info!("[sys_openat] O_CREATE");
-            // check if the file already exists, ignore it currently
-            // if flags.contains(FileFlags::O_EXCL) {
-            //     if get_path(self.task, filename, fd, "sys_openat").is_ok() {
-            //         return Err(Errno::EEXIST);
-            //     }
-            // }
-            get_path_or_create(
-                self.task,
-                filename,
-                fd,
-                mode.union(InodeMode::FILE),
-                "sys_openat",
-            )
-            .await?
+        let path = read_path(path)?;
+        let searchflags = FcntlArgFlags::from_arg(&flags);
+
+        let dentry = if flags.contains(FileFlags::O_CREATE) {
+            let (dentry, name) = get_dentry_parent(self.task, fd, &path, &searchflags)?;
+            if let Some(dentry) = dentry.get_child(name) {
+                Ok(dentry)
+            } else {
+                dentry.clone().create(name, mode | InodeMode::FILE).await
+            }
         } else {
-            get_path(self.task, filename, fd, "sys_openat")?
-        };
+            get_dentry(self.task, fd, &path, &searchflags)
+        }?;
 
-        // fixme: now if has O_CREATE flag, and the file already exists, we just open it
-
-        let dentry = path.dentry();
         let inode = dentry.inode()?;
         if flags.contains(FileFlags::O_DIRECTORY) && !inode.file_type() == InodeMode::DIR {
             return Err(Errno::ENOTDIR);
@@ -257,7 +237,6 @@ impl Syscall<'_> {
         let mut read_size = 0;
         for i in 0..iovcnt {
             let iov_ptr = UserPtr::<Iovec>::new(iovp + i * Iovec::size());
-            // todo: check lazy?
             iov_ptr.as_slice_const_checked(Iovec::size()).await?;
 
             let iov = iov_ptr.read().await?;
@@ -332,7 +311,6 @@ impl Syscall<'_> {
         let mut write_size = 0;
         for i in 0..iovcnt {
             let iov_ptr = UserPtr::<Iovec>::new(iovp + i * Iovec::size());
-            // todo: check lazy?
             iov_ptr.as_slice_const_checked(Iovec::size()).await?;
 
             let iov = iov_ptr.read().await?;
@@ -373,17 +351,20 @@ impl Syscall<'_> {
     /// Create a directory
     pub async fn sys_mkdirat(&self, dirfd: isize, path: usize, mode: u32) -> SyscallResult {
         let mode = InodeMode::from_bits_truncate(mode);
-        let path = get_path_or_create(self.task, path, dirfd, InodeMode::DIR | mode, "sys_mkdirat")
-            .await?;
-        assert_eq!(
-            path.dentry().inode()?.file_type(),
-            InodeMode::DIR,
-            "sys_mkdirat: path must be a directory",
-        );
+        let path = read_path(path)?;
         info!(
             "[sys_mkdirat] dirfd: {}, path: {:?}, mode: {:?}",
             dirfd, path, mode
         );
+
+        let searchflags = FcntlArgFlags::AT_SYMLINK_NOFOLLOW;
+        let (dentry, name) = get_dentry_parent(self.task, dirfd, &path, &searchflags)?;
+        if let Some(_) = dentry.get_child(name) {
+            error!("[sys_mkdirat] dir already exists: {}", name);
+            return Err(Errno::EEXIST);
+        } else {
+            dentry.clone().create(name, mode | InodeMode::DIR).await?;
+        }
         Ok(0)
     }
 
@@ -419,13 +400,14 @@ impl Syscall<'_> {
         mask: u32,
         buf: usize,
     ) -> SyscallResult {
-        let path = get_path(self.task, path, dirfd, "sys_statx")?;
+        let path = read_path(path)?;
         let flags = FcntlArgFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
         info!(
             "[sys_statx] dirfd: {}, path: {:?}, flags: {:?}",
             dirfd, path, flags,
         );
-        let statx = path.dentry().inode()?.statx(mask)?;
+        let dentry = get_dentry(self.task, dirfd, &path, &flags)?;
+        let statx = dentry.inode()?.statx(mask)?;
         let ptr = UserPtr::<Statx>::new(buf);
         ptr.write(statx).await?;
         Ok(0)
@@ -437,15 +419,16 @@ impl Syscall<'_> {
         dirfd: isize,
         path: usize,
         stat_buf: usize,
-        flags: i32,
+        flags: u32,
     ) -> SyscallResult {
-        let flags = FileFlags::from_bits_retain(flags);
-        let path = get_path(self.task, path, dirfd, "sys_newfstat")?;
+        let path = read_path(path)?;
+        let flags = FcntlArgFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
+        let dentry = get_dentry(self.task, dirfd, &path, &flags)?;
         info!(
             "[sys_newfstat] dirfd: {}, path: {:?}, stat_buf: {:#x}, flags: {:?}",
             dirfd, path, stat_buf, flags
         );
-        let kstat = Kstat::from_stat(path.dentry().inode()?)?;
+        let kstat = Kstat::from_stat(dentry.inode()?)?;
         let ptr = UserPtr::<Kstat>::new(stat_buf);
         ptr.write(kstat).await?;
         Ok(0)
@@ -462,7 +445,6 @@ impl Syscall<'_> {
         // let file_name = file.dentry().path()?;
         // info!("[sys_ioctl] file_name: {:?}", file_name);
 
-        let arg_ptr = UserPtr::<u8>::new(arg);
         let cmd = if let Some(cmd) = TtyIoctlCmd::from_repr(request) {
             IoctlCmd::Tty(cmd)
         } else if let Some(cmd) = RtcIoctlCmd::from_repr(request) {
@@ -472,15 +454,12 @@ impl Syscall<'_> {
         } else {
             return Err(Errno::EINVAL);
         };
-        trace!(
+        debug!(
             "[sys_ioctl]: fd: {}, request: {:#x}, argp: {:#x}, cmd: {:?}",
-            fd,
-            request,
-            arg,
-            cmd
+            fd, request, arg, cmd
         );
         match cmd {
-            IoctlCmd::Tty(_x) => {
+            IoctlCmd::Tty(_) => {
                 return file.ioctl(request, arg);
             }
             IoctlCmd::Rtc(x) => match x {
@@ -554,34 +533,12 @@ impl Syscall<'_> {
         let ptr = UserPtr::<u8>::new(dir);
         let dir = ptr.get_string_from_ptr()?;
         let ptr = UserPtr::<u8>::new(fstype);
-        let mut fstype = ptr.get_string_from_ptr()?;
+        let fstype = ptr.get_string_from_ptr()?;
         let flags = MountFlags::from_bits(flags as u32).ok_or(Errno::EINVAL)?;
         info!(
-            "[sys_mount] special: {}, dir: {}, fstype: {}, flags: {:?}",
+            "[sys_mount] [NO IMPL] special: {}, dir: {}, fstype: {}, flags: {:?}",
             special, dir, fstype, flags
         );
-
-        if fstype == "vfat" {
-            warn!("[sys_mount] vfat is deprecated, use ext4 instead");
-            fstype = "ext4".to_string();
-        }
-
-        let fs = if let Some(fs) = FS_MANAGER.get(&fstype) {
-            fs
-        } else {
-            warn!("[sys_mount] file system {} not found", fstype);
-            return Ok(0);
-        };
-
-        // normally, we should choose the device by special
-        // but now we just use the default device
-        let device = crate::fs::blockcache::get_block_cache();
-
-        let mut split_path = dir.split('/').collect::<Vec<&str>>();
-        let name = split_path.pop().unwrap();
-        let parent = root_dentry().find_path(&split_path)?;
-        trace!("[sys_mount] parent: {:?}, name: {}", parent.name(), name);
-        fs.root(Some(parent), flags, name, Some(device)).await;
         Ok(0)
     }
 
@@ -589,24 +546,7 @@ impl Syscall<'_> {
     pub fn sys_umount2(&self, dir: usize, flags: usize) -> SyscallResult {
         let ptr = UserPtr::<u8>::new(dir);
         let dir = ptr.get_string_from_ptr()?;
-        info!("[sys_umount2] target: {}", dir);
-
-        let _flags = MountFlags::from_bits(flags as u32).ok_or(Errno::EINVAL)?;
-
-        let mut split_path = dir.split('/').collect::<Vec<&str>>();
-        let name = split_path.pop().unwrap();
-        if split_path.is_empty() {
-            warn!("[sys_umount2] path {} cannot umount", dir);
-            return Ok(0);
-        }
-        let parent = if let Ok(p) = root_dentry().find_path(&split_path) {
-            p
-        } else {
-            warn!("[sys_umount2] path {} not found", dir);
-            return Ok(0);
-        };
-        parent.remove_child(name).unwrap();
-
+        info!("[sys_umount2] [NO IMPL] target: {}, flags: {}", dir, flags);
         Ok(0)
     }
 
@@ -618,32 +558,45 @@ impl Syscall<'_> {
         oldpath: usize,
         newdirfd: isize,
         newpath: usize,
-        _flags: i32,
+        flags: i32,
     ) -> SyscallResult {
-        let task = self.task;
-        let cwd = task.cwd().clone();
-        let cwd = cwd.as_str();
-        let old_path = get_path(task, oldpath, olddirfd, "sys_linkat")?;
-        let new_path = if cwd == "/" {
-            get_path_or_create(task, newpath, newdirfd, InodeMode::LINK, "sys_linkat").await?
-        } else {
-            get_path(task, newpath, newdirfd, "sys_linkat")?
-        };
+        const AT_EMPTY_PATH: i32 = 0x1000;
+        const AT_SYMLINK_FOLLOW: i32 = 0x400;
+
+        let old_path = read_path(oldpath)?;
+        let new_path = read_path(newpath)?;
         info!(
-            "[sys_linkat] old_path: {:?}, new_path: {:?}",
-            old_path, new_path
+            "[sys_linkat] olddirfd: {}, oldpath: {}, newdirfd: {}, newpath: {}, flags: {}",
+            olddirfd, old_path, newdirfd, new_path, flags
         );
 
-        let old_dentry = if cwd == "/" {
-            Path::try_from("/musl/busybox".to_string())
-                .unwrap()
-                .dentry()
+        if old_path == "/proc/meminfo" || old_path == "/proc/cpuinfo" {
+            // todo: support /proc
+            return Err(Errno::EXDEV);
+        }
+
+        if flags & !(AT_SYMLINK_FOLLOW | AT_EMPTY_PATH) != 0 {
+            error!("[sys_linkat] invalid flags: {}", flags);
+            return Err(Errno::EINVAL);
+        }
+
+        let searchflags = if flags & AT_SYMLINK_FOLLOW != 0 {
+            FcntlArgFlags::empty()
         } else {
-            old_path.dentry()
+            FcntlArgFlags::AT_SYMLINK_NOFOLLOW
         };
-        let new_dentry = new_path.dentry();
-        new_dentry.set_inode_none();
-        new_dentry.link_to(old_dentry).await
+
+        let old_dentry = get_dentry(self.task, olddirfd, &old_path, &searchflags)?;
+        if old_dentry.inode()?.file_type() == InodeMode::DIR {
+            error!("[sys_linkat] old_dentry is directory");
+            return Err(Errno::EPERM);
+        }
+
+        let target_dentry = old_dentry;
+        let searchflags = FcntlArgFlags::empty();
+        let (parent, name) = get_dentry_parent(self.task, newdirfd, &new_path, &searchflags)?;
+        // todo: check parent W_OK permission
+        parent.create_link(target_dentry, name).await
     }
 
     /// todo: now just set the same inode
@@ -653,29 +606,19 @@ impl Syscall<'_> {
         newdirfd: isize,
         linkpath: usize,
     ) -> SyscallResult {
-        // let new_path = get_path_or_create(
-        //     self.task,
-        //     linkpath,
-        //     newdirfd,
-        //     InodeMode::LINK,
-        //     "sys_symlinkat",
-        // )
-        // .await?;
+        let target_path = read_path(target)?;
+        let link_path = read_path(linkpath)?;
+        info!(
+            "[sys_symlinkat] target: {}, newdirfd: {}, linkpath: {}",
+            target_path, newdirfd, link_path
+        );
 
-        // let ptr = UserPtr::<u8>::new(target);
-        // let target = ptr.get_string_from_ptr()?;
-
-        // info!(
-        //     "[sys_symlinkat] target: {:?}, newdirfd: {}, linkpath: {:?}",
-        //     target, newdirfd, new_path
-        // );
-
-        // let new_dentry = new_path.dentry();
-        // new_dentry.inode()?.symlink(target);
+        let searchflags = FcntlArgFlags::empty();
+        let (parent, name) = get_dentry_parent(self.task, newdirfd, &link_path, &searchflags)?;
+        parent.create_symlink(target_path, name).await?;
         Ok(0)
     }
 
-    // todo: AT_SYMLINK_NOFOLLOW
     /// Read link file, error if the file is not a link
     pub async fn sys_readlinkat(
         &self,
@@ -684,12 +627,17 @@ impl Syscall<'_> {
         buf: usize,
         buflen: usize,
     ) -> SyscallResult {
-        let path = get_path(self.task, path, dirfd, "sys_readlinkat")?;
+        if buflen as isize <= 0 {
+            error!("[sys_readlinkat] buflen must be greater than 0");
+            return Err(Errno::EINVAL);
+        }
+        let path = read_path(path)?;
+        let searchflags = FcntlArgFlags::AT_SYMLINK_NOFOLLOW;
+        let dentry = get_dentry(self.task, dirfd, &path, &searchflags)?;
         info!(
             "[sys_readlinkat] dirfd: {}, path: {:?}, buf: {:#x}, bufsize: {}",
             dirfd, path, buf, buflen,
         );
-        let dentry = path.dentry();
         if dentry.inode()?.file_type() != InodeMode::LINK {
             return Err(Errno::EINVAL);
         }
@@ -702,13 +650,20 @@ impl Syscall<'_> {
 
     /// Unlink a file, also delete the file if nlink is 0
     pub async fn sys_unlinkat(&self, dirfd: isize, path: usize, flags: i32) -> SyscallResult {
+        pub const AT_REMOVEDIR: i32 = 0x200;
+        if flags & !AT_REMOVEDIR != 0 {
+            error!("[sys_unlinkat] AT_REMOVEDIR flag is set");
+            return Err(Errno::EINVAL);
+        }
+        let path = read_path(path)?;
         let flags = FileFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
-        info!("[sys_unlinkat] dirfd: {}, flags: {:?}", dirfd, flags);
-        let task = self.task;
-        let path = get_path(task, path, dirfd, "sys_unlinkat")?;
-        let dentry = path.dentry();
+        let searchflags = FcntlArgFlags::from_arg(&flags);
+        info!(
+            "[sys_unlinkat] dirfd: {}, path: {}, flags: {:?}",
+            dirfd, path, flags
+        );
+        let dentry = get_dentry(self.task, dirfd, &path, &searchflags)?;
         dentry.unlink(&flags).await?;
-        debug!("[sys_unlinkat] unlink ok");
         Ok(0)
     }
 
@@ -784,7 +739,7 @@ impl Syscall<'_> {
             }
             FcntlFlags::F_SETFD => {
                 let arg = FileFlags::from_bits_retain(arg as i32);
-                let fd_flags = FcntlArgFlags::from_arg(arg);
+                let fd_flags = FcntlArgFlags::from_arg(&arg);
                 fd_table.set_fdflag(fd, &fd_flags);
                 Ok(0)
             }
@@ -871,9 +826,9 @@ impl Syscall<'_> {
         dirfd: isize,
         path: usize,
         times: usize,
-        flags: i32,
+        flags: u32,
     ) -> SyscallResult {
-        let flags = FileFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
+        let flags = FcntlArgFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
         info!(
             "[sys_utimensat] dirfd: {}, times: {:#x}, flags: {:?}",
             dirfd, times, flags
@@ -882,7 +837,10 @@ impl Syscall<'_> {
         let times_ptr = UserPtr::<TimeSpec>::new(times);
         let inode = if path_ptr.is_null() {
             match dirfd {
-                AT_FDCWD => return Err(Errno::EINVAL),
+                AT_FDCWD => {
+                    error!("[sys_utimensat] dirfd is AT_FDCWD but path is null");
+                    return Err(Errno::EINVAL);
+                }
                 fd => self
                     .task
                     .fd_table()
@@ -891,8 +849,9 @@ impl Syscall<'_> {
                     .inode(),
             }
         } else {
-            let path = get_path(self.task, path, dirfd, "sys_utimensat")?;
-            path.dentry().inode()?
+            let path = read_path(path)?;
+            let dentry = get_dentry(self.task, dirfd, &path, &flags)?;
+            dentry.inode()?
         };
 
         let current = TimeSpec::from(get_time_duration());
@@ -962,17 +921,100 @@ impl Syscall<'_> {
         new_path: usize,
         flags: i32,
     ) -> SyscallResult {
-        let old_path = get_path(self.task, old_path, old_dirfd, "sys_renameat2")?;
-        let new_path = get_path(self.task, new_path, new_dirfd, "sys_renameat2")?;
+        let old_path = read_path(old_path)?;
+        let new_path = read_path(new_path)?;
         let flags = RenameFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
         info!(
             "[sys_renameat2] old_path: {:?}, new_path: {:?}",
             old_path, new_path
         );
 
-        let old_dentry = old_path.dentry();
-        let new_dentry = new_path.dentry();
-        old_dentry.rename_to(new_dentry, flags).await?;
+        if (flags.contains(RenameFlags::RENAME_NOREPLACE)
+            || flags.contains(RenameFlags::RENAME_WHITEOUT))
+            && flags.contains(RenameFlags::RENAME_EXCHANGE)
+        {
+            error!("[sys_renameat2] NOREPLACE and RENAME_EXCHANGE cannot be used together");
+            return Err(Errno::EINVAL);
+        }
+
+        let searchflags = FcntlArgFlags::AT_SYMLINK_NOFOLLOW;
+        let old_dentry = get_dentry(self.task, old_dirfd, &old_path, &searchflags)?;
+        let (new_dentry_parent, new_name) =
+            get_dentry_parent(self.task, new_dirfd, &new_path, &searchflags)?;
+
+        if old_dentry.is_negative() {
+            error!("[sys_renameat2] oldpath does not exist");
+            return Err(Errno::ENOENT);
+        }
+
+        if let Some(new_dentry) = new_dentry_parent.get_child(new_name) {
+            // new dentry must not exist if NOREPLACE is set
+            if flags.contains(RenameFlags::RENAME_NOREPLACE) {
+                error!("[sys_renameat2] newpath already exists with NOREPLACE flag");
+                return Err(Errno::EINVAL);
+            }
+
+            // check if newpath is an ancestor of oldpath
+            if flags.contains(RenameFlags::RENAME_EXCHANGE) {
+                let mut current = old_dentry.clone();
+                loop {
+                    if let Some(parent) = current.parent() {
+                        if core::ptr::addr_eq(Arc::as_ptr(&parent), Arc::as_ptr(&new_dentry)) {
+                            error!("[sys_renameat2] newpath is an ancestor of oldpath");
+                            return Err(Errno::EINVAL);
+                        }
+                        current = parent;
+                    } else {
+                        break;
+                    }
+                }
+            }
+
+            let new_inode = new_dentry.inode().expect("should have inode");
+
+            // fixme: if old_dentry is a dir, new_dentry must not exist or be an empty dir
+            // currently doesn't check if it is an empty dir
+            if old_dentry.inode().unwrap().file_type() == InodeMode::DIR {
+                error!("[sys_renameat2] new_dentry is not an empty directory");
+                return Err(Errno::ENOTEMPTY);
+            }
+
+            // check if old_dentry and new_dentry are the same hard link
+            if Arc::ptr_eq(&old_dentry.inode().unwrap(), &new_inode) {
+                warn!(
+                    "[sys_renameat2] old_dentry and new_dentry are the hard links of the same file"
+                );
+                return Ok(0);
+            }
+        } else {
+            // new_path does not exist, but if EXCHANGE is set
+            if flags.contains(RenameFlags::RENAME_EXCHANGE) {
+                error!("[sys_renameat2] newpath must exist with EXCHANGE flag");
+                return Err(Errno::EINVAL);
+            }
+        }
+
+        // rename: currently just create a new file with the same inode and delete the
+        // old one
+        // todo: support the real fs rename, mention that ext4_rs doesn't support rename
+        let parent = old_dentry.parent().ok_or(Errno::ENOENT)?;
+        let old_inode = old_dentry.inode().unwrap();
+        parent
+            .clone()
+            .create(new_name, old_inode.inode_mode())
+            .await?;
+        let new_dentry = parent.get_child(new_name).unwrap();
+        new_dentry.set_inode(old_inode);
+
+        let old_name = old_dentry.name();
+        parent
+            .clone()
+            .open(&FileFlags::empty())
+            .unwrap()
+            .delete_child(old_name)
+            .await?;
+        parent.remove_child(old_dentry.name()).unwrap();
+
         Ok(0)
     }
 
@@ -1090,21 +1132,25 @@ impl Syscall<'_> {
         Ok(out_len as isize)
     }
 
-    pub fn sys_fchmod(&self, fd: usize, path: usize, mode: usize) -> SyscallResult {
-        let path = get_path(self.task, path, fd as isize, "sys_fchmod")?;
-        info!("[sys_fchmod] set {:o} mode to {:?}", mode, path);
-
-        let inode = path.dentry().inode()?;
+    pub fn sys_fchmod(&self, fd: usize, mode: usize) -> SyscallResult {
+        info!("[sys_fchmod] set {:o} mode for fd: {}", mode, fd);
+        let file = self.task.fd_table().get(fd).ok_or(Errno::EBADF)?;
+        if file.flags().contains(FileFlags::O_PATH) {
+            error!("[sys_fchmod] O_PATH file cannot be changed");
+            return Err(Errno::EINVAL);
+        }
+        let inode = file.dentry().inode()?;
         inode.set_permission(self.task, mode as u32);
         Ok(0)
     }
 
-    pub fn sys_fchmodat(&self, fd: usize, path: usize, mode: usize, _flag: i32) -> SyscallResult {
-        // todo: support flag
-        let path = get_path(self.task, path, fd as isize, "sys_fchmodat")?;
+    pub fn sys_fchmodat(&self, fd: usize, path: usize, mode: usize, flags: u32) -> SyscallResult {
+        let path = read_path(path)?;
         info!("[sys_fchmodat] set {:o} mode to {:?}", mode, path);
 
-        let inode = path.dentry().inode()?;
+        let searchflags = FcntlArgFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
+        let dentry = get_dentry(self.task, fd as isize, &path, &searchflags)?;
+        let inode = dentry.inode()?;
         inode.set_permission(self.task, mode as u32);
         Ok(0)
     }
@@ -1127,15 +1173,17 @@ impl Syscall<'_> {
         path: usize,
         owner: u32,
         group: u32,
-        _flag: i32,
+        flags: u32,
     ) -> SyscallResult {
-        let path = get_path(self.task, path, fd as isize, "sys_fchownat")?;
+        let path = read_path(path)?;
         info!(
             "[sys_fchownat] set owner: {:?}, group: {:?} for {:?}",
             owner, group, path
         );
 
-        let inode = path.dentry().inode()?;
+        let searchflags = FcntlArgFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
+        let dentry = get_dentry(self.task, fd as isize, &path, &searchflags)?;
+        let inode = dentry.inode()?;
         inode.chown(self.task, owner, group)?;
         Ok(0)
     }
@@ -1149,11 +1197,13 @@ impl Syscall<'_> {
         const R_OK: i32 = 4;
         const AT_EACCESS: i32 = 0x200;
         const UID_ROOT: u32 = 0;
-        let path = get_path(self.task, path, fd as isize, "sys_faccessat")?;
-        let dentry = path.dentry();
+
+        let is_fs = flags & AT_EACCESS != 0;
+        let path = read_path(path)?;
+        let searchflags = FcntlArgFlags::from_bits(flags as u32).ok_or(Errno::EINVAL)?;
+        let dentry = get_dentry(self.task, fd as isize, &path, &searchflags)?;
         let inode = dentry.inode()?;
         let pri = inode.privilege();
-        let is_fs = flags & AT_EACCESS != 0;
 
         log::info!(
             "[sys_faccessat] fd: {}, path: {:?}, mode: {}, flags: {}, file_pri: {:?}",
@@ -1351,14 +1401,22 @@ impl Syscall<'_> {
         Ok(0)
     }
 
-    pub fn sys_mknodat(&self, fd: isize, path: usize, mode: usize, dev: u64) -> SyscallResult {
-        let mode: InodeMode = InodeMode::from_bits(mode as u32).ok_or(Errno::EINVAL)?;
-        let (path, name) = get_path_at_parent(self.task, path, fd, "sys_mknodat")?;
+    pub async fn sys_mknodat(
+        &self,
+        fd: isize,
+        path: usize,
+        mode: usize,
+        dev: u64,
+    ) -> SyscallResult {
+        let mode = InodeMode::from_bits(mode as u32).ok_or(Errno::EINVAL)?;
+        let path = read_path(path)?;
+        let searchflags = FcntlArgFlags::AT_SYMLINK_NOFOLLOW;
+        let (parent, name) = get_dentry_parent(self.task, fd, &path, &searchflags)?;
         info!(
             "[sys_mknodat] dirfd: {}, path: {:?}, mode: {:?}, dev: {}",
             fd, path, mode, dev
         );
-        // 兼容旧的设备号格式(16位)
+
         let dev_t = if dev < 0xffff {
             let major = (dev >> 8) as u32 & 0xff;
             let minor = (dev & 0xff) as u32;
@@ -1366,10 +1424,13 @@ impl Syscall<'_> {
         } else {
             DevT::new(dev)
         };
-        let dentry = path.dentry().parent();
-        if let Some(parent) = dentry {
+
+        if mode.contains(InodeMode::FILE) {
+            parent.create(name, mode).await?;
+        } else {
             parent.mknodat_son(&name, dev_t, mode)?;
         }
+
         Ok(0)
     }
 
@@ -1395,122 +1456,8 @@ impl Syscall<'_> {
     }
 }
 
-async fn get_path_or_create(
-    task: &Arc<Task>,
-    rawpath: usize,
-    fd: isize,
-    mode: InodeMode,
-    debug_syscall_name: &str,
-) -> SysResult<Path> {
-    let ptr = UserPtr::<u8>::new(rawpath);
-    let path_str = ptr.get_string_from_ptr()?;
-    debug!("[{debug_syscall_name}] path(may create): {}", path_str);
-    if path_str.len() > 255 {
-        return Err(Errno::ENAMETOOLONG);
-    }
-    if !path_str.starts_with('/') {
-        if fd == AT_FDCWD {
-            let cwd = task.cwd().clone();
-            trace!("[{debug_syscall_name}] cwd: {:?}", cwd);
-            cwd.from_cd_or_create(&path_str, mode).await
-        } else {
-            let cwd = task
-                .fd_table()
-                .get(fd as usize)
-                .ok_or(Errno::EBADF)?
-                .dentry()
-                .path()?;
-            trace!("[{debug_syscall_name}] cwd: {:?}", cwd);
-            cwd.from_cd_or_create(&path_str, mode).await
-        }
-    } else {
-        Path::from_or_create(path_str, mode).await
-    }
-}
-
-fn get_path(
-    task: &Arc<Task>,
-    rawpath: usize,
-    fd: isize,
-    debug_syscall_name: &str,
-) -> SysResult<Path> {
-    let ptr = UserPtr::<u8>::new(rawpath);
-    let path_str = ptr.get_string_from_ptr()?;
-    debug!("[{debug_syscall_name}] path: {}", path_str);
-    if path_str.len() > 255 {
-        return Err(Errno::ENAMETOOLONG);
-    }
-    if !path_str.starts_with('/') {
-        if fd == AT_FDCWD {
-            let cwd = task.cwd().clone();
-            trace!("[{debug_syscall_name}] cwd: {:?}", cwd);
-            cwd.from_cd(&path_str)
-        } else {
-            let cwd = task
-                .fd_table()
-                .get(fd as usize)
-                .ok_or(Errno::EBADF)?
-                .dentry()
-                .path()?;
-            trace!("[{debug_syscall_name}] cwd: {:?}", cwd);
-            cwd.from_cd(&path_str)
-        }
-    } else {
-        Path::try_from(path_str)
-    }
-}
-
-// todo: improve this
-pub fn get_path_at_parent(
-    task: &Arc<Task>,
-    rawpath: usize,
-    fd: isize,
-    debug_syscall_name: &str,
-) -> SysResult<(Path, String)> {
-    let ptr = UserPtr::<u8>::new(rawpath);
-    let mut path_str = ptr.get_string_from_ptr()?;
-
-    if path_str.ends_with("/") && path_str.len() > 1 {
-        path_str.pop();
-    }
-
-    let entry_name;
-    if let Some(last_slash_pos) = path_str.rfind('/') {
-        if last_slash_pos == 0 {
-            entry_name = path_str[1..].to_string();
-            path_str = "/".to_string();
-        } else {
-            entry_name = path_str[(last_slash_pos + 1)..].to_string();
-            path_str.truncate(last_slash_pos);
-        }
-    } else {
-        entry_name = path_str.clone();
-        path_str = ".".to_string();
-    }
-
-    debug!(
-        "[{debug_syscall_name}] parent path: {}, entry name: {}",
-        path_str, entry_name
-    );
-
-    let parent_path = if !path_str.starts_with('/') {
-        if fd == AT_FDCWD {
-            let cwd = task.cwd().clone();
-            trace!("[{debug_syscall_name}] cwd: {:?}", cwd);
-            cwd.from_cd(&path_str)?
-        } else {
-            let cwd = task
-                .fd_table()
-                .get(fd as usize)
-                .ok_or(Errno::EBADF)?
-                .dentry()
-                .path()?;
-            trace!("[{debug_syscall_name}] cwd: {:?}", cwd);
-            cwd.from_cd(&path_str)?
-        }
-    } else {
-        Path::try_from(path_str)?
-    };
-
-    Ok((parent_path, entry_name))
+#[inline(always)]
+fn read_path(raw: usize) -> SysResult<String> {
+    let ptr = UserPtr::<u8>::new(raw);
+    ptr.get_string_from_ptr()
 }

@@ -253,8 +253,11 @@ impl PipeDentry {
         let pipe_dentry = Arc::new(Self {
             meta: DentryMeta::new(Some(parent.clone()), name, super_block),
         });
-        debug!("[PipeDentry] create pipe dentry: {}", pipe_dentry.name());
-        parent.add_child_directly(pipe_dentry.clone());
+        debug!(
+            "[PipeDentry] create pipe dentry: {}",
+            pipe_dentry.into_dyn().name()
+        );
+        parent.add_child(pipe_dentry.clone());
         pipe_dentry
     }
 }
@@ -338,7 +341,7 @@ impl PipeFile {
         file_flags: &FileFlags,
     ) -> Arc<Self> {
         let name = format!("{}-read", name);
-        let dentry = PipeDentry::new(&name);
+        let dentry = PipeDentry::new(&name).into_dyn();
         let inode = Arc::new(PipeInode::new());
         dentry.set_inode(inode.clone());
         let meta = FileMeta::new(dentry, inode, &(*file_flags | FileFlags::O_RDONLY));
@@ -351,7 +354,7 @@ impl PipeFile {
         file_flags: &FileFlags,
     ) -> Arc<Self> {
         let name = format!("{}-write", name);
-        let dentry = PipeDentry::new(&name);
+        let dentry = PipeDentry::new(&name).into_dyn();
         let inode = Arc::new(PipeInode::new());
         dentry.set_inode(inode.clone());
         let meta = FileMeta::new(dentry, inode, &(*file_flags | FileFlags::O_WRONLY));
@@ -456,7 +459,8 @@ impl Drop for PipeFile {
     fn drop(&mut self) {
         let mut buffer = self.buffer.lock();
         if self.is_read_end() {
-            let name = self.meta.dentry().name();
+            let dentry = self.meta.dentry();
+            let name = dentry.name();
             warn!("[PipeFile] {} dropped!", name);
             root_dentry().remove_child(&name);
             buffer.read_end = false;
@@ -464,7 +468,8 @@ impl Drop for PipeFile {
                 waker.wake();
             }
         } else {
-            let name = self.meta.dentry().name();
+            let dentry = self.meta.dentry();
+            let name = dentry.name();
             warn!("[PipeFile] {} dropped!", name);
             root_dentry().remove_child(&name);
             buffer.write_end = false;

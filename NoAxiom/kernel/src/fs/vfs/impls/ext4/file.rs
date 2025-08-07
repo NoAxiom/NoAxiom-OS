@@ -1,5 +1,5 @@
 use alloc::{boxed::Box, sync::Arc};
-use core::task::Waker;
+use core::{sync::atomic::AtomicBool, task::Waker};
 
 use arch::{Arch, ArchInt};
 use async_trait::async_trait;
@@ -143,6 +143,7 @@ pub struct Ext4Dir {
     /// the dir struct in ext4, multi threads read/write the same file should
     /// ensure the atomicity, which provided by the fs lock
     ino: u32,
+    loaded: AtomicBool,
 }
 
 impl Ext4Dir {
@@ -150,6 +151,7 @@ impl Ext4Dir {
         Self {
             meta: FileMeta::new(dentry.clone(), inode.clone(), file_flags),
             ino: inode.get_inode().lock().inode_num,
+            loaded: AtomicBool::new(false),
         }
     }
 }
@@ -174,6 +176,14 @@ impl File for Ext4Dir {
     }
 
     async fn load_dir(&self) -> Result<(), Errno> {
+        if self.loaded.load(core::sync::atomic::Ordering::SeqCst) {
+            debug!(
+                "[AsyncSmpExt4]Dir {}: already loaded",
+                self.meta.dentry().name()
+            );
+            return Ok(());
+        }
+
         static mut FIRST: bool = true;
         debug!("[AsyncSmpExt4]Dir {}: load_dir", self.meta.dentry().name());
         let super_block = self.meta.dentry().super_block();
@@ -220,13 +230,15 @@ impl File for Ext4Dir {
                     child_name, file_type
                 );
             };
-            self.dentry().add_child(&child_name, inode);
+            self.dentry().add_child_with_inode(&child_name, inode);
         }
         unsafe {
             if FIRST {
                 FIRST = false;
             }
         }
+        self.loaded
+            .store(true, core::sync::atomic::Ordering::SeqCst);
         Ok(())
     }
 

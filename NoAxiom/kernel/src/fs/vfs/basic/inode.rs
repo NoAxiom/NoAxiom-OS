@@ -153,6 +153,16 @@ impl dyn Inode {
     pub fn set_size(&self, size: usize) {
         self.meta().inner.lock().size = size;
     }
+    #[inline(always)]
+    pub fn symlink(&self) -> Option<String> {
+        let symlink = self.meta().symlink.lock();
+        symlink.clone()
+    }
+    #[inline(always)]
+    pub fn set_symlink(&self, target: String) {
+        let mut symlink = self.meta().symlink.lock();
+        *symlink = Some(target);
+    }
     pub fn privilege(&self) -> InodeMode {
         let inode_mode = self.meta().inode_mode.load(Ordering::SeqCst);
         let inode_mode = inode_mode & PRIVILEGE_MASK;
@@ -334,11 +344,6 @@ impl dyn Inode {
         } else {
             true
         }
-    }
-
-    pub fn symlink(&self, target: String) {
-        let mut symlink = self.meta().symlink.lock();
-        *symlink = Some(target);
     }
 }
 

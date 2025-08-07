@@ -25,9 +25,15 @@ use super::{
     tcb::TCB,
 };
 use crate::{
-    fs::{fdtable::FdTable, path::Path},
+    entry::init_proc::INIT_PROC_NAME,
+    fs::{
+        fdtable::FdTable,
+        vfs::{
+            basic::{dentry::Dentry, file::File},
+            root_dentry,
+        },
+    },
     include::{
-        fs::{FileFlags, InodeMode},
         process::{
             auxv::{AuxEntry, AT_NULL, AT_RANDOM},
             CloneFlags, TaskFlags,
@@ -110,7 +116,9 @@ pub struct Task {
 
     // shared
     fd_table: SharedMut<FdTable>,         // file descriptor table
-    cwd: SharedMut<Path>,                 // current work directory
+    cwd: SharedMut<Arc<dyn Dentry>>,      // current work directory
+    exe: SharedMut<String>,               // executable file path
+    root: SharedMut<Arc<dyn Dentry>>,     // root directory
     sa_list: SharedMut<SigActionList>,    // signal action list, saves signal handler
     memory_set: SharedMut<MemorySet>,     // memory set for the task
     thread_group: SharedMut<ThreadGroup>, // thread group
@@ -264,8 +272,17 @@ impl Task {
 
     /// get cwd
     #[inline(always)]
-    pub fn cwd(&self) -> SpinLockGuard<Path> {
+    pub fn cwd(&self) -> SpinLockGuard<Arc<dyn Dentry>> {
         self.cwd.lock()
+    }
+    #[inline(always)]
+    pub fn exe(&self) -> SpinLockGuard<String> {
+        self.exe.lock()
+    }
+    /// get root
+    #[inline(always)]
+    pub fn root(&self) -> SpinLockGuard<Arc<dyn Dentry>> {
+        self.root.lock()
     }
 
     /// trap context
@@ -471,10 +488,6 @@ impl Task {
         // identifier
         let tid = tid_alloc();
         let tgid = tid.0;
-        // def root path
-        let path = Path::from_or_create(format!("/"), InodeMode::DIR)
-            .await
-            .unwrap();
         // create task
         let task = Arc::new(Self {
             tid,
@@ -488,7 +501,9 @@ impl Task {
             memory_set: Shared::new(memory_set),
             sched_entity: ThreadOnly::new(SchedEntity::default()),
             fd_table: Shared::new(FdTable::new()),
-            cwd: Shared::new(path),
+            cwd: Shared::new(root_dentry()),
+            exe: Shared::new(format!("/{}", INIT_PROC_NAME)), // executable path
+            root: Shared::new(root_dentry()),
             sa_list: Shared::new(SigActionList::new()),
             tcb: ThreadOnly::new(TCB {
                 cx: TaskTrapContext::new(TrapContext::app_init_cx(elf_entry, user_sp), true),
@@ -666,6 +681,8 @@ impl Task {
                 sched_entity: ThreadOnly::new(SchedEntity::default()),
                 fd_table,
                 cwd: self.cwd.clone(),
+                exe: self.exe.clone(),
+                root: self.root.clone(),
                 sa_list,
                 tcb: ThreadOnly::new(TCB {
                     cx: TaskTrapContext::new(self.trap_context().clone(), true),
@@ -705,6 +722,8 @@ impl Task {
                 sched_entity: ThreadOnly::new(SchedEntity::default()),
                 fd_table,
                 cwd: Shared::new(self.cwd().clone()),
+                exe: Shared::new(self.exe().clone()),
+                root: Shared::new(self.root().clone()),
                 sa_list,
                 tcb: ThreadOnly::new(TCB {
                     cx: TaskTrapContext::new(self.trap_context().clone(), true),
@@ -734,11 +753,10 @@ impl Task {
     /// execute
     pub async fn execve(
         self: &Arc<Self>,
-        path: Path,
+        elf_file: Arc<dyn File>,
         args: Vec<String>,
         envs: Vec<String>,
     ) -> SysResult<()> {
-        let elf_file = path.dentry().open(&FileFlags::O_RDWR)?;
         let ElfMemoryInfo {
             memory_set,
             entry_point,
@@ -746,6 +764,7 @@ impl Task {
             mut auxs,
         } = MemorySet::load_elf(&elf_file).await?;
         memory_set.memory_activate();
+        *self.exe() = elf_file.path();
         self.terminate_threads();
         self.change_memory_set(memory_set);
         let (user_sp, _argc, _argv_base, _envp_base) =

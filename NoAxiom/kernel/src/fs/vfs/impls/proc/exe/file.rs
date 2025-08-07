@@ -29,9 +29,9 @@ impl File for ExeFile {
     }
 
     async fn base_readlink(&self, buf: &mut [u8]) -> SyscallResult {
-        let exe = current_task().unwrap().cwd().as_string();
+        let exe = &current_task().unwrap().exe();
         if buf.len() < exe.len() + 1 {
-            warn!("readlink buf not big enough");
+            error!("readlink buf not big enough");
             return Err(Errno::EINVAL);
         }
         buf[0..exe.len()].copy_from_slice(exe.as_bytes());
@@ -42,7 +42,7 @@ impl File for ExeFile {
     async fn base_read(&self, _offset: usize, _buf: &mut [u8]) -> SyscallResult {
         return_errno!(
             Errno::ENOEXEC,
-            "ExeFile::base_read not supported for {}",
+            "ExeFile::base_read not supported for {}, if it is lmbench, it's right!",
             self.meta().dentry().name()
         );
     }
@@ -50,7 +50,7 @@ impl File for ExeFile {
     async fn base_write(&self, _offset: usize, _buf: &[u8]) -> SyscallResult {
         return_errno!(
             Errno::ENOEXEC,
-            "ExeFile::base_write not supported for {}",
+            "ExeFile::base_write not supported for {}, if it is lmbench, it's right!",
             self.meta().dentry().name()
         );
     }

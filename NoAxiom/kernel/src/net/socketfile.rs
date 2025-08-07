@@ -124,9 +124,9 @@ impl SocketDentry {
         });
         debug!(
             "[SocketDentry] create socket dentry: {}",
-            pipe_dentry.name()
+            pipe_dentry.into_dyn().name()
         );
-        parent.add_child_directly(pipe_dentry.clone());
+        parent.add_child(pipe_dentry.clone());
         pipe_dentry
     }
 }

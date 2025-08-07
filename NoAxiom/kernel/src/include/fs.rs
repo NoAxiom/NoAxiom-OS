@@ -483,12 +483,15 @@ bitflags! {
 }
 
 impl FcntlArgFlags {
-    pub fn from_arg(arg: FileFlags) -> Self {
+    pub fn from_arg(arg: &FileFlags) -> Self {
+        let mut ret = FcntlArgFlags::empty();
         if arg.contains(FileFlags::O_CLOEXEC) {
-            FcntlArgFlags::FD_CLOEXEC
-        } else {
-            FcntlArgFlags::empty()
+            ret |= FcntlArgFlags::FD_CLOEXEC;
         }
+        if arg.contains(FileFlags::O_NOFOLLOW) {
+            ret |= FcntlArgFlags::AT_SYMLINK_NOFOLLOW;
+        }
+        ret
     }
 }
 

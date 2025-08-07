@@ -1,6 +1,11 @@
 // ! **File** is the file system file instance opened in memory
 
-use alloc::{boxed::Box, string::String, sync::Arc, vec::Vec};
+use alloc::{
+    boxed::Box,
+    string::{String, ToString},
+    sync::Arc,
+    vec::Vec,
+};
 use core::{
     hash::{Hash, Hasher},
     sync::atomic::{AtomicI32, AtomicUsize, Ordering},
@@ -338,15 +343,23 @@ impl dyn File {
         self.meta().pos.fetch_add(len as usize, Ordering::Release);
         Ok(len)
     }
+    #[inline(always)]
     pub fn name(&self) -> String {
-        self.dentry().name()
+        self.dentry().name().to_string()
     }
+    #[inline(always)]
+    pub fn path(&self) -> String {
+        self.dentry().path().to_string()
+    }
+    #[inline(always)]
     pub fn pos(&self) -> usize {
         self.meta().pos.load(Ordering::SeqCst)
     }
+    #[inline(always)]
     pub fn flags(&self) -> FileFlags {
         FileFlags::from_bits(self.meta().flags.load(Ordering::SeqCst)).unwrap_or(FileFlags::empty())
     }
+    #[inline(always)]
     pub fn inode(&self) -> Arc<dyn Inode> {
         self.meta().inode.clone()
     }
