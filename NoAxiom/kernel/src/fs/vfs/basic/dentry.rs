@@ -319,7 +319,11 @@ impl dyn Dentry {
                     Ok(file) => {
                         assert_no_lock!();
                         // todo: add sync fn load_dir method
-                        warn!("[walk_path] {} is not open! Now open it.", self.name());
+                        warn!(
+                            "[walk_path] {} cannot find {}! Now load this dir.",
+                            name,
+                            self.name()
+                        );
                         block_on(file.load_dir()).expect("can not load dir!");
                     }
                     Err(e) => {
