@@ -770,7 +770,6 @@ impl AhciDevice {
     // ahci sata读函数
     // blknr 开始的sector/block偏移
     // blkcnt 读取的sector/block总数
-    #[no_mangle]
     pub fn ahci_sata_read_common(&self, blknr: u64, blkcnt: u32, buffer: *mut u8) -> u64 {
         let ahci_dev = self;
         let pdev: &AhciBlkDev = &ahci_dev.blk_dev;
@@ -788,7 +787,6 @@ impl AhciDevice {
     // ahci sata写函数
     // blknr 开始的sector/block偏移
     // blkcnt 写入的sector/block总数
-    #[no_mangle]
     pub fn ahci_sata_write_common(&self, blknr: u64, blkcnt: u32, buffer: *mut u8) -> u64 {
         let ahci_dev = self;
         let pdev: &AhciBlkDev = &ahci_dev.blk_dev;
@@ -811,7 +809,6 @@ impl AhciDevice {
     }
 
     // ahci初始化函数
-    #[no_mangle]
     pub fn new(base_pa: usize) -> Result<Self, ()> {
         let mut dev = Self::new_bare();
         let mut ahci_dev = &mut dev;
