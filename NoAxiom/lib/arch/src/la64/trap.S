@@ -141,41 +141,32 @@
     ld.d      $sp, $sp, 3*8
     ertn
 
-
     .globl    __kernel_user_ptr_vec
     .align    12
     __kernel_user_ptr_vec:
-# save sp and align sp
-    csrwr     $sp, CSR_SAVE1           # save sp since we will align it, use CSR_SAVE1 to avoid conflict
-    csrrd     $sp, CSR_SAVE1
-    addi.d    $sp, $sp, -32*8
-    srli.d    $sp, $sp, 3              # align sp to avoid unaligned exception
-    slli.d    $sp, $sp, 3
-
-# save kernel registers
-    STORE_X   %1
-    STORE_X   %2
-    .set      n, 4
-    .rept     28
-    STORE_X   %n
-    .set      n, n+1
-    .endr
-
-# call user ptr handler and update trap_type
-# assume that we won't trap again
-    bl        la_kernel_user_ptr_handler
-
-# load kernel registers
-    LOAD_X    %1
-    LOAD_X    %2
-    .set      n, 4
-    .rept     28
-    LOAD_X    %n
-    .set      n, n+1
-    .endr
-    csrrd     $sp, CSR_SAVE1
+    csrrd     $a0, CSR_ERA
+    addi.d    $a0, $a0, 4
+    csrwr     $a0, CSR_ERA
+    li.d      $a0, 1
+    csrrd     $a1, CSR_ESTAT
     ertn
 
+    .globl    __try_read_user
+    .align    4
+    __try_read_user:
+    move      $a1, $a0
+    move      $a0, $zero
+    ld.b      $a1, $a1, 0
+    jirl      $zero, $ra, 0
+
+    .globl    __try_write_user
+    .align    4
+    __try_write_user:
+    move      $a2, $a0
+    move      $a0, $zero
+    ld.b      $a1, $a2, 0
+    st.b      $a1, $a2, 0
+    jirl      $zero, $ra, 0
 
 # float registers store & load macros
     FP_START  = 0

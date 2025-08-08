@@ -217,6 +217,7 @@ pub(crate) fn user_trampoline_init() {
 impl ArchMemory for LA64 {
     const KERNEL_ADDR_OFFSET: usize = KERNEL_ADDR_OFFSET;
     const IO_ADDR_OFFSET: usize = IO_ADDR_OFFSET;
+    const HAS_KERNEL_SPACE: bool = false;
     type PageTable = PageTable;
     fn tlb_init() {
         tlb_init();
@@ -237,6 +238,6 @@ impl ArchMemory for LA64 {
         tlb_flush_all();
     }
     fn current_root_ppn() -> usize {
-        pgd::read().base() >> PAGE_WIDTH
+        pgdl::read().base() >> PAGE_WIDTH
     }
 }

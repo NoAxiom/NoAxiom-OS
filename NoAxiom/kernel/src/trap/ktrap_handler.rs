@@ -18,7 +18,7 @@ pub fn kernel_trap_handler(trap_type: &TrapType) {
     match *trap_type {
         TrapType::Exception(exception) => kernel_exception_handler(exception),
         TrapType::Interrupt(interrupt) => kernel_interrupt_handler(interrupt),
-        TrapType::None | TrapType::Handled => {}
+        TrapType::None => {}
         TrapType::Unknown => panic!("unsupported trap type"),
     }
     current_cpu().sub_trap_depth();

@@ -3,6 +3,7 @@
 use core::panic::PanicInfo;
 
 use arch::{Arch, ArchInfo, ArchTrap};
+use driver::debug::force_unlock_debug_console;
 use memory::{frame::print_frame_info, heap::print_heap_info};
 
 use crate::{
@@ -24,7 +25,8 @@ lazy_static::lazy_static! {
 }
 
 #[panic_handler]
-fn panic(info: &PanicInfo) -> ! {
+unsafe fn panic(info: &PanicInfo) -> ! {
+    force_unlock_debug_console();
     println!(
         "[PANIC] HART{}, TID{}, PANIC at {}ms, epc={:#x}, trap_depth={}",
         get_hartid(),

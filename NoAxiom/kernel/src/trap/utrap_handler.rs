@@ -145,7 +145,7 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
                 }
             };
         }
-        TrapType::None | TrapType::Handled => {}
+        TrapType::None => {}
         TrapType::Unknown => {
             panic!("unsupported trap type: {trap_type:x?}");
         }
