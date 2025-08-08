@@ -1,7 +1,9 @@
 use arch::{Arch, ArchTime};
-use driver::base_dev::shutdown;
 
-use crate::{constant::time::MSEC_PER_SEC, include::time::TimeSpec, time::gettime::get_time};
+use crate::{
+    constant::time::MSEC_PER_SEC, include::time::TimeSpec, panic::kshutdown,
+    time::gettime::get_time,
+};
 
 pub const LOG_BEGIN: TimeSpec = from_ms(0);
 pub const LOG_END: TimeSpec = from_ms(60000);
@@ -65,7 +67,7 @@ pub fn log_hook() {
                 log::set_max_level(log::LevelFilter::Off);
                 if SHUTDOWN_WHEN_LOG_END {
                     println!("[kernel] Time limit reached, shutting down...");
-                    shutdown();
+                    kshutdown();
                 }
             }
         }

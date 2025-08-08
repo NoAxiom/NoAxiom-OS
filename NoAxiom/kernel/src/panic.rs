@@ -3,16 +3,24 @@
 use core::panic::PanicInfo;
 
 use arch::{Arch, ArchInfo, ArchTrap};
+use driver::base_dev::shutdown;
 use memory::{frame::print_frame_info, heap::print_heap_info};
 
 use crate::{
     cpu::{current_cpu, get_hartid},
+    fs,
     syscall::utils::current_syscall,
     time::gettime::get_time_ms,
 };
 
+pub fn kshutdown() -> ! {
+    fs::disk_sync();
+    shutdown()
+}
+
 fn safe_shutdown() -> ! {
     println!("[kernel] poweroff");
+    fs::disk_sync();
     #[cfg(feature = "debug_sig")]
     driver::base_dev::debug_shutdown();
     #[cfg(not(feature = "debug_sig"))]

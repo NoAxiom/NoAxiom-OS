@@ -99,7 +99,7 @@ impl PageCacheManager {
             for (offset, page) in page_cache.iter() {
                 sorted.push((*offset, page));
             }
-            sorted.sort_by_key(|(offset, _)| *offset);
+            sorted.sort_by_key(|(offset, _)| *offset); // for trash ext4_rs which has bug in out of order read
 
             let mut offsets_to_remove = Vec::new();
             for (offset, page) in &sorted {
@@ -179,6 +179,28 @@ impl PageCacheManager {
             let removed = init_size - page_cache.len();
             self.page_count -= removed;
         }
+    }
+
+    pub fn sync_all(&mut self) {
+        for (file, page_cache) in self.inner.iter_mut() {
+            let file_size = file.size();
+            let mut sorted = Vec::new();
+            for (offset, page) in page_cache.iter() {
+                sorted.push((*offset, page));
+            }
+            sorted.sort_by_key(|(offset, _)| *offset);
+            for (offset, page) in &sorted {
+                if page.state == PageState::Modified {
+                    assert_no_lock!();
+                    assert!(Arch::is_external_interrupt_enabled());
+                    let len = PAGE_SIZE.min(file_size - offset);
+                    block_on(file.base_write(*offset, &page.data.ppn().get_bytes_array()[..len]))
+                        .unwrap();
+                }
+            }
+            page_cache.clear();
+        }
+        self.page_count = 0;
     }
 }
 

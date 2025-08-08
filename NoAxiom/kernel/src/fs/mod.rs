@@ -11,6 +11,7 @@ pub mod vfs;
 
 use arch::{Arch, ArchInt};
 use driver::manager::DEV_BUS;
+use kfuture::block::block_on;
 
 pub async fn fs_init() {
     info!("[fs] fs_init start");
@@ -31,4 +32,11 @@ pub fn test() {
     let dev = DEV_BUS.get_default_block_device().unwrap();
 
     vfs::impls::ext4::ext4_rs_test(dev);
+}
+
+pub fn disk_sync() {
+    println_debug!("[kernel] begin sync to the disk!");
+    pagecache::get_pagecache_wguard().sync_all();
+    block_on(blockcache::get_block_cache().sync_all()).expect("[kernel] sync block cache failed!");
+    println_debug!("[kernel] sync to the disk succeed!");
 }

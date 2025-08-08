@@ -1,7 +1,5 @@
-use driver::base_dev::shutdown;
-
 use super::{Syscall, SyscallResult};
-use crate::{mm::user_ptr::UserPtr, utils::random_fill};
+use crate::{mm::user_ptr::UserPtr, panic::kshutdown, utils::random_fill};
 
 impl Syscall<'_> {
     /// get a random number
@@ -16,6 +14,6 @@ impl Syscall<'_> {
     /// systemshutdown
     pub fn sys_systemshutdown() -> ! {
         println!("[kernel] system shutdown (syscall)");
-        shutdown()
+        kshutdown()
     }
 }

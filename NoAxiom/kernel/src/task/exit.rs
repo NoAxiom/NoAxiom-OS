@@ -1,6 +1,5 @@
 use alloc::sync::Arc;
 
-use driver::base_dev::shutdown;
 use ksync::assert_no_lock;
 
 use super::Task;
@@ -9,6 +8,7 @@ use crate::{
     cpu::current_cpu,
     include::futex::FUTEX_BITSET_MATCH_ANY,
     mm::user_ptr::UserPtr,
+    panic::kshutdown,
     signal::{
         sig_detail::{SigChildDetail, SigDetail},
         sig_info::{SigCode, SigInfo},
@@ -51,7 +51,8 @@ pub async fn init_proc_exit_handler(task: &Arc<Task>) {
         ),
     }
     println!("[kernel] system shutdown (normal exit)");
-    shutdown();
+    drop(pcb);
+    kshutdown();
 }
 
 impl Task {
