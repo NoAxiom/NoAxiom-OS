@@ -20,7 +20,6 @@ pub fn kshutdown() -> ! {
 
 fn safe_shutdown() -> ! {
     println!("[kernel] poweroff");
-    fs::disk_sync();
     #[cfg(feature = "debug_sig")]
     driver::base_dev::debug_shutdown();
     #[cfg(not(feature = "debug_sig"))]
