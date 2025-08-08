@@ -1,9 +1,5 @@
-use core::{
-    arch::{asm, global_asm},
-    intrinsics::volatile_load,
-};
+use core::arch::global_asm;
 
-use config::cpu::CPU_NUM;
 use log::error;
 use loongArch64::register::{
     badi, badv, ecfg, eentry, era,
@@ -17,8 +13,8 @@ use super::{
     LA64,
 };
 use crate::{
-    ArchAsm, ArchInt, ArchTrap, ArchTrapContext, ArchUserFloatContext, ExceptionType,
-    InterruptNumber, InterruptType, PageFaultType, TrapType, UserPtrResult,
+    ArchInt, ArchTrap, ArchTrapContext, ArchUserFloatContext, ExceptionType, InterruptNumber,
+    InterruptType, PageFaultType, TrapType, UserPtrResult,
 };
 
 global_asm!(include_str!("./trap.S"));
