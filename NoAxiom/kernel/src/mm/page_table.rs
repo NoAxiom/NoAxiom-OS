@@ -97,6 +97,13 @@ impl PageTable {
         translate_vpn_into_pte(self.root_ppn, vpn)
     }
 
+    #[allow(unused)]
+    #[deprecated(note = "this is for test only")]
+    pub fn find_pte_test(&self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
+        debug!("find_pte_test: vpn: {:#x}", vpn.raw());
+        translate_vpn_into_pte_test(self.root_ppn, vpn)
+    }
+
     /// map vpn -> ppn
     pub fn map(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: MappingFlags) {
         let pte = self.create_pte(vpn);
@@ -124,7 +131,14 @@ impl PageTable {
     }
 
     /// map unchecked
-    pub unsafe fn map_unchecked(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: MappingFlags) {
+    #[allow(unused)]
+    #[deprecated]
+    pub unsafe fn map_unchecked(
+        &mut self,
+        vpn: VirtPageNum,
+        ppn: PhysPageNum,
+        flags: MappingFlags,
+    ) {
         let pte = self.create_pte(vpn);
         if pte.is_allocated() {
             warn!(
@@ -214,6 +228,39 @@ pub fn translate_vpn_into_pte<'a>(
         if !pte.is_allocated() {
             return None;
         }
+        if i == INDEX_LEVELS - 1 {
+            result = Some(pte);
+            break;
+        }
+        ppn = pte.ppn().into();
+    }
+    result
+}
+
+#[allow(unused)]
+pub fn translate_vpn_into_pte_test<'a>(
+    root_ppn: PhysPageNum,
+    vpn: VirtPageNum,
+) -> Option<&'a mut PageTableEntry> {
+    let index = vpn.get_index();
+    let mut ppn = root_ppn;
+    let mut result: Option<&mut PageTableEntry> = None;
+    info!("translate_vpn_into_pte_test: vpn: {:#x}", vpn.raw());
+    info!("translate_vpn_into_pte_test: root_ppn: {:#x}", ppn.raw());
+    info!("translate_vpn_into_pte_test: index: {:?}", index);
+    for (i, idx) in index.iter().enumerate() {
+        let pte = &mut ppn.get_pte_array()[*idx];
+        if !pte.is_allocated() {
+            warn!(
+                "translate_vpn_into_pte_test: pte not allocated at index {}, pte_ppn {:#x}, mapping_flags: {:?}, pte_raw_flags: {:?}, raw_value: {:#x}",
+                i, pte.ppn(), pte.flags(), pte.raw_flag(), pte.0
+            );
+            return None;
+        }
+        info!(
+            "translate_vpn_into_pte_test: index {}, pte_ppn {:#x}, mapping_flags: {:?}, pte_raw_flags: {:?}",
+            i, pte.ppn(), pte.flags(), pte.raw_flag()
+        );
         if i == INDEX_LEVELS - 1 {
             result = Some(pte);
             break;

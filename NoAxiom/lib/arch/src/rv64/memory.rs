@@ -158,6 +158,7 @@ impl From<PTEFlags> for MappingFlags {
 impl ArchMemory for RV64 {
     const KERNEL_ADDR_OFFSET: usize = KERNEL_ADDR_OFFSET;
     const IO_ADDR_OFFSET: usize = IO_ADDR_OFFSET;
+    const HAS_KERNEL_SPACE: bool = true;
     type PageTable = PageTable;
     fn tlb_init() {}
     // flush all TLB

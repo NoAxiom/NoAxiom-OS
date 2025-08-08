@@ -34,8 +34,19 @@ pub enum TrapType {
     Exception(ExceptionType),
     Interrupt(InterruptType),
     Unknown, // unknown trap type
-    Handled, // trap has been handled
     None,    // no trap type, implying the trap has been handled
+}
+
+impl TrapType {
+    pub fn is_interrupt(&self) -> bool {
+        matches!(self, TrapType::Interrupt(_))
+    }
+    pub fn is_exception(&self) -> bool {
+        matches!(self, TrapType::Exception(_))
+    }
+    pub fn is_pagefault(&self) -> bool {
+        matches!(self, TrapType::Exception(ExceptionType::PageFault(_)))
+    }
 }
 
 /// Trap Frame Arg Type

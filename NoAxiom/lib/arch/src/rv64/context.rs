@@ -13,106 +13,19 @@
 //! X10 ~ X17	       a0 ~ a7   用于函数调用，被调用函数需要保存的数据
 //! X18 ~ X27	       s2 ~ s11  用于函数调用，传递参数和返回值
 
+#![allow(dead_code)]
+
 use core::{
     arch::asm,
     ops::{Index, IndexMut},
 };
 
-use bit_field::BitField;
 use riscv::register::sstatus::{self, FS, SPP};
 
-use crate::{ArchTrapContext, ArchUserFloatContext, TrapArgs};
-
-pub mod reg_id {
-    #![allow(unused)]
-    pub const ZERO: usize = 0;
-    pub const RA: usize = 1;
-    pub const SP: usize = 2;
-    pub const GP: usize = 3;
-    pub const TP: usize = 4;
-    pub const T0: usize = 5;
-    pub const T1: usize = 6;
-    pub const T2: usize = 7;
-    pub const S0: usize = 8;
-    pub const FP: usize = 8;
-    pub const S1: usize = 9;
-    pub const A0: usize = 10;
-    pub const A1: usize = 11;
-    pub const A2: usize = 12;
-    pub const A3: usize = 13;
-    pub const A4: usize = 14;
-    pub const A5: usize = 15;
-    pub const A6: usize = 16;
-    pub const A7: usize = 17;
-    pub const S2: usize = 18;
-    pub const S3: usize = 19;
-    pub const S4: usize = 20;
-    pub const S5: usize = 21;
-    pub const S6: usize = 22;
-    pub const S7: usize = 23;
-    pub const S8: usize = 24;
-    pub const S9: usize = 25;
-    pub const S10: usize = 26;
-    pub const S11: usize = 27;
-    pub const T3: usize = 28;
-    pub const T4: usize = 29;
-    pub const T5: usize = 30;
-    pub const T6: usize = 31;
-}
-
-/// virtual sstatus register, it's not a real register
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone)]
-pub struct MySstatus(pub usize);
-
-impl MySstatus {
-    pub fn read() -> Self {
-        let val: usize;
-        unsafe {
-            asm!("csrr {},sstatus", out(reg)val);
-        }
-        MySstatus(val)
-    }
-    pub fn sum() -> usize {
-        (Self::read().0 >> 18) & 1
-    }
-    pub fn set_value(&mut self, val: usize) {
-        self.0 = val;
-    }
-    pub fn set_spp(&mut self, spp: SPP) {
-        self.0 = self.0 & !(1 << 8) | ((spp as usize) << 8);
-    }
-    pub fn spp(&self) -> SPP {
-        let v = (self.0 >> 8) & 1;
-        if v == 1 {
-            SPP::Supervisor
-        } else {
-            SPP::User
-        }
-    }
-    pub fn set_spie(&mut self) {
-        self.0 |= 1 << 5;
-    }
-    pub fn sie(&self) -> bool {
-        (self.0 & (1 << 1)) != 0
-    }
-    pub fn set_sie(&mut self, value: bool) {
-        self.0 = self.0 & !(1 << 1) | ((value as usize) << 1);
-    }
-    pub fn set_fs(&mut self, fs: FS) {
-        let v: u8 = unsafe { core::mem::transmute(fs) };
-        self.0.set_bits(13..15, v as usize);
-    }
-    pub fn fs(&self) -> FS {
-        match self.0.get_bits(13..15) {
-            0 => FS::Off,
-            1 => FS::Initial,
-            2 => FS::Clean,
-            3 => FS::Dirty,
-            _ => unreachable!(),
-        }
-    }
-}
+use crate::{
+    rv64::registers::{gprs, MySstatus},
+    ArchTrapContext, ArchUserFloatContext, TrapArgs,
+};
 
 /// Trap Context
 /// save registers when trap occurs
@@ -215,17 +128,17 @@ impl Index<TrapArgs> for TrapContext {
     fn index(&self, index: TrapArgs) -> &Self::Output {
         match index {
             TrapArgs::EPC => &self.sepc,
-            TrapArgs::RA => &self.x[reg_id::RA],
-            TrapArgs::SP => &self.x[reg_id::SP],
-            TrapArgs::RES => &self.x[reg_id::A0],
-            TrapArgs::A0 => &self.x[reg_id::A0],
-            TrapArgs::A1 => &self.x[reg_id::A1],
-            TrapArgs::A2 => &self.x[reg_id::A2],
-            TrapArgs::A3 => &self.x[reg_id::A3],
-            TrapArgs::A4 => &self.x[reg_id::A4],
-            TrapArgs::A5 => &self.x[reg_id::A5],
-            TrapArgs::TLS => &self.x[reg_id::TP],
-            TrapArgs::SYSCALL => &self.x[reg_id::A7],
+            TrapArgs::RA => &self.x[gprs::RA],
+            TrapArgs::SP => &self.x[gprs::SP],
+            TrapArgs::RES => &self.x[gprs::A0],
+            TrapArgs::A0 => &self.x[gprs::A0],
+            TrapArgs::A1 => &self.x[gprs::A1],
+            TrapArgs::A2 => &self.x[gprs::A2],
+            TrapArgs::A3 => &self.x[gprs::A3],
+            TrapArgs::A4 => &self.x[gprs::A4],
+            TrapArgs::A5 => &self.x[gprs::A5],
+            TrapArgs::TLS => &self.x[gprs::TP],
+            TrapArgs::SYSCALL => &self.x[gprs::A7],
         }
     }
 }
@@ -234,17 +147,17 @@ impl IndexMut<TrapArgs> for TrapContext {
     fn index_mut(&mut self, index: TrapArgs) -> &mut Self::Output {
         match index {
             TrapArgs::EPC => &mut self.sepc,
-            TrapArgs::RA => &mut self.x[reg_id::RA],
-            TrapArgs::SP => &mut self.x[reg_id::SP],
-            TrapArgs::RES => &mut self.x[reg_id::A0],
-            TrapArgs::A0 => &mut self.x[reg_id::A0],
-            TrapArgs::A1 => &mut self.x[reg_id::A1],
-            TrapArgs::A2 => &mut self.x[reg_id::A2],
-            TrapArgs::A3 => &mut self.x[reg_id::A3],
-            TrapArgs::A4 => &mut self.x[reg_id::A4],
-            TrapArgs::A5 => &mut self.x[reg_id::A5],
-            TrapArgs::TLS => &mut self.x[reg_id::TP],
-            TrapArgs::SYSCALL => &mut self.x[reg_id::A7],
+            TrapArgs::RA => &mut self.x[gprs::RA],
+            TrapArgs::SP => &mut self.x[gprs::SP],
+            TrapArgs::RES => &mut self.x[gprs::A0],
+            TrapArgs::A0 => &mut self.x[gprs::A0],
+            TrapArgs::A1 => &mut self.x[gprs::A1],
+            TrapArgs::A2 => &mut self.x[gprs::A2],
+            TrapArgs::A3 => &mut self.x[gprs::A3],
+            TrapArgs::A4 => &mut self.x[gprs::A4],
+            TrapArgs::A5 => &mut self.x[gprs::A5],
+            TrapArgs::TLS => &mut self.x[gprs::TP],
+            TrapArgs::SYSCALL => &mut self.x[gprs::A7],
         }
     }
 }
@@ -270,7 +183,7 @@ impl ArchTrapContext for TrapContext {
             kernel_tp: 0,
             freg: UserFloatContext::new(),
         };
-        cx.x[reg_id::SP] = sp;
+        cx.x[gprs::SP] = sp;
         cx
     }
     // fn update_cx(&mut self, entry: usize, sp: usize, argc: usize, argv: usize,

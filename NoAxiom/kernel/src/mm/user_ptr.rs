@@ -326,7 +326,9 @@ impl<T> UserPtr<T> {
 
     /// translate current address to physical address
     pub async fn translate_pa(&self) -> SysResult<PhysAddr> {
-        if let Err(TrapType::Exception(ExceptionType::PageFault(pf))) = Arch::check_read(self.addr()) {
+        if let Err(TrapType::Exception(ExceptionType::PageFault(pf))) =
+            Arch::check_read(self.addr())
+        {
             warn!(
                 "[translate_pa] detect trap at addr {:#x} during syscall {:?}",
                 self.addr(),

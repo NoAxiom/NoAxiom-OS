@@ -54,7 +54,9 @@ extern "C" {
 pub static KERNEL_SPACE: Once<MemorySet> = Once::new();
 
 pub fn kernel_space_activate() {
-    KERNEL_SPACE.get().unwrap().memory_activate();
+    if Arch::HAS_KERNEL_SPACE {
+        KERNEL_SPACE.get().unwrap().memory_activate();
+    }
 }
 
 #[inline(always)]

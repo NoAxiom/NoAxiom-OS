@@ -97,9 +97,9 @@ impl Task {
             "[mmap] addr: {:#x}, start_va: {:#x}, length: {:#x}, prot: {:?}, flags: {:?}, fd: {}, offset: {:#x}",
             addr, start_va.raw(), length, prot, flags, fd, offset
         );
-        memory_set
+        let res = memory_set
             .mmap_manager
             .insert(start_va, length, prot, flags, offset, file)?;
-        Ok(start_va.raw())
+        Ok(res)
     }
 }

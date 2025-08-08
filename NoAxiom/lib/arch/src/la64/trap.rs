@@ -1,9 +1,5 @@
-use core::{
-    arch::{asm, global_asm},
-    intrinsics::volatile_load,
-};
+use core::arch::global_asm;
 
-use config::cpu::CPU_NUM;
 use log::error;
 use loongArch64::register::{
     badi, badv, ecfg, eentry, era,
@@ -17,8 +13,8 @@ use super::{
     LA64,
 };
 use crate::{
-    ArchAsm, ArchInt, ArchTrap, ArchTrapContext, ArchUserFloatContext, ExceptionType,
-    InterruptNumber, InterruptType, PageFaultType, TrapType, UserPtrResult,
+    ArchInt, ArchTrap, ArchTrapContext, ArchUserFloatContext, ExceptionType, InterruptNumber,
+    InterruptType, PageFaultType, TrapType, UserPtrResult,
 };
 
 global_asm!(include_str!("./trap.S"));
@@ -48,46 +44,68 @@ fn set_ptr_entry() {
     eentry::set_eentry(__kernel_user_ptr_vec as usize);
 }
 
-#[repr(align(64))]
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-struct Wrapper(TrapType);
-static mut USER_PTR_TRAP_TYPE: [Wrapper; CPU_NUM] = [Wrapper(TrapType::None); CPU_NUM];
-
 unsafe fn before_user_ptr() {
     LA64::disable_interrupt();
     set_ptr_entry();
-    USER_PTR_TRAP_TYPE[LA64::get_hartid()] = Wrapper(TrapType::None);
 }
 
-unsafe fn after_user_ptr() -> UserPtrResult {
-    let trap_type = volatile_load(&USER_PTR_TRAP_TYPE[LA64::get_hartid()]).0;
-    let res = match trap_type {
-        TrapType::None => Ok(()),
-        _ => Err(trap_type),
-    };
+unsafe fn after_user_ptr() {
     set_kernel_trap_entry();
     LA64::enable_interrupt();
-    res
 }
 
-unsafe fn bare_read(ptr: usize) {
-    asm!("ld.b $a0, $a0, 0", in("$a0") ptr);
+#[repr(C)]
+struct CheckResult {
+    flag: usize,
+    estat: usize,
+}
+
+extern "C" {
+    fn __try_read_user(ptr: usize) -> CheckResult;
+    fn __try_write_user(ptr: usize) -> CheckResult;
+    fn __user_rw_exception_entry();
 }
 
 unsafe fn check_read(ptr: usize) -> UserPtrResult {
     before_user_ptr();
-    bare_read(ptr);
-    after_user_ptr()
-}
-
-unsafe fn bare_write(ptr: usize) {
-    asm!("ld.b $t0, $a0, 0; st.b $t0, $a0, 0", in("$a0") ptr);
+    let res = __try_read_user(ptr);
+    if res.flag != 0 {
+        let estat = Estat::from(res.estat);
+        let badv = badv::read().vaddr();
+        let trap_type = get_trap_type(None, estat, badv);
+        if trap_type.is_pagefault() {
+            after_user_ptr();
+            return Err(trap_type);
+        } else {
+            log::error!(
+                "[check_read] read user ptr failed with unexpected trap {:?}",
+                trap_type
+            );
+        }
+    }
+    after_user_ptr();
+    Ok(())
 }
 
 unsafe fn check_write(ptr: usize) -> UserPtrResult {
     before_user_ptr();
-    bare_write(ptr);
-    after_user_ptr()
+    let res = __try_write_user(ptr);
+    if res.flag != 0 {
+        let estat = Estat::from(res.estat);
+        let badv = badv::read().vaddr();
+        let trap_type = get_trap_type(None, estat, badv);
+        if trap_type.is_pagefault() {
+            after_user_ptr();
+            return Err(trap_type);
+        } else {
+            log::error!(
+                "[check_read] read user ptr failed with unexpected trap {:?}",
+                trap_type
+            );
+        }
+    }
+    after_user_ptr();
+    Ok(())
 }
 
 #[no_mangle]
@@ -98,16 +116,6 @@ pub unsafe extern "C" fn la_kernel_trap_handler(tf: &mut TrapContext) {
         Trap::Exception(Exception::AddressNotAligned) => emulate_load_store_insn(tf),
         _ => kernel_trap_handler(&get_trap_type(Some(tf), estat, badv)),
     }
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn la_kernel_user_ptr_handler() {
-    let hartid = LA64::get_hartid();
-    let pc = era::read().pc();
-    era::set_pc(pc + 4);
-    let estat = estat::read();
-    let badv = badv::read().vaddr();
-    USER_PTR_TRAP_TYPE[hartid] = Wrapper(get_trap_type(None, estat, badv));
 }
 
 fn get_trap_type(tf: Option<&mut TrapContext>, estat: Estat, badv: usize) -> TrapType {
@@ -127,8 +135,12 @@ fn get_trap_type(tf: Option<&mut TrapContext>, estat: Estat, badv: usize) -> Tra
             match e {
                 Exception::Breakpoint => TrapType::Exception(ExceptionType::Breakpoint),
                 Exception::AddressNotAligned => {
-                    unsafe { emulate_load_store_insn(tf.unwrap()) };
-                    return TrapType::None;
+                    if let Some(tf) = tf {
+                        unsafe { emulate_load_store_insn(tf) }
+                        TrapType::None
+                    } else {
+                        TrapType::Unknown
+                    }
                 }
                 Exception::Syscall => TrapType::Exception(ExceptionType::Syscall),
                 Exception::StorePageFault | Exception::PageModifyFault => TrapType::Exception(

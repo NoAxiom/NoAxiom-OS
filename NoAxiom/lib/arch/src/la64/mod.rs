@@ -5,7 +5,6 @@ mod info;
 mod interrupt;
 mod memory;
 mod time;
-mod tlb;
 mod trap;
 mod unaligned;
 

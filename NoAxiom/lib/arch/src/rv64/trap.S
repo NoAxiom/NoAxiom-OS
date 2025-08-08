@@ -145,11 +145,38 @@
     KERNEL_LOAD_REG
     sret
 
+    .globl    __kernel_user_ptr_vec
+    .align    12
     __kernel_user_ptr_vec:
-    KERNEL_SAVE_REG
-    call      rv_kernel_user_ptr_handler
-    KERNEL_LOAD_REG
+    csrr      a0, sepc
+    addi      a0, a0, 4
+    csrw      sepc, a0
+    li        a0, 1
+    csrr      a1, scause
     sret
+
+    .globl    __try_read_user
+    .align    4
+    __try_read_user:
+    mv        a1, a0
+    mv        a0, zero
+    .option   push
+    .option   norvc
+    lb        a1, 0(a1)
+    .option   pop
+    ret
+
+    .globl    __try_write_user
+    .align    4
+    __try_write_user:
+    mv        a2, a0
+    mv        a0, zero
+    .option   push
+    .option   norvc
+    lb        a1, 0(a2)
+    sb        a1, 0(a2)
+    .option   pop
+    ret
 
     .section  .text.signal
     .globl    user_sigreturn

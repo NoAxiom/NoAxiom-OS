@@ -24,7 +24,23 @@ impl Write for DebugConsole {
 }
 
 pub fn debug_print(args: fmt::Arguments<'_>) {
-    DEBUG_PRINT_MUTEX.lock().write_fmt(args).unwrap();
+    #[cfg(not(feature = "debug_sig"))]
+    if let Some(mut console) = DEBUG_PRINT_MUTEX.try_lock() {
+        console.write_fmt(args).unwrap();
+    }
+    #[cfg(feature = "debug_sig")]
+    loop {
+        if let Some(mut console) = DEBUG_PRINT_MUTEX.try_lock() {
+            console.write_fmt(args).unwrap();
+            break;
+        } else {
+            unsafe { DEBUG_PRINT_MUTEX.force_unlock() };
+        }
+    }
+}
+
+pub unsafe fn force_unlock_debug_console() {
+    unsafe { DEBUG_PRINT_MUTEX.force_unlock() };
 }
 
 #[macro_export]
