@@ -13,6 +13,8 @@
 //! X10 ~ X17	       a0 ~ a7   用于函数调用，被调用函数需要保存的数据
 //! X18 ~ X27	       s2 ~ s11  用于函数调用，传递参数和返回值
 
+#![allow(dead_code)]
+
 use core::{
     arch::asm,
     ops::{Index, IndexMut},

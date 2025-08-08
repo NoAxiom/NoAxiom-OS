@@ -1,11 +1,7 @@
-use core::{
-    arch::{asm, global_asm},
-    intrinsics::volatile_load,
-};
+use core::arch::global_asm;
 
-use config::cpu::CPU_NUM;
 use riscv::register::{
-    scause::{self, Exception, Interrupt, Scause, Trap},
+    scause::{self, Exception, Interrupt, Trap},
     sepc,
     sstatus::FS,
     stval,
@@ -14,12 +10,15 @@ use riscv::register::{
 
 use super::{context::TrapContext, interrupt::disable_interrupt, RV64};
 use crate::{
-    rv64::interrupt::{
-        enable_external_interrupt, enable_software_interrupt, enable_stimer_interrupt,
-        enable_user_memory_access,
+    rv64::{
+        interrupt::{
+            enable_external_interrupt, enable_software_interrupt, enable_stimer_interrupt,
+            enable_user_memory_access,
+        },
+        scause::MyScause,
     },
-    ArchAsm, ArchInt, ArchTrap, ArchTrapContext, ArchUserFloatContext, ExceptionType,
-    InterruptType, PageFaultType, TrapType, UserPtrResult,
+    ArchInt, ArchTrap, ArchTrapContext, ArchUserFloatContext, ExceptionType, InterruptType,
+    PageFaultType, TrapType, UserPtrResult,
 };
 
 global_asm!(include_str!("./trap.S"));
@@ -27,19 +26,80 @@ extern "C" {
     fn __user_trapvec();
     fn __user_trapret(cx: *mut TrapContext);
     fn __kernel_trapvec();
+    fn __try_read_user(ptr: usize) -> CheckResult;
+    fn __try_write_user(ptr: usize) -> CheckResult;
     fn __kernel_user_ptr_vec();
     fn kernel_trap_handler(trap_type: &TrapType);
 }
 
 #[no_mangle]
 pub extern "C" fn rv_kernel_trap_handler() {
-    let scause = scause::read();
+    let scause = scause::read().bits();
     let stval = stval::read();
     let trap_type = get_trap_type(scause, stval);
     unsafe { kernel_trap_handler(&trap_type) };
 }
 
-pub fn get_trap_type(scause: Scause, stval: usize) -> TrapType {
+#[repr(C)]
+struct CheckResult {
+    flag: usize,
+    scause: usize,
+}
+
+unsafe fn before_user_ptr() {
+    RV64::disable_interrupt();
+    set_ptr_entry();
+}
+
+unsafe fn after_user_ptr() {
+    set_kernel_trap_entry();
+    RV64::enable_interrupt();
+}
+
+unsafe fn check_read(ptr: usize) -> UserPtrResult {
+    before_user_ptr();
+    let res = __try_read_user(ptr);
+    if res.flag != 0 {
+        let scause = MyScause::new(res.scause).bits();
+        let stval = stval::read();
+        let trap_type = get_trap_type(scause, stval);
+        if trap_type.is_pagefault() {
+            after_user_ptr();
+            return Err(trap_type);
+        } else {
+            log::error!(
+                "[check_read] read user ptr failed with unexpected trap {:?}",
+                trap_type
+            );
+        }
+    }
+    after_user_ptr();
+    Ok(())
+}
+
+unsafe fn check_write(ptr: usize) -> UserPtrResult {
+    before_user_ptr();
+    let res = __try_write_user(ptr);
+    if res.flag != 0 {
+        let scause = MyScause::new(res.scause).bits();
+        let stval = stval::read();
+        let trap_type = get_trap_type(scause, stval);
+        if trap_type.is_pagefault() {
+            after_user_ptr();
+            return Err(trap_type);
+        } else {
+            log::error!(
+                "[check_read] read user ptr failed with unexpected trap {:?}",
+                trap_type
+            );
+        }
+    }
+    after_user_ptr();
+    Ok(())
+}
+
+pub fn get_trap_type(scause: usize, stval: usize) -> TrapType {
+    let scause = MyScause::new(scause);
     match scause.cause() {
         Trap::Exception(Exception::LoadFault) => TrapType::Unknown,
         Trap::Exception(Exception::UserEnvCall) => TrapType::Exception(ExceptionType::Syscall),
@@ -85,71 +145,6 @@ fn set_ptr_entry() {
     set_trap_entry(__kernel_user_ptr_vec as usize);
 }
 
-#[repr(align(64))]
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-struct Wrapper(TrapType);
-static mut USER_PTR_TRAP_TYPE: [Wrapper; CPU_NUM] = [Wrapper(TrapType::None); CPU_NUM];
-
-unsafe fn before_user_ptr() {
-    RV64::disable_interrupt();
-    set_ptr_entry();
-    USER_PTR_TRAP_TYPE[RV64::get_hartid()] = Wrapper(TrapType::None);
-}
-
-unsafe fn after_user_ptr() -> UserPtrResult {
-    let trap_type = volatile_load(&USER_PTR_TRAP_TYPE[RV64::get_hartid()]).0;
-    let res = match trap_type {
-        TrapType::None => Ok(()),
-        _ => Err(trap_type),
-    };
-    set_kernel_trap_entry();
-    RV64::enable_interrupt();
-    res
-}
-
-unsafe fn bare_read(ptr: usize) {
-    asm!(
-        ".option push
-        .option norvc
-        lb a0, 0(a0)
-        .option pop",
-        in("a0") ptr,
-    );
-}
-
-unsafe fn check_read(ptr: usize) -> UserPtrResult {
-    before_user_ptr();
-    bare_read(ptr);
-    after_user_ptr()
-}
-
-unsafe fn bare_write(ptr: usize) {
-    asm!(
-        ".option push
-        .option norvc
-        lb t0, 0(a0)
-        sb t0, 0(a0)
-        .option pop",
-        in("a0") ptr,
-    );
-}
-
-unsafe fn check_write(ptr: usize) -> UserPtrResult {
-    before_user_ptr();
-    bare_write(ptr);
-    after_user_ptr()
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn rv_kernel_user_ptr_handler() {
-    let hartid = RV64::get_hartid();
-    let scause = scause::read();
-    let stval = stval::read();
-    let sepc = sepc::read();
-    sepc::write(sepc + 4); // skip read
-    USER_PTR_TRAP_TYPE[hartid] = Wrapper(get_trap_type(scause, stval));
-}
-
 pub fn trap_init() {
     set_kernel_trap_entry();
     enable_user_memory_access();
@@ -182,7 +177,7 @@ impl ArchTrap for RV64 {
     }
     /// translate scause and stval to common TrapType
     fn read_trap_type(_cx: &mut TrapContext) -> TrapType {
-        let scause = scause::read();
+        let scause = scause::read().bits();
         let stval = stval::read();
         get_trap_type(scause, stval)
     }

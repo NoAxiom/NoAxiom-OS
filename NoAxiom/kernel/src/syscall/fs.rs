@@ -503,10 +503,10 @@ impl Syscall<'_> {
                     match arg {
                         IOCTL_LOG_OFF => {
                             println_debug!("[kernel] log off");
-                            // switch_log_off();
+                            switch_log_off();
                         }
                         IOCTL_LOG_ON => {
-                            // switch_log_on();
+                            switch_log_on();
                             println_debug!("[kernel] log on");
                         }
                         _ => {
