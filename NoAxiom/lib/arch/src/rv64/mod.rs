@@ -4,7 +4,7 @@ mod context;
 mod info;
 mod interrupt;
 mod memory;
-mod scause;
+mod registers;
 mod time;
 mod trap;
 

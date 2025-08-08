@@ -15,7 +15,7 @@ use crate::{
             enable_external_interrupt, enable_software_interrupt, enable_stimer_interrupt,
             enable_user_memory_access,
         },
-        scause::MyScause,
+        registers::MyScause,
     },
     ArchInt, ArchTrap, ArchTrapContext, ArchUserFloatContext, ExceptionType, InterruptType,
     PageFaultType, TrapType, UserPtrResult,
