@@ -2,7 +2,7 @@ use alloc::sync::Arc;
 
 use bitflags::bitflags;
 use config::fs::BLOCK_SIZE;
-use include::errno::SysResult;
+use include::errno::{Errno, SysResult};
 use strum::FromRepr;
 
 use crate::fs::vfs::basic::inode::Inode;
@@ -74,7 +74,7 @@ bitflags! {
     }
 
     #[derive(Debug, Clone, Copy, Eq, PartialEq)]
-    pub struct InodeMode: u32 { // todo: u16
+    pub struct InodeMode: u32 {
         /// FIFO.
         const FIFO  = 0o010000;
         /// Character device.
@@ -82,13 +82,13 @@ bitflags! {
         /// Directory
         const DIR   = 0o040000;
         /// Block device
-        const BLOCK = 0o060000;
+        const BLOCK = 0o060000; // = DIR | CHAR
         /// Regular file.
         const FILE  = 0o100000;
         /// Symbolic link.
-        const LINK  = 0o120000;
+        const LINK  = 0o120000; // = FILE | CHAR
         /// Socket
-        const SOCKET = 0o140000;
+        const SOCKET = 0o140000; // = FILE | DIR
 
         /// Set-user-ID on execution.
         const SET_UID = 0o4000;
@@ -179,23 +179,30 @@ bitflags! {
 }
 
 impl InodeMode {
+    #[inline(always)]
     pub fn user_permissions(&self) -> u32 {
         (self.bits() & OWNER_MASK) >> 6
     }
+    #[inline(always)]
     pub fn group_permissions(&self) -> u32 {
         (self.bits() & GROUP_MASK) >> 3
     }
+    #[inline(always)]
     pub fn other_permissions(&self) -> u32 {
         self.bits() & OTHER_MASK
     }
-    pub fn dir_default() -> Self {
-        InodeMode::DIR
-            | InodeMode::OWNER_READ
-            | InodeMode::OTHER_WRITE
-            | InodeMode::OWNER_EXEC
-            | InodeMode::GROUP_READ
-            | InodeMode::GROUP_EXEC
-            | InodeMode::OTHER_EXEC
+    pub fn file_type(mode: u32) -> SysResult<InodeMode> {
+        let inode_mode = mode & TYPE_MASK;
+        match inode_mode {
+            0o140000 => Ok(InodeMode::SOCKET), // S_IFSOCK
+            0o120000 => Ok(InodeMode::LINK),   // S_IFLNK
+            0o100000 => Ok(InodeMode::FILE),   // S_IFREG
+            0o060000 => Ok(InodeMode::BLOCK),  // S_IFBLK
+            0o040000 => Ok(InodeMode::DIR),    // S_IFDIR
+            0o020000 => Ok(InodeMode::CHAR),   // S_IFCHR
+            0o010000 => Ok(InodeMode::FIFO),   // S_IFIFO
+            _ => Err(Errno::EINVAL),
+        }
     }
 }
 

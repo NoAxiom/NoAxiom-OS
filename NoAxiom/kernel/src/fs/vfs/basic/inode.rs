@@ -150,10 +150,10 @@ impl dyn Inode {
     pub fn set_inode_mode(&self, mode: InodeMode) {
         self.meta().inode_mode.store(mode.bits(), Ordering::SeqCst);
     }
+    #[inline(always)]
     pub fn file_type(&self) -> InodeMode {
         let inode_mode = self.meta().inode_mode.load(Ordering::SeqCst);
-        let inode_mode = inode_mode & TYPE_MASK;
-        InodeMode::from_bits(inode_mode).expect("Invalid inode file type!")
+        InodeMode::file_type(inode_mode).expect("Invalid file type!")
     }
     #[inline(always)]
     pub fn set_size(&self, size: usize) {
