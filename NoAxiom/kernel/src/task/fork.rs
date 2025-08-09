@@ -208,7 +208,7 @@ impl Task {
 
     /// wait child to exit or execve for CloneFlags::VFORK
     pub async fn vfork_wait_for_completion(&self, flag: Arc<AtomicBool>) {
-        while flag.load(Ordering::SeqCst) {
+        while !flag.load(Ordering::SeqCst) {
             suspend_now().await;
         }
     }
