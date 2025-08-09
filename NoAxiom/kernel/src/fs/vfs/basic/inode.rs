@@ -41,8 +41,8 @@ pub struct InodeMeta {
     /// The page cache of the file, managed by the `Inode`
     pub page_cache: Option<()>,
 
-    uid: AtomicU32,                 // todo: add this to the stat
-    gid: AtomicU32,                 // todo: add this to the stat
+    pub uid: AtomicU32,             // todo: add this to the stat
+    pub gid: AtomicU32,             // todo: add this to the stat
     symlink: Mutex<Option<String>>, // for symlink, the target path
 }
 
@@ -103,6 +103,12 @@ pub trait Inode: Send + Sync + DowncastSync {
     fn stat(&self) -> SysResult<Stat>;
     async fn truncate(&self, _new: usize) -> SysResult<()> {
         panic!("this inode not implemented truncate");
+    }
+    fn into_dyn(self: &Arc<Self>) -> Arc<dyn Inode>
+    where
+        Self: Sized,
+    {
+        self.clone()
     }
 }
 
