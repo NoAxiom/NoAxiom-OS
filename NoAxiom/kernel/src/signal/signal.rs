@@ -120,10 +120,7 @@ impl TryFrom<usize> for Signal {
         if let Some(signal) = Self::from_repr(signo) {
             Ok(signal)
         } else {
-            return_errno!(
-                Errno::EINVAL,
-                "[SIGNAL] Try to convert an invalid number to Signal"
-            );
+            Err(Errno::EINVAL)
         }
     }
 }
