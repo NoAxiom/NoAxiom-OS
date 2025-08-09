@@ -2,10 +2,16 @@ use alloc::sync::Arc;
 use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 use arch::{Arch, ArchMemory};
+use include::errno::{Errno, SyscallResult};
 
 use crate::{
     include::process::CloneFlags,
-    sched::{sched_entity::SchedEntity, utils::suspend_now},
+    mm::user_ptr::UserPtr,
+    sched::{
+        sched_entity::SchedEntity,
+        spawn::spawn_utask,
+        utils::{suspend_now, take_waker},
+    },
     task::{
         context::TaskTrapContext,
         futex::FutexQueue,
@@ -20,8 +26,63 @@ use crate::{
 };
 
 impl Task {
-    /// fork
-    pub fn fork(self: &Arc<Task>, flags: CloneFlags) -> Arc<Self> {
+    /// clone current task
+    pub async fn do_fork(
+        self: &Arc<Self>,
+        flags: usize,
+        stack: usize,
+        ptid: usize,
+        tls: usize,
+        ctid: usize,
+    ) -> SyscallResult {
+        let flags = CloneFlags::from_bits(flags & !0xff).ok_or(Errno::EINVAL)?;
+        let new_task = self.inner_fork(flags);
+        let new_tid = new_task.tid();
+        let new_cx = new_task.trap_context_mut();
+        debug!(
+            "[sys_fork] flags: {:?} stack: {:#x} ptid: {:#x} tls: {:#x} ctid: {:#x}",
+            flags, stack, ptid, tls, ctid
+        );
+        use arch::TrapArgs::*;
+        if stack != 0 {
+            new_cx[SP] = stack;
+        }
+        if flags.contains(CloneFlags::SETTLS) {
+            new_cx[TLS] = tls;
+        }
+        if flags.contains(CloneFlags::PARENT_SETTID) {
+            let ptid = UserPtr::<usize>::new(ptid);
+            ptid.write(new_tid).await?;
+        }
+        if flags.contains(CloneFlags::CHILD_SETTID) {
+            new_task.tcb_mut().set_child_tid = Some(ctid);
+        }
+        if flags.contains(CloneFlags::CHILD_CLEARTID) {
+            new_task.tcb_mut().clear_child_tid = Some(ctid);
+        }
+        new_cx[RES] = 0;
+        trace!("[sys_fork] new task context: {:?}", new_cx);
+        info!(
+            "[sys_fork] parent: TID{} child: TID{}",
+            self.tid(),
+            new_task.tid(),
+        );
+        let has_vfork = flags.contains(CloneFlags::VFORK);
+        if has_vfork {
+            let waker = take_waker().await;
+            new_task.register_vfork_info(waker);
+        }
+        spawn_utask(&new_task);
+        if has_vfork {
+            if let Some((vfork_flag, _)) = new_task.vfork_flag() {
+                self.vfork_wait_for_completion(vfork_flag).await;
+            }
+        }
+        // TASK_MANAGER.get_init_proc().print_child_tree();
+        Ok(new_tid as isize)
+    }
+
+    fn inner_fork(self: &Arc<Task>, flags: CloneFlags) -> Arc<Self> {
         let memory_set = if flags.contains(CloneFlags::VM) {
             self.memory_set().clone()
         } else {
