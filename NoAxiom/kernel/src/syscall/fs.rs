@@ -186,7 +186,7 @@ impl Syscall<'_> {
         }?;
 
         let inode = dentry.inode()?;
-        if flags.contains(FileFlags::O_DIRECTORY) && !inode.file_type() == InodeMode::DIR {
+        if flags.contains(FileFlags::O_DIRECTORY) && inode.file_type() != InodeMode::DIR {
             return Err(Errno::ENOTDIR);
         }
 
