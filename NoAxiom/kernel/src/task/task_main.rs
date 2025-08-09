@@ -1,6 +1,7 @@
 use alloc::sync::Arc;
 use core::{
     future::Future,
+    intrinsics::likely,
     pin::Pin,
     task::{Context, Poll},
 };
@@ -10,8 +11,9 @@ use ksync::assert_no_lock;
 
 use crate::{
     cpu::current_cpu,
-    mm::memory_set::kernel_space_activate,
-    sched::utils::suspend_now,
+    include::process::TaskFlags,
+    mm::{memory_set::kernel_space_activate, user_ptr::UserPtr},
+    sched::utils::{suspend_now, take_waker},
     task::{status::TaskStatus, Task},
     trap::utrap_handler::user_trap_handler,
     with_interrupt_off,
@@ -75,6 +77,32 @@ macro_rules! check_status {
         }
         assert_no_lock!();
     };
+}
+
+impl Task {
+    /// init thread only resources
+    pub async fn thread_init(self: &Arc<Self>) {
+        if let Some(tid) = self.tcb().set_child_tid {
+            let ptr = UserPtr::<usize>::new(tid);
+            let _ = ptr.write(self.tid()).await.inspect_err(|err| {
+                error!(
+                    "[kernel] failed to write set_child_tid: {}, tid: {}",
+                    err,
+                    self.tid()
+                )
+            });
+        }
+        self.set_waker(take_waker().await);
+    }
+    /// try to get task status
+    pub fn try_get_status(&self) -> Option<TaskStatus> {
+        if likely(!self.tif().contains(TaskFlags::TIF_STATUS_CHANGED)) {
+            None
+        } else {
+            self.tif_mut().remove(TaskFlags::TIF_STATUS_CHANGED);
+            Some(self.pcb().status())
+        }
+    }
 }
 
 /// user task main

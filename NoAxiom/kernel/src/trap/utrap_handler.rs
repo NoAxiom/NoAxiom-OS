@@ -4,10 +4,7 @@
 use alloc::sync::Arc;
 use core::intrinsics::unlikely;
 
-use arch::{
-    consts::KERNEL_ADDR_OFFSET, Arch, ArchInt, ExceptionType, InterruptType, PageFaultType,
-    TrapArgs, TrapType,
-};
+use arch::{Arch, ArchInt, ExceptionType, InterruptType, PageFaultType, TrapArgs, TrapType};
 
 use super::{ext_int::ext_int_handler, soft_int::soft_int_handler};
 use crate::{
@@ -40,12 +37,6 @@ pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
 
     // def: context, user trap pc, trap type
     let cx = task.trap_context_mut();
-    assert!(
-        cx[TrapArgs::EPC] & KERNEL_ADDR_OFFSET == 0,
-        "epc {:#x?} shouldn't be in kernel space, trap_type: {:x?}",
-        cx[TrapArgs::EPC],
-        trap_type
-    );
 
     // user trap handler vector
     match trap_type {
