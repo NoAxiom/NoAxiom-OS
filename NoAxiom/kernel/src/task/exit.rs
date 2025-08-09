@@ -107,15 +107,10 @@ impl Task {
                 error!("[exit_handler] parent not found");
             }
         }
+
+        // handle vfork and wake parent if flag is detected
+        self.vfork_callback();
         warn!("[exit_hander] task {} exited successfully", self.tid());
-        // TASK_MANAGER.get_init_proc().print_child_tree();
-        // let tids = TASK_MANAGER
-        //     .0
-        //     .lock()
-        //     .iter()
-        //     .map(|(tid, _)| *tid)
-        //     .collect::<Vec<_>>();
-        // println!("[exit_handler] all tasks: {:?}", tids);
     }
 }
 

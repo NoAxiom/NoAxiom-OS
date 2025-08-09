@@ -2,53 +2,55 @@ use bitflags::bitflags;
 
 bitflags! {
     #[derive(Debug, Clone, Copy)]
-    pub struct CloneFlags: usize{
+    pub struct CloneFlags: usize {
         /// set if VM shared between processes
-        const VM = 0x0000100;
+        const VM                  = 0x0000_0100;
         /// set if fs info shared between processes
-        const FS = 0x0000200;
+        const FS                  = 0x0000_0200;
         /// set if open files shared between processes
-        const FILES = 0x0000400;
+        const FILES               = 0x0000_0400;
         /// set if signal handlers and blocked signals shared
-        const SIGHAND = 0x00000800;
-        /// Set if a pidfd should be placed in parent.
-        const PIDFD = 0x00001000;
+        const SIGHAND             = 0x0000_0800;
+        /// set if a pidfd should be placed in parent
+        const PIDFD               = 0x0000_1000;
+        /// set if we want to let tracing continue on the child too
+        const PTRACE              = 0x0000_2000;
+        /// set if the parent wants the child to wake it up on mm_release
+        const VFORK               = 0x0000_4000;
         /// set if we want to have the same parent as the cloner
-        const PARENT = 0x00008000;
+        const PARENT              = 0x0000_8000;
         /// Same thread group?
-        const THREAD = 0x00010000;
+        const THREAD              = 0x0001_0000;
+        /// New mount namespace group
+        const NEWNS               = 0x0002_0000;
         /// share system V SEM_UNDO semantics
-        const SYSVSEM = 0x00040000;
+        const SYSVSEM             = 0x0004_0000;
         /// create a new TLS for the child
-        const SETTLS = 0x00080000;
+        const SETTLS              = 0x0008_0000;
         /// set the TID in the parent
-        const PARENT_SETTID = 0x00100000;
+        const PARENT_SETTID       = 0x0010_0000;
         /// clear the TID in the child
-        const CHILD_CLEARTID = 0x00200000;
+        const CHILD_CLEARTID      = 0x0020_0000;
         /// Unused, ignored
-        const CLONE_DETACHED = 0x00400000;
+        const DETACHED            = 0x0040_0000;
+        /// set if the tracing process can't force CLONE_PTRACE on this clone
+        const UNTRACED            = 0x0080_0000;
         /// set the TID in the child
-        const CHILD_SETTID = 0x01000000;
-        /// clear child signal handler
-        const CHILD_CLEAR_SIGHAND = 0x100000000;
-        /// Set if the tracing process can't
-        const UNTRACED = 0x00800000;
-        /// New cgroup namespace.
-        const NEWCGROUP = 0x02000000;
-        /// New utsname group.
-        const NEWUTS = 0x04000000;
-        /// New ipcs.
-        const NEWIPC = 0x08000000;
-        /// New user namespace.
-        const NEWUSER = 0x10000000;
-        /// New pid namespace.
-        const NEWPID = 0x20000000;
-        /// New network namespace.
-        const NEWNET = 0x40000000;
-        /// Clone I/O context.
-        const IO = 0x80000000 ;
-        /// CLone_legacy_flag
-        const LEGACY_FLAGS = 0xffffffff;
+        const CHILD_SETTID        = 0x0100_0000;
+        /// New cgroup namespace
+        const NEWCGROUP           = 0x0200_0000;
+        /// New utsname namespace
+        const NEWUTS              = 0x0400_0000;
+        /// New ipc namespace
+        const NEWIPC              = 0x0800_0000;
+        /// New user namespace
+        const NEWUSER             = 0x1000_0000;
+        /// New pid namespace
+        const NEWPID              = 0x2000_0000;
+        /// New network namespace
+        const NEWNET              = 0x4000_0000;
+        /// Clone io context
+        const IO                  = 0x8000_0000;
     }
 }
 

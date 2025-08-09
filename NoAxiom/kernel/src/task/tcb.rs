@@ -1,4 +1,5 @@
-use core::task::Waker;
+use alloc::sync::Arc;
+use core::{sync::atomic::AtomicBool, task::Waker};
 
 use arch::TrapContext;
 
@@ -19,6 +20,7 @@ pub struct TCB {
     pub set_child_tid: Option<usize>,   // set tid address
     pub clear_child_tid: Option<usize>, // clear tid address
     pub current_syscall: SyscallID,     // current syscall id
+    pub vfork_wait: Option<VforkInfo>,  // vfork wait flag, used for vfork clone
 }
 
 impl Default for TCB {
@@ -33,6 +35,9 @@ impl Default for TCB {
             set_child_tid: None,
             clear_child_tid: None,
             current_syscall: SyscallID::NO_SYSCALL,
+            vfork_wait: None,
         }
     }
 }
+
+type VforkInfo = (Arc<AtomicBool>, Waker);

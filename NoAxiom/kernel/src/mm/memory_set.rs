@@ -133,7 +133,7 @@ impl MemorySet {
     /// do not use this function directly, use [`Self::new_with_kernel`] instead
     fn new(page_table: PageTable) -> Self {
         let page_table = SyncUnsafeCell::new(page_table);
-        trace!(
+        debug!(
             "[memory_set] new memory set with page table: {:#x}",
             page_table.as_ref().root_ppn().raw()
         );
@@ -171,10 +171,10 @@ impl MemorySet {
         Self::new(PageTable::new_allocated())
     }
 
-    /// create a new memory set with kernel space mapped,
+    /// create a new memory set with kernel space mapped
     pub fn new_user_space() -> Self {
         let kernel_pt = KERNEL_SPACE.get().unwrap().page_table();
-        let mut user_space = Self::new(PageTable::clone_from_other(&kernel_pt));
+        let mut user_space = Self::new(kernel_pt.new_root_cloned());
         user_space.map_sig_trampoline();
         user_space
     }
@@ -623,7 +623,6 @@ impl MemorySet {
         new_set.mmap_manager = self.mmap_manager.clone();
         for (vpn, frame_tracker) in self.mmap_manager.frame_trackers.iter() {
             let vpn = vpn.clone();
-            trace!("[clone_cow] mmap vpn {:#x} is mapped as cow", vpn.raw());
             let old_pte = self.page_table().find_pte(vpn).unwrap();
             let old_flags = old_pte.flags();
             if !self

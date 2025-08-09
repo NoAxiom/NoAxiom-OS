@@ -5,7 +5,7 @@ use core::{
     intrinsics::{likely, unlikely},
     marker::PhantomData,
     ptr::null,
-    sync::atomic::{AtomicU32, AtomicUsize},
+    sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering},
     task::Waker,
 };
 
@@ -46,7 +46,7 @@ use crate::{
     },
     sched::{
         sched_entity::{SchedEntity, SchedPrio},
-        utils::take_waker,
+        utils::{suspend_now, take_waker},
     },
     signal::{
         sig_action::SigActionList,
@@ -110,6 +110,9 @@ pub struct Task {
     tcb: ThreadOnly<TCB>,                  // thread control block
     sched_entity: ThreadOnly<SchedEntity>, // sched entity for the task, shared with scheduler
 
+    // memory set can be both modified and shared
+    memory_set: ThreadOnly<SharedMut<MemorySet>>, // memory set for the task
+
     // immutable
     tid: Immutable<TidTracer>, // task id, with lifetime holded
     tgid: Immutable<TGID>,     // task group id, aka pid
@@ -120,7 +123,6 @@ pub struct Task {
     exe: SharedMut<String>,               // executable file path
     root: SharedMut<Arc<dyn Dentry>>,     // root directory
     sa_list: SharedMut<SigActionList>,    // signal action list, saves signal handler
-    memory_set: SharedMut<MemorySet>,     // memory set for the task
     thread_group: SharedMut<ThreadGroup>, // thread group
     pgid: Arc<AtomicUsize>,               // process group id
     futex: SharedMut<FutexQueue>,         // futex wait queue
@@ -240,16 +242,15 @@ impl Task {
     /// memory set
     #[inline(always)]
     pub fn memory_set(&self) -> &Arc<SpinLock<MemorySet>> {
-        &self.memory_set
+        &self.memory_set.as_ref()
     }
     #[inline(always)]
     pub fn memory_activate(&self) {
-        self.memory_set.lock().memory_activate();
+        self.memory_set.as_ref().lock().memory_activate();
     }
     /// change current memory set
     pub fn change_memory_set(&self, memory_set: MemorySet) {
-        let mut ms = self.memory_set().lock();
-        *ms = memory_set;
+        *self.memory_set.as_ref_mut() = Arc::new(SpinLock::new(memory_set));
     }
 
     /// thread group
@@ -431,6 +432,17 @@ impl Task {
     pub fn itimer(&self) -> SpinLockGuard<ITimerManager> {
         self.itimer.lock()
     }
+
+    /// fetch vfork flag
+    pub fn vfork_flag(&self) -> Option<(Arc<AtomicBool>, Waker)> {
+        self.tcb().vfork_wait.clone()
+    }
+
+    /// register vfork info
+    /// for parent's flag fetching and child's callback
+    pub fn register_vfork_info(&self, parent_waker: Waker) {
+        self.tcb_mut().vfork_wait = Some((Arc::new(AtomicBool::new(false)), parent_waker));
+    }
 }
 
 // process implementation
@@ -498,7 +510,7 @@ impl Task {
                 ..Default::default()
             }),
             thread_group: Shared::new(ThreadGroup::new()),
-            memory_set: Shared::new(memory_set),
+            memory_set: ThreadOnly::new(Shared::new(memory_set)),
             sched_entity: ThreadOnly::new(SchedEntity::default()),
             fd_table: Shared::new(FdTable::new()),
             cwd: Shared::new(root_dentry()),
@@ -677,7 +689,7 @@ impl Task {
                     parent,
                     ..Default::default()
                 }),
-                memory_set,
+                memory_set: ThreadOnly::new(memory_set),
                 sched_entity: ThreadOnly::new(SchedEntity::default()),
                 fd_table,
                 cwd: self.cwd.clone(),
@@ -718,7 +730,7 @@ impl Task {
                     parent,
                     ..Default::default()
                 }),
-                memory_set,
+                memory_set: ThreadOnly::new(memory_set),
                 sched_entity: ThreadOnly::new(SchedEntity::default()),
                 fd_table,
                 cwd: Shared::new(self.cwd().clone()),
@@ -772,6 +784,7 @@ impl Task {
         *self.trap_context_mut() = TrapContext::app_init_cx(entry_point, user_sp);
         self.sa_list().reset();
         self.fd_table().close_on_exec();
+        self.vfork_callback();
         Ok(())
     }
 
@@ -788,6 +801,21 @@ impl Task {
             });
         }
         self.set_waker(take_waker().await);
+    }
+
+    /// wait child to exit or execve for CloneFlags::VFORK
+    pub async fn vfork_wait_for_completion(&self, flag: Arc<AtomicBool>) {
+        while flag.load(Ordering::SeqCst) {
+            suspend_now().await;
+        }
+    }
+
+    /// callback for vfork, wake suspended parent
+    pub fn vfork_callback(&self) {
+        if let Some((flag, waker)) = self.tcb_mut().vfork_wait.take() {
+            flag.store(true, Ordering::SeqCst);
+            waker.wake();
+        }
     }
 
     #[allow(unused)]

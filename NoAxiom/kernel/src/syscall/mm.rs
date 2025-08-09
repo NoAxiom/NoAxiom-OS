@@ -42,9 +42,8 @@ impl Syscall<'_> {
         if addr % PAGE_SIZE != 0 || length == 0 {
             return Err(Errno::EINVAL);
         }
-        self.task
-            .mmap(addr, length, prot, flags, fd, offset)
-            .map(|addr| addr as isize)
+        let res = self.task.mmap(addr, length, prot, flags, fd, offset)?;
+        Ok(res as isize)
     }
 
     pub fn sys_munmap(&self, start: usize, length: usize) -> SyscallResult {
@@ -89,6 +88,7 @@ impl Syscall<'_> {
             } else {
                 let task = self.task;
                 let mut memory_set = task.memory_set().lock();
+                let page_table = unsafe { &mut *memory_set.page_table.get() };
                 let mmap_start = memory_set.mmap_manager.mmap_start;
                 let mmap_top = memory_set.mmap_manager.mmap_top;
                 let mmap_prots = MmapProts::from_bits(prot).unwrap();
@@ -96,7 +96,7 @@ impl Syscall<'_> {
                 if va >= mmap_start && va < mmap_top {
                     memory_set
                         .mmap_manager
-                        .mprotect(vpn, mmap_prots, &page_table)?;
+                        .mprotect(vpn, mmap_prots, page_table)?;
                 } else {
                     return Err(Errno::EINVAL);
                 }

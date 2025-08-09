@@ -108,6 +108,15 @@ impl MmapManager {
     ) -> SysResult<usize> {
         let end_va = VirtAddr::from(start_va.raw() + length);
         let mut offset = st_offset;
+        debug!(
+            "[mmap] insert range: {:#x} - {:#x}, prot: {:?}, flags: {:?}, file: {:?}, offset: {:#x}",
+            start_va.raw(),
+            end_va.raw(),
+            prot,
+            flags,
+            file.as_ref().map(|f| f.name()),
+            offset
+        );
         for vpn in VpnRange::new_from_va(start_va, end_va)? {
             // created a mmap page with lazy-mapping
             let mmap_page = MmapPage {
@@ -129,6 +138,11 @@ impl MmapManager {
     /// remove a mmap range in mmap space
     pub fn remove(&mut self, start_va: VirtAddr, length: usize) -> SysResult<()> {
         let end_va = VirtAddr::from(start_va.raw() + length);
+        debug!(
+            "[mmap] remove range: {:#x} - {:#x}",
+            start_va.raw(),
+            end_va.raw()
+        );
         for vpn in VpnRange::new_from_va(start_va, end_va)? {
             self.mmap_map.remove(&vpn);
             self.frame_trackers.remove(&vpn);
@@ -146,7 +160,7 @@ impl MmapManager {
         &mut self,
         vpn: VirtPageNum,
         add_prot: MmapProts,
-        page_table: &PageTable,
+        page_table: &mut PageTable,
     ) -> SysResult<()> {
         let page = self.mmap_map.get_mut(&vpn).ok_or(Errno::ENOMEM)?;
         let old_prot = page.prot;

@@ -26,7 +26,7 @@ pub fn schedule_spawn_with_path() {
         }
         let elf = MemorySet::load_elf(&file).await.unwrap();
         let task = Task::new_init_process(elf).await;
-        spawn_utask(task);
+        spawn_utask(&task);
     });
 }
 

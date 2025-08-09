@@ -24,7 +24,10 @@ use crate::{
     },
     mm::user_ptr::UserPtr,
     return_errno,
-    sched::{spawn::spawn_utask, utils::yield_now},
+    sched::{
+        spawn::spawn_utask,
+        utils::{take_waker, yield_now},
+    },
     signal::{
         interruptable::interruptable,
         sig_detail::{SigDetail, SigKillDetail},
@@ -119,7 +122,17 @@ impl Syscall<'_> {
             self.task.tid(),
             new_task.tid(),
         );
-        spawn_utask(new_task);
+        let has_vfork = flags.contains(CloneFlags::VFORK);
+        if has_vfork {
+            let waker = take_waker().await;
+            new_task.register_vfork_info(waker);
+        }
+        spawn_utask(&new_task);
+        if has_vfork {
+            if let Some((vfork_flag, _)) = new_task.vfork_flag() {
+                self.task.vfork_wait_for_completion(vfork_flag).await;
+            }
+        }
         // TASK_MANAGER.get_init_proc().print_child_tree();
         Ok(new_tid as isize)
     }

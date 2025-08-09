@@ -77,3 +77,14 @@ pub fn log_init() {
     switch_log_on();
     info!("[init] log init success");
 }
+
+#[allow(dead_code)]
+pub fn current_log_level() -> LevelFilter {
+    log::max_level()
+}
+
+#[allow(dead_code)]
+pub fn set_log_level(level: LevelFilter) {
+    log::set_max_level(level);
+    info!("[init] log level set to {:?}", level);
+}

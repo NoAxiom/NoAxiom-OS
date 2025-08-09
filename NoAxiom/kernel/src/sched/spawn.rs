@@ -15,11 +15,11 @@ use crate::{
 };
 
 /// inner spawn: spawn a new user task
-pub fn spawn_utask(task: Arc<Task>) {
+pub fn spawn_utask(task: &Arc<Task>) {
     warn!("[spawn_utask] new task tid = {}", task.tid());
     RUNTIME.spawn(
         UserTaskFuture::new(task.clone(), task_main(task.clone())),
-        Some(&task),
+        Some(task),
     );
 }
 

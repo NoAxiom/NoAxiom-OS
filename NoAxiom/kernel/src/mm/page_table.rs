@@ -13,9 +13,15 @@ use super::{
 use crate::pte_flags;
 
 #[derive(Debug)]
+enum PageTableRoot {
+    Frame(FrameTracker),
+    PageNum(PhysPageNum),
+}
+
+#[derive(Debug)]
 pub struct PageTable {
-    /// root ppn, serves as an identifier of this page table
-    root_ppn: PhysPageNum,
+    /// identifier of this page table
+    root: PageTableRoot,
 
     /// page table frame tracker holder,
     /// doesn't track data pages
@@ -33,8 +39,8 @@ impl PageTable {
         let frame = frame_alloc().unwrap();
         info!("[page_table] root_ppn = {:#x}", frame.ppn().raw());
         PageTable {
-            root_ppn: frame.ppn(),
-            frames: vec![frame],
+            root: PageTableRoot::Frame(frame),
+            frames: Vec::new(),
             is_kernel: false,
         }
     }
@@ -43,27 +49,39 @@ impl PageTable {
         self.is_kernel = true;
     }
 
+    /// get root ppn from frame or raw ppn
+    pub fn root_ppn(&self) -> PhysPageNum {
+        match self.root {
+            PageTableRoot::Frame(ref frame) => frame.ppn(),
+            PageTableRoot::PageNum(ppn) => ppn,
+        }
+    }
+
     /// use ppn to generate a new pagetable,
     /// note that the frame won't be saved,
     /// so do assure that it's already wrapped in tcb
     pub fn from_ppn(ppn: usize) -> Self {
         Self {
-            root_ppn: PhysPageNum::from(ppn),
+            root: PageTableRoot::PageNum(PhysPageNum::from(ppn)),
             frames: Vec::new(),
             is_kernel: false,
         }
     }
 
-    /// clone from another page table, only direct page will be copied
-    pub fn clone_from_other(other: &PageTable) -> Self {
+    pub fn clone_root(&self) -> FrameTracker {
         let new_frame = frame_alloc().unwrap();
         new_frame
             .ppn()
             .get_bytes_array()
-            .copy_from_slice(other.root_ppn.get_bytes_array());
+            .copy_from_slice(self.root_ppn().get_bytes_array());
+        new_frame
+    }
+
+    /// clone from another page table, only direct page will be copied
+    pub fn new_root_cloned(&self) -> Self {
         PageTable {
-            root_ppn: new_frame.ppn(),
-            frames: vec![new_frame],
+            root: PageTableRoot::Frame(self.clone_root()),
+            frames: Vec::new(),
             is_kernel: false,
         }
     }
@@ -71,7 +89,7 @@ impl PageTable {
     /// insert new pte into the page table trie
     fn create_pte(&mut self, vpn: VirtPageNum) -> &mut PageTableEntry {
         let index = vpn.get_index();
-        let mut ppn = self.root_ppn;
+        let mut ppn = self.root_ppn();
         let mut result: Option<&mut PageTableEntry> = None;
         for (i, idx) in index.iter().enumerate() {
             let arr = ppn.get_pte_array();
@@ -94,14 +112,14 @@ impl PageTable {
     /// try to find pte, returns None at failure
     #[inline(always)]
     pub fn find_pte(&self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
-        translate_vpn_into_pte(self.root_ppn, vpn)
+        translate_vpn_into_pte(self.root_ppn(), vpn)
     }
 
     #[allow(unused)]
     #[deprecated(note = "this is for test only")]
     pub fn find_pte_test(&self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
         debug!("find_pte_test: vpn: {:#x}", vpn.raw());
-        translate_vpn_into_pte_test(self.root_ppn, vpn)
+        translate_vpn_into_pte_test(self.root_ppn(), vpn)
     }
 
     /// map vpn -> ppn
@@ -114,13 +132,13 @@ impl PageTable {
             pte.flags(),
             pte.ppn()
         );
-        trace!(
-            "mapping: vpn: {:#x?}, ppn: {:#x?}, flags: {:?}, pte_addr: {:#x}",
-            vpn,
-            ppn,
-            flags,
-            pte as *mut PageTableEntry as usize
-        );
+        // trace!(
+        //     "mapping: vpn: {:#x?}, ppn: {:#x?}, flags: {:?}, pte_addr: {:#x}",
+        //     vpn,
+        //     ppn,
+        //     flags,
+        //     pte as *mut PageTableEntry as usize
+        // );
         // if vpn.as_va_usize() == 0 {
         //     warn!(
         //         "mapping: vpn: {:#x?}, ppn: {:#x?}, flags: {:?}, pte_addr: {:#x}",
@@ -132,22 +150,8 @@ impl PageTable {
 
     /// map unchecked
     #[allow(unused)]
-    #[deprecated]
-    pub unsafe fn map_unchecked(
-        &mut self,
-        vpn: VirtPageNum,
-        ppn: PhysPageNum,
-        flags: MappingFlags,
-    ) {
+    pub fn map_unchecked(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: MappingFlags) {
         let pte = self.create_pte(vpn);
-        if pte.is_allocated() {
-            warn!(
-                "mapping {:#x?} again, flags: {:?}, ppn: {:#x}",
-                vpn,
-                flags,
-                ppn.raw()
-            );
-        }
         *pte = PageTableEntry::new(ppn.raw(), flags | pte_flags!(V, D, A));
     }
 
@@ -173,12 +177,6 @@ impl PageTable {
             let aligned_pa_usize: usize = aligned_pa.into();
             (aligned_pa_usize + offset).into()
         })
-    }
-
-    /// get root ppn
-    #[inline(always)]
-    pub const fn root_ppn(&self) -> PhysPageNum {
-        self.root_ppn
     }
 
     /// set flags for a vpn
