@@ -34,3 +34,41 @@ pub const W_OK: i32 = 2;
 pub const R_OK: i32 = 4;
 pub const UID_ROOT: u32 = 0;
 pub const AT_EACCESS: i32 = 0x200;
+
+/// 请求文件类型 (stx_mode & S_IFMT)
+pub const STATX_TYPE: u32 = 0x00000001;
+/// 请求文件权限模式 (stx_mode & ~S_IFMT)
+pub const STATX_MODE: u32 = 0x00000002;
+/// 请求硬链接计数 (stx_nlink)
+pub const STATX_NLINK: u32 = 0x00000004;
+/// 请求文件所有者UID (stx_uid)
+pub const STATX_UID: u32 = 0x00000008;
+/// 请求文件所属组GID (stx_gid)
+pub const STATX_GID: u32 = 0x00000010;
+/// 请求最后访问时间 (stx_atime)
+pub const STATX_ATIME: u32 = 0x00000020;
+/// 请求最后修改时间 (stx_mtime)
+pub const STATX_MTIME: u32 = 0x00000040;
+/// 请求最后状态变更时间 (stx_ctime)
+pub const STATX_CTIME: u32 = 0x00000080;
+/// 请求inode编号 (stx_ino)
+pub const STATX_INO: u32 = 0x00000100;
+/// 请求文件大小 (stx_size)
+pub const STATX_SIZE: u32 = 0x00000200;
+/// 请求分配的磁盘块数 (stx_blocks)
+pub const STATX_BLOCKS: u32 = 0x00000400;
+
+/// 基础统计信息 (包含传统stat结构中的所有字段)
+pub const STATX_BASIC_STATS: u32 = 0x000007ff;
+pub const STATX_ALL: u32 = 0x00000fff;
+
+/// 请求文件创建时间 (stx_btime)
+pub const STATX_BTIME: u32 = 0x00000800;
+/// 请求挂载点ID (stx_mnt_id)
+pub const STATX_MNT_ID: u32 = 0x00001000;
+/// 请求直接I/O对齐信息
+pub const STATX_DIOALIGN: u32 = 0x00002000;
+/// 请求扩展的唯一挂载点ID
+pub const STATX_MNT_ID_UNIQUE: u32 = 0x00004000;
+/// 请求子卷信息 (stx_subvol)
+pub const STATX_SUBVOL: u32 = 0x00008000;

@@ -6,7 +6,11 @@ use ksync::assert_no_lock;
 
 use super::{Syscall, SyscallResult};
 use crate::{
-    constant::fs::{AT_EACCESS, AT_FDCWD, F_OK, R_OK, UTIME_NOW, UTIME_OMIT, W_OK, X_OK},
+    constant::fs::{
+        AT_EACCESS, AT_FDCWD, F_OK, R_OK, STATX_ALL, STATX_ATIME, STATX_BLOCKS, STATX_BTIME,
+        STATX_CTIME, STATX_GID, STATX_INO, STATX_MODE, STATX_MTIME, STATX_NLINK, STATX_SIZE,
+        STATX_TYPE, STATX_UID, UTIME_NOW, UTIME_OMIT, W_OK, X_OK,
+    },
     fs::{
         fdtable::RLimit,
         path::{get_dentry, get_dentry_parent, kcreate_async},
@@ -14,9 +18,9 @@ use crate::{
     },
     include::{
         fs::{
-            AtFlags, BlkIoctlCmd, DevT, FallocFlags, FcntlFlags, FdFlags, FileFlags, InodeMode,
-            IoctlCmd, Iovec, Kstat, LoopIoctlCmd, MountFlags, NoAxiomIoctlCmd, RenameFlags,
-            RtcIoctlCmd, SearchFlags, SeekFrom, Statfs, Statx, TtyIoctlCmd, Whence,
+            AtFlags, BlkIoctlCmd, DevT, FallocFlags, FcntlFlags, FdFlags, FileFlags, Flock,
+            InodeMode, IoctlCmd, Iovec, Kstat, LoopIoctlCmd, MountFlags, NoAxiomIoctlCmd,
+            RenameFlags, RtcIoctlCmd, SearchFlags, SeekFrom, Statfs, Statx, TtyIoctlCmd, Whence,
             EXT4_MAX_FILE_SIZE,
         },
         resource::Resource,
@@ -39,9 +43,6 @@ impl Syscall<'_> {
     pub async fn sys_getcwd(&self, buf: usize, size: usize) -> SyscallResult {
         if buf as usize == 0 {
             return Err(Errno::EFAULT);
-        }
-        if buf as usize != 0 && size == 0 {
-            return Err(Errno::EINVAL);
         }
 
         let cwd = self.task.cwd().clone();
@@ -445,6 +446,10 @@ impl Syscall<'_> {
         buf: usize,
     ) -> SyscallResult {
         let path = read_path(path)?;
+        if flags < 0 {
+            error!("[sys_statx] invalid flags: {}", flags);
+            return Err(Errno::EINVAL);
+        }
         let flags = AtFlags::from_bits_truncate(flags);
         info!(
             "[sys_statx] dirfd: {}, path: {:?}, flags: {:?}",
@@ -457,11 +462,37 @@ impl Syscall<'_> {
                 .ok_or(Errno::EBADF)?
                 .dentry()
         } else {
+            if path.is_empty() {
+                error!("[sys_statx] pathname is empty");
+                return Err(Errno::ENOENT);
+            }
             get_dentry(self.task, dirfd, &path, &flags.into())?
         };
 
+        const VALID_MASK: u32 = STATX_TYPE
+            | STATX_MODE
+            | STATX_NLINK
+            | STATX_UID
+            | STATX_GID
+            | STATX_ATIME
+            | STATX_MTIME
+            | STATX_CTIME
+            | STATX_INO
+            | STATX_SIZE
+            | STATX_BLOCKS
+            | STATX_BTIME
+            | STATX_ALL;
+        if (mask & !VALID_MASK) != 0 {
+            error!("[sys_statx] invalid mask: {}", mask);
+            return Err(Errno::EINVAL);
+        }
+
         let statx = dentry.inode()?.statx(mask)?;
         let ptr = UserPtr::<Statx>::new(buf);
+        if ptr.is_null() {
+            error!("[statx] invalid user pointer");
+            return Err(Errno::EFAULT);
+        }
         ptr.write(statx).await?;
         Ok(0)
     }
@@ -838,14 +869,14 @@ impl Syscall<'_> {
 
     /// Manipulate file descriptor. It performs one of the operations described
     /// below on the open file descriptor fd.
-    pub fn sys_fcntl(&self, fd: usize, cmd: usize, arg: usize) -> SyscallResult {
+    pub async fn sys_fcntl(&self, fd: usize, cmd: usize, arg: usize) -> SyscallResult {
         let task = self.task;
         let flags = FileFlags::from_bits_retain(arg as i32);
         let mut fd_table = task.fd_table();
         let file = fd_table.get(fd).ok_or(Errno::EBADF)?;
         // let file_name = file.dentry().path()?;
         // info!("[sys_fcntl] file_name: {:?}", file_name);
-        let op = FcntlFlags::from_bits(cmd).unwrap_or(FcntlFlags::F_GETOWN_EX);
+        let op = FcntlFlags::from_repr(cmd).ok_or(Errno::EINVAL)?;
 
         info!("[sys_fcntl] fd: {fd}, cmd: {op:?}, arg: {flags:?}");
         match op {
@@ -875,8 +906,19 @@ impl Syscall<'_> {
             FcntlFlags::F_DUPFD_CLOEXEC => {
                 let new_fd = fd_table.alloc_fd_after(arg)?;
                 assert!(new_fd > fd);
+                let ret = fd_table.copyfrom(fd, new_fd)?;
                 fd_table.set_fdflag(new_fd, &FdFlags::FD_CLOEXEC);
-                fd_table.copyfrom(fd, new_fd)
+                Ok(ret)
+            }
+            FcntlFlags::F_SETLK => {
+                let ptr = UserPtr::<Flock>::new(arg);
+                if ptr.is_null() {
+                    return Err(Errno::EFAULT);
+                } else {
+                    let flock = ptr.read().await?;
+                    debug!("[flock] {:?}", flock);
+                }
+                return Err(Errno::EINVAL);
             }
             _ => {
                 warn!("fcntl cmd: {op:?} not implemented");
@@ -1140,11 +1182,24 @@ impl Syscall<'_> {
         let fd_table = self.task.fd_table();
         let file = fd_table.get(fd).ok_or(Errno::EBADF)?;
         drop(fd_table);
+        let mode = file.inode().inode_mode();
+        if mode.contains(InodeMode::SOCKET) {
+            error!("[sys_ftruncate] ftruncate on a socket");
+            return Err(Errno::EINVAL);
+        }
+        if mode.contains(InodeMode::DIR) {
+            error!("[sys_ftruncate] ftruncate on a directory");
+            return Err(Errno::EISDIR);
+        }
+        if !file.meta().writable() {
+            error!("[sys_ftruncate] file is not writable");
+            return Err(Errno::EINVAL);
+        }
         // let file_name = file.dentry().path()?;
         // info!("[sys_ftruncate] file_name: {:?}", file_name);
         file.dentry().check_access(self.task, W_OK, true)?;
         if file.size() < length {
-            file.write_at(length, &[0u8; 1]).await?;
+            file.write_at(length - 1, &[0u8; 1]).await?;
             Ok(0)
         } else {
             file.truncate_pagecache(length);
@@ -1257,6 +1312,10 @@ impl Syscall<'_> {
             "[sys_fchmodat] set {:o} mode to {:?}, flags: {:?}",
             mode, path, flags
         );
+        if path.is_empty() {
+            error!("[sys_fchmodat] path is empty");
+            return Err(Errno::ENOENT);
+        }
 
         let dentry = get_dentry(self.task, fd as isize, &path, &flags.into())?;
         let inode = dentry.inode()?;
@@ -1302,6 +1361,11 @@ impl Syscall<'_> {
     pub fn sys_faccessat(&self, fd: usize, path: usize, mode: i32, flags: i32) -> SyscallResult {
         let is_fs = flags & AT_EACCESS != 0;
         let path = read_path(path)?;
+        let supported_flags = AT_EACCESS | 0x1000 | 0x100 | 0x60 | 0x2 | 0xfffe | 0x1;
+        if flags & !supported_flags != 0 {
+            log::error!("[sys_faccessat] Unsupported flags: {:#x}", flags);
+            return Err(Errno::EINVAL);
+        }
         let flags = AtFlags::from_bits_truncate(flags);
         info!(
             "[sys_faccessat] fd: {}, path: {:?}, mode: {}, flags: {:?}",

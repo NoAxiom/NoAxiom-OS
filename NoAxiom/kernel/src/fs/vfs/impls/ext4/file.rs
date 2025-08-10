@@ -1,5 +1,5 @@
 use alloc::{boxed::Box, sync::Arc};
-use core::{sync::atomic::AtomicBool, task::Waker};
+use core::task::Waker;
 
 use arch::{Arch, ArchInt};
 use async_trait::async_trait;
@@ -81,7 +81,8 @@ impl File for Ext4File {
     }
 
     async fn base_readlink(&self, _buf: &mut [u8]) -> SyscallResult {
-        todo!()
+        error!("[ext4] readlink from ext4 file");
+        Err(Errno::ENOSYS)
     }
 
     /// write all the buf content, extend the file if necessary
@@ -143,7 +144,6 @@ pub struct Ext4Dir {
     /// the dir struct in ext4, multi threads read/write the same file should
     /// ensure the atomicity, which provided by the fs lock
     ino: u32,
-    loaded: AtomicBool,
 }
 
 impl Ext4Dir {
@@ -151,7 +151,6 @@ impl Ext4Dir {
         Self {
             meta: FileMeta::new(dentry.clone(), inode.clone(), file_flags),
             ino: inode.get_inode().lock().inode_num,
-            loaded: AtomicBool::new(false),
         }
     }
 }
@@ -176,7 +175,13 @@ impl File for Ext4Dir {
     }
 
     async fn load_dir(&self) -> Result<(), Errno> {
-        if self.loaded.load(core::sync::atomic::Ordering::SeqCst) {
+        let downcast_inode = self
+            .meta
+            .inode
+            .clone()
+            .downcast_arc::<Ext4DirInode>()
+            .map_err(|_| Errno::EIO)?;
+        if downcast_inode.is_loaded() {
             debug!(
                 "[AsyncSmpExt4]Dir {}: already loaded",
                 self.meta.dentry().name()
@@ -237,8 +242,7 @@ impl File for Ext4Dir {
                 FIRST = false;
             }
         }
-        self.loaded
-            .store(true, core::sync::atomic::Ordering::SeqCst);
+        downcast_inode.set_loaded(true);
         Ok(())
     }
 

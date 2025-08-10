@@ -57,7 +57,7 @@ impl<'a> Syscall<'a> {
             SYS_SYMLINKAT =>        self.sys_symlinkat(args[0], args[1] as isize, args[2]).await,
             SYS_UNLINKAT =>         self.sys_unlinkat(args[0] as isize, args[1], args[2] as i32).await,
             SYS_PRLIMIT64 =>        self.sys_prlimit64(args[0], args[1] as u32, args[2], args[3]).await,
-            SYS_FCNTL =>            self.sys_fcntl(args[0], args[1], args[2]),
+            SYS_FCNTL =>            self.sys_fcntl(args[0], args[1], args[2]).await,
             SYS_READLINKAT =>       self.sys_readlinkat(args[0] as isize, args[1], args[2], args[3]).await,
             SYS_IOCTL =>            self.sys_ioctl(args[0], args[1], args[2]).await,
             SYS_SENDFILE =>         self.sys_sendfile(args[0], args[1], args[2], args[3]).await,

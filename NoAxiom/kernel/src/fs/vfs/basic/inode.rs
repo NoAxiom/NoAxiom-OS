@@ -196,6 +196,7 @@ impl dyn Inode {
     }
     pub fn statx(&self, mask: u32) -> SysResult<Statx> {
         let stat = self.stat()?;
+        debug!("[statx] file_size: {}", stat.st_size);
         Ok(Statx {
             stx_mask: mask,
             stx_blksize: BLOCK_SIZE as u32,
@@ -298,7 +299,7 @@ impl dyn Inode {
 
         // change gid
         if gid_change && gid != self.gid() {
-            warn!("inode gid: {}", self.gid());
+            warn!("[chown] inode gid: {}", self.gid());
             if euid != self.uid() {
                 error!(
                     "[chown] No permission to change ownership, euid: {}, egid: {}",
@@ -314,13 +315,15 @@ impl dyn Inode {
                     return Err(Errno::EPERM);
                 }
             }
-            if mode.other_permissions() != 0 && mode.contains(InodeMode::FILE) {
+            if mode.bits() & 0o111 != 0 && mode.contains(InodeMode::FILE) {
                 warn!("[chown] Normal User changes the owner");
                 // 如果是文件是non-group-executable, 则保留setgid位
                 if mode.contains(InodeMode::GROUP_EXEC) {
                     // clear setuid and setgid
+                    debug!("[chown] clear setuid and setgid");
                     mode &= !(InodeMode::SET_GID | InodeMode::SET_UID);
                 } else {
+                    debug!("[chown] clear setuid");
                     mode &= !(InodeMode::SET_UID);
                 }
                 self.set_inode_mode(mode);

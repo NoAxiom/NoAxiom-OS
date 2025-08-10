@@ -1,4 +1,5 @@
 use alloc::{boxed::Box, sync::Arc};
+use core::sync::atomic::AtomicBool;
 
 use arch::{Arch, ArchInt};
 use async_trait::async_trait;
@@ -112,7 +113,7 @@ impl Inode for Ext4FileInode {
                 .await
                 .map_err(fs_err)?;
         } else {
-            ext4.write_at(inode.inode_num, new, &[0; 1])
+            ext4.write_at(inode.inode_num, new - 1, &[0; 1])
                 .await
                 .map_err(fs_err)?;
         }
@@ -123,6 +124,7 @@ impl Inode for Ext4FileInode {
 pub struct Ext4DirInode {
     meta: InodeMeta,
     ino: Arc<SpinLock<IExtInode>>,
+    loaded: AtomicBool,
 }
 
 impl Ext4DirInode {
@@ -130,10 +132,18 @@ impl Ext4DirInode {
         Self {
             meta: InodeMeta::new(superblock, InodeMode::DIR | mode, 0, false),
             ino: Arc::new(SpinLock::new(inode)),
+            loaded: AtomicBool::new(false),
         }
     }
     pub fn get_inode(&self) -> Arc<SpinLock<IExtInode>> {
         self.ino.clone()
+    }
+    pub fn is_loaded(&self) -> bool {
+        self.loaded.load(core::sync::atomic::Ordering::SeqCst)
+    }
+    pub fn set_loaded(&self, loaded: bool) {
+        self.loaded
+            .store(loaded, core::sync::atomic::Ordering::SeqCst);
     }
 }
 

@@ -415,29 +415,31 @@ impl Iovec {
     }
 }
 
+#[derive(FromRepr, Debug, Eq, PartialEq, Clone, Copy)]
+#[allow(non_camel_case_types)]
+#[repr(usize)]
+pub enum FcntlFlags {
+    F_DUPFD = 0,
+    F_GETFD = 1,
+    F_SETFD = 2,
+    F_GETFL = 3,
+    F_SETFL = 4,
+    F_GETLK = 5,
+    F_SETLK = 6,
+    F_SETLKW = 7,
+    F_SETOWN = 8,
+    F_GETOWN = 9,
+    F_SETSIG = 10,
+    F_GETSIG = 11,
+    F_SETOWN_EX = 15,
+    F_GETOWN_EX = 16,
+    F_GETOWNER_UIDS = 17,
+    F_DUPFD_CLOEXEC = 1030,
+    F_SETPIPE_SZE = 1031,
+    F_GETPIPE_SZ = 1032,
+}
+
 bitflags! {
-    #[derive(PartialEq, Eq, Debug)]
-    pub struct FcntlFlags: usize {
-        const F_DUPFD = 0;
-        const F_GETFD = 1;
-        const F_SETFD = 2;
-        const F_GETFL = 3;
-        const F_SETFL = 4;
-        const F_GETLK = 5;
-        const F_SETLK = 6;
-        const F_SETLKW = 7;
-        const F_SETOWN = 8;
-        const F_GETOWN = 9;
-        const F_SETSIG = 10;
-        const F_GETSIG = 11;
-        const F_SETOWN_EX = 15;
-        const F_GETOWN_EX = 16;
-        const F_GETOWNER_UIDS = 17;
-
-        // 发现 F_UNLCK = 2 , 这个标记分类待研究
-        const F_DUPFD_CLOEXEC = 1030;
-    }
-
     #[derive(PartialEq, Eq, Debug, Clone)]
     pub struct FdFlags: usize {
         const FD_CLOEXEC = 1;
@@ -461,6 +463,11 @@ bitflags! {
         const AT_RECURSIVE			= 0x8000;
     }
 }
+
+// File lock types for fcntl
+pub const F_RDLCK: i16 = 0; // Read lock
+pub const F_WRLCK: i16 = 1; // Write lock
+pub const F_UNLCK: i16 = 2; // Unlock
 
 impl From<AtFlags> for SearchFlags {
     fn from(flags: AtFlags) -> Self {
@@ -869,5 +876,44 @@ impl DevT {
 impl From<DevT> for u64 {
     fn from(dev: DevT) -> Self {
         dev.0
+    }
+}
+
+// Type aliases for C compatibility
+pub type OffT = i64;
+pub type PidT = i32;
+
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+pub struct Flock {
+    /// F_RDLCK, F_WRLCK, or F_UNLCK
+    pub l_type: i16,
+    /// offset in bytes, relative to l_whence
+    pub l_start: OffT,
+    /// SEEK_SET, SEEK_CUR, or SEEK_END
+    pub l_whence: i16,
+    /// length, in bytes; 0 means lock to EOF
+    pub l_len: OffT,
+    /// returned with F_GETLK
+    pub l_pid: PidT,
+}
+
+impl Flock {
+    pub fn new() -> Self {
+        Self {
+            l_type: F_UNLCK,
+            l_start: 0,
+            l_whence: 0, // SEEK_SET
+            l_len: 0,
+            l_pid: 0,
+        }
+    }
+
+    pub fn is_valid_type(&self) -> bool {
+        matches!(self.l_type, F_RDLCK | F_WRLCK | F_UNLCK)
+    }
+
+    pub fn is_valid_whence(&self) -> bool {
+        matches!(self.l_whence, 0 | 1 | 2) // SEEK_SET, SEEK_CUR, SEEK_END
     }
 }
