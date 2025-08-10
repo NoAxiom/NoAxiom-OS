@@ -6,12 +6,14 @@ use alloc::{
 use async_trait::async_trait;
 use downcast_rs::{impl_downcast, DowncastSync};
 use driver::block::BlockDevice;
+use include::errno::{Errno, SysResult};
 use ksync::Once;
 
 use super::{
     dentry::Dentry,
     filesystem::{EmptyFileSystem, FileSystem},
 };
+use crate::include::fs::Statfs;
 
 /// stand for file system
 pub struct SuperBlockMeta {
@@ -40,6 +42,10 @@ pub trait SuperBlock: Send + Sync + DowncastSync {
         if let Some(dev) = &self.meta().device {
             dev.sync_all().await.expect("sync all failed");
         }
+    }
+    async fn statfs(&self) -> SysResult<Statfs> {
+        error!("statfs not implemented for this superblock");
+        Err(Errno::ENOSYS)
     }
 }
 impl_downcast!(sync SuperBlock);

@@ -806,23 +806,6 @@ pub struct Statfs {
     pub f_spare: [u64; 4],
 }
 impl Statfs {
-    // TODO
-    pub fn new() -> Self {
-        Self {
-            f_type: 1,
-            f_bsize: 512,
-            f_blocks: 12345,
-            f_bfree: 1234,
-            f_bavail: 123,
-            f_files: 1000,
-            f_ffree: 100,
-            f_fsid: 1,
-            f_namelen: 123,
-            f_frsize: 4096,
-            f_flag: 123,
-            f_spare: [0; 4],
-        }
-    }
     #[allow(unused)]
     pub fn as_bytes(&self) -> &[u8] {
         let size = core::mem::size_of::<Self>();

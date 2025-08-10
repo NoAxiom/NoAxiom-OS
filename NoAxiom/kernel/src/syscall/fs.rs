@@ -456,6 +456,28 @@ impl Syscall<'_> {
         Ok(0)
     }
 
+    /// get fs status
+    pub async fn sys_statfs(&self, path: usize, buf: usize) -> SyscallResult {
+        let path = read_path(path)?;
+        let searchflags = SearchFlags::empty();
+        let dentry = get_dentry(self.task, AT_FDCWD, &path, &searchflags)?;
+        info!("[sys_statfs] path: {}", path);
+        let statfs = dentry.super_block().statfs().await?;
+        let ptr = UserPtr::<Statfs>::new(buf);
+        ptr.write(statfs).await?;
+        Ok(0)
+    }
+
+    pub async fn sys_fstatfs(&self, fd: usize, buf: usize) -> SyscallResult {
+        let file = self.task.fd_table().get(fd).ok_or(Errno::EBADF)?;
+        let dentry = file.dentry();
+        info!("[sys_fstatfs] fd: {}, path: {}", fd, dentry.path());
+        let statfs = dentry.super_block().statfs().await?;
+        let ptr = UserPtr::<Statfs>::new(buf);
+        ptr.write(statfs).await?;
+        Ok(0)
+    }
+
     pub async fn sys_ioctl(&self, fd: usize, request: usize, arg: usize) -> SyscallResult {
         info!(
             "[sys_ioctl] fd: {}, request: {:#x}, arg: {:#x}",
@@ -1088,17 +1110,6 @@ impl Syscall<'_> {
             file.inode().truncate(length).await?;
             Ok(0)
         }
-    }
-
-    /// get fs status
-    pub async fn sys_statfs(&self, path: usize, buf: usize) -> SyscallResult {
-        let ptr = UserPtr::<u8>::new(path as usize);
-        let path = ptr.get_string_from_ptr()?;
-        info!("[sys_statfs] path: {}, buf: {:#x}", path, buf);
-        let statfs = Statfs::new();
-        let ptr = UserPtr::<Statfs>::new(buf);
-        ptr.write(statfs).await?;
-        Ok(0)
     }
 
     /// splice data from one file descriptor to another
