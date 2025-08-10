@@ -27,3 +27,10 @@ pub const LEN_BEFORE_NAME: usize = 19;
 
 pub const UTIME_NOW: usize = 0x3fffffff;
 pub const UTIME_OMIT: usize = 0x3ffffffe;
+
+pub const F_OK: i32 = 0;
+pub const X_OK: i32 = 1;
+pub const W_OK: i32 = 2;
+pub const R_OK: i32 = 4;
+pub const UID_ROOT: u32 = 0;
+pub const AT_EACCESS: i32 = 0x200;

@@ -292,6 +292,7 @@ pub enum SyscallID {
 
     // additional
     SYS_CLONE3 = 435,
+    SYS_FACCESSAT2 = 439,
 
     // for debug
     NO_SYSCALL = -1,

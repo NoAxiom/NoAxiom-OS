@@ -12,6 +12,7 @@ use downcast_rs::DowncastSync;
 use ksync::mutex::{SpinLock, SpinLockGuard};
 
 use crate::{
+    constant::fs::{F_OK, R_OK, UID_ROOT, W_OK, X_OK},
     fs::{
         path,
         vfs::{
@@ -28,6 +29,7 @@ use crate::{
         },
     },
     include::fs::ALL_PERMISSIONS_MASK,
+    task::Task,
 };
 
 type Mutex<T> = SpinLock<T>;
@@ -426,55 +428,86 @@ impl dyn Dentry {
         Ok(())
     }
 
-    /// Unlink, unlink self and delete the inner file if nlink is 0.
-    pub async fn unlink(self: Arc<Self>, file_flags: &FileFlags) -> SyscallResult {
-        if unlikely(self.name() == "interrupts") {
-            // MENTION: this is required by official
-            return Err(Errno::ENOSYS);
-        }
-
-        let inode = if let Ok(inode) = self.inode() {
-            inode
-        } else {
-            warn!("[Vfs::unlink] {} is negative", self.name());
-            return Ok(0);
-        };
-        let mut nlink = inode.meta().inner.lock().nlink;
-        debug!(
-            "[Vfs::unlink] nlink: {}, file_type: {:?}",
-            nlink,
-            inode.file_type()
-        );
-        nlink -= 1;
-        if nlink == 0 {
-            let parent = self.parent().unwrap();
-            let mut w_guard = crate::fs::pagecache::get_pagecache_wguard();
-            let file = self.clone().open(file_flags)?;
-            w_guard.mark_deleted(&file);
-            drop(w_guard);
-            inode.set_state(InodeState::Deleted).await;
-            parent.remove_child(&self.name()).unwrap();
-            parent
-                .open(&FileFlags::empty())
-                .unwrap()
-                .delete_child(&self.name())
-                .await?;
-        }
-        Ok(0)
-    }
-
     /// Check if the dentry has access to the file.
-    pub fn check_access(self: &Arc<Self>) -> SysResult<()> {
+    pub fn check_arrive(self: &Arc<Self>) -> SysResult<()> {
         if self.inode()?.privilege().bits() & 0o111 == 0 {
             warn!(
-                "[check_access] {} has no access, its access is {}",
+                "[check_arrive] {} has no access, its access is {}",
                 self.name(),
                 self.inode()?.privilege().bits()
             );
             return Err(Errno::EACCES);
         }
         if let Some(parent) = self.parent() {
-            return parent.check_access();
+            return parent.check_arrive();
+        }
+        Ok(())
+    }
+
+    pub fn check_access(
+        self: &Arc<Self>,
+        task: &Arc<Task>,
+        access: i32,
+        is_fs: bool,
+    ) -> SysResult<()> {
+        let uid = if is_fs { task.fsuid() } else { task.uid() };
+        let gid = if is_fs { task.fsgid() } else { task.gid() };
+        let dentry = self;
+        let inode = self.inode()?;
+        let pri = inode.privilege();
+
+        if uid == UID_ROOT {
+            if (access & X_OK != 0) && (pri.bits() & 0o111 == 0) {
+                error!(
+                    "[sys_faccessat] root user cannot execute file: {:?}",
+                    self.path()
+                );
+                return Err(Errno::EACCES);
+            }
+            return Ok(());
+        }
+
+        debug!(
+            "[check_access] uid: {}, gid: {}, inode uid: {}, inode gid: {}",
+            uid,
+            gid,
+            inode.uid(),
+            inode.gid()
+        );
+
+        // check if the parent directory is accessible
+        if let Some(parent) = dentry.parent() {
+            parent.check_arrive()?;
+        }
+
+        if access == F_OK {
+            return Ok(());
+        }
+
+        let permission = if uid == inode.uid() {
+            pri.user_permissions() as i32
+        } else if gid == inode.gid() {
+            pri.group_permissions() as i32
+        } else {
+            pri.other_permissions() as i32
+        };
+
+        if (access & X_OK != 0) && (permission & X_OK == 0) {
+            error!(
+                "[sys_faccessat] user cannot execute file: {:?}",
+                self.path()
+            );
+            return Err(Errno::EACCES);
+        }
+
+        if (access & R_OK != 0) && (permission & R_OK == 0) {
+            error!("[sys_faccessat] user cannot read file: {:?}", self.path());
+            return Err(Errno::EACCES);
+        }
+
+        if (access & W_OK != 0) && (permission & W_OK == 0) {
+            error!("[sys_faccessat] user cannot write file: {:?}", self.path());
+            return Err(Errno::EACCES);
         }
         Ok(())
     }

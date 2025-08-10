@@ -1,11 +1,12 @@
 use alloc::{string::String, sync::Arc};
+use core::intrinsics::unlikely;
 
 use include::errno::SysResult;
 use ksync::assert_no_lock;
 
 use super::{Syscall, SyscallResult};
 use crate::{
-    constant::fs::{AT_FDCWD, UTIME_NOW, UTIME_OMIT},
+    constant::fs::{AT_EACCESS, AT_FDCWD, F_OK, R_OK, UTIME_NOW, UTIME_OMIT, W_OK, X_OK},
     fs::{
         fdtable::RLimit,
         path::{get_dentry, get_dentry_parent, kcreate_async},
@@ -123,7 +124,16 @@ impl Syscall<'_> {
             error!("[sys_chdir] tar path must be a dir");
             return Err(Errno::ENOTDIR);
         }
-        dentry.check_access()?;
+        dentry.check_arrive()?;
+        *self.task.cwd() = dentry;
+        Ok(0)
+    }
+
+    pub fn sys_fchdir(&self, fd: usize) -> SyscallResult {
+        info!("[sys_fchdir] fd: {}", fd);
+        let file = self.task.fd_table().get(fd).ok_or(Errno::EBADF)?;
+        let dentry = file.dentry();
+        dentry.check_access(self.task, X_OK, true)?;
         *self.task.cwd() = dentry;
         Ok(0)
     }
@@ -605,7 +615,7 @@ impl Syscall<'_> {
         let target_dentry = old_dentry;
         let searchflags = SearchFlags::AT_SYMLINK_NOFOLLOW;
         let (parent, name) = get_dentry_parent(self.task, newdirfd, &new_path, &searchflags)?;
-        // todo: check parent W_OK permission
+        parent.check_access(self.task, W_OK, true)?;
         parent.create_link(target_dentry, name).await
     }
 
@@ -672,7 +682,40 @@ impl Syscall<'_> {
             dirfd, path, flags
         );
         let dentry = get_dentry(self.task, dirfd, &path, &searchflags)?;
-        dentry.unlink(&flags).await?;
+        if unlikely(dentry.name() == "interrupts") {
+            // MENTION: this is required by official
+            return Err(Errno::ENOSYS);
+        }
+        let inode = if let Ok(inode) = dentry.inode() {
+            inode
+        } else {
+            warn!("[sys_unlinkat] {} is negative", dentry.name());
+            return Ok(0);
+        };
+        let mut nlink = inode.meta().inner.lock().nlink;
+        debug!(
+            "[sys_unlinkat] nlink: {}, file_type: {:?}",
+            nlink,
+            inode.file_type()
+        );
+        nlink -= 1;
+        if nlink == 0 {
+            let parent = dentry.parent().unwrap();
+            parent.check_access(self.task, W_OK, true)?;
+            let mut w_guard = crate::fs::pagecache::get_pagecache_wguard();
+            let file = dentry.clone().open(&flags)?;
+            w_guard.mark_deleted(&file);
+            drop(w_guard);
+            inode
+                .set_state(crate::fs::vfs::basic::inode::InodeState::Deleted)
+                .await;
+            parent.remove_child(&dentry.name()).unwrap();
+            parent
+                .open(&FileFlags::empty())
+                .unwrap()
+                .delete_child(&dentry.name())
+                .await?;
+        }
         Ok(0)
     }
 
@@ -1035,6 +1078,7 @@ impl Syscall<'_> {
         drop(fd_table);
         // let file_name = file.dentry().path()?;
         // info!("[sys_ftruncate] file_name: {:?}", file_name);
+        file.dentry().check_access(self.task, W_OK, true)?;
         if file.size() < length {
             file.write_at(length, &[0u8; 1]).await?;
             Ok(0)
@@ -1203,13 +1247,6 @@ impl Syscall<'_> {
     /// check user's permissions of a file relative to a directory file
     /// descriptor
     pub fn sys_faccessat(&self, fd: usize, path: usize, mode: i32, flags: i32) -> SyscallResult {
-        const F_OK: i32 = 0;
-        const X_OK: i32 = 1;
-        const W_OK: i32 = 2;
-        const R_OK: i32 = 4;
-        const AT_EACCESS: i32 = 0x200;
-        const UID_ROOT: u32 = 0;
-
         let is_fs = flags & AT_EACCESS != 0;
         let path = read_path(path)?;
         let flags = AtFlags::from_bits_truncate(flags);
@@ -1219,73 +1256,12 @@ impl Syscall<'_> {
         );
 
         let dentry = get_dentry(self.task, fd as isize, &path, &flags.into())?;
-        let inode = dentry.inode()?;
-        let pri = inode.privilege();
 
         if mode & !(F_OK | R_OK | W_OK | X_OK) != 0 {
             error!("[sys_faccessat] shouldn't have mode: {:?}", mode);
             return Err(Errno::EINVAL);
         }
-
-        let uid = if is_fs {
-            self.task.fsuid()
-        } else {
-            self.task.uid()
-        };
-        let gid = if is_fs {
-            self.task.fsgid()
-        } else {
-            self.task.gid()
-        };
-
-        if uid == UID_ROOT {
-            if (mode & X_OK != 0) && (pri.bits() & 0o111 == 0) {
-                error!("[sys_faccessat] root user cannot execute file: {:?}", path);
-                return Err(Errno::EACCES);
-            }
-            return Ok(0);
-        }
-
-        debug!(
-            "[sys_faccessat] uid: {}, gid: {}, inode uid: {}, inode gid: {}",
-            uid,
-            gid,
-            inode.uid(),
-            inode.gid()
-        );
-
-        // check if the parent directory is accessible
-        if let Some(parent) = dentry.parent() {
-            parent.check_access()?;
-        }
-
-        if mode == F_OK {
-            return Ok(0);
-        }
-
-        let permission = if uid == inode.uid() {
-            pri.user_permissions() as i32
-        } else if gid == inode.gid() {
-            pri.group_permissions() as i32
-        } else {
-            pri.other_permissions() as i32
-        };
-
-        if (mode & X_OK != 0) && (permission & X_OK == 0) {
-            error!("[sys_faccessat] user cannot execute file: {:?}", path);
-            return Err(Errno::EACCES);
-        }
-
-        if (mode & R_OK != 0) && (permission & R_OK == 0) {
-            error!("[sys_faccessat] user cannot read file: {:?}", path);
-            return Err(Errno::EACCES);
-        }
-
-        if (mode & W_OK != 0) && (permission & W_OK == 0) {
-            error!("[sys_faccessat] user cannot write file: {:?}", path);
-            return Err(Errno::EACCES);
-        }
-
+        dentry.check_access(self.task, mode, is_fs)?;
         Ok(0)
     }
 
