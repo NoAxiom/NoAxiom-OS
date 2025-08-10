@@ -259,10 +259,22 @@ impl dyn Dentry {
     ) -> SysResult<(Arc<dyn Dentry>, usize)> {
         let abs = symlink_path.starts_with('/');
         let components = path::resolve_path(symlink_path)?;
-        if abs {
+        let res = if abs {
             root_dentry().__walk_path(&components, 0, jumps)
         } else {
             self.__walk_path(&components, 0, jumps)
+        };
+        match res {
+            Ok((dentry, new_jumps)) => {
+                if let Ok(inode) = dentry.inode() {
+                    let symlink_path = inode.symlink().expect("must have symlink path");
+                    debug!("[__symlink_jump] Following symlink: {}", symlink_path);
+                    dentry.__symlink_jump(&symlink_path, jumps + 1)
+                } else {
+                    Ok((dentry, new_jumps))
+                }
+            }
+            Err(e) => Err(e),
         }
     }
 
