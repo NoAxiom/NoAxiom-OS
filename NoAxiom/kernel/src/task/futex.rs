@@ -145,10 +145,11 @@ impl Future for FutexFuture {
     type Output = SyscallResult;
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let task = current_task().unwrap();
+        let is_pending =
+            unsafe { UserPtr::from(self.uaddr as *const u32).atomic_load_acquire() } == self.val;
         if !self.is_in {
             let mut futex = task.futex();
-            if unsafe { UserPtr::from(self.uaddr as *const u32).atomic_load_acquire() } == self.val
-            {
+            if is_pending {
                 self.is_in = true;
                 futex.insert_waiter(self.pa, cx.waker().clone(), self.bitset);
                 debug!(
@@ -161,17 +162,12 @@ impl Future for FutexFuture {
                 // failed to lock, remove the waker
                 return Poll::Ready(Err(Errno::EAGAIN));
             };
+        } else {
+            if is_pending {
+                Poll::Pending
+            } else {
+                Poll::Ready(Ok(0))
+            }
         }
-        Poll::Ready(Ok(0))
     }
 }
-
-/*
-
-Futex是一个主要运行与用户空间的互斥锁, 用于竞争较少的情况
-主要维护思想是: 先尝试在用户空间当中进行上锁, 如果上锁成功则直接使用
-如果上锁失败, 再陷入内核当中插入到waitqueue当中进行等待
-这样可以在竞争较小的情况下尽量的避免内核陷入
-内核当中的sys_futex是用于维护上锁失败时的等待的
-
-*/

@@ -1,20 +1,52 @@
-pub const FUTEX_WAIT: usize = 0;
-pub const FUTEX_WAKE: usize = 1;
-pub const FUTEX_FD: usize = 2;
-pub const FUTEX_REQUEUE: usize = 3;
-pub const FUTEX_CMP_REQUEUE: usize = 4;
-pub const FUTEX_WAKE_OP: usize = 5;
-pub const FUTEX_LOCK_PI: usize = 6;
-pub const FUTEX_UNLOCK_PI: usize = 7;
-pub const FUTEX_TRYLOCK_PI: usize = 8;
-pub const FUTEX_WAIT_BITSET: usize = 9;
-pub const FUTEX_WAKE_BITSET: usize = 10;
-pub const FUTEX_WAIT_REQUEUE_PI: usize = 11;
-pub const FUTEX_CMP_REQUEUE_PI: usize = 12;
-pub const FUTEX_LOCK_PI2: usize = 13;
+use bitflags::bitflags;
+use strum::FromRepr;
 
-pub const FUTEX_PRIVATE_FLAG: usize = 128;
-pub const FUTEX_CLOCK_REALTIME: usize = 256;
-pub const FUTEX_CMD_MASK: usize = !(FUTEX_PRIVATE_FLAG | FUTEX_CLOCK_REALTIME);
+#[repr(usize)]
+#[derive(FromRepr)]
+#[derive(Debug)]
+pub enum FutexOps {
+    FutexWait = 0,
+    FutexWake = 1,
+    FutexFd = 2,
+    FutexRequeue = 3,
+    FutexCmpRequeue = 4,
+    FutexWakeOp = 5,
+    FutexLockPi = 6,
+    FutexUnlockPi = 7,
+    FutexTrylockPi = 8,
+    FutexWaitBitset = 9,
+    FutexWakeBitset = 10,
+    FutexWaitRequeuePi = 11,
+    FutexCmpRequeuePi = 12,
+    FutexLockPi2 = 13,
+}
+
+impl FutexOps {
+    pub fn is_futex_wake(&self) -> bool {
+        matches!(
+            self,
+            FutexOps::FutexWake | FutexOps::FutexWakeOp | FutexOps::FutexWakeBitset
+        )
+    }
+}
+
+bitflags! {
+    #[repr(transparent)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub struct FutexFlags: usize {
+        const FUTEX_PRIVATE = 128;
+        const FUTEX_CLOCK_REALTIME = 256;
+        const FUTEX_CMD_MASK = !(Self::FUTEX_PRIVATE.bits() | Self::FUTEX_CLOCK_REALTIME.bits());
+    }
+}
+
+impl FutexFlags {
+    pub fn is_private(&self) -> bool {
+        self.contains(Self::FUTEX_PRIVATE)
+    }
+    pub fn is_clock_realtime(&self) -> bool {
+        self.contains(Self::FUTEX_CLOCK_REALTIME)
+    }
+}
 
 pub const FUTEX_BITSET_MATCH_ANY: u32 = u32::MAX;
