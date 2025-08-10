@@ -1,5 +1,5 @@
 use alloc::{string::String, sync::Arc, vec::Vec};
-use core::{ptr::null, sync::atomic::AtomicU32};
+use core::{intrinsics::unlikely, ptr::null, sync::atomic::AtomicU32};
 
 use arch::{Arch, ArchInfo, ArchTrapContext, TrapContext};
 use include::errno::SysResult;
@@ -8,12 +8,16 @@ use crate::{
     entry::init_proc::INIT_PROC_NAME,
     fs::{
         fdtable::FdTable,
+        path::get_dentry,
         vfs::{
             basic::{dentry::Dentry, file::File},
             root_dentry,
         },
     },
-    include::process::auxv::{AuxEntry, AT_NULL, AT_RANDOM},
+    include::{
+        fs::FileFlags,
+        process::auxv::{AuxEntry, AT_NULL, AT_RANDOM},
+    },
     mm::memory_set::{ElfMemoryInfo, MemorySet},
     sched::sched_entity::SchedEntity,
     signal::{sig_action::SigActionList, sig_manager::SigManager, sig_set::SigSet},
@@ -198,6 +202,34 @@ impl Task {
         args: Vec<String>,
         envs: Vec<String>,
     ) -> SysResult<()> {
+        // check shebang
+        let mut shebang_header = [0u8; 2];
+        elf_file.read_at(0, &mut shebang_header).await?;
+        let (elf_file, args) = if unlikely(shebang_header == [35, 33]) {
+            let content = elf_file.read_all().await?;
+            let mut content_str =
+                String::from_utf8(content).map_err(|_| include::errno::Errno::EINVAL)?;
+            while content_str.ends_with('\n') {
+                content_str.pop();
+            }
+            let tar_path = &content_str[2..];
+            debug!("[execve] shebang path: {}", tar_path);
+            if !tar_path.starts_with("/") {
+                return Err(include::errno::Errno::EINVAL);
+            }
+            let tar_dentry =
+                get_dentry(self, 0, tar_path, &crate::include::fs::SearchFlags::empty())?;
+
+            let mut new_args = Vec::new();
+            new_args.push(String::from(tar_path));
+            new_args.push(elf_file.path());
+            new_args.extend(args);
+
+            (tar_dentry.open(&FileFlags::empty())?, new_args)
+        } else {
+            (elf_file, args)
+        };
+
         let ElfMemoryInfo {
             memory_set,
             entry_point,
