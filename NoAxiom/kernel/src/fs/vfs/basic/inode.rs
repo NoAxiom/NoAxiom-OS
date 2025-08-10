@@ -2,6 +2,7 @@ use alloc::{boxed::Box, string::String, sync::Arc};
 use core::sync::atomic::{AtomicU32, Ordering};
 
 use async_trait::async_trait;
+use config::fs::BLOCK_SIZE;
 use downcast_rs::{impl_downcast, DowncastSync};
 use include::errno::Errno;
 use ksync::mutex::SpinLock;
@@ -104,12 +105,6 @@ pub trait Inode: Send + Sync + DowncastSync {
     async fn truncate(&self, _new: usize) -> SysResult<()> {
         panic!("this inode not implemented truncate");
     }
-    fn into_dyn(self: &Arc<Self>) -> Arc<dyn Inode>
-    where
-        Self: Sized,
-    {
-        self.clone()
-    }
 }
 
 impl dyn Inode {
@@ -201,20 +196,31 @@ impl dyn Inode {
     }
     pub fn statx(&self, mask: u32) -> SysResult<Statx> {
         let stat = self.stat()?;
-        Ok(Statx::new(
-            mask,
-            stat.st_nlink,
-            stat.st_mode as u16,
-            stat.st_ino,
-            stat.st_size,
-            StatxTimestamp::new(stat.st_atime_sec as i64, stat.st_atime_nsec as u32),
-            StatxTimestamp::new(stat.st_ctime_sec as i64, stat.st_ctime_nsec as u32),
-            StatxTimestamp::new(stat.st_mtime_sec as i64, stat.st_mtime_nsec as u32),
-            (stat.st_rdev as u32 & 0xffff_00) >> 8 as u32,
-            (stat.st_rdev & 0xff) as u32,
-            (stat.st_dev as u32 & 0xffff_00) >> 8 as u32,
-            (stat.st_dev & 0xff) as u32,
-        ))
+        Ok(Statx {
+            stx_mask: mask,
+            stx_blksize: BLOCK_SIZE as u32,
+            stx_attributes: 0,
+            stx_nlink: stat.st_nlink,
+            stx_uid: stat.st_uid,
+            stx_gid: stat.st_gid,
+            stx_mode: stat.st_mode as u16,
+            __statx_pad1: [0; 1],
+            stx_ino: stat.st_ino,
+            stx_size: stat.st_size,
+            stx_blocks: stat.st_blocks,
+            stx_attributes_mask: 0,
+            stx_atime: StatxTimestamp::new(stat.st_atime_sec as i64, stat.st_atime_nsec as u32),
+            stx_ctime: StatxTimestamp::new(stat.st_ctime_sec as i64, stat.st_ctime_nsec as u32),
+            stx_btime: StatxTimestamp::new(stat.st_ctime_sec as i64, stat.st_ctime_nsec as u32),
+            stx_mtime: StatxTimestamp::new(stat.st_mtime_sec as i64, stat.st_mtime_nsec as u32),
+            stx_rdev_major: (stat.st_rdev as u32 & 0xffff_00) >> 8 as u32,
+            stx_rdev_minor: (stat.st_rdev & 0xff) as u32,
+            stx_dev_major: (stat.st_dev as u32 & 0xffff_00) >> 8 as u32,
+            stx_dev_minor: (stat.st_dev & 0xff) as u32,
+            stx_mnt_id: 0,
+            __statx_pad2: 0,
+            __statx_pad3: [0; 12],
+        })
     }
     // set timestamp, `None` means not to change
     pub fn set_time(

@@ -428,7 +428,16 @@ impl Syscall<'_> {
             "[sys_statx] dirfd: {}, path: {:?}, flags: {:?}",
             dirfd, path, flags,
         );
-        let dentry = get_dentry(self.task, dirfd, &path, &flags.into())?;
+        let dentry = if flags.contains(AtFlags::AT_EMPTY_PATH) {
+            self.task
+                .fd_table()
+                .get(dirfd as usize)
+                .ok_or(Errno::EBADF)?
+                .dentry()
+        } else {
+            get_dentry(self.task, dirfd, &path, &flags.into())?
+        };
+
         let statx = dentry.inode()?.statx(mask)?;
         let ptr = UserPtr::<Statx>::new(buf);
         ptr.write(statx).await?;

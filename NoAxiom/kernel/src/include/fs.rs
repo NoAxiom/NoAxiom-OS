@@ -253,7 +253,7 @@ pub struct Statx {
     pub stx_uid: u32,
     pub stx_gid: u32,
     pub stx_mode: u16,
-    __statx_pad1: [u16; 1],
+    pub __statx_pad1: [u16; 1],
     pub stx_ino: u64,
     pub stx_size: u64,
     pub stx_blocks: u64,
@@ -267,8 +267,8 @@ pub struct Statx {
     pub stx_dev_major: u32,
     pub stx_dev_minor: u32,
     pub stx_mnt_id: u64,
-    __statx_pad2: u64,
-    __statx_pad3: [u64; 12],
+    pub __statx_pad2: u64,
+    pub __statx_pad3: [u64; 12],
 }
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
@@ -296,46 +296,6 @@ impl Statx {
     }
     pub fn get_size(&self) -> usize {
         self.stx_size as usize
-    }
-    pub fn new(
-        stx_mask: u32,
-        stx_nlink: u32,
-        stx_mode: u16,
-        stx_ino: u64,
-        stx_size: u64,
-        stx_atime: StatxTimestamp,
-        stx_ctime: StatxTimestamp,
-        stx_mtime: StatxTimestamp,
-        stx_rdev_major: u32,
-        stx_rdev_minor: u32,
-        stx_dev_major: u32,
-        stx_dev_minor: u32,
-    ) -> Self {
-        Self {
-            stx_mask,
-            stx_blksize: BLOCK_SIZE as u32,
-            stx_attributes: 0,
-            stx_nlink,
-            stx_uid: 0,
-            stx_gid: 0,
-            stx_mode,
-            __statx_pad1: [0 as u16; 1],
-            stx_ino,
-            stx_size,
-            stx_blocks: (stx_size as u64 + BLOCK_SIZE as u64 - 1) / BLOCK_SIZE as u64,
-            stx_attributes_mask: 0,
-            stx_atime,
-            stx_btime: stx_ctime,
-            stx_ctime,
-            stx_mtime,
-            stx_rdev_major,
-            stx_rdev_minor,
-            stx_dev_major,
-            stx_dev_minor,
-            stx_mnt_id: 0,
-            __statx_pad2: 0,
-            __statx_pad3: [0 as u64; 12],
-        }
     }
 }
 
