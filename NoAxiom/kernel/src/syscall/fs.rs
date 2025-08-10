@@ -41,10 +41,6 @@ use crate::{
 impl Syscall<'_> {
     /// Get current working directory
     pub async fn sys_getcwd(&self, buf: usize, size: usize) -> SyscallResult {
-        if buf as usize == 0 {
-            return Err(Errno::EFAULT);
-        }
-
         let cwd = self.task.cwd().clone();
         let cwd_str = format!("{}\0", cwd.path());
         let cwd_bytes = cwd_str.as_bytes();
@@ -58,6 +54,10 @@ impl Syscall<'_> {
         );
 
         let user_ptr = UserPtr::<u8>::new(buf);
+        if user_ptr.is_null() {
+            error!("[sys_getcwd] invalid user pointer");
+            return Err(Errno::EFAULT);
+        }
         let buf_slice = user_ptr.as_slice_mut_checked(size).await?;
         buf_slice[..cwd_bytes.len()].copy_from_slice(cwd_bytes);
 
@@ -426,6 +426,12 @@ impl Syscall<'_> {
     /// Get file status
     pub async fn sys_fstat(&self, fd: usize, stat_buf: usize) -> SyscallResult {
         trace!("[sys_fstat]: fd: {}, stat_buf: {:#x}", fd, stat_buf);
+
+        // Check for NULL pointer
+        if stat_buf == 0 {
+            return Err(Errno::EFAULT);
+        }
+
         let fd_table = self.task.fd_table();
         let file = fd_table.get(fd).ok_or(Errno::EBADF)?;
         drop(fd_table);
@@ -711,7 +717,8 @@ impl Syscall<'_> {
         let searchflags = SearchFlags::AT_SYMLINK_NOFOLLOW;
         let (parent, name) = get_dentry_parent(self.task, newdirfd, &new_path, &searchflags)?;
         parent.check_access(self.task, W_OK, true)?;
-        parent.create_link(target_dentry, name).await
+        parent.create_link(target_dentry, name).await?;
+        Ok(0)
     }
 
     pub async fn sys_symlinkat(
@@ -746,20 +753,46 @@ impl Syscall<'_> {
             return Err(Errno::EINVAL);
         }
         let path = read_path(path)?;
-        let searchflags = SearchFlags::AT_SYMLINK_NOFOLLOW;
-        let dentry = get_dentry(self.task, dirfd, &path, &searchflags)?;
+
         info!(
             "[sys_readlinkat] dirfd: {}, path: {:?}, buf: {:#x}, bufsize: {}",
             dirfd, path, buf, buflen,
         );
-        if dentry.inode()?.file_type() != InodeMode::LINK {
-            return Err(Errno::EINVAL);
-        }
+
+        let searchflags = SearchFlags::AT_SYMLINK_NOFOLLOW;
+        let dentry = if path.is_empty() {
+            self.task
+                .fd_table()
+                .get(dirfd as usize)
+                .ok_or(Errno::EBADF)?
+                .dentry()
+        } else {
+            get_dentry(self.task, dirfd, &path, &searchflags)?
+        };
+
         let user_ptr = UserPtr::<u8>::new(buf);
         let buf_slice = user_ptr.as_slice_mut_checked(buflen).await?;
-        let file = dentry.open(&FileFlags::empty())?;
-        let res = file.base_readlink(buf_slice).await;
-        res
+
+        if dentry.name() == "exe" {
+            let file = dentry.open(&FileFlags::empty())?;
+            return file.base_readlink(buf_slice).await;
+        }
+
+        if let Ok(inode) = dentry.inode() {
+            if let Some(tar_path) = inode.symlink() {
+                dentry.symlink_jump(self.task, &tar_path)?;
+                Ok(tar_path.len() as isize)
+            } else {
+                error!(
+                    "[sys_readlinkat] dentry is not a symlink: {}",
+                    dentry.name()
+                );
+                Err(Errno::EINVAL)
+            }
+        } else {
+            error!("[sys_readlinkat] dentry {} is negative.", dentry.name());
+            Err(Errno::ENOENT)
+        }
     }
 
     /// Unlink a file, also delete the file if nlink is 0
@@ -1177,6 +1210,7 @@ impl Syscall<'_> {
     }
 
     /// Truncate a file to a specified length
+    /// todo: FIXME!
     pub async fn sys_ftruncate(&self, fd: usize, length: usize) -> SyscallResult {
         info!("[sys_ftruncate] fd: {}, length: {}", fd, length);
         let fd_table = self.task.fd_table();
@@ -1198,8 +1232,13 @@ impl Syscall<'_> {
         // let file_name = file.dentry().path()?;
         // info!("[sys_ftruncate] file_name: {:?}", file_name);
         file.dentry().check_access(self.task, W_OK, true)?;
-        if file.size() < length {
-            file.write_at(length - 1, &[0u8; 1]).await?;
+        let size = file.size();
+        if size < length {
+            file.inode().set_size(length);
+            if length - size <= 4096 {
+                // fixme: where are not clean?
+                file.write_at(size, &vec![0u8; length - size]).await?;
+            }
             Ok(0)
         } else {
             file.truncate_pagecache(length);
