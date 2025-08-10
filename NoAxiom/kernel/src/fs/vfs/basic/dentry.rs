@@ -413,8 +413,13 @@ impl dyn Dentry {
                 InodeMode::LINK | InodeMode::from_bits(ALL_PERMISSIONS_MASK).unwrap(),
             )
             .await?;
+        let target = if target.starts_with("/") {
+            target
+        } else {
+            format!("{}/{}", self.path(), target)
+        };
         son.inode()?.set_symlink(target.clone());
-        debug!("[Vfs::symlink] set_symlink {} to {}", name, target);
+        debug!("[Vfs::symlink] set_symlink {} to {}", target, name);
 
         Ok(())
     }
