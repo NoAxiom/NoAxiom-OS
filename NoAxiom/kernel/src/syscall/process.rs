@@ -30,7 +30,7 @@ use crate::{
     },
     task::{
         exit::ExitReason,
-        futex::FutexFuture,
+        futex::{FutexAddr, FutexFuture, FUTEX_SHARED_QUEUE},
         manager::{PROCESS_GROUP_MANAGER, TASK_MANAGER},
     },
     time::timeout::TimeLimitedFuture,
@@ -288,7 +288,7 @@ impl Syscall<'_> {
     ) -> SyscallResult {
         let option = FutexOps::from_repr(futex_op & FutexFlags::FUTEX_CMD_MASK.bits())
             .ok_or(Errno::EINVAL)?;
-        let flags = FutexFlags::from_bits_truncate(futex_op);
+        let flags = FutexFlags::from_bits_retain(futex_op & FutexFlags::FUTEX_FLAG_MASK.bits());
         if flags.is_clock_realtime() && option.is_futex_wake() {
             return Err(Errno::EPERM);
         }
@@ -305,8 +305,7 @@ impl Syscall<'_> {
                     FutexOps::FutexWait => FUTEX_BITSET_MATCH_ANY,
                     _ => unreachable!(),
                 };
-                let futex_word = UserPtr::<u32>::new(uaddr);
-                let pa = futex_word.translate_pa().await?;
+                let faddr = FutexAddr::new(uaddr, flags).await?;
                 let timeout = match val2 {
                     0 => None,
                     val2 => {
@@ -321,14 +320,34 @@ impl Syscall<'_> {
                         Some(limit_time)
                     }
                 };
-                let res = interruptable(
-                    self.task,
-                    TimeLimitedFuture::new(FutexFuture::new(uaddr, pa, val, bitset), timeout),
-                    None,
-                    None,
-                )
-                .await?
-                .map_timeout(Err(Errno::ETIMEDOUT))?;
+                info!(
+                    "[sys_futex] futex wait, uaddr = {:#x}, faddr = {:x?}, val = {}, bitset = {:#x}, timeout = {:?}",
+                    uaddr, faddr, val, bitset, timeout
+                );
+                let res = match faddr {
+                    FutexAddr::Private(faddr) => interruptable(
+                        self.task,
+                        TimeLimitedFuture::new(
+                            FutexFuture::new(uaddr, faddr, val, bitset, task.futex_ref()),
+                            timeout,
+                        ),
+                        None,
+                        None,
+                    )
+                    .await?
+                    .map_timeout(Err(Errno::ETIMEDOUT))?,
+                    FutexAddr::Shared(faddr) => interruptable(
+                        self.task,
+                        TimeLimitedFuture::new(
+                            FutexFuture::new(uaddr, faddr, val, bitset, &FUTEX_SHARED_QUEUE),
+                            timeout,
+                        ),
+                        None,
+                        None,
+                    )
+                    .await?
+                    .map_timeout(Err(Errno::ETIMEDOUT))?,
+                };
                 Ok(res)
             }
             FutexOps::FutexWake | FutexOps::FutexWakeBitset => {
@@ -340,26 +359,40 @@ impl Syscall<'_> {
                 if bitset == 0 {
                     return_errno!(Errno::EINVAL, "[sys_futex] bitset is 0");
                 }
-                let futex_word = UserPtr::<u32>::new(uaddr);
-                let pa = futex_word.translate_pa().await?;
-                let res = task.futex().wake_waiter(pa, val, bitset);
+                let addr = FutexAddr::new(uaddr, flags).await?;
+                let res = match addr {
+                    FutexAddr::Private(addr) => task.futex().wake_waiter(addr, val, bitset),
+                    FutexAddr::Shared(addr) => {
+                        FUTEX_SHARED_QUEUE.lock().wake_waiter(addr, val, bitset)
+                    }
+                };
                 info!(
-                    "[sys_futex] futex wake, uaddr = {:#x}, val = {}, res: {:?}",
-                    uaddr, val, res
+                    "[sys_futex] futex wake, uaddr = {:#x}, faddr = {:x?}, val = {}, res: {:?}",
+                    uaddr, addr, val, res
                 );
                 yield_now().await;
                 Ok(res as isize)
             }
             FutexOps::FutexRequeue => {
-                let old_word = UserPtr::<u32>::new(uaddr);
-                let new_word = UserPtr::<u32>::new(uaddr2);
-                let old_pa = old_word.translate_pa().await?;
-                let new_pa = new_word.translate_pa().await?;
                 warn!(
                     "[sys_futex] futex requeue: uaddr={:#x}, uaddr2={:#x}, val={}, val2={}",
                     uaddr, uaddr2, val, val2
                 );
-                Ok(task.futex().requeue(old_pa, new_pa, val, val2 as u32) as isize)
+                match flags.is_private() {
+                    true => {
+                        let old_pa = FutexAddr::new_private(uaddr);
+                        let new_pa = FutexAddr::new_private(uaddr2);
+                        Ok(task.futex().requeue(old_pa, new_pa, val, val2 as u32) as isize)
+                    }
+                    false => {
+                        let old_pa = FutexAddr::new_shared(uaddr).await?;
+                        let new_pa = FutexAddr::new_shared(uaddr2).await?;
+                        Ok(FUTEX_SHARED_QUEUE
+                            .lock()
+                            .requeue(old_pa, new_pa, val, val2 as u32)
+                            as isize)
+                    }
+                }
             }
             _ => return_errno!(Errno::EINVAL),
         }

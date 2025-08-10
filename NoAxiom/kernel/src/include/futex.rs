@@ -36,7 +36,8 @@ bitflags! {
     pub struct FutexFlags: usize {
         const FUTEX_PRIVATE = 128;
         const FUTEX_CLOCK_REALTIME = 256;
-        const FUTEX_CMD_MASK = !(Self::FUTEX_PRIVATE.bits() | Self::FUTEX_CLOCK_REALTIME.bits());
+        const FUTEX_FLAG_MASK = Self::FUTEX_PRIVATE.bits() | Self::FUTEX_CLOCK_REALTIME.bits();
+        const FUTEX_CMD_MASK = !Self::FUTEX_FLAG_MASK.bits();
     }
 }
 

@@ -15,6 +15,7 @@ use crate::{
         signal::Signal,
     },
     task::{
+        futex::FUTEX_SHARED_QUEUE,
         manager::{PROCESS_GROUP_MANAGER, TASK_MANAGER},
         status::TaskStatus,
     },
@@ -76,11 +77,18 @@ impl Task {
             let ptr = UserPtr::<usize>::new(tidaddress);
             assert_no_lock!();
             let _ = ptr.try_write(0).await;
+            let _ = self
+                .futex()
+                .wake_waiter(ptr.va_addr(), 1, FUTEX_BITSET_MATCH_ANY);
             let _ = ptr
                 .translate_pa()
                 .await
                 .inspect_err(|err| error!("[exit_handler] clear child tid failed: {}", err))
-                .map(|pa| self.futex().wake_waiter(pa, 1, FUTEX_BITSET_MATCH_ANY));
+                .map(|pa| {
+                    FUTEX_SHARED_QUEUE
+                        .lock()
+                        .wake_waiter(pa, 1, FUTEX_BITSET_MATCH_ANY)
+                });
         }
 
         // send SIGCHLD to parent

@@ -26,7 +26,7 @@ use crate::{
     mm::{memory_set::MemorySet, user_ptr::UserPtr},
     sched::sched_entity::{SchedEntity, SchedPrio},
     signal::{sig_action::SigActionList, sig_set::SigMask, sig_stack::UContext},
-    task::futex::FutexQueue,
+    task::futex::FutexPrivateQueue,
     time::{time_info::TimeInfo, timer::ITimerManager},
 };
 
@@ -117,7 +117,7 @@ pub struct Task {
     /// process group id
     pub(super) pgid: Arc<AtomicUsize>,
     /// futex wait queue
-    pub(super) futex: SharedMut<FutexQueue>,
+    pub(super) futex: SharedMut<FutexPrivateQueue>,
     /// interval timer
     pub(super) itimer: SharedMut<ITimerManager>,
 }
@@ -409,7 +409,10 @@ impl Task {
     }
 
     /// futex wait queue
-    pub fn futex(&self) -> SpinLockGuard<FutexQueue> {
+    pub fn futex_ref(&self) -> &SpinLock<FutexPrivateQueue> {
+        self.futex.as_ref()
+    }
+    pub fn futex(&self) -> SpinLockGuard<FutexPrivateQueue> {
         self.futex.lock()
     }
 
