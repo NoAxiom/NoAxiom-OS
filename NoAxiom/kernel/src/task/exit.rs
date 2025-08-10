@@ -133,7 +133,8 @@ impl Drop for Task {
                 .as_ref()
                 .map_or_else(|| 0, |task| task.tid()),
             // parent.tid(),
-        )
+        );
+        Self::del_dir_proc(self.tid());
     }
 }
 
