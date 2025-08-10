@@ -123,7 +123,12 @@ impl Dentry for Ext4Dentry {
                 // For gid: check if parent directory has setgid bit
                 let parent_inode = self.into_dyn().inode()?;
                 let parent_mode = parent_inode.inode_mode();
+                let mut mode = mode;
                 let gid = if parent_mode.contains(crate::include::fs::InodeMode::SET_GID) {
+                    if uid != 0 {
+                        warn!("[ext4Inode] clear S_ISGID flag",);
+                        mode.remove(crate::include::fs::InodeMode::SET_GID);
+                    }
                     // If parent has setgid bit, inherit parent's gid
                     parent_inode.gid()
                 } else {
