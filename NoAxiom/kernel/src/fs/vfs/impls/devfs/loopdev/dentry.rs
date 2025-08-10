@@ -3,10 +3,13 @@ use alloc::{boxed::Box, sync::Arc};
 use async_trait::async_trait;
 
 use crate::{
-    fs::vfs::basic::{
-        dentry::{Dentry, DentryMeta},
-        file::File,
-        superblock::SuperBlock,
+    fs::vfs::{
+        basic::{
+            dentry::{Dentry, DentryMeta},
+            file::File,
+            superblock::SuperBlock,
+        },
+        impls::devfs::loop_control::file::get_loop_control,
     },
     include::{
         fs::{FileFlags, InodeMode},
@@ -43,7 +46,14 @@ impl Dentry for LoopDevDentry {
     }
 
     fn open(self: Arc<Self>, _file_flags: &FileFlags) -> SysResult<Arc<dyn File>> {
-        Err(Errno::ENOSYS)
+        let dentry = self.into_dyn();
+        let name = dentry.name();
+        let device_id = name
+            .strip_prefix("loop")
+            .ok_or(Errno::EINVAL)?
+            .parse::<usize>()
+            .map_err(|_| Errno::EINVAL)?;
+        Ok(get_loop_control().get(device_id).unwrap())
     }
 
     async fn create(self: Arc<Self>, _name: &str, _mode: InodeMode) -> SysResult<Arc<dyn Dentry>> {

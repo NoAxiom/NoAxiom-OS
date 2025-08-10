@@ -5,7 +5,7 @@ use config::fs::BLOCK_SIZE;
 use include::errno::{Errno, SysResult};
 use strum::FromRepr;
 
-use crate::fs::vfs::basic::inode::Inode;
+use crate::{fs::vfs::basic::inode::Inode, include::time::TimeSpec, time::gettime::get_timeval};
 
 pub const EXT4_MAX_FILE_SIZE: usize = 0x1000000000000;
 
@@ -611,6 +611,27 @@ pub enum RtcIoctlCmd {
 
 #[derive(FromRepr, Debug)]
 #[repr(usize)]
+pub enum LoopIoctlCmd {
+    /// Get the current loop device.
+    LOOPGETSTATUS = 0x4C03,
+    /// Set the loop device.
+    LOOPSETSTATUS = 0x4C02,
+    /// Get the next free loop device.
+    LOOPCTLGETFREE = 0x4C82,
+
+    LOOPSETFD = 0x4C00,
+    LOOPCLRFD = 0x4C01,
+}
+
+#[derive(FromRepr, Debug)]
+#[repr(usize)]
+pub enum BlkIoctlCmd {
+    LABLKGETSIZE64 = 0x80081272,
+    RVBLKGETSIZE64 = 0xffffffff80081272,
+}
+
+#[derive(FromRepr, Debug)]
+#[repr(usize)]
 pub enum NoAxiomIoctlCmd {
     /// ONLY FOR TESTS
     TESTCASE = 0x114514,
@@ -622,6 +643,8 @@ pub enum NoAxiomIoctlCmd {
 pub enum IoctlCmd {
     Tty(TtyIoctlCmd),
     Rtc(RtcIoctlCmd),
+    Loop(LoopIoctlCmd),
+    Block(BlkIoctlCmd),
     Other(NoAxiomIoctlCmd),
 }
 

@@ -14,9 +14,10 @@ use crate::{
     },
     include::{
         fs::{
-            AtFlags, DevT, FallocFlags, FcntlFlags, FdFlags, FileFlags, InodeMode, IoctlCmd, Iovec,
-            Kstat, MountFlags, NoAxiomIoctlCmd, RenameFlags, RtcIoctlCmd, SearchFlags, SeekFrom,
-            Statfs, Statx, TtyIoctlCmd, Whence, EXT4_MAX_FILE_SIZE,
+            AtFlags, BlkIoctlCmd, DevT, FallocFlags, FcntlFlags, FdFlags, FileFlags, InodeMode,
+            IoctlCmd, Iovec, Kstat, LoopIoctlCmd, MountFlags, NoAxiomIoctlCmd, RenameFlags,
+            RtcIoctlCmd, SearchFlags, SeekFrom, Statfs, Statx, TtyIoctlCmd, Whence,
+            EXT4_MAX_FILE_SIZE,
         },
         resource::Resource,
         result::Errno,
@@ -25,7 +26,7 @@ use crate::{
     mm::user_ptr::UserPtr,
     return_errno,
     signal::interruptable::interruptable,
-    time::gettime::get_time_duration,
+    time::gettime::{get_time_duration, get_timeval},
     utils::{
         global_alloc,
         hack::{switch_into_ltp, switch_outof_ltp},
@@ -488,10 +489,6 @@ impl Syscall<'_> {
     }
 
     pub async fn sys_ioctl(&self, fd: usize, request: usize, arg: usize) -> SyscallResult {
-        info!(
-            "[sys_ioctl] fd: {}, request: {:#x}, arg: {:#x}",
-            fd, request, arg
-        );
         let fd_table = self.task.fd_table();
         let file = fd_table.get(fd).ok_or(Errno::EBADF)?;
         drop(fd_table);
@@ -502,12 +499,17 @@ impl Syscall<'_> {
             IoctlCmd::Tty(cmd)
         } else if let Some(cmd) = RtcIoctlCmd::from_repr(request) {
             IoctlCmd::Rtc(cmd)
+        } else if let Some(cmd) = LoopIoctlCmd::from_repr(request) {
+            IoctlCmd::Loop(cmd)
+        } else if let Some(cmd) = BlkIoctlCmd::from_repr(request) {
+            IoctlCmd::Block(cmd)
         } else if let Some(cmd) = NoAxiomIoctlCmd::from_repr(request) {
             IoctlCmd::Other(cmd)
         } else {
+            error!("Unknown ioctl command: {:#x}", request);
             return Err(Errno::EINVAL);
         };
-        debug!(
+        info!(
             "[sys_ioctl]: fd: {}, request: {:#x}, argp: {:#x}, cmd: {:?}",
             fd, request, arg, cmd
         );
@@ -518,6 +520,16 @@ impl Syscall<'_> {
             IoctlCmd::Rtc(x) => match x {
                 RtcIoctlCmd::RTCRDTIME => {
                     return file.ioctl(request, arg);
+                }
+            },
+            IoctlCmd::Loop(_) => {
+                return file.ioctl(request, arg);
+            }
+            IoctlCmd::Block(x) => match x {
+                BlkIoctlCmd::RVBLKGETSIZE64 | BlkIoctlCmd::LABLKGETSIZE64 => {
+                    let ptr = UserPtr::<u64>::new(arg);
+                    ptr.write(0x10000).await?;
+                    return Ok(0);
                 }
             },
             IoctlCmd::Other(x) => match x {
@@ -1358,6 +1370,13 @@ impl Syscall<'_> {
                 .await?;
             *off_out.unwrap() += ret_len as u32;
         }
+
+        let current_time = TimeSpec::from(get_time_duration());
+        out_file.inode().set_time(
+            &Some(current_time),
+            &Some(current_time),
+            &Some(current_time),
+        );
 
         debug!(
             "[sys_copy_file_range] fd_in: {}, off_in: xx, offset: {}, size: {}   fd_out: {}, off_out: xx, offset: {}, size: {}, len: {}",

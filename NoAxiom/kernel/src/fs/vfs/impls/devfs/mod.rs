@@ -12,7 +12,6 @@ use crate::{
         impls::{
             devfs::{
                 loop_control::{dentry::LoopControlDentry, inode::LoopControlInode},
-                loopdev::{dentry::LoopDevDentry, inode::LoopDevInode},
                 null::{NullDentry, NullInode},
             },
             ramfs::{dentry::RamFsDentry, inode::RamFsDirInode},
@@ -125,16 +124,6 @@ pub async fn init(fs_root: Arc<dyn Dentry>) -> SysResult<()> {
     let loop_control_inode = Arc::new(LoopControlInode::new(fs_root.super_block()));
     loop_control_dentry.into_dyn().set_inode(loop_control_inode);
     fs_root.add_child(loop_control_dentry);
-
-    info!("[fs] create /dev/loop0");
-    let loopdev_dentry = Arc::new(LoopDevDentry::new(
-        Some(fs_root.clone()),
-        "loop0",
-        fs_root.super_block(),
-    ));
-    let loopdev_inode = Arc::new(LoopDevInode::new(fs_root.super_block()));
-    loopdev_dentry.into_dyn().set_inode(loopdev_inode);
-    fs_root.add_child(loopdev_dentry);
 
     Ok(())
 }
