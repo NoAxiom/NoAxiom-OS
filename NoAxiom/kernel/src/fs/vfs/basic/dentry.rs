@@ -221,6 +221,8 @@ impl dyn Dentry {
                 self.name(),
                 old.name()
             );
+        } else {
+            debug!("[dentry] add child {} to {} success", name, self.name());
         }
     }
 

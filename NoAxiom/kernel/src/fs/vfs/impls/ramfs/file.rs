@@ -52,6 +52,11 @@ impl File for RamFsFile {
         unreachable!()
     }
     async fn base_write(&self, offset: usize, buf: &[u8]) -> SyscallResult {
+        let inode = &self.meta.inode;
+        let size = inode.size();
+        if offset + buf.len() > size {
+            inode.set_size(offset + buf.len());
+        }
         let mut data = self.data.write();
         if offset + buf.len() > data.len() {
             data.resize(offset + buf.len(), 0);

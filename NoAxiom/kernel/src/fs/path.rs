@@ -10,7 +10,7 @@ use super::vfs::basic::dentry::Dentry;
 use crate::{
     constant::fs::AT_FDCWD,
     fs::vfs::root_dentry,
-    include::fs::{InodeMode, SearchFlags},
+    include::fs::{FileFlags, InodeMode, SearchFlags},
     syscall::SysResult,
     task::Task,
 };
@@ -59,6 +59,27 @@ pub fn kcreate(path: &str, mode: InodeMode) -> Arc<dyn Dentry> {
     let parent = root_dentry().walk_path(&paths).expect("walk path failed");
     assert_no_lock!();
     block_on(parent.create(name, mode)).unwrap()
+}
+
+/// Delete a file
+///
+/// MENTION
+/// - make sure the file existed
+pub fn kdelete(path: &str) {
+    debug_assert!(path.starts_with('/'), "kdelete only support absolute path");
+    let (paths, last) = resolve_path2(path).expect("resolve path failed");
+    debug!("[kdelete] paths: {:?}, last: {:?}", paths, last);
+    let name = last.expect("kdelete must have a name at the end");
+    let parent = root_dentry().walk_path(&paths).expect("walk path failed");
+    block_on(
+        parent
+            .clone()
+            .open(&FileFlags::empty())
+            .expect("opened failed")
+            .delete_child(name),
+    )
+    .expect("delete failed");
+    parent.remove_child(name);
 }
 
 /// the async version of kcreate

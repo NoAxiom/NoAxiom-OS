@@ -1,6 +1,8 @@
 use alloc::{
     boxed::Box,
     string::{String, ToString},
+    sync::Arc,
+    vec::Vec,
 };
 use core::task::Waker;
 
@@ -12,6 +14,7 @@ use crate::{
     fs::vfs::basic::file::{File, FileMeta},
     include::io::PollEvent,
     syscall::{SysResult, SyscallResult},
+    task::manager::TASK_MANAGER,
 };
 
 pub struct StatusFile {
@@ -28,6 +31,23 @@ impl StatusFile {
     }
 }
 
+enum StatTid {
+    SelfTid,
+    Tid(usize),
+}
+
+fn resolve_path_tid(path: &str) -> StatTid {
+    let parts: Vec<&str> = path.split('/').collect();
+    if parts.len() < 3 || parts[1] != "proc" {
+        panic!("Invalid proc path: {}", path);
+    }
+    if parts[2] == "self" {
+        StatTid::SelfTid
+    } else {
+        StatTid::Tid(parts[2].parse().expect("Failed to parse tid from path"))
+    }
+}
+
 #[async_trait]
 impl File for StatusFile {
     fn meta(&self) -> &FileMeta {
@@ -35,8 +55,16 @@ impl File for StatusFile {
     }
     // todo: /proc/self/status isn't well implemented
     async fn base_read(&self, offset: usize, buf: &mut [u8]) -> SyscallResult {
+        let path = self.meta.dentry().path();
+        let tid = resolve_path_tid(&path);
+        let task = match tid {
+            StatTid::SelfTid => current_task().unwrap(),
+            StatTid::Tid(x) => &TASK_MANAGER.get(x).ok_or_else(|| {
+                error!("[StatusFile::base_read] Failed to get task, return EINVAL");
+                Errno::EINVAL
+            })?,
+        };
         // todo: maybe can just read empty
-        let task = current_task().unwrap();
 
         // 名称：这里我们用执行路径的文件名部分作为任务名（类似 bash）
         let name = "cyclictest";

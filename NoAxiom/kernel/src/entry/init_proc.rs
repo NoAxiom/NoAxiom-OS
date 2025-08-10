@@ -1,6 +1,6 @@
 use crate::{
     fs::path::kcreate,
-    include::fs::{FileFlags, InodeMode},
+    include::fs::{FileFlags, InodeMode, ALL_PERMISSIONS_MASK},
     mm::memory_set::MemorySet,
     sched::spawn::{spawn_ktask, spawn_utask},
     task::Task,
@@ -14,7 +14,10 @@ pub fn schedule_spawn_with_path() {
     println!("[kernel] INIT_PROC: {}", INIT_PROC_NAME);
     spawn_ktask(async move {
         let path_str = format!("/{}", INIT_PROC_NAME);
-        let dentry = kcreate(&path_str, InodeMode::FILE);
+        let dentry = kcreate(
+            &path_str,
+            InodeMode::FILE | InodeMode::from_bits(ALL_PERMISSIONS_MASK).unwrap(),
+        );
         let file = dentry.open(&FileFlags::O_RDWR).unwrap();
         let content = get_content(INIT_PROC_NAME);
         file.write_at(0, content).await.unwrap();

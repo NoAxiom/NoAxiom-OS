@@ -163,7 +163,11 @@ impl Task {
             let new_tid_tracer = tid_alloc();
             let new_tid = new_tid_tracer.0;
             let new_pgid = self.get_pgid(); // use parent's pgid
+            let new_cwd = self.cwd().clone();
+            let new_exe = self.exe().clone();
+            let new_root = self.root().clone();
             info!("fork new process, tgid: {}", new_tid);
+            assert_no_lock!();
             let new_process = Arc::new(Self {
                 tid: new_tid_tracer,
                 tgid: new_tid,
@@ -176,9 +180,9 @@ impl Task {
                 memory_set: ThreadOnly::new(memory_set),
                 sched_entity: ThreadOnly::new(SchedEntity::default()),
                 fd_table,
-                dir_cwd: Shared::new(self.cwd().clone()),
-                dir_exe: Shared::new(self.exe().clone()),
-                dir_root: Shared::new(self.root().clone()),
+                dir_cwd: Shared::new(new_cwd),
+                dir_exe: Shared::new(new_exe),
+                dir_root: Shared::new(new_root),
                 dir_proc: Shared::new(Self::set_dir_proc(new_tid)),
                 sa_list,
                 tcb: ThreadOnly::new(TCB {

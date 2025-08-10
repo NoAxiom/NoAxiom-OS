@@ -8,14 +8,15 @@ use crate::{
     entry::init_proc::INIT_PROC_NAME,
     fs::{
         fdtable::FdTable,
-        path::get_dentry,
+        path::{get_dentry, kcreate, kdelete},
         vfs::{
             basic::{dentry::Dentry, file::File},
+            impls::proc::status::{dentry::StatusDentry, inode::StatusInode},
             root_dentry,
         },
     },
     include::{
-        fs::FileFlags,
+        fs::{FileFlags, InodeMode},
         process::auxv::{AuxEntry, AT_NULL, AT_RANDOM},
     },
     mm::memory_set::{ElfMemoryInfo, MemorySet},
@@ -91,10 +92,31 @@ impl Task {
         task
     }
 
-    /// initialize the process's proc/self path
-    pub fn set_dir_proc(_tid: usize) -> Arc<dyn Dentry> {
-        // todo: unimplmented
-        root_dentry()
+    /// create and initialize the process's proc/{tid} path
+    pub fn set_dir_proc(tid: usize) -> Arc<dyn Dentry> {
+        let ret = kcreate(
+            &format!("/proc/{}", tid),
+            InodeMode::DIR | InodeMode::from_bits(0o755).unwrap(),
+        );
+
+        /* add some files */
+        // add stat
+        let stat = Arc::new(StatusDentry::new(
+            Some(ret.clone()),
+            "stat",
+            ret.super_block(),
+        ));
+        let statinode = Arc::new(StatusInode::new(ret.super_block()));
+        stat.into_dyn().set_inode(statinode);
+        ret.add_child(stat);
+        // todo: add more
+
+        ret
+    }
+
+    /// delete the process's proc/{tid} path
+    pub fn del_dir_proc(tid: usize) {
+        kdelete(&format!("/proc/{}", tid));
     }
 
     /// init user stack with pushing arg, env, and auxv

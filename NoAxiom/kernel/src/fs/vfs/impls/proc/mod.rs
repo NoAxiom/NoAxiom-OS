@@ -28,7 +28,7 @@ pub mod filesystem;
 mod interrupts;
 mod meminfo;
 mod mounts;
-mod status;
+pub mod status;
 mod superblock;
 
 pub use interrupts::inc_interrupts_count;
