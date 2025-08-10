@@ -101,8 +101,16 @@ impl Syscall<'_> {
     }
 
     // Duplicate a file descriptor to a specific fd
-    pub fn sys_dup3(&self, old_fd: usize, new_fd: usize) -> SyscallResult {
+    pub fn sys_dup3(&self, old_fd: usize, new_fd: usize, flags: i32) -> SyscallResult {
         info!("[sys_dup3] old_fd: {}, new_fd: {}", old_fd, new_fd);
+
+        if (flags & !(FileFlags::O_CLOEXEC.bits())) != 0 {
+            return Err(Errno::EINVAL);
+        }
+        if new_fd == old_fd {
+            info!("[sys_dup3] same fd!");
+            return Err(Errno::EINVAL);
+        }
 
         let mut fd_table = self.task.fd_table();
         if fd_table.get(old_fd).is_none() {
@@ -110,7 +118,13 @@ impl Syscall<'_> {
         }
 
         fd_table.fill_to(new_fd)?;
-        fd_table.copyfrom(old_fd, new_fd)
+        fd_table.copyfrom(old_fd, new_fd)?;
+
+        if flags & FileFlags::O_CLOEXEC.bits() != 0 {
+            fd_table.set_fdflag(new_fd, &FdFlags::FD_CLOEXEC);
+        }
+
+        Ok(new_fd as isize)
     }
 
     /// Switch to a new work directory

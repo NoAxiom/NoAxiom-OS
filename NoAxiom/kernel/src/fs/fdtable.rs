@@ -188,7 +188,7 @@ impl FdTable {
 
     /// Fill the `fd` slot with None
     pub fn fill_to(&mut self, fd: usize) -> SyscallResult {
-        if fd > self.rslimit() {
+        if fd >= self.rslimit() {
             return Err(Errno::EBADF);
         }
         for _ in self.table.len()..fd + 1 {

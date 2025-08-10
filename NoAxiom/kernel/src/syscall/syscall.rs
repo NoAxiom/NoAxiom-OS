@@ -43,7 +43,7 @@ impl<'a> Syscall<'a> {
             SYS_CHROOT =>           self.sys_chroot(args[0]),
             SYS_GETCWD =>           self.sys_getcwd(args[0], args[1]).await,
             SYS_DUP =>              self.sys_dup(args[0]),
-            SYS_DUP3 =>             self.sys_dup3(args[0], args[1]),
+            SYS_DUP3 =>             self.sys_dup3(args[0], args[1], args[2] as i32),
             SYS_PIPE2 =>            self.sys_pipe2(args[0], args[1] as i32).await,
             SYS_STATX =>            self.sys_statx(args[0] as isize, args[1], args[2] as i32, args[3] as u32, args[4]).await,
             SYS_FSTAT =>            self.sys_fstat(args[0], args[1]).await,
