@@ -62,14 +62,13 @@ impl Dentry for Ext4Dentry {
                     .map_err(|_| Errno::EIO)?,
                 file_flags,
             ))),
-            InodeMode::FILE => Ok(Arc::new(Ext4File::new(
+            InodeMode::FILE | InodeMode::LINK => Ok(Arc::new(Ext4File::new(
                 self.clone(),
                 inode
                     .downcast_arc::<Ext4FileInode>()
                     .map_err(|_| Errno::EIO)?,
                 file_flags,
             ))),
-            InodeMode::LINK => todo!("link file!"),
             _ => Err(Errno::EINVAL),
         }
     }

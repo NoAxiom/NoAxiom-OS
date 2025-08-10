@@ -348,6 +348,8 @@ impl dyn Dentry {
                         "var" => {}
                         "iozone.tmp.DUMMY" | "iozone.DUMMY" | "iozone.DUMMY.0"
                         | "iozone.DUMMY.1" | "iozone.DUMMY.2" | "iozone.DUMMY.3" => {}
+                        "busybox.conf" => {}
+                        "oom_score_adj" => {}
                         other => {
                             error!(
                                 "[walk_path] {} not found in {}, step: {}",
