@@ -26,7 +26,7 @@ use crate::{
     mm::user_ptr::UserPtr,
     return_errno,
     signal::interruptable::interruptable,
-    time::gettime::{get_time_duration, get_timeval},
+    time::gettime::get_time_duration,
     utils::{
         global_alloc,
         hack::{switch_into_ltp, switch_outof_ltp},
@@ -187,6 +187,9 @@ impl Syscall<'_> {
             Ok(dentry)
         } else if flags.contains(FileFlags::O_CREATE) {
             let (dentry, name) = get_dentry_parent(self.task, fd, &path, &searchflags)?;
+            if !dentry.can_search(self.task) {
+                return Err(Errno::EACCES);
+            }
             if let Some(dentry) = dentry.get_child(name) {
                 Ok(dentry)
             } else {
@@ -197,6 +200,10 @@ impl Syscall<'_> {
         }?;
 
         let inode = dentry.inode()?;
+        if flags.contains(FileFlags::O_TRUNC) {
+            inode.set_size(0);
+            inode.truncate(0).await?;
+        }
         if flags.contains(FileFlags::O_DIRECTORY) && inode.file_type() != InodeMode::DIR {
             return Err(Errno::ENOTDIR);
         }

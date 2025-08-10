@@ -10,9 +10,7 @@ use ksync::mutex::SpinLock;
 use super::superblock::{EmptySuperBlock, SuperBlock};
 use crate::{
     include::{
-        fs::{
-            InodeMode, Stat, Statx, StatxTimestamp, ALL_PERMISSIONS_MASK, PRIVILEGE_MASK, TYPE_MASK,
-        },
+        fs::{InodeMode, Stat, Statx, StatxTimestamp, ALL_PERMISSIONS_MASK, PRIVILEGE_MASK},
         time::TimeSpec,
     },
     syscall::SysResult,
@@ -102,8 +100,10 @@ pub struct InodeMetaInner {
 pub trait Inode: Send + Sync + DowncastSync {
     fn meta(&self) -> &InodeMeta;
     fn stat(&self) -> SysResult<Stat>;
+    // pay attention this func doesn't change the inode info size
     async fn truncate(&self, _new: usize) -> SysResult<()> {
-        panic!("this inode not implemented truncate");
+        warn!("this inode not implemented truncate");
+        Ok(())
     }
 }
 

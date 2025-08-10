@@ -43,17 +43,14 @@ use super::{
 use crate::{
     fs::{
         pipe::PipeInode,
-        vfs::{
-            basic::inode::InodeState,
-            impls::devfs::{null::NullInode, tty::inode::TtyInode, urandom::inode::UrandomInode},
-        },
+        vfs::impls::devfs::{null::NullInode, tty::inode::TtyInode, urandom::inode::UrandomInode},
     },
     include::{
         fs::{DevT, FileFlags, InodeMode},
         result::Errno,
     },
     sched::utils::block_on,
-    syscall::{SysResult, SyscallResult},
+    syscall::SysResult,
 };
 
 pub struct DentryMeta {
@@ -239,39 +236,55 @@ impl dyn Dentry {
     /// follow the symlink at a limited time
     /// use recursion
     /// todo: add path_cache!!
-    pub fn walk_path(self: &Arc<Self>, path: &Vec<&str>) -> SysResult<Arc<dyn Dentry>> {
-        Ok(self.__walk_path(path, 0, 0)?.0)
+    pub fn walk_path(
+        self: &Arc<Self>,
+        task: &Arc<Task>,
+        path: &Vec<&str>,
+    ) -> SysResult<Arc<dyn Dentry>> {
+        Ok(self.__walk_path(Some(task), path, 0, 0)?.0)
+    }
+
+    pub fn walk_path_no_checksearch(
+        self: &Arc<Self>,
+        path: &Vec<&str>,
+    ) -> SysResult<Arc<dyn Dentry>> {
+        Ok(self.__walk_path(None, path, 0, 0)?.0)
     }
 
     /// Must ensure the inode has symlink
     /// symlink jump, follow the symlink path
-    pub fn symlink_jump(self: &Arc<Self>, symlink_path: &str) -> SysResult<Arc<dyn Dentry>> {
+    pub fn symlink_jump(
+        self: &Arc<Self>,
+        task: &Arc<Task>,
+        symlink_path: &str,
+    ) -> SysResult<Arc<dyn Dentry>> {
         debug_assert!(self
             .inode()
             .expect("should have inode!")
             .symlink()
             .is_some());
-        Ok(self.__symlink_jump(symlink_path, 0)?.0)
+        Ok(self.__symlink_jump(Some(task), symlink_path, 0)?.0)
     }
 
     fn __symlink_jump(
         self: &Arc<Self>,
+        task: Option<&Arc<Task>>,
         symlink_path: &str,
         jumps: usize,
     ) -> SysResult<(Arc<dyn Dentry>, usize)> {
         let abs = symlink_path.starts_with('/');
         let components = path::resolve_path(symlink_path)?;
         let res = if abs {
-            root_dentry().__walk_path(&components, 0, jumps)
+            root_dentry().__walk_path(task, &components, 0, jumps)
         } else {
-            self.__walk_path(&components, 0, jumps)
+            self.__walk_path(task, &components, 0, jumps)
         };
         match res {
             Ok((dentry, new_jumps)) => {
                 if let Ok(inode) = dentry.inode() {
                     if let Some(symlink_path) = inode.symlink() {
                         debug!("[__symlink_jump] Following symlink: {}", symlink_path);
-                        return dentry.__symlink_jump(&symlink_path, jumps + 1);
+                        return dentry.__symlink_jump(task, &symlink_path, jumps + 1);
                     }
                 }
                 Ok((dentry, new_jumps))
@@ -282,6 +295,7 @@ impl dyn Dentry {
 
     fn __walk_path(
         self: &Arc<Self>,
+        task: Option<&Arc<Task>>,
         path: &Vec<&str>,
         step: usize,
         jumps: usize,
@@ -305,13 +319,22 @@ impl dyn Dentry {
             error!("[walk_path] {} is not a dir", self.name());
             return Err(Errno::ENOTDIR);
         }
+        // check search access, todo: add likely
+        if let Some(task) = task {
+            if task.fsuid() != 0 {
+                if !self.can_search(task) {
+                    error!("[walk_path] has no search access");
+                    return Err(Errno::EACCES);
+                }
+            }
+        }
 
         let entry = path[step];
         match entry {
-            "." => self.__walk_path(path, step + 1, jumps),
+            "." => self.__walk_path(task, path, step + 1, jumps),
             ".." => {
                 if let Some(parent) = self.parent() {
-                    parent.__walk_path(path, step + 1, jumps)
+                    parent.__walk_path(task, path, step + 1, jumps)
                 } else {
                     error!("[walk_path] {} has no parent", self.name());
                     Err(Errno::ENOENT)
@@ -319,11 +342,11 @@ impl dyn Dentry {
             }
             name => {
                 if let Some(symlink_path) = inode.symlink() {
-                    let (tar, new_jumps) = self.__symlink_jump(&symlink_path, jumps + 1)?;
-                    return tar.__walk_path(path, step + 1, new_jumps);
+                    let (tar, new_jumps) = self.__symlink_jump(task, &symlink_path, jumps + 1)?;
+                    return tar.__walk_path(task, path, step + 1, new_jumps);
                 }
                 if let Some(child) = self.get_child(name) {
-                    return child.__walk_path(path, step + 1, jumps);
+                    return child.__walk_path(task, path, step + 1, jumps);
                 }
                 debug!(
                     "[walk_path] {} not found in {}, step: {}",
@@ -352,7 +375,7 @@ impl dyn Dentry {
                     }
                 }
                 if let Some(child) = self.get_child(name) {
-                    return child.__walk_path(path, step + 1, jumps);
+                    return child.__walk_path(task, path, step + 1, jumps);
                 }
                 #[cfg(feature = "debug_sig")]
                 {
@@ -361,11 +384,13 @@ impl dyn Dentry {
                         "riscv64-linux-gnu" => {}
                         "ld.so.preload" | "ld.so.cache" => {}
                         "usr" | "tls" | "smaps" | "tmp" => {}
-                        "var" | "sys" => {}
+                        "var" | "sys" | "stat" => {}
                         "iozone.tmp.DUMMY" | "iozone.DUMMY" | "iozone.DUMMY.0"
                         | "iozone.DUMMY.1" | "iozone.DUMMY.2" | "iozone.DUMMY.3" => {}
                         "busybox.conf" => {}
                         "oom_score_adj" => {}
+                        "mkfs.ext3" | "mkfs.ext4" | "mkfs.xfs" | "mkfs.btrfs" | "mkfs.bcachefs"
+                        | "[" => {}
                         other => {
                             error!(
                                 "[walk_path] {} not found in {}, step: {}",
@@ -507,23 +532,55 @@ impl dyn Dentry {
         };
 
         if (access & X_OK != 0) && (permission & X_OK == 0) {
-            error!(
-                "[sys_faccessat] user cannot execute file: {:?}",
-                self.path()
-            );
+            error!("[check_access] user cannot execute file: {:?}", self.path());
             return Err(Errno::EACCES);
         }
 
         if (access & R_OK != 0) && (permission & R_OK == 0) {
-            error!("[sys_faccessat] user cannot read file: {:?}", self.path());
+            error!("[check_access] user cannot read file: {:?}", self.path());
             return Err(Errno::EACCES);
         }
 
         if (access & W_OK != 0) && (permission & W_OK == 0) {
-            error!("[sys_faccessat] user cannot write file: {:?}", self.path());
+            error!("[check_access] user cannot write file: {:?}", self.path());
             return Err(Errno::EACCES);
         }
         Ok(())
+    }
+
+    pub fn can_search(self: &Arc<Self>, task: &Arc<Task>) -> bool {
+        let (euid, egid) = { (task.fsuid(), task.fsgid()) };
+        if euid == 0 {
+            return true;
+        }
+        let i_mode = self.inode().unwrap().inode_mode().bits();
+        debug!(
+            "[can_search] Checking search permission for {}, mode: {:o}, euid: {}, egid: {}",
+            self.path(),
+            i_mode,
+            euid,
+            egid
+        );
+        let (user_perm, group_perm, other_perm) =
+            ((i_mode >> 6) & 0o7, (i_mode >> 3) & 0o7, i_mode & 0o7);
+        let perm = if euid == self.inode().unwrap().uid() {
+            user_perm
+        } else if egid == self.inode().unwrap().gid() {
+            group_perm
+        } else {
+            other_perm
+        };
+        if perm & 0o111 == 0 {
+            error!(
+                "[can_search] No search permission for {}, mode: {:o}, euid: {}, egid: {}",
+                self.path(),
+                i_mode,
+                euid,
+                egid
+            );
+            return false;
+        }
+        true
     }
 
     // todo: improve this

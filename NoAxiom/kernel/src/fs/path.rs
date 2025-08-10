@@ -36,8 +36,9 @@ pub fn kopen(path: &str) -> Arc<dyn Dentry> {
     debug_assert!(path.starts_with('/'), "kopen only support absolute path");
     let paths = resolve_path(path).expect("resolve path failed");
     debug!("[kopen] paths: {:?}", paths);
+
     root_dentry()
-        .walk_path(&paths)
+        .walk_path_no_checksearch(&paths)
         .expect("kopen failed, please check the path")
 }
 
@@ -56,7 +57,10 @@ pub fn kcreate(path: &str, mode: InodeMode) -> Arc<dyn Dentry> {
     let (paths, last) = resolve_path2(path).expect("resolve path failed");
     debug!("[kcreate] paths: {:?}, last: {:?}", paths, last);
     let name = last.expect("kcreate must have a name at the end");
-    let parent = root_dentry().walk_path(&paths).expect("walk path failed");
+
+    let parent = root_dentry()
+        .walk_path_no_checksearch(&paths)
+        .expect("walk path failed");
     assert_no_lock!();
     block_on(parent.create(name, mode)).unwrap()
 }
@@ -70,7 +74,10 @@ pub fn kdelete(path: &str) {
     let (paths, last) = resolve_path2(path).expect("resolve path failed");
     debug!("[kdelete] paths: {:?}, last: {:?}", paths, last);
     let name = last.expect("kdelete must have a name at the end");
-    let parent = root_dentry().walk_path(&paths).expect("walk path failed");
+
+    let parent = root_dentry()
+        .walk_path_no_checksearch(&paths)
+        .expect("walk path failed");
     block_on(
         parent
             .clone()
@@ -88,7 +95,10 @@ pub async fn kcreate_async(path: &str, mode: InodeMode) -> Arc<dyn Dentry> {
     let (paths, last) = resolve_path2(path).expect("resolve path failed");
     debug!("[kcreate] paths: {:?}, last: {:?}", paths, last);
     let name = last.expect("kcreate must have a name at the end");
-    let parent = root_dentry().walk_path(&paths).expect("walk path failed");
+
+    let parent = root_dentry()
+        .walk_path_no_checksearch(&paths)
+        .expect("walk path failed");
     assert_no_lock!();
     parent.create(name, mode).await.unwrap()
 }
@@ -197,7 +207,7 @@ fn __get_dentry(
         task.root().clone()
     };
 
-    let mut this = cwd.walk_path(components)?;
+    let mut this = cwd.walk_path(task, components)?;
 
     // special case for the last component
     // if the last component is a symlink, we need to follow it
@@ -205,7 +215,7 @@ fn __get_dentry(
         if !flags.contains(SearchFlags::AT_SYMLINK_NOFOLLOW) {
             if let Some(symlink_path) = inode.symlink() {
                 debug!("[get_dentry] Following symlink: {}", symlink_path);
-                this = this.symlink_jump(&symlink_path)?;
+                this = this.symlink_jump(task, &symlink_path)?;
             } else {
                 trace!(
                     "[get_dentry] AT_SYMLINK_NOFOLLOW is not set, but Dentry {} has no symlink",

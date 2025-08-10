@@ -29,6 +29,28 @@ impl Ext4FileInode {
             ino: Arc::new(AsyncMutex::new(inode)),
         }
     }
+
+    pub fn new_with_owner(
+        superblock: Arc<dyn SuperBlock>,
+        inode: IExtInode,
+        mode: InodeMode,
+        uid: u32,
+        gid: u32,
+    ) -> Self {
+        let meta = InodeMeta::new(
+            superblock,
+            InodeMode::FILE | mode,
+            inode.inode.size() as usize,
+            true,
+        );
+        // Set the correct owner and group
+        meta.uid.store(uid, core::sync::atomic::Ordering::SeqCst);
+        meta.gid.store(gid, core::sync::atomic::Ordering::SeqCst);
+        Self {
+            meta,
+            ino: Arc::new(AsyncMutex::new(inode)),
+        }
+    }
     pub fn get_inode(&self) -> Arc<AsyncMutex<IExtInode>> {
         self.ino.clone()
     }

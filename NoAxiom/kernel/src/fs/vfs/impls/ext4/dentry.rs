@@ -9,6 +9,7 @@ use super::{
     inode::{Ext4DirInode, Ext4FileInode},
 };
 use crate::{
+    cpu::current_task,
     fs::vfs::{
         basic::{
             dentry::{Dentry, DentryMeta},
@@ -101,20 +102,6 @@ impl Dentry for Ext4Dentry {
         } else {
             format!("/{}", name)
         };
-        // if ext4
-        //     .dir_find_entry(
-        //         this_inode_num,
-        //         &name,
-        //         &mut Ext4DirSearchResult::new(Ext4DirEntry::default()),
-        //     )
-        //     .await
-        //     .is_ok()
-        // {
-        //     warn!("file \"{}\" exists, ignore create!", child_path);
-        //     let res = self.into_dyn().get_child(name).unwrap();
-        //     trace!("res file type: {:?}", res.inode().unwrap().file_type());
-        //     return Ok(res);
-        // }
         assert_no_lock!();
         assert!(Arch::is_interrupt_enabled());
         if mode.contains(InodeMode::FILE) {
@@ -128,9 +115,38 @@ impl Dentry for Ext4Dentry {
                 .map_err(fs_err)?;
             trace!("[ext4] drop ext4");
             drop(ext4);
-            // let inode_type = new_file_inode.inode.file_type();
-            // debug!("new file inode type: {:?}", inode_type);
-            let new_inode = Ext4FileInode::new(super_block.clone(), new_file_inode, mode);
+
+            // Determine the correct uid and gid for the new file
+            let new_inode = if let Some(task) = current_task() {
+                let uid = task.fsuid(); // New file gets creator's uid
+
+                // For gid: check if parent directory has setgid bit
+                let parent_inode = self.into_dyn().inode()?;
+                let parent_mode = parent_inode.inode_mode();
+                let gid = if parent_mode.contains(crate::include::fs::InodeMode::SET_GID) {
+                    // If parent has setgid bit, inherit parent's gid
+                    parent_inode.gid()
+                } else {
+                    // Otherwise use creator's gid
+                    task.fsgid()
+                };
+                debug!(
+                    "[ext4] setting file owner: uid={}, gid={}, parent_mode={:?}",
+                    uid, gid, parent_mode
+                );
+                // let inode_type = new_file_inode.inode.file_type();
+                // debug!("new file inode type: {:?}", inode_type);
+                super::inode::Ext4FileInode::new_with_owner(
+                    super_block.clone(),
+                    new_file_inode,
+                    mode,
+                    uid,
+                    gid,
+                )
+            } else {
+                Ext4FileInode::new(super_block.clone(), new_file_inode, mode)
+            };
+
             Ok(self
                 .into_dyn()
                 .add_child_with_inode(name, Arc::new(new_inode)))

@@ -1,4 +1,7 @@
-use alloc::sync::Arc;
+use alloc::{boxed::Box, sync::Arc};
+
+use async_trait::async_trait;
+use include::errno::SysResult;
 
 use crate::{
     config::fs::BLOCK_SIZE,
@@ -34,6 +37,7 @@ impl NullInode {
     }
 }
 
+#[async_trait]
 impl Inode for NullInode {
     fn meta(&self) -> &InodeMeta {
         &self.meta
@@ -65,5 +69,8 @@ impl Inode for NullInode {
             st_ctime_nsec: inner.ctime_nsec as u64,
             unused: 0,
         })
+    }
+    async fn truncate(&self, _new: usize) -> SysResult<()> {
+        Ok(())
     }
 }
