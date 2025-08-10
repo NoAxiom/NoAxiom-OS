@@ -269,12 +269,12 @@ impl dyn Dentry {
         match res {
             Ok((dentry, new_jumps)) => {
                 if let Ok(inode) = dentry.inode() {
-                    let symlink_path = inode.symlink().expect("must have symlink path");
-                    debug!("[__symlink_jump] Following symlink: {}", symlink_path);
-                    dentry.__symlink_jump(&symlink_path, jumps + 1)
-                } else {
-                    Ok((dentry, new_jumps))
+                    if let Some(symlink_path) = inode.symlink() {
+                        debug!("[__symlink_jump] Following symlink: {}", symlink_path);
+                        return dentry.__symlink_jump(&symlink_path, jumps + 1);
+                    }
                 }
+                Ok((dentry, new_jumps))
             }
             Err(e) => Err(e),
         }
@@ -361,7 +361,7 @@ impl dyn Dentry {
                         "riscv64-linux-gnu" => {}
                         "ld.so.preload" | "ld.so.cache" => {}
                         "usr" | "tls" | "smaps" | "tmp" => {}
-                        "var" => {}
+                        "var" | "sys" => {}
                         "iozone.tmp.DUMMY" | "iozone.DUMMY" | "iozone.DUMMY.0"
                         | "iozone.DUMMY.1" | "iozone.DUMMY.2" | "iozone.DUMMY.3" => {}
                         "busybox.conf" => {}
