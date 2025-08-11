@@ -206,7 +206,6 @@ impl Syscall<'_> {
                 }
             }
         }
-        println!("res: {}", res);
         if res == i32::MAX {
             Err(Errno::ESRCH)
         } else {
