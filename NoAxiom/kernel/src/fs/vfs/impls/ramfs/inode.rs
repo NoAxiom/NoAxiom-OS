@@ -54,8 +54,8 @@ impl Inode for RamFsFileInode {
             unused: 0,
         })
     }
-    async fn truncate(&self, _new: usize) -> SysResult<()> {
-        warn!("[RamFsFileInode] truncate is just return");
+    async fn truncate(&self, new: usize) -> SysResult<()> {
+        self.meta.inner.lock().size = new;
         Ok(())
     }
 }

@@ -84,7 +84,7 @@ pub async fn init(fs_root: Arc<dyn Dentry>) -> SysResult<()> {
     let pid_max_dentry = kernel_dentry.add_child_with_inode("pid_max", pid_max_inode);
     pid_max_dentry
         .open(&FileFlags::O_WRONLY)?
-        .write("32768\0".as_bytes())
+        .write_at(0, "32768\0".as_bytes())
         .await?;
 
     info!("[fs] create /proc/self");

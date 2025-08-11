@@ -1,23 +1,24 @@
-use alloc::{boxed::Box, sync::Arc, vec::Vec};
+use alloc::{boxed::Box, sync::Arc};
 use core::task::Waker;
 
 use async_trait::async_trait;
 use include::errno::Errno;
-use ksync::mutex::RwLock;
 
 use super::{
     dentry::RamFsDentry,
     inode::{RamFsDirInode, RamFsFileInode},
 };
 use crate::{
-    fs::vfs::basic::file::{File, FileMeta},
+    fs::vfs::{
+        basic::file::{File, FileMeta},
+        impls::ramfs::ramfs_write_guard,
+    },
     include::{fs::FileFlags, io::PollEvent},
     syscall::{SysResult, SyscallResult},
 };
 
 pub struct RamFsFile {
     meta: FileMeta,
-    data: Arc<RwLock<Vec<u8>>>,
 }
 
 impl RamFsFile {
@@ -28,7 +29,6 @@ impl RamFsFile {
     ) -> Self {
         Self {
             meta: FileMeta::new(dentry.clone(), inode.clone(), file_flags),
-            data: Arc::new(RwLock::new(Vec::new())),
         }
     }
 }
@@ -39,11 +39,28 @@ impl File for RamFsFile {
         &self.meta
     }
     async fn base_read(&self, offset: usize, buf: &mut [u8]) -> SyscallResult {
-        let data = self.data.read();
+        let path = self.meta.dentry().path();
+        let mut fs = ramfs_write_guard();
+        let data = {
+            if let Some(data) = fs.get_content(&path) {
+                data
+            } else {
+                fs.add_file(path.clone());
+                fs.get_content(&path).unwrap()
+            }
+        };
 
-        if offset >= data.len() {
+        debug!("[ramfs] open new file: {}", path);
+        let inode = &self.meta.inode;
+        let size = inode.size();
+        debug!(
+            "[ramfs] read offset: {}, size: {}, data: {:?}",
+            offset, size, data
+        );
+        if offset >= size {
             return Ok(0); // EOF
         }
+
         let len = core::cmp::min(data.len() - offset, buf.len());
         buf[..len].copy_from_slice(&data[offset..offset + len]);
         Ok(len as isize)
@@ -52,24 +69,44 @@ impl File for RamFsFile {
         unreachable!()
     }
     async fn base_write(&self, offset: usize, buf: &[u8]) -> SyscallResult {
+        let path = self.meta.dentry().path();
+        let mut fs = ramfs_write_guard();
+        let data = {
+            if let Some(data) = fs.get_content_mut(&path) {
+                data
+            } else {
+                fs.add_file(path.clone());
+                fs.get_content_mut(&path).unwrap()
+            }
+        };
+
         let inode = &self.meta.inode;
         let size = inode.size();
+        debug!(
+            "[ramfs] write offset: {}, size: {}, data: {:?}, buf: {:?}",
+            offset, size, data, buf
+        );
         if offset + buf.len() > size {
             inode.set_size(offset + buf.len());
         }
-        let mut data = self.data.write();
-        if offset + buf.len() > data.len() {
-            data.resize(offset + buf.len(), 0);
-        }
-        let dst = &mut data[offset..offset + buf.len()];
-        dst.copy_from_slice(&buf[..dst.len()]);
+        data.resize(inode.size(), 0);
+
+        data[offset..offset + buf.len()].copy_from_slice(&buf);
         Ok(buf.len() as isize)
     }
     async fn load_dir(&self) -> SysResult<()> {
         Err(Errno::ENOTDIR)
     }
-    async fn delete_child(&self, _name: &str) -> SysResult<()> {
-        Err(Errno::ENOSYS)
+    async fn delete_child(&self, name: &str) -> SysResult<()> {
+        let parent = self.meta.dentry().parent().ok_or_else(|| {
+            error!("[ramfs] delete_child called on root dentry");
+            Errno::ENOENT
+        })?;
+        let mut parent_path = parent.path();
+        parent_path.push_str(name);
+        let mut fs = ramfs_write_guard();
+        fs.remove_file(&parent_path);
+        Ok(())
     }
     fn ioctl(&self, _cmd: usize, _arg: usize) -> SyscallResult {
         Err(Errno::ENOTTY)

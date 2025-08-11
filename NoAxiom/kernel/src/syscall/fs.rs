@@ -1234,11 +1234,11 @@ impl Syscall<'_> {
         file.dentry().check_access(self.task, W_OK, true)?;
         let size = file.size();
         if size < length {
-            file.inode().set_size(length);
             if length - size <= 4096 {
                 // fixme: where are not clean?
                 file.write_at(size, &vec![0u8; length - size]).await?;
             }
+            file.inode().set_size(length);
             Ok(0)
         } else {
             file.truncate_pagecache(length);
