@@ -1,7 +1,6 @@
 use alloc::{
     boxed::Box,
     string::{String, ToString},
-    sync::Arc,
     vec::Vec,
 };
 use core::task::Waker;
@@ -67,7 +66,7 @@ impl File for StatusFile {
         // todo: maybe can just read empty
 
         // 名称：这里我们用执行路径的文件名部分作为任务名（类似 bash）
-        let name = "cyclictest";
+        let name = task.exe().clone();
         let umask = 0o022; // 默认umask为022(fake)
         let state_str = "R (running)";
         let tgid = task.tgid();
@@ -76,14 +75,14 @@ impl File for StatusFile {
         let ppid = task.pcb().parent.as_ref().unwrap().upgrade().unwrap().tid();
 
         let tracerpid = 0; // 跟踪此进程的进程 PID（如果未被跟踪，则为 0）
-        let uid = 0;
-        let euid = 0;
-        let suid = 0;
-        let fsuid = 0;
-        let gid = 0;
-        let egid = 0;
-        let sgid = 0;
-        let fsgid = 0;
+        let uid = task.uid();
+        let euid = task.euid();
+        let suid = task.suid();
+        let fsuid = task.fsuid();
+        let gid = task.gid();
+        let egid = task.egid();
+        let sgid = task.sgid();
+        let fsgid = task.fsgid();
         let fdsize = task.fd_table().rlimit().rlim_cur as usize;
         let groups = String::new();
         let nstgid = task.tgid(); // pid 所属的每个 PID 命名空间中的线程组 ID
