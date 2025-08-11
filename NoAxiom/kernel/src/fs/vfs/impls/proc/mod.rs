@@ -110,7 +110,7 @@ pub async fn init(fs_root: Arc<dyn Dentry>) -> SysResult<()> {
 
     info!("[fs] create /proc/self/status");
     let status_dentry = Arc::new(StatusDentry::new(
-        Some(fs_root.clone()),
+        Some(self_dentry.clone()),
         "status",
         fs_root.super_block(),
     ));
@@ -120,7 +120,7 @@ pub async fn init(fs_root: Arc<dyn Dentry>) -> SysResult<()> {
 
     info!("[fs] create /proc/self/maps");
     let maps_dentry = Arc::new(RamFsDentry::new(
-        Some(fs_root.clone()),
+        Some(self_dentry.clone()),
         "maps",
         fs_root.super_block(),
     ));
