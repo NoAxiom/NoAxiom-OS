@@ -170,7 +170,8 @@ impl Syscall<'_> {
         if status.is_non_null() {
             debug!(
                 "[sys_wait4]: write exit_code at status_addr = {:#x}, value: {:#x}",
-                status.va_addr().raw(), exit_code.inner()
+                status.va_addr().raw(),
+                exit_code.inner()
             );
             status.write(exit_code.inner()).await?;
             trace!("[sys_wait4]: write exit code {:#x}", exit_code.inner());
@@ -803,7 +804,7 @@ impl Syscall<'_> {
         Ok(0)
     }
 
-    /// 类似 setresuid
+    /// ref: RocketOS
     pub fn sys_setresgid(&self, rgid: i32, egid: i32, sgid: i32) -> SyscallResult {
         info!(
             "[sys_setregid] rgid: {}, egid: {}, sgid: {}",
@@ -874,6 +875,34 @@ impl Syscall<'_> {
                 self.task.set_sgid(sgid as u32);
             }
         }
+        Ok(0)
+    }
+
+    pub async fn sys_getresgid(&self, rgid: usize, egid: usize, sgid: usize) -> SyscallResult {
+        info!(
+            "[sys_getresgid] rgid: {:#x}, egid: {:#x}, sgid: {:#x}",
+            rgid, egid, sgid
+        );
+        let rgid = UserPtr::<u32>::new(rgid);
+        let egid = UserPtr::<u32>::new(egid);
+        let sgid = UserPtr::<u32>::new(sgid);
+        rgid.try_write(self.task.gid()).await?;
+        egid.try_write(self.task.egid()).await?;
+        sgid.try_write(self.task.sgid()).await?;
+        Ok(0)
+    }
+    pub async fn sys_getresuid(&self, ruid: usize, euid: usize, suid: usize) -> SyscallResult {
+        info!(
+            "[sys_getresuid] ruid: {}, euid: {}, suid: {}",
+            ruid, euid, suid
+        );
+        let task = self.task;
+        let ruid = UserPtr::<u32>::new(ruid);
+        let euid = UserPtr::<u32>::new(euid);
+        let suid = UserPtr::<u32>::new(suid);
+        ruid.try_write(task.uid()).await?;
+        euid.try_write(task.euid()).await?;
+        suid.try_write(task.suid()).await?;
         Ok(0)
     }
 }
