@@ -294,4 +294,11 @@ impl Syscall<'_> {
             return Err(Errno::EINTR);
         }
     }
+
+    pub async fn sys_sigpending(&self, set: usize) -> SyscallResult {
+        let set = UserPtr::<SigSet>::new(set);
+        let sigset = self.task.pcb().signals.pending_set;
+        set.write(sigset).await?;
+        Ok(0)
+    }
 }
