@@ -11,20 +11,31 @@ use crate::signal::signal::{NSIG, SIG_DFL, SIG_IGN};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum SAHandlerType {
-    Ignore,
-    Kill,
+    Ign,
+    Term,
+    Core,
     Stop,
-    Continue,
+    Cont,
     User { handler: usize }, // handler addr
 }
 
 impl SAHandlerType {
     pub const fn new_default(signal: Signal) -> Self {
         match signal {
-            Signal::SIGCHLD | Signal::SIGURG | Signal::SIGWINCH => Self::Ignore,
+            Signal::SIGCHLD | Signal::SIGURG | Signal::SIGWINCH => Self::Ign,
             Signal::SIGSTOP | Signal::SIGTSTP | Signal::SIGTTIN | Signal::SIGTTOU => Self::Stop,
-            Signal::SIGCONT => Self::Continue,
-            _ => Self::Kill,
+            Signal::SIGABRT
+            | Signal::SIGBUS
+            | Signal::SIGFPE
+            | Signal::SIGILL
+            | Signal::SIGQUIT
+            | Signal::SIGSEGV
+            | Signal::SIGSYS
+            | Signal::SIGTRAP
+            | Signal::SIGXCPU
+            | Signal::SIGXFSZ => Self::Core, // SIGIOT | SIGUNUSED
+            Signal::SIGCONT => Self::Cont,
+            _ => Self::Term,
         }
     }
 }
@@ -88,7 +99,7 @@ impl KSigAction {
         match sa.handler {
             SIG_DFL => KSigAction::new_default(signal),
             SIG_IGN => Self {
-                handler: SAHandlerType::Ignore,
+                handler: SAHandlerType::Ign,
                 flags: sa.flags,
                 mask: sa.mask,
                 restorer: sa.restorer,
@@ -105,11 +116,9 @@ impl KSigAction {
     pub fn into_sa(&self) -> USigAction {
         USigAction {
             handler: match self.handler {
-                SAHandlerType::Ignore => SIG_IGN,
-                SAHandlerType::Kill => SIG_DFL,
-                SAHandlerType::Stop => SIG_DFL,
-                SAHandlerType::Continue => SIG_DFL,
+                SAHandlerType::Ign => SIG_IGN,
                 SAHandlerType::User { handler } => handler,
+                _ => SIG_DFL,
             },
             flags: self.flags,
             mask: self.mask,
@@ -144,7 +153,7 @@ impl SigActionList {
     pub fn get_ignored_bitmap(&self) -> SigSet {
         let mut res = SigSet::empty();
         for (index, sa) in self.actions.iter().enumerate() {
-            if sa.handler == SAHandlerType::Ignore {
+            if sa.handler == SAHandlerType::Ign {
                 let sigset = unsafe { SigSet::from_raw_sa_index(index) };
                 res |= sigset;
             }

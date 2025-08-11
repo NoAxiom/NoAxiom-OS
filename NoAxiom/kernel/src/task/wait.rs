@@ -5,7 +5,7 @@ use core::{
     task::{Context, Poll},
 };
 
-use super::{exit::ExitReason, status::TaskStatus, Task};
+use super::{exit::ExitCode, status::TaskStatus, Task};
 use crate::{
     include::{
         process::{PidSel, WaitOption},
@@ -15,7 +15,7 @@ use crate::{
     syscall::SysResult,
 };
 
-type WaitChildOutput = (ExitReason, usize);
+type WaitChildOutput = (ExitCode, usize);
 
 pub struct WaitChildFuture<'a> {
     task: &'a Arc<Task>,
@@ -76,7 +76,7 @@ impl Future for WaitChildFuture<'_> {
                     TaskStatus::Zombie => {
                         let child_tid = child.tid();
                         let exit_code = ch_pcb.exit_code;
-                        trace!(
+                        debug!(
                             "[wait4] child_tid: {}, exit_code: {}",
                             child_tid,
                             exit_code.inner()
@@ -99,18 +99,13 @@ impl Future for WaitChildFuture<'_> {
         };
         let res = match res {
             Poll::Pending => {
-                if self.wait_option.contains(WaitOption::WNOHANG) && res.is_pending() {
-                    trace!("[sys_wait4] return nohang");
-                    Poll::Ready(Ok((ExitReason::new(0, 0), 0)))
+                if self.wait_option.contains(WaitOption::WNOHANG) {
+                    Poll::Ready(Err(Errno::EAGAIN))
                 } else {
-                    trace!("[sys_wait4] suspend for child exit");
                     Poll::Pending
                 }
             }
-            Poll::Ready(_) => {
-                trace!("[sys_wait4] exited child found");
-                res
-            }
+            Poll::Ready(_) => res,
         };
         res
     }

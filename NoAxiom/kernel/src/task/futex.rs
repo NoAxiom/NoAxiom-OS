@@ -39,7 +39,6 @@ impl FutexWaiter {
     }
 }
 
-/// waiter queue: a map of TID -> Waker, bitset
 type WaiterQueueInner = VecDeque<FutexWaiter>;
 pub struct WaiterQueue(WaiterQueueInner);
 impl WaiterQueue {
@@ -153,8 +152,12 @@ where
                 if waiter.bitset & bitset == 0 {
                     tmp_waiters.push_back(waiter);
                 } else {
-                    waiter.done.store(true, Ordering::SeqCst);
-                    waiter.waker.wake();
+                    if Arc::strong_count(&waiter.done) > 1 {
+                        waiter.done.store(true, Ordering::SeqCst);
+                        waiter.waker.wake();
+                    } else {
+                        warn!("[futex] waker already dropped, wake canceled");
+                    }
                     count += 1;
                     if count >= wake_num {
                         break;

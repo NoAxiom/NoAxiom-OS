@@ -226,6 +226,7 @@ pub mod rusage {
     }
 }
 
+#[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct CloneArgs {
     pub flags: u64,        /* Flags bit mask */
@@ -239,6 +240,24 @@ pub struct CloneArgs {
     pub set_tid: u64,      /* Pointer to a pid_t array (since Linux 5.5) */
     pub set_tid_size: u64, /* Number of elements in set_tid (since Linux 5.5) */
     pub cgroup: u64,       /* File descriptor for target cgroupof child (since Linux 5.7) */
+}
+
+impl CloneArgs {
+    pub fn from_legacy(flags: usize, stack: usize, ptid: usize, tls: usize, ctid: usize) -> Self {
+        Self {
+            flags: flags as u64,
+            pidfd: 0,
+            child_tid: ctid as u64,
+            parent_tid: ptid as u64,
+            exit_signal: 0,
+            stack: stack as u64,
+            stack_size: 0,
+            tls: tls as u64,
+            set_tid: 0,
+            set_tid_size: 0,
+            cgroup: 0,
+        }
+    }
 }
 
 bitflags! {

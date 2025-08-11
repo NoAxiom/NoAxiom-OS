@@ -5,7 +5,7 @@ use arch::{Arch, ArchMemory};
 use include::errno::{Errno, SyscallResult};
 
 use crate::{
-    include::process::CloneFlags,
+    include::process::{CloneArgs, CloneFlags},
     mm::user_ptr::UserPtr,
     sched::{
         sched_entity::SchedEntity,
@@ -27,18 +27,16 @@ use crate::{
 
 impl Task {
     /// clone current task
-    pub async fn do_fork(
-        self: &Arc<Self>,
-        flags: usize,
-        stack: usize,
-        ptid: usize,
-        tls: usize,
-        ctid: usize,
-    ) -> SyscallResult {
+    pub async fn do_fork(self: &Arc<Self>, args: CloneArgs) -> SyscallResult {
+        let flags = args.flags as usize;
         let flags = CloneFlags::from_bits(flags & !0xff).ok_or(Errno::EINVAL)?;
         let new_task = self.inner_fork(flags);
         let new_tid = new_task.tid();
         let new_cx = new_task.trap_context_mut();
+        let stack = args.stack as usize + args.stack_size as usize;
+        let ptid = args.parent_tid as usize;
+        let ctid = args.child_tid as usize;
+        let tls = args.tls as usize;
         debug!(
             "[sys_fork] flags: {:?} stack: {:#x} ptid: {:#x} tls: {:#x} ctid: {:#x}",
             flags, stack, ptid, tls, ctid

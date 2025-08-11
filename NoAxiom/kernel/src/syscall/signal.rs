@@ -230,20 +230,26 @@ impl Syscall<'_> {
 
     async fn __sys_sigtimedwait(
         &self,
-        mut mask: SigSet,
+        set: SigSet,
         info: UserPtr<RawSigInfo>,
         timeout: TimeSpec,
     ) -> SyscallResult {
-        mask.remove(SigSet::SIGKILL | SigSet::SIGSTOP);
+        let mask = !(set.with_kill());
+        if (timeout.tv_nsec as isize) < 0 || timeout.tv_nsec >= 1_000_000_000 {
+            return Err(Errno::EINVAL);
+        }
         let timeout = Duration::from(timeout);
-        TimeLimitedFuture::new(self.__sys_sigsuspend(mask), Some(timeout));
+        let _ = TimeLimitedFuture::new(self.__sys_sigsuspend(mask), Some(timeout))
+            .await
+            .map_timeout_result(Err(Errno::EAGAIN))?;
+
         let si = self.task.pcb().signals.pop_with_mask(mask);
         if let Some(si) = si {
             let raw_si = si.into_raw();
             info.try_write(raw_si).await?;
             return Ok(si.signal.raw() as isize);
         } else {
-            return Err(Errno::EAGAIN);
+            return Err(Errno::EINTR);
         }
     }
 }

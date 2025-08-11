@@ -5,7 +5,7 @@ use alloc::{
 
 use bitflags::Flags;
 
-use super::{exit::ExitReason, status::TaskStatus, Task};
+use super::{exit::ExitCode, status::TaskStatus, Task};
 use crate::{
     include::process::{robust_list::RobustList, TaskFlags},
     signal::{sig_manager::SigManager, sig_set::SigSet, sig_stack::SigAltStack},
@@ -17,8 +17,8 @@ use crate::{
 #[repr(align(64))]
 pub struct PCB {
     // task status
-    pub status: TaskStatus,    // task status
-    pub exit_code: ExitReason, // exit code
+    pub status: TaskStatus,  // task status
+    pub exit_code: ExitCode, // exit code
 
     // paternity
     // assertion: only when the task is group leader, it can have children
@@ -39,7 +39,7 @@ impl Default for PCB {
             children: Vec::new(),
             parent: None,
             status: TaskStatus::Normal,
-            exit_code: ExitReason::default(),
+            exit_code: ExitCode::default(),
             signals: SigManager::new(),
             sig_stack: None,
             robust_list: RobustList::default(),
@@ -58,10 +58,10 @@ impl PCB {
     }
 
     // exit code
-    pub fn exit_code(&self) -> ExitReason {
+    pub fn exit_code(&self) -> ExitCode {
         self.exit_code
     }
-    pub fn set_exit_code(&mut self, exit_code: ExitReason) {
+    pub fn set_exit_code(&mut self, exit_code: ExitCode) {
         self.exit_code = exit_code;
     }
 

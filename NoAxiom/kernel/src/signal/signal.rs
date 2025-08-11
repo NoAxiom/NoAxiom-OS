@@ -24,7 +24,7 @@ pub enum Signal {
     SIGQUIT = 3,
     SIGILL = 4,
     SIGTRAP = 5,
-    SIGABRT = 6,
+    SIGABRT = 6, // a.k.a SIGIOT
     SIGBUS = 7,
     SIGFPE = 8,
     SIGKILL = 9,
@@ -49,9 +49,9 @@ pub enum Signal {
     SIGVTALRM = 26,
     SIGPROF = 27,
     SIGWINCH = 28,
-    SIGIO = 29,
+    SIGIO = 29, // a.k.a SIGPOLL
     SIGPWR = 30,
-    SIGSYS = 31,
+    SIGSYS = 31, // a.k.a SIGUNUSED
 
     // rt signal, not implemented yet!
     SIGTIMER = 32,

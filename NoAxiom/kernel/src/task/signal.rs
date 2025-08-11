@@ -17,10 +17,9 @@ use crate::{
         sig_info::SigInfo,
         sig_set::SigMask,
         sig_stack::{MContext, UContext},
-        signal::Signal,
     },
     syscall::utils::clear_current_syscall,
-    task::{exit::ExitReason, status::TaskStatus, Task},
+    task::{exit::ExitCode, status::TaskStatus, Task},
 };
 
 extern "C" {
@@ -91,10 +90,11 @@ impl Task {
 
             // start handle
             match action.handler {
-                SAHandlerType::Ignore => self.sig_default_ignore(),
-                SAHandlerType::Kill => self.sig_default_terminate(si.errno, si.signal),
+                SAHandlerType::Ign => self.sig_default_ignore(),
+                SAHandlerType::Term => self.sig_default_terminate(&si),
                 SAHandlerType::Stop => self.sig_default_stop(),
-                SAHandlerType::Continue => self.sig_default_continue(),
+                SAHandlerType::Cont => self.sig_default_continue(),
+                SAHandlerType::Core => self.sig_default_coredump(&si),
                 SAHandlerType::User { handler } => {
                     drop(sa_list);
                     let mut pcb = self.pcb();
@@ -264,15 +264,16 @@ impl Task {
     }
 
     /// terminate the process
-    fn sig_default_terminate(&self, errno: i32, signal: Signal) {
+    fn sig_default_terminate(&self, si: &SigInfo) {
         warn!(
             "sig_default_terminate: terminate the process, tid: {}, during: {:?}",
             self.tid(),
             self.tcb().current_syscall
         );
-        debug!("[sig_default_terminate] terminate the process");
-        self.terminate_group(ExitReason::new(errno, signal.raw()));
-        debug!("[sig_default_terminate] terminate the process done");
+        let errno = si.errno;
+        let signal = si.signal;
+        let exit_code = ExitCode::new(errno).signaled(signal);
+        self.terminate_group(exit_code);
     }
     /// stop the process
     fn sig_default_stop(&self) {
@@ -300,6 +301,14 @@ impl Task {
             task.wake_unchecked();
         }
         // todo: notify parent?
+    }
+    /// terminate the process and dump core
+    fn sig_default_coredump(&self, si: &SigInfo) {
+        let errno = si.errno;
+        let signal = si.signal;
+        debug!("[sig_default_coredump] coredump the process");
+        let exit_code = ExitCode::new(errno).signaled(signal).core_dumped();
+        self.terminate_group(exit_code);
     }
     /// ignore the signal
     #[inline(always)]

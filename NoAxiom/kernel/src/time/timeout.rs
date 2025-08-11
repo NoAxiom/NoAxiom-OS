@@ -6,6 +6,8 @@ use core::{
     time::Duration,
 };
 
+use include::errno::SysResult;
+
 use crate::{
     cpu::current_task,
     signal::interruptable::interruptable,
@@ -24,6 +26,12 @@ impl<T> TimeLimitedType<T> {
     pub fn map_timeout(self, timeout: T) -> T {
         match self {
             TimeLimitedType::Ok(res) => res,
+            TimeLimitedType::TimeOut => timeout,
+        }
+    }
+    pub fn map_timeout_result(self, timeout: SysResult<T>) -> SysResult<T> {
+        match self {
+            TimeLimitedType::Ok(res) => Ok(res),
             TimeLimitedType::TimeOut => timeout,
         }
     }

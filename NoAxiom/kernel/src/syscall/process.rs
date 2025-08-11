@@ -29,7 +29,7 @@ use crate::{
         signal::Signal,
     },
     task::{
-        exit::ExitReason,
+        exit::ExitCode,
         futex::{FutexAddr, FutexFuture, FUTEX_SHARED_QUEUE},
         manager::{PROCESS_GROUP_MANAGER, TASK_MANAGER},
     },
@@ -39,14 +39,14 @@ use crate::{
 impl Syscall<'_> {
     /// exit current task by marking it as zombie
     pub fn sys_exit(&self, exit_code: i32) -> SyscallResult {
-        self.task.terminate(ExitReason::new(exit_code, 0));
+        self.task.terminate(ExitCode::new(exit_code));
         Ok(0)
     }
 
     /// exit group
     pub fn sys_exit_group(&self, exit_code: i32) -> SyscallResult {
         let task = self.task;
-        let exit_code = ExitReason::new(exit_code, 0);
+        let exit_code = ExitCode::new(exit_code);
         task.terminate_group(exit_code);
         task.terminate(exit_code);
         Ok(0)
@@ -64,16 +64,10 @@ impl Syscall<'_> {
          * u64 tls)
          */
         #[cfg(target_arch = "loongarch64")]
-        let x = self
-            .task
-            .do_fork(args[0], args[1], args[2], /* here */ args[4], args[3])
-            .await;
+        let cl_args = CloneArgs::from_legacy(args[0], args[1], args[2], args[4], args[3]);
         #[cfg(target_arch = "riscv64")]
-        let x = self
-            .task
-            .do_fork(args[0], args[1], args[2], args[3], args[4])
-            .await;
-        x
+        let cl_args = CloneArgs::from_legacy(args[0], args[1], args[2], args[3], args[4]);
+        self.task.do_fork(cl_args).await
     }
 
     /// clone3
@@ -81,12 +75,7 @@ impl Syscall<'_> {
         let cl_args = UserPtr::<CloneArgs>::new(cl_args);
         let cl_args = cl_args.read().await?;
         warn!("[sys_clone3] cl_args: {:#x?}", cl_args);
-        let flags = cl_args.flags as usize;
-        let stack = cl_args.stack as usize + cl_args.stack_size as usize - 16;
-        let ptid = cl_args.parent_tid as usize;
-        let ctid = cl_args.child_tid as usize;
-        let tls = cl_args.tls as usize;
-        self.task.do_fork(flags, stack, ptid, tls, ctid).await
+        self.task.do_fork(cl_args).await
     }
 
     /// execve syscall impl
@@ -155,6 +144,10 @@ impl Syscall<'_> {
         );
         let wait_option = WaitOption::from_bits(options as i32).ok_or(Errno::EINVAL)?;
         let status: UserPtr<i32> = UserPtr::new(status_addr);
+
+        if pid == i32::MIN as isize {
+            return Err(Errno::ESRCH);
+        }
 
         // pid type
         // -1: all children, >0: specific pid, other: group unimplemented
