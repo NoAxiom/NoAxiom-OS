@@ -4,7 +4,7 @@ use smoltcp::wire::{IpAddress, IpEndpoint, Ipv4Address};
 
 use super::SyscallResult;
 use crate::{
-    fs::pipe::PipeFile,
+    fs::{pipe::PipeFile, vfs::basic::file::File},
     include::{
         fs::{FdFlags, FileFlags},
         net::{
@@ -31,15 +31,36 @@ impl Syscall<'_> {
             address_family, socket_type, protocol
         );
 
+        // Extract flags from socket_type
+        let flags = socket_type & !0xf; // Get the upper bits (flags)
+        let actual_socket_type = socket_type & 0xf; // Get the lower 4 bits (actual type)
+
+        // Check for SOCK_CLOEXEC flag
+        let has_cloexec = (flags & (crate::include::net::SOCK_CLOEXEC as usize)) != 0;
+        let has_nonblock = (flags & (crate::include::net::SOCK_NONBLOCK as usize)) != 0;
+
         // todo: maybe should add socket inode
         let socket_file = SocketFile::new(
             AddressFamily::try_from(address_family as u16)?,
-            PosixSocketType::try_from(socket_type & 0xf)?,
+            PosixSocketType::try_from(actual_socket_type)?,
         )?;
 
         let mut fd_table = self.task.fd_table();
         let socket_fd = fd_table.alloc_fd()?;
         fd_table.set(socket_fd as usize, Arc::new(socket_file));
+
+        // Set FD_CLOEXEC flag if SOCK_CLOEXEC was specified
+        if has_cloexec {
+            fd_table.set_fdflag(socket_fd as usize, &FdFlags::FD_CLOEXEC);
+        }
+
+        if has_nonblock {
+            fd_table
+                .get_socketfile(socket_fd)
+                .unwrap()
+                .meta()
+                .set_flags(FileFlags::O_NONBLOCK);
+        }
 
         debug!("[sys_socket] socket fd: {}", socket_fd);
         Ok(socket_fd as isize)
@@ -340,6 +361,17 @@ impl Syscall<'_> {
             "[sys_recvfrom] sockfd: {}, buf: {}, flags: ignored, addr: {}, addr_len: {}",
             sockfd, buf, addr, addr_len
         );
+
+        //check addr len is valid
+        if addr_len > 0 {
+            if addr_len == 0xffffffffffffffff {
+                return Err(Errno::EFAULT);
+            }
+            let addr_len_read = UserPtr::<i32>::new(addr_len).read().await?;
+            if addr_len_read < 0 {
+                return Err(Errno::EINVAL);
+            }
+        }
 
         let fd_table = self.task.fd_table();
         let socket_file = fd_table.get_socketfile(sockfd as usize)?;
