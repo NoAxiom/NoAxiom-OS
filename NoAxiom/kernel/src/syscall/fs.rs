@@ -1689,12 +1689,15 @@ impl Syscall<'_> {
             "[sys_fadvise64] fd: {}, offset: {}, len: {}, advice: {}",
             fd, offset, len, advice
         );
-        log::warn!("[sys_fadvise64] Unimplemented");
+        warn!("[sys_fadvise64] Unimplemented");
         match advice {
             0..=5 => {}
             _ => return Err(Errno::EINVAL),
         }
-        let _file = self.task.fd_table().get(fd).ok_or(Errno::EBADF)?;
+        let file = self.task.fd_table().get(fd).ok_or(Errno::EBADF)?;
+        if file.dentry().inode()?.file_type() == InodeMode::FIFO {
+            return Err(Errno::ESPIPE);
+        }
         Ok(0)
     }
 }
