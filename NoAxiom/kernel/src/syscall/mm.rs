@@ -6,7 +6,7 @@ use crate::{
     config::mm::PAGE_SIZE,
     include::{
         ipc::{IPC_PRIVATE, IPC_RMID},
-        mm::{MmapFlags, MmapProts},
+        mm::{Madv, MmapFlags, MmapProts},
         result::Errno,
     },
     mm::{address::VirtAddr, page_table::PageTable, permission::MapPermission, shm::SHM_MANAGER},
@@ -160,5 +160,19 @@ impl Syscall<'_> {
         let nattch = memory_set.detach_shm(address.into());
         drop(memory_set);
         Ok(nattch as isize)
+    }
+
+    /// Unimplemente advise
+    /// todo: finish this!!
+    pub fn sys_madvise(addr: usize, len: usize, advice: i32) -> SyscallResult {
+        let madvise = Madv::from_repr(advice).ok_or(Errno::EINVAL)?;
+        info!(
+            "[sys_madvise]: addr: {:#x}, len: {:#x}, advice: {:?}",
+            addr, len, madvise
+        );
+        if addr % PAGE_SIZE != 0 {
+            return Err(Errno::EINVAL);
+        }
+        Ok(0)
     }
 }

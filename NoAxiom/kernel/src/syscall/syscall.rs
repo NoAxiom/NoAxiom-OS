@@ -136,7 +136,7 @@ impl<'a> Syscall<'a> {
 
             // mm
             SYS_MEMBARRIER =>   Self::empty_syscall("membarrier", 0), // fixme: should impl this in multicore
-            SYS_MADVISE =>      Self::empty_syscall("madvise", 0),
+            SYS_MADVISE =>      Self::sys_madvise(args[0], args[1], args[2] as i32),
             SYS_BRK =>          self.sys_brk(args[0]),
             SYS_MMAP =>         self.sys_mmap(args[0],args[1],args[2],args[3],args[4] as isize, args[5]),
             SYS_MUNMAP =>       self.sys_munmap(args[0], args[1]),
