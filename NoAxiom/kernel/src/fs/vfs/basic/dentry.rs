@@ -17,6 +17,7 @@ use crate::{
         path,
         pipe::PipeDentry,
         vfs::{
+            basic::inode::EmptyInode,
             impls::devfs::{
                 loop_control::{dentry::LoopControlDentry, inode::LoopControlInode},
                 loopdev::{dentry::LoopDevDentry, inode::LoopDevInode},
@@ -763,4 +764,19 @@ impl Dentry for EmptyDentry {
     async fn symlink(self: Arc<Self>, _name: &str, _tar_name: &str) -> SysResult<()> {
         unreachable!()
     }
+}
+
+lazy_static::lazy_static! {
+    pub static ref DENTRY_HERE: Arc<dyn Dentry> = {
+        let ret = Arc::new(EmptyDentry::new("."));
+        ret.into_dyn().set_inode(Arc::new(EmptyInode::new()));
+        ret.into_dyn().inode().unwrap().set_inode_mode(InodeMode::DIR | InodeMode::from_bits(0o755).unwrap());
+        ret
+    };
+    pub static ref DENTRY_FRONT: Arc<dyn Dentry> = {
+        let ret = Arc::new(EmptyDentry::new(".."));
+        ret.into_dyn().set_inode(Arc::new(EmptyInode::new()));
+        ret.into_dyn().inode().unwrap().set_inode_mode(InodeMode::DIR | InodeMode::from_bits(0o755).unwrap());
+        ret
+    };
 }

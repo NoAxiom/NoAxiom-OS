@@ -24,7 +24,10 @@ use crate::{
     constant::fs::LEN_BEFORE_NAME,
     fs::{
         pagecache::{get_pagecache_rguard, get_pagecache_wguard, PageState},
-        vfs::basic::inode::InodeState,
+        vfs::basic::{
+            dentry::{DENTRY_FRONT, DENTRY_HERE},
+            inode::InodeState,
+        },
     },
     include::{
         fs::{FileFlags, LinuxDirent64, SeekFrom},
@@ -373,12 +376,17 @@ impl dyn File {
     /// Read directory entries from the directory file.
     pub async fn read_dir(&self, buf: &mut [u8]) -> SyscallResult {
         self.load_dir().await?;
+        if buf.len() < core::mem::size_of::<LinuxDirent64>() {
+            return Err(Errno::EINVAL);
+        }
 
         let buf_len = buf.len();
         let mut writen_len = 0;
         let mut buf_it = buf;
         let dentry = self.dentry();
-        let children = dentry.children();
+        let mut children = dentry.children().clone();
+        children.insert(".".to_string(), DENTRY_HERE.clone());
+        children.insert("..".to_string(), DENTRY_FRONT.clone());
         let offset = self.meta().pos.load(Ordering::Relaxed);
         for dentry in children.values().skip(offset) {
             if dentry.is_negative() {
@@ -393,10 +401,13 @@ impl dyn File {
                 inode.id() as u64,
                 offset as u64,
                 rec_len as u16,
-                inode.file_type().bits() as u8,
+                (inode.file_type().bits() >> 8) as u8,
             );
 
-            trace!("[sys_getdents64] linux dirent {linux_dirent:?}");
+            debug!(
+                "[sys_getdents64] dentry {:?}, linux dirent {linux_dirent:?}",
+                dentry.path()
+            );
             if writen_len + rec_len > buf_len {
                 break;
             }
