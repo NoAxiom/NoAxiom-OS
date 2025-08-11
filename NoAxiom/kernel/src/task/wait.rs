@@ -100,7 +100,8 @@ impl Future for WaitChildFuture<'_> {
         let res = match res {
             Poll::Pending => {
                 if self.wait_option.contains(WaitOption::WNOHANG) {
-                    Poll::Ready(Err(Errno::EAGAIN))
+                    // Poll::Ready(Err(Errno::EAGAIN))
+                    Poll::Ready(Ok((ExitCode::default(), 0usize)))
                 } else {
                     Poll::Pending
                 }
