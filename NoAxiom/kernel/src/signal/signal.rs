@@ -18,6 +18,7 @@ pub type SigErrno = i32;
 #[repr(usize)]
 #[allow(non_camel_case_types, unused)]
 pub enum Signal {
+    SIGINVAL = 0, // invalid signal, used for error handling
     // non-rt signal
     SIGHUP = 1,
     SIGINT = 2,
@@ -121,6 +122,23 @@ impl TryFrom<usize> for Signal {
             Ok(signal)
         } else {
             Err(Errno::EINVAL)
+        }
+    }
+}
+
+impl Signal {
+    /// returns None if signo is zero
+    /// otherwise returns Some(Ok(signal)) if signo is valid, or
+    /// Some(Err(Errno::EINVAL)) if invalid
+    pub fn try_from_with_zero_as_none(signo: usize) -> SysResult<Option<Self>> {
+        if signo == 0 {
+            Ok(None)
+        } else {
+            if let Some(signal) = Self::from_repr(signo) {
+                Ok(Some(signal))
+            } else {
+                Err(Errno::EINVAL)
+            }
         }
     }
 }

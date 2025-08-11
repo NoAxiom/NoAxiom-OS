@@ -4,6 +4,7 @@
 //! sys_sigreturn
 //! sys_sigsuspend
 
+use alloc::sync::Arc;
 use core::{future::pending, time::Duration};
 
 use arch::{ArchTrapContext, TrapArgs};
@@ -21,7 +22,10 @@ use crate::{
         sig_set::SigSet,
         signal::Signal,
     },
-    task::manager::{PROCESS_GROUP_MANAGER, TASK_MANAGER},
+    task::{
+        manager::{PROCESS_GROUP_MANAGER, TASK_MANAGER},
+        Task,
+    },
     time::timeout::TimeLimitedFuture,
 };
 
@@ -109,13 +113,13 @@ impl Syscall<'_> {
     }
 
     pub fn sys_kill(&self, pid: isize, signo: usize) -> SyscallResult {
-        let signal = Signal::try_from(signo)?;
-        warn!(
-            "[sys_kill] from: {}, target: {}, signal: {:?}",
+        info!(
+            "[sys_kill] from: {}, target: {}, signo: {}",
             self.task.tid(),
             pid,
-            signal,
+            signo,
         );
+        let signal = Signal::try_from_with_zero_as_none(signo)?;
         match pid {
             0 => {
                 // process group
@@ -127,45 +131,65 @@ impl Syscall<'_> {
                     .into_iter()
                     .map(|t| t.task())
                 {
-                    task.recv_siginfo(
-                        SigInfo::new_detailed(
-                            signal,
-                            SigCode::User,
-                            0,
-                            SigDetail::Kill(SigKillDetail { pid: pgid }),
-                        ),
-                        false,
-                    );
+                    if !self.__sys_kill_can_send_to(&task) {
+                        continue;
+                    }
+                    if let Some(signal) = signal {
+                        task.recv_siginfo(
+                            SigInfo::new_detailed(
+                                signal,
+                                SigCode::User,
+                                0,
+                                SigDetail::Kill(SigKillDetail { pid: pgid }),
+                            ),
+                            false,
+                        );
+                    }
+                    return Ok(0);
                 }
+                Err(Errno::EPERM)
             }
             -1 => {
                 for (_, task) in TASK_MANAGER.0.lock().iter() {
                     let task = task.upgrade().unwrap();
                     if task.tgid() != INIT_PROCESS_ID && task.is_group_leader() {
-                        task.recv_siginfo(
-                            SigInfo::new_detailed(
-                                signal,
-                                SigCode::User,
-                                0,
-                                SigDetail::Kill(SigKillDetail { pid: task.tgid() }),
-                            ),
-                            false,
-                        );
+                        if !self.__sys_kill_can_send_to(&task) {
+                            continue;
+                        }
+                        if let Some(signal) = signal {
+                            task.recv_siginfo(
+                                SigInfo::new_detailed(
+                                    signal,
+                                    SigCode::User,
+                                    0,
+                                    SigDetail::Kill(SigKillDetail { pid: task.tgid() }),
+                                ),
+                                false,
+                            );
+                        }
+                        return Ok(0);
                     }
                 }
+                Err(Errno::EPERM)
             }
             _ if pid > 0 => {
                 if let Some(task) = TASK_MANAGER.get(pid as usize) {
                     if task.is_group_leader() {
-                        task.recv_siginfo(
-                            SigInfo::new_detailed(
-                                signal,
-                                SigCode::User,
-                                0,
-                                SigDetail::Kill(SigKillDetail { pid: task.tgid() }),
-                            ),
-                            false,
-                        );
+                        if !self.__sys_kill_can_send_to(&task) {
+                            return Err(Errno::EPERM);
+                        }
+                        if let Some(signal) = signal {
+                            task.recv_siginfo(
+                                SigInfo::new_detailed(
+                                    signal,
+                                    SigCode::User,
+                                    0,
+                                    SigDetail::Kill(SigKillDetail { pid: task.tgid() }),
+                                ),
+                                false,
+                            );
+                        }
+                        return Ok(0);
                     } else {
                         // sys_kill is sent to process not thread
                         return Err(Errno::ESRCH);
@@ -186,22 +210,40 @@ impl Syscall<'_> {
                     .map(|t| t.task())
                 {
                     if task.tgid() == -pid as usize {
-                        task.recv_siginfo(
-                            SigInfo::new_detailed(
-                                signal,
-                                SigCode::User,
-                                0,
-                                SigDetail::Kill(SigKillDetail { pid: pgid }),
-                            ),
-                            false,
-                        );
-                        return Ok(0);
+                        if !self.__sys_kill_can_send_to(&task) {
+                            return Err(Errno::EPERM);
+                        }
+                        if let Some(signal) = signal {
+                            task.recv_siginfo(
+                                SigInfo::new_detailed(
+                                    signal,
+                                    SigCode::User,
+                                    0,
+                                    SigDetail::Kill(SigKillDetail { pid: pgid }),
+                                ),
+                                false,
+                            );
+                            return Ok(0);
+                        }
                     }
                 }
                 return Err(Errno::ESRCH);
             }
         }
-        Ok(0)
+    }
+
+    fn __sys_kill_can_send_to(&self, target: &Arc<Task>) -> bool {
+        let sender = self.task;
+        let sender_uid = sender.uid();
+        let sender_euid = sender.euid();
+        let target_uid = target.uid();
+        let target_suid = target.suid();
+        return sender.tgid() == target.tgid()
+            || sender_euid == 0
+            || sender_euid == target_suid
+            || sender_euid == target_uid
+            || sender_uid == target_suid
+            || sender_uid == target_uid;
     }
 
     pub async fn sys_sigsuspend(&self, mask: usize) -> SyscallResult {
