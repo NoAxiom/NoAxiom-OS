@@ -201,8 +201,40 @@ impl UserFloatContext {
     }
 }
 
+/// machine context
+/// restores CPU's context
+#[derive(Clone, Copy, Debug)]
+#[repr(C)]
+pub struct SigContext {
+    epc: usize,
+    /// user general regs
+    user_x: [usize; 32],
+    /// float reg state, currently unused
+    fpstate: [usize; 66],
+}
+
+impl SigContext {
+    pub fn from_cx(value: &TrapContext) -> Self {
+        Self {
+            epc: value[TrapArgs::EPC],
+            user_x: value.gprs().clone(),
+            fpstate: [0; 66],
+        }
+    }
+    pub fn epc(&self) -> usize {
+        self.epc
+    }
+    pub fn gprs(&self) -> [usize; 32] {
+        self.user_x
+    }
+}
+
 impl ArchTrapContext for TrapContext {
     type FloatContext = UserFloatContext;
+    type SigContext = SigContext;
+    fn as_sig_cx(&self) -> Self::SigContext {
+        SigContext::from_cx(self)
+    }
 
     fn freg_mut(&mut self) -> &mut Self::FloatContext {
         &mut self.freg

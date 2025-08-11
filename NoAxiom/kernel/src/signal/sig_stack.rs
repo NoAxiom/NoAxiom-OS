@@ -1,4 +1,4 @@
-use arch::{ArchTrapContext, TrapArgs, TrapContext};
+use arch::{ArchTrapContext, TrapContext};
 
 use super::sig_set::SigMask;
 
@@ -34,6 +34,10 @@ impl SigAltStack {
     }
 }
 
+pub type SigContext = <TrapContext as ArchTrapContext>::SigContext;
+const RAW_SIGMASK_BITS: usize = 1024;
+pub const UCONTEXT_UNUSED_SIZE: usize = RAW_SIGMASK_BITS / 8 - core::mem::size_of::<SigMask>();
+
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
 pub struct UContext {
@@ -44,37 +48,11 @@ pub struct UContext {
     pub uc_stack: SigAltStack,
     /// when the ucontext is activated, will block sigs by this sigmask
     pub uc_sigmask: SigMask,
-    /// padding
-    pub __unused: [usize; 1024 / 8 - core::mem::size_of::<SigMask>()],
+    /// There's some padding here to allow sigset_t to be expanded in the
+    /// future.  Though this is unlikely, other architectures put uc_sigmask
+    /// at the end of this structure and explicitly state it can be
+    /// expanded, so we didn't want to box ourselves in here.
+    pub __unused: [u8; UCONTEXT_UNUSED_SIZE],
     /// machine context
-    pub uc_mcontext: MContext,
-}
-
-/// machine context
-/// restores CPU's context
-#[derive(Clone, Copy, Debug)]
-#[repr(C)]
-pub struct MContext {
-    /// user general regs
-    user_x: [usize; 32],
-    /// float reg state, currently unused
-    fpstate: [usize; 66],
-}
-
-impl MContext {
-    pub fn from_cx(value: &TrapContext) -> Self {
-        let mut res = Self {
-            user_x: value.gprs().clone(),
-            fpstate: [0; 66],
-        };
-        // fixme: is this correct in LA64?
-        res.user_x[0] = value[TrapArgs::EPC];
-        res
-    }
-    pub fn epc(&self) -> usize {
-        self.user_x[0]
-    }
-    pub fn gprs(&self) -> [usize; 32] {
-        self.user_x
-    }
+    pub uc_mcontext: SigContext,
 }

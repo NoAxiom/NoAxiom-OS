@@ -162,8 +162,38 @@ impl IndexMut<TrapArgs> for TrapContext {
     }
 }
 
+/// machine context
+/// restores CPU's context
+#[derive(Clone, Copy, Debug)]
+#[repr(C)]
+pub struct SigContext {
+    /// user general regs
+    user_x: [usize; 32],
+    /// float reg state, currently unused
+    fpstate: [usize; 66],
+}
+
+impl SigContext {
+    pub fn from_cx(value: &TrapContext) -> Self {
+        let mut res = Self {
+            // sepc:
+            user_x: value.gprs().clone(),
+            fpstate: [0; 66],
+        };
+        res.user_x[0] = value[TrapArgs::EPC];
+        res
+    }
+    pub fn epc(&self) -> usize {
+        self.user_x[0]
+    }
+    pub fn gprs(&self) -> [usize; 32] {
+        self.user_x
+    }
+}
+
 impl ArchTrapContext for TrapContext {
     type FloatContext = UserFloatContext;
+    type SigContext = SigContext;
     fn freg_mut(&mut self) -> &mut Self::FloatContext {
         &mut self.freg
     }
@@ -185,6 +215,9 @@ impl ArchTrapContext for TrapContext {
         };
         cx.x[gprs::SP] = sp;
         cx
+    }
+    fn as_sig_cx(&self) -> Self::SigContext {
+        SigContext::from_cx(self)
     }
     // fn update_cx(&mut self, entry: usize, sp: usize, argc: usize, argv: usize,
     // envp: usize) {     use TrapArgs::*;

@@ -15,8 +15,7 @@ use crate::{
         sig_action::{SAFlags, SAHandlerType},
         sig_detail::SigDetail,
         sig_info::SigInfo,
-        sig_set::SigMask,
-        sig_stack::{MContext, UContext},
+        sig_stack::{SigContext, UContext, UCONTEXT_UNUSED_SIZE},
     },
     syscall::utils::clear_current_syscall,
     task::{exit::ExitCode, status::TaskStatus, Task},
@@ -130,8 +129,8 @@ impl Task {
                         uc_link: 0,
                         uc_stack,
                         uc_sigmask: sig_mask,
-                        __unused: [0; 1024 / 8 - core::mem::size_of::<SigMask>()],
-                        uc_mcontext: MContext::from_cx(&cx),
+                        __unused: [0; UCONTEXT_UNUSED_SIZE],
+                        uc_mcontext: SigContext::from_cx(&cx),
                     };
                     assert_no_lock!();
                     ucontext_ptr.write(ucontext).await.unwrap_or_else(|err| {
@@ -165,7 +164,7 @@ impl Task {
                     // update cx
                     // flow: kernel (restore) -> handler -> ..
                     // -> user_sigreturn -> (syscall) kernel
-                    // fixme: should we update gp & tp?
+                    // should we update gp & tp?
                     cx[EPC] = handler;
                     cx[RA] = if action.flags.contains(SAFlags::SA_RESTORER) {
                         info!("[sigstack] use restorer: {:#x}", action.restorer);

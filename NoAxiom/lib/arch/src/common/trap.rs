@@ -85,10 +85,10 @@ pub trait ArchTrapContext:
     Index<TrapArgs, Output = usize> + IndexMut<TrapArgs, Output = usize>
 {
     type FloatContext: ArchUserFloatContext;
+    type SigContext;
     fn app_init_cx(entry: usize, sp: usize) -> Self;
-    // fn update_cx(&mut self, entry: usize, sp: usize, argc: usize, argv: usize,
-    // envp: usize);
     fn freg_mut(&mut self) -> &mut Self::FloatContext;
+    fn as_sig_cx(&self) -> Self::SigContext;
     fn gprs(&self) -> &[usize; 32];
     fn gprs_mut(&mut self) -> &mut [usize; 32];
     fn get_syscall_id(&self) -> usize {
