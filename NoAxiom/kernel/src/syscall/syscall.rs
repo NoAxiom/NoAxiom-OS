@@ -156,6 +156,8 @@ impl<'a> Syscall<'a> {
             SYS_SCHEED_GETSCHEDULER =>  self.sys_sched_getscheduler(args[0]),
             SYS_SCHED_GETPARAM =>       self.sys_sched_getparam(args[0], args[1]).await,
             SYS_SCHED_SETSCHEDULER =>   self.sys_sched_setscheduler(args[0], args[1] as _, args[2]),
+            SYS_GETPRIORITY =>          self.sys_getpriority(args[0] as _, args[1] as _),
+            SYS_SETPRIORITY =>          self.sys_setpriority(args[0] as _, args[1] as _, args[2] as _),
 
             // time
             SYS_TIMES =>            self.sys_times(args[0]).await,

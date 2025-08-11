@@ -4,7 +4,6 @@
 //! sys_sigreturn
 //! sys_sigsuspend
 
-use alloc::sync::Arc;
 use core::{future::pending, time::Duration};
 
 use arch::{ArchTrapContext, TrapArgs};
@@ -22,10 +21,7 @@ use crate::{
         sig_set::SigSet,
         signal::Signal,
     },
-    task::{
-        manager::{PROCESS_GROUP_MANAGER, TASK_MANAGER},
-        Task,
-    },
+    task::manager::{PROCESS_GROUP_MANAGER, TASK_MANAGER},
     time::timeout::TimeLimitedFuture,
 };
 
@@ -131,7 +127,7 @@ impl Syscall<'_> {
                     .into_iter()
                     .map(|t| t.task())
                 {
-                    if !self.__sys_kill_can_send_to(&task) {
+                    if !self.task.check_user_permission(&task) {
                         continue;
                     }
                     if let Some(signal) = signal {
@@ -153,7 +149,7 @@ impl Syscall<'_> {
                 for (_, task) in TASK_MANAGER.0.lock().iter() {
                     let task = task.upgrade().unwrap();
                     if task.tgid() != INIT_PROCESS_ID && task.is_group_leader() {
-                        if !self.__sys_kill_can_send_to(&task) {
+                        if !self.task.check_user_permission(&task) {
                             continue;
                         }
                         if let Some(signal) = signal {
@@ -175,7 +171,7 @@ impl Syscall<'_> {
             _ if pid > 0 => {
                 if let Some(task) = TASK_MANAGER.get(pid as usize) {
                     if task.is_group_leader() {
-                        if !self.__sys_kill_can_send_to(&task) {
+                        if !self.task.check_user_permission(&task) {
                             return Err(Errno::EPERM);
                         }
                         if let Some(signal) = signal {
@@ -210,7 +206,7 @@ impl Syscall<'_> {
                     .map(|t| t.task())
                 {
                     if task.tgid() == -pid as usize {
-                        if !self.__sys_kill_can_send_to(&task) {
+                        if !self.task.check_user_permission(&task) {
                             return Err(Errno::EPERM);
                         }
                         if let Some(signal) = signal {
@@ -230,20 +226,6 @@ impl Syscall<'_> {
                 return Err(Errno::ESRCH);
             }
         }
-    }
-
-    fn __sys_kill_can_send_to(&self, target: &Arc<Task>) -> bool {
-        let sender = self.task;
-        let sender_uid = sender.uid();
-        let sender_euid = sender.euid();
-        let target_uid = target.uid();
-        let target_suid = target.suid();
-        return sender.tgid() == target.tgid()
-            || sender_euid == 0
-            || sender_euid == target_suid
-            || sender_euid == target_uid
-            || sender_uid == target_suid
-            || sender_uid == target_uid;
     }
 
     pub async fn sys_sigsuspend(&self, mask: usize) -> SyscallResult {

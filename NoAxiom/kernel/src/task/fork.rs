@@ -130,7 +130,7 @@ impl Task {
                     ..Default::default()
                 }),
                 memory_set: ThreadOnly::new(memory_set),
-                sched_entity: ThreadOnly::new(SchedEntity::default()),
+                sched_entity: ThreadOnly::new(SchedEntity::new(self.sched_entity().nice)),
                 fd_table,
                 dir_cwd: self.dir_cwd.clone(),
                 dir_exe: self.dir_exe.clone(),
@@ -176,7 +176,7 @@ impl Task {
                     ..Default::default()
                 }),
                 memory_set: ThreadOnly::new(memory_set),
-                sched_entity: ThreadOnly::new(SchedEntity::default()),
+                sched_entity: ThreadOnly::new(SchedEntity::new(self.sched_entity().nice)),
                 fd_table,
                 dir_cwd: Shared::new(new_cwd),
                 dir_exe: Shared::new(new_exe),

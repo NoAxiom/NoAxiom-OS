@@ -61,7 +61,7 @@ impl Task {
             }),
             thread_group: Shared::new(ThreadGroup::new()),
             memory_set: ThreadOnly::new(Shared::new(memory_set)),
-            sched_entity: ThreadOnly::new(SchedEntity::default()),
+            sched_entity: ThreadOnly::new(SchedEntity::new(0)),
             fd_table: Shared::new(FdTable::new()),
             dir_cwd: Shared::new(root_dentry()),
             dir_exe: Shared::new(format!("/{}", INIT_PROC_NAME)), // executable path

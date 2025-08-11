@@ -1,4 +1,5 @@
 use config::cpu::CPU_NUM;
+use strum::FromRepr;
 
 pub const SCHED_OTHER: isize = 0;
 pub const SCHED_FIFO: isize = 1;
@@ -70,4 +71,13 @@ impl Default for CpuMask {
         }
         new_mask
     }
+}
+
+#[repr(usize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(FromRepr)]
+pub enum PriorityWhich {
+    Process = 0, // WHO is a process ID.
+    Pgrp = 1,    // WHO is a process group ID.
+    User = 2,    // WHO is a user ID.
 }

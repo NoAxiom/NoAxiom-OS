@@ -1,5 +1,7 @@
 use alloc::sync::Arc;
 
+use include::errno::{Errno, SysResult};
+
 use crate::{include::sched::CpuMask, task::Task, time::time_info::TimeInfo};
 
 #[derive(Debug, Clone, Copy)]
@@ -10,15 +12,17 @@ pub enum SchedPrio {
 }
 
 pub struct SchedEntity {
+    pub nice: i32,             // nice priority
     pub sched_prio: SchedPrio, // scheduling priority
     pub time_stat: TimeInfo,   // task time
     pub cpu_mask: CpuMask,     // cpu mask
     pub yield_req: bool,       // need yield
 }
 
-impl Default for SchedEntity {
-    fn default() -> Self {
+impl SchedEntity {
+    pub fn new(nice: i32) -> Self {
         Self {
+            nice,
             sched_prio: SchedPrio::Normal,
             time_stat: TimeInfo::default(),
             cpu_mask: CpuMask::default(),
@@ -26,6 +30,7 @@ impl Default for SchedEntity {
         }
     }
 }
+
 impl SchedEntity {
     pub fn clear_pending_yield(&mut self) {
         self.yield_req = false;
@@ -35,6 +40,18 @@ impl SchedEntity {
     }
     pub fn need_yield(&self) -> bool {
         self.time_stat.is_timeup() || self.yield_req
+    }
+    pub fn try_set_nice(&mut self, new: i32) -> SysResult<()> {
+        // user can't dec nice
+        if new > 19 || new < -20 {
+            return Err(Errno::EINVAL);
+        }
+        let old = self.nice;
+        if new < old {
+            return Err(Errno::EPERM);
+        }
+        self.nice = new;
+        Ok(())
     }
 }
 

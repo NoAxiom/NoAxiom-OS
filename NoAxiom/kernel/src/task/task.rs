@@ -439,6 +439,21 @@ impl Task {
     pub fn register_vfork_info(&self, parent_waker: Waker) {
         self.tcb_mut().vfork_wait = Some((Arc::new(AtomicBool::new(false)), parent_waker));
     }
+
+    /// check user permisson when accessing target task from current task
+    pub fn check_user_permission(&self, target: &Arc<Task>) -> bool {
+        let sender = self;
+        let sender_uid = sender.uid();
+        let sender_euid = sender.euid();
+        let target_uid = target.uid();
+        let target_suid = target.suid();
+        return sender.tgid() == target.tgid()
+            || sender_euid == 0
+            || sender_euid == target_suid
+            || sender_euid == target_uid
+            || sender_uid == target_suid
+            || sender_uid == target_uid;
+    }
 }
 
 // process implementation

@@ -2,10 +2,10 @@ use include::errno::Errno;
 
 use super::{Syscall, SyscallResult};
 use crate::{
-    include::sched::{CpuMask, SchedParam, SCHED_OTHER},
+    include::sched::{CpuMask, PriorityWhich, SchedParam, SCHED_OTHER},
     mm::user_ptr::UserPtr,
     sched::utils::yield_now,
-    task::manager::TASK_MANAGER,
+    task::manager::{PROCESS_GROUP_MANAGER, TASK_MANAGER},
 };
 
 impl Syscall<'_> {
@@ -104,5 +104,113 @@ impl Syscall<'_> {
             user_param.set_priority(1);
         }
         Ok(0)
+    }
+
+    pub fn sys_setpriority(&self, which: usize, who: usize, prio: i32) -> SyscallResult {
+        let which = PriorityWhich::from_repr(which).ok_or(Errno::EINVAL)?;
+        match which {
+            PriorityWhich::Process => {
+                let target = if who == 0 {
+                    self.task
+                } else {
+                    &TASK_MANAGER.get(who).ok_or(Errno::ESRCH)?
+                };
+                if !self.task.check_user_permission(target) {
+                    return Err(Errno::EPERM);
+                }
+                target.sched_entity_mut().try_set_nice(prio)?;
+                Ok(0)
+            }
+            PriorityWhich::Pgrp => {
+                let pgid = if who == 0 { self.task.get_pgid() } else { who };
+                let pg = PROCESS_GROUP_MANAGER.lock().get_group(pgid);
+                if let Some(pg) = pg {
+                    for it in pg {
+                        let task = it.task();
+                        if !self.task.check_user_permission(&task) {
+                            return Err(Errno::EPERM);
+                        }
+                        task.sched_entity_mut().try_set_nice(prio)?;
+                    }
+                    Ok(0)
+                } else {
+                    Err(Errno::ESRCH)
+                }
+            }
+            PriorityWhich::User => {
+                let uid = if who == 0 {
+                    self.task.uid()
+                } else {
+                    who as u32
+                };
+                for (_tid, task) in TASK_MANAGER.0.lock().iter_mut() {
+                    let task = task.upgrade().ok_or(Errno::ESRCH)?;
+                    if task.uid() != uid {
+                        continue;
+                    }
+                    if !self.task.check_user_permission(&task) {
+                        return Err(Errno::EPERM);
+                    }
+                    task.sched_entity_mut().try_set_nice(prio)?;
+                }
+                Ok(0)
+            }
+        }
+    }
+
+    pub fn sys_getpriority(&self, which: usize, who: usize) -> SyscallResult {
+        let which = PriorityWhich::from_repr(which).ok_or(Errno::EINVAL)?;
+        let mut res = i32::MAX;
+        match which {
+            PriorityWhich::Process => {
+                let target = if who == 0 {
+                    self.task
+                } else {
+                    &TASK_MANAGER.get(who).ok_or(Errno::ESRCH)?
+                };
+                if !self.task.check_user_permission(target) {
+                    return Err(Errno::EPERM);
+                }
+                res = res.min(target.sched_entity().nice);
+            }
+            PriorityWhich::Pgrp => {
+                let pgid = if who == 0 { self.task.get_pgid() } else { who };
+                let pg = PROCESS_GROUP_MANAGER.lock().get_group(pgid);
+                if let Some(pg) = pg {
+                    for tracer in pg {
+                        let target = tracer.task();
+                        if !self.task.check_user_permission(&target) {
+                            return Err(Errno::EPERM);
+                        }
+                        res = res.min(target.sched_entity().nice);
+                    }
+                } else {
+                    return Err(Errno::ESRCH);
+                }
+            }
+            PriorityWhich::User => {
+                let uid = if who == 0 {
+                    self.task.uid()
+                } else {
+                    who as u32
+                };
+                for (_tid, target) in TASK_MANAGER.0.lock().iter_mut() {
+                    let target = target.upgrade().ok_or(Errno::ESRCH)?;
+                    if target.uid() != uid {
+                        continue;
+                    }
+                    if !self.task.check_user_permission(&target) {
+                        return Err(Errno::EPERM);
+                    }
+                    res = res.min(target.sched_entity().nice);
+                }
+            }
+        }
+        println!("res: {}", res);
+        if res == i32::MAX {
+            Err(Errno::ESRCH)
+        } else {
+            Ok(res as isize + 20)
+        }
     }
 }
