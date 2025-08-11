@@ -607,7 +607,7 @@ impl dyn Dentry {
                 let pipe_inode = Arc::new(PipeInode::new());
                 pipe_dentry.set_inode(pipe_inode);
                 pipe_dentry.inode().unwrap().set_inode_mode(mode);
-                self.add_child(pipe_dentry);
+                self.add_child(pipe_dentry); // not set parent correctly!
                 Ok(())
             }
             InodeMode::CHAR => {

@@ -243,6 +243,7 @@ impl Drop for PipeBuffer {
 
 pub struct PipeDentry {
     meta: DentryMeta,
+    file: SpinLock<Option<Arc<dyn File>>>, // for mknodat
 }
 
 impl PipeDentry {
@@ -252,6 +253,7 @@ impl PipeDentry {
         let super_block = parent.super_block();
         let pipe_dentry = Arc::new(Self {
             meta: DentryMeta::new(Some(parent.clone()), name, super_block),
+            file: SpinLock::new(None),
         });
         debug!(
             "[PipeDentry] create pipe dentry: {}",
@@ -272,8 +274,17 @@ impl Dentry for PipeDentry {
         unreachable!("pipe dentry should not have child");
     }
 
-    fn open(self: Arc<Self>, _file_flags: &FileFlags) -> SysResult<Arc<dyn File>> {
-        unreachable!("pipe dentry should not open");
+    fn open(self: Arc<Self>, file_flags: &FileFlags) -> SysResult<Arc<dyn File>> {
+        warn!("[pipedentry] open for mknodat!");
+        let file = self.file.lock();
+        if let Some(file) = file.clone() {
+            return Ok(file);
+        }
+        drop(file); // release the lock before creating a new pipe
+
+        let (read, _write) = PipeFile::new_pipe(file_flags);
+        *self.file.lock() = Some(read.clone());
+        return Ok(read);
     }
 
     async fn create(self: Arc<Self>, _name: &str, _mode: InodeMode) -> SysResult<Arc<dyn Dentry>> {

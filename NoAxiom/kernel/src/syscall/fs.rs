@@ -869,7 +869,13 @@ impl Syscall<'_> {
             nlink,
             inode.file_type()
         );
+
         nlink -= 1;
+        if inode.file_type() == InodeMode::FIFO {
+            warn!("[sys_unlinkat] unlink a fifo file, passed!");
+            return Ok(0);
+        }
+
         if nlink == 0 {
             let parent = dentry.parent().unwrap();
             parent.check_access(self.task, W_OK, true)?;
