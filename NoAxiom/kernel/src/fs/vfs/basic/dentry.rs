@@ -433,6 +433,15 @@ impl dyn Dentry {
             return Err(Errno::ENOTDIR);
         }
 
+        if let Some(old) = self.get_child(name) {
+            error!(
+                "[Vfs::link] {} already exists in {}",
+                old.name(),
+                self.name()
+            );
+            return Err(Errno::EEXIST);
+        }
+
         let inode = target.inode()?;
         let son = self.clone().from_name(name);
         son.set_inode(inode.clone());

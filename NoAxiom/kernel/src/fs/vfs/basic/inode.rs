@@ -196,7 +196,6 @@ impl dyn Inode {
     }
     pub fn statx(&self, mask: u32) -> SysResult<Statx> {
         let stat = self.stat()?;
-        debug!("[statx] file_size: {}", stat.st_size);
         Ok(Statx {
             stx_mask: mask,
             stx_blksize: BLOCK_SIZE as u32,

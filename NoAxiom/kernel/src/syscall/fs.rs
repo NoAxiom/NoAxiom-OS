@@ -722,6 +722,11 @@ impl Syscall<'_> {
             return Err(Errno::EINVAL);
         }
 
+        if old_path.is_empty() {
+            error!("[sys_linkat] old_path is empty");
+            return Err(Errno::ENOENT);
+        }
+
         let searchflags = if flags.contains(AtFlags::AT_SYMLINK_FOLLOW) {
             SearchFlags::empty()
         } else {
@@ -736,7 +741,11 @@ impl Syscall<'_> {
 
         let target_dentry = old_dentry;
         let searchflags = SearchFlags::AT_SYMLINK_NOFOLLOW;
-        let (parent, name) = get_dentry_parent(self.task, newdirfd, &new_path, &searchflags)?;
+        let (parent, name) = get_dentry_parent(self.task, newdirfd, &new_path, &searchflags)
+            .map_err(|e| match e {
+                Errno::EEXIST => Errno::ENOENT,
+                e => e,
+            })?;
         parent.check_access(self.task, W_OK, true)?;
         parent.create_link(target_dentry, name).await?;
         Ok(0)
