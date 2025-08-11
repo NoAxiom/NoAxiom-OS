@@ -15,6 +15,7 @@ use crate::{
     constant::fs::{F_OK, R_OK, UID_ROOT, W_OK, X_OK},
     fs::{
         path,
+        pipe::PipeDentry,
         vfs::{
             impls::devfs::{
                 loop_control::{dentry::LoopControlDentry, inode::LoopControlInode},
@@ -591,12 +592,15 @@ impl dyn Dentry {
         dev_t: DevT,
         mode: InodeMode,
     ) -> SysResult<()> {
-        let inode = self.inode()?;
-        let file_type = inode.file_type();
+        let file_type = InodeMode::file_type(mode.bits())?;
         let super_block = self.super_block();
         match file_type {
             InodeMode::FIFO => {
-                self.set_inode(Arc::new(PipeInode::new()));
+                let pipe_dentry = Arc::new(PipeDentry::new(name)).into_dyn();
+                let pipe_inode = Arc::new(PipeInode::new());
+                pipe_dentry.set_inode(pipe_inode);
+                pipe_dentry.inode().unwrap().set_inode_mode(mode);
+                self.add_child(pipe_dentry);
                 Ok(())
             }
             InodeMode::CHAR => {
@@ -720,8 +724,8 @@ impl dyn Dentry {
                     }
                 }
             }
-            _ => {
-                error!("[mknodat] Unsupported inode type for mknodat");
+            mode => {
+                error!("[mknodat] Unsupported inode type {:?} for mknodat", mode);
                 Err(Errno::EINVAL)
             }
         }

@@ -50,13 +50,8 @@ impl File for RamFsFile {
             }
         };
 
-        debug!("[ramfs] open new file: {}", path);
         let inode = &self.meta.inode;
         let size = inode.size();
-        debug!(
-            "[ramfs] read offset: {}, size: {}, data: {:?}",
-            offset, size, data
-        );
         if offset >= size {
             return Ok(0); // EOF
         }
@@ -82,10 +77,6 @@ impl File for RamFsFile {
 
         let inode = &self.meta.inode;
         let size = inode.size();
-        debug!(
-            "[ramfs] write offset: {}, size: {}, data: {:?}, buf: {:?}",
-            offset, size, data, buf
-        );
         if offset + buf.len() > size {
             inode.set_size(offset + buf.len());
         }
