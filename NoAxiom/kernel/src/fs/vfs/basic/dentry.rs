@@ -278,7 +278,9 @@ impl dyn Dentry {
         let res = if abs {
             root_dentry().__walk_path(task, &components, 0, jumps)
         } else {
-            self.__walk_path(task, &components, 0, jumps)
+            self.parent()
+                .expect("must have parent")
+                .__walk_path(task, &components, 0, jumps)
         };
         match res {
             Ok((dentry, new_jumps)) => {
@@ -458,11 +460,6 @@ impl dyn Dentry {
                 InodeMode::LINK | InodeMode::from_bits(ALL_PERMISSIONS_MASK).unwrap(),
             )
             .await?;
-        let target = if target.starts_with("/") {
-            target
-        } else {
-            format!("{}/{}", self.path(), target)
-        };
         son.inode()?.set_symlink(target.clone());
         debug!("[Vfs::symlink] set_symlink {} to {}", target, name);
 

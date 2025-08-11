@@ -780,8 +780,21 @@ impl Syscall<'_> {
 
         if let Ok(inode) = dentry.inode() {
             if let Some(tar_path) = inode.symlink() {
-                dentry.symlink_jump(self.task, &tar_path)?;
-                Ok(tar_path.len() as isize)
+                let len = tar_path.len();
+                if buflen < len {
+                    error!(
+                        "[sys_readlinkat] buffer size {} is too small for symlink {}",
+                        buflen, tar_path
+                    );
+                    return Err(Errno::ENAMETOOLONG);
+                }
+                debug!(
+                    "[sys_readlinkat] symlink {} resolved to {}",
+                    dentry.name(),
+                    tar_path
+                );
+                buf_slice[..len].copy_from_slice(tar_path.as_bytes());
+                Ok(len as isize)
             } else {
                 error!(
                     "[sys_readlinkat] dentry is not a symlink: {}",
