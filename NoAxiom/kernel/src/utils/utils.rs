@@ -1,6 +1,5 @@
 #[inline(always)]
-#[allow(unused)]
-pub fn align_up(addr: usize, align: usize) -> usize {
+pub fn align_ceil(addr: usize, align: usize) -> usize {
     (addr + align - 1) & !(align - 1)
 }
 

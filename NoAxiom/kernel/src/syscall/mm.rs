@@ -5,14 +5,14 @@ use super::SyscallResult;
 use crate::{
     config::mm::PAGE_SIZE,
     include::{
-        ipc::{IPC_PRIVATE, IPC_RMID},
+        ipc::{IpcCtlCmd, SHM_MAX, SHM_MIN},
         mm::{Madv, MmapFlags, MmapProts},
         result::Errno,
     },
     mm::{address::VirtAddr, page_table::PageTable, permission::MapPermission, shm::SHM_MANAGER},
     return_errno,
     syscall::Syscall,
-    utils::align_up,
+    utils::align_ceil,
 };
 
 impl Syscall<'_> {
@@ -36,7 +36,7 @@ impl Syscall<'_> {
         fd: isize,
         offset: usize,
     ) -> SyscallResult {
-        let length = align_up(length, PAGE_SIZE);
+        let length = align_ceil(length, PAGE_SIZE);
         let prot = MmapProts::from_bits_truncate(prot);
         let flags = MmapFlags::from_bits_truncate(flags);
         if addr % PAGE_SIZE != 0 || length == 0 {
@@ -113,25 +113,22 @@ impl Syscall<'_> {
             "[shmget] key: {:#x}, size: {:#x}, shmflg: {:#x}",
             key, size, shmflg
         );
-        let size = (size + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE;
-        assert!(size % PAGE_SIZE == 0);
-        let new_key = match key {
-            IPC_PRIVATE => SHM_MANAGER.lock().create(key, size, shmflg),
-            _ => {
-                error!("[shmget] key {:#x} is not IPC_PRIVATE", key);
-                return Err(Errno::ENOSYS);
-            }
-        };
-        Ok(new_key as isize)
+        if size < SHM_MIN || size > SHM_MAX {
+            return Err(Errno::EINVAL);
+        }
+        let size = align_ceil(size, PAGE_SIZE);
+        let shmid = SHM_MANAGER.lock().get(key, size, shmflg)?;
+        Ok(shmid as isize)
     }
 
     /// remove the shared memory segment with the given key
     pub fn sys_shmctl(&self, key: usize, cmd: usize, _buf: *const u8) -> SyscallResult {
         warn!("[shmctl] remove shm key: {:#x}, cmd: {:#x}", key, cmd);
-        if cmd == IPC_RMID {
+        let cmd = IpcCtlCmd::from_repr(cmd).ok_or(Errno::EINVAL)?;
+        if cmd == IpcCtlCmd::IPC_RMID {
             SHM_MANAGER.lock().remove(key);
         } else {
-            error!("[shmctl] cmd {:#x} is not IPC_RMID", cmd);
+            error!("[shmctl] cmd {:?} is not IPC_RMID", cmd);
             return Err(Errno::ENOSYS);
         }
         Ok(0)

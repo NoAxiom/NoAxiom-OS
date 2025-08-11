@@ -1,6 +1,7 @@
 use alloc::{collections::BTreeMap, vec::Vec};
 
 use config::mm::SHM_OFFSET;
+use include::errno::{Errno, SysResult};
 use ksync::mutex::SpinLock;
 use lazy_static::lazy_static;
 use memory::address::{PhysAddr, VirtAddr};
@@ -8,7 +9,10 @@ use memory::address::{PhysAddr, VirtAddr};
 use super::map_area::MapArea;
 use crate::{
     cpu::current_task,
-    include::{fs::CreateMode, mm::ShmIdDs},
+    include::{
+        fs::CreateMode,
+        ipc::{IpcGetFlags, IpcPerm, ShmIdDs, IPC_NEW},
+    },
     time::gettime::get_time,
 };
 
@@ -42,18 +46,25 @@ impl ShmManager {
             shm_areas: BTreeMap::new(),
         }
     }
-    pub fn create(&mut self, key: usize, size: usize, shmflags: usize) -> usize {
-        let key = if key == 0 {
-            if self.shm_areas.is_empty() {
-                1
-            } else {
-                self.shm_areas.last_key_value().unwrap().0 + 1
-            }
-        } else {
-            key
+    fn new_area(key: usize, size: usize, shmflags: usize) -> ShmArea {
+        assert!(key != IPC_NEW);
+        let task = current_task().unwrap();
+        let pid = task.pid();
+        let mode = CreateMode::from_bits((shmflags & 0o777) as u32).unwrap();
+        let uid = task.uid();
+        let gid = task.gid();
+        let perm = IpcPerm {
+            __key: key,
+            uid,
+            gid,
+            cuid: uid,
+            cgid: gid,
+            mode,
+            __seq: 0,
+            __pad2: 0,
+            __glibc_reserved1: 0,
+            __glibc_reserved2: 0,
         };
-        let pid = current_task().unwrap().tid();
-        let perm = CreateMode::from_bits((shmflags & 0o777) as u32).unwrap();
         let shmid_ds = ShmIdDs {
             shm_perm: perm,
             shm_size: size,
@@ -65,10 +76,30 @@ impl ShmManager {
             shm_nattch: 0,
         };
         let buffer: Vec<u8> = vec![0 as u8; size];
-        let shm_area = ShmArea { shmid_ds, buffer };
-        assert!(self.shm_areas.get(&key).is_none());
-        self.shm_areas.insert(key, shm_area);
-        key
+        ShmArea { shmid_ds, buffer }
+    }
+    pub fn get(&mut self, mut key: usize, size: usize, shmflags: usize) -> SysResult<usize> {
+        let flags = if key == IPC_NEW {
+            key = self.shm_areas.last_key_value().map(|x| x.0).unwrap_or(&0) + 1;
+            IpcGetFlags::IPC_CREAT | IpcGetFlags::IPC_EXCL
+        } else {
+            IpcGetFlags::from_bits_truncate(shmflags)
+        };
+        if self.shm_areas.contains_key(&key) {
+            if flags.contains(IpcGetFlags::IPC_CREAT) {
+                if flags.contains(IpcGetFlags::IPC_EXCL) {
+                    Err(Errno::EEXIST)
+                } else {
+                    Ok(key)
+                }
+            } else {
+                Err(Errno::ENOENT)
+            }
+        } else {
+            let area = Self::new_area(key, size, shmflags);
+            self.shm_areas.insert(key, area);
+            Ok(key)
+        }
     }
     pub fn base_attach(&mut self, key: usize) {
         let shm_area = &mut self.shm_areas.get_mut(&key).unwrap();

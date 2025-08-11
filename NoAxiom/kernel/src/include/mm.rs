@@ -2,8 +2,6 @@ use arch::MappingFlags;
 use bitflags::bitflags;
 use strum::FromRepr;
 
-use super::fs::CreateMode;
-
 bitflags! {
     #[derive(Clone, Copy, Debug)]
     /// see [man mmap](https://man7.org/linux/man-pages/man2/mmap.2.html)
@@ -59,18 +57,6 @@ bitflags! {
         /// When fd is -1 and MAP_ANONYMOUS flag exists, mmap will create an anonymous mapping
         const MAP_ANONYMOUS = 0x20;
     }
-}
-
-#[allow(unused)]
-pub struct ShmIdDs {
-    pub shm_perm: CreateMode, /* Ownership and permissions */
-    pub shm_size: usize,      /* Size of segment (bytes) */
-    pub shm_atime: usize,     /* Last attach time */
-    pub shm_dtime: usize,     /* Last detach time */
-    pub shm_ctime: usize,     /* Creation time/time of last modification via shmctl() */
-    pub shm_cpid: usize,      /* PID of creator */
-    pub shm_lpid: usize,      /* PID of last shmat(2)/shmdt(2) */
-    pub shm_nattch: usize,    /* Number of current attaches */
 }
 
 #[derive(FromRepr, Debug, Eq, PartialEq)]
