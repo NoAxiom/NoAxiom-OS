@@ -19,9 +19,9 @@ use crate::{
     include::{
         fs::{
             AtFlags, BlkIoctlCmd, DevT, FallocFlags, FcntlFlags, FdFlags, FileFlags, Flock,
-            InodeMode, IoctlCmd, Iovec, Kstat, LoopIoctlCmd, MountFlags, NoAxiomIoctlCmd,
-            RenameFlags, RtcIoctlCmd, SearchFlags, SeekFrom, Statfs, Statx, TtyIoctlCmd, Whence,
-            EXT4_MAX_FILE_SIZE,
+            InodeMode, IoctlCmd, Iovec, Kstat, LoopIoctlCmd, MountFlags, NamespaceIoctlCmd,
+            NoAxiomIoctlCmd, RenameFlags, RtcIoctlCmd, SearchFlags, SeekFrom, Statfs, Statx,
+            TtyIoctlCmd, Whence, EXT4_MAX_FILE_SIZE,
         },
         resource::Resource,
         result::Errno,
@@ -561,6 +561,8 @@ impl Syscall<'_> {
             IoctlCmd::Loop(cmd)
         } else if let Some(cmd) = BlkIoctlCmd::from_repr(request) {
             IoctlCmd::Block(cmd)
+        } else if let Some(cmd) = NamespaceIoctlCmd::from_repr(request) {
+            IoctlCmd::Namespace(cmd)
         } else if let Some(cmd) = NoAxiomIoctlCmd::from_repr(request) {
             IoctlCmd::Other(cmd)
         } else {
@@ -588,6 +590,25 @@ impl Syscall<'_> {
                     let ptr = UserPtr::<u64>::new(arg);
                     ptr.write(0x10000).await?;
                     return Ok(0);
+                }
+            },
+            IoctlCmd::Namespace(x) => match x {
+                NamespaceIoctlCmd::NsGetUserns => {
+                    // Return ENOTTY for namespace ioctl commands as they are not supported yet
+                    warn!("[sys_ioctl] Namespace ioctl NS_GET_USERNS not implemented");
+                    return Err(Errno::ENOTTY);
+                }
+                NamespaceIoctlCmd::NsGetParent => {
+                    warn!("[sys_ioctl] Namespace ioctl NS_GET_PARENT not implemented");
+                    return Err(Errno::ENOTTY);
+                }
+                NamespaceIoctlCmd::NsGetNstype => {
+                    warn!("[sys_ioctl] Namespace ioctl NS_GET_NSTYPE not implemented");
+                    return Err(Errno::ENOTTY);
+                }
+                NamespaceIoctlCmd::NsGetOwnerUid => {
+                    warn!("[sys_ioctl] Namespace ioctl NS_GET_OWNER_UID not implemented");
+                    return Err(Errno::ENOTTY);
                 }
             },
             IoctlCmd::Other(x) => match x {

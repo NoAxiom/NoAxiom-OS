@@ -645,6 +645,19 @@ pub enum NoAxiomIoctlCmd {
     LOG = 0x1919810,
 }
 
+#[derive(FromRepr, Debug)]
+#[repr(usize)]
+pub enum NamespaceIoctlCmd {
+    /// Get the user namespace
+    NsGetUserns = 0xb701,
+    /// Get the parent namespace
+    NsGetParent = 0xb702,
+    /// Get the namespace type
+    NsGetNstype = 0xb703,
+    /// Get the owner UID
+    NsGetOwnerUid = 0xb704,
+}
+
 #[derive(Debug)]
 #[repr(usize)]
 pub enum IoctlCmd {
@@ -652,6 +665,7 @@ pub enum IoctlCmd {
     Rtc(RtcIoctlCmd),
     Loop(LoopIoctlCmd),
     Block(BlkIoctlCmd),
+    Namespace(NamespaceIoctlCmd),
     Other(NoAxiomIoctlCmd),
 }
 
