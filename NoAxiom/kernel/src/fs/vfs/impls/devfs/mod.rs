@@ -102,7 +102,6 @@ pub async fn init(fs_root: Arc<dyn Dentry>) -> SysResult<()> {
     urandom_dentry.into_dyn().set_inode(urandom_inode);
     fs_root.add_child(urandom_dentry);
 
-    //todo: add /dev/shm
     info!("[fs] create /dev/shm");
     let shm_dentry = Arc::new(RamFsDentry::new(
         Some(fs_root.clone()),

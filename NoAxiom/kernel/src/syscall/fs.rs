@@ -405,7 +405,7 @@ impl Syscall<'_> {
         let searchflags = SearchFlags::AT_SYMLINK_NOFOLLOW;
         let (dentry, name) = get_dentry_parent(self.task, dirfd, &path, &searchflags)?;
         if let Some(_) = dentry.get_child(name) {
-            error!("[sys_mkdirat] dir already exists: {}", name);
+            warn!("[sys_mkdirat] dir already exists: {}", name);
             return Err(Errno::EEXIST);
         } else {
             dentry.clone().create(name, mode | InodeMode::DIR).await?;

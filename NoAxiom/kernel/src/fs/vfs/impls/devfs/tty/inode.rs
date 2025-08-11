@@ -16,7 +16,12 @@ pub struct TtyInode {
 impl TtyInode {
     pub fn new(superblock: Arc<dyn SuperBlock>) -> Self {
         Self {
-            meta: InodeMeta::new(superblock, InodeMode::CHAR, BLOCK_SIZE, false),
+            meta: InodeMeta::new(
+                superblock,
+                InodeMode::CHAR | InodeMode::from_bits(0o666).unwrap(),
+                BLOCK_SIZE,
+                false,
+            ),
         }
     }
 }

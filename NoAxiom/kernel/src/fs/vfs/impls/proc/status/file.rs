@@ -72,7 +72,7 @@ impl File for StatusFile {
         let tgid = task.tgid();
         let ngid = 0; // NUMA 组 ID（如果没有则为 0）
         let pid = task.pid();
-        let ppid = task.pcb().parent.as_ref().unwrap().upgrade().unwrap().tid();
+        let ppid = 0;
 
         let tracerpid = 0; // 跟踪此进程的进程 PID（如果未被跟踪，则为 0）
         let uid = task.uid();

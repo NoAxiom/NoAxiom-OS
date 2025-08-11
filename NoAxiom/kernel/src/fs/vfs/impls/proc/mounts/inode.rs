@@ -16,7 +16,12 @@ pub struct MountsInode {
 impl MountsInode {
     pub fn new(superblock: Arc<dyn SuperBlock>) -> Self {
         Self {
-            meta: InodeMeta::new(superblock, InodeMode::FILE, BLOCK_SIZE, false),
+            meta: InodeMeta::new(
+                superblock,
+                InodeMode::FILE | InodeMode::from_bits(0o444).unwrap(),
+                BLOCK_SIZE,
+                false,
+            ),
         }
     }
 }

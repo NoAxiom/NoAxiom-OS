@@ -391,6 +391,7 @@ impl dyn Dentry {
                         "oom_score_adj" => {}
                         "mkfs.ext3" | "mkfs.ext4" | "mkfs.xfs" | "mkfs.btrfs" | "mkfs.bcachefs"
                         | "[" => {}
+                        "X.1" | "X.4" | "X.7" => {}
                         other => {
                             error!(
                                 "[walk_path] {} not found in {}, step: {}",
