@@ -181,8 +181,12 @@ impl Syscall<'_> {
     pub async fn sys_openat(&self, fd: isize, path: usize, flags: i32, mode: u32) -> SyscallResult {
         let path_str = UserPtr::<u8>::new(path).get_string_from_ptr()?;
         let mode = InodeMode::from_bits(mode).ok_or(Errno::EINVAL)?;
-        let searchflags = SearchFlags::from_bits_truncate(flags);
         let flags = FileFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
+        let searchflags = if flags.contains(FileFlags::O_NOFOLLOW) {
+            SearchFlags::AT_SYMLINK_NOFOLLOW
+        } else {
+            SearchFlags::empty()
+        };
         info!(
             "[sys_openat] dirfd {}, flags {:?}, filename {}, mode {:?}",
             fd, flags, path_str, mode
@@ -193,7 +197,7 @@ impl Syscall<'_> {
 
         let dentry = if flags.contains(FileFlags::O_TMPFILE) {
             let this = get_dentry(self.task, fd, &path, &searchflags)?;
-            if this.inode()?.file_type() != InodeMode::DIR {
+            if unlikely(this.inode()?.file_type() != InodeMode::DIR) {
                 error!("[sys_openat] O_TMPFILE can only be used on directories");
                 return Err(Errno::ENOTDIR);
             }
@@ -202,10 +206,17 @@ impl Syscall<'_> {
             Ok(dentry)
         } else if flags.contains(FileFlags::O_CREATE) {
             let (dentry, name) = get_dentry_parent(self.task, fd, &path, &searchflags)?;
-            if !dentry.can_search(self.task) {
+            if unlikely(!dentry.can_search(self.task)) {
                 return Err(Errno::EACCES);
             }
             if let Some(dentry) = dentry.get_child(name) {
+                if flags.contains(FileFlags::O_EXCL) {
+                    error!(
+                        "[sys_openat] O_EXCL flag is set, file {} already exists",
+                        dentry.path()
+                    );
+                    return Err(Errno::EEXIST);
+                }
                 Ok(dentry)
             } else {
                 dentry.clone().create(name, mode | InodeMode::FILE).await
@@ -214,13 +225,49 @@ impl Syscall<'_> {
             get_dentry(self.task, fd, &path, &searchflags)
         }?;
 
+        if unlikely(flags.contains(FileFlags::O_NOATIME)) {
+            let inode = dentry.inode()?;
+            let task_uid = self.task.fsuid();
+
+            if task_uid != 0 && task_uid != inode.uid() {
+                error!("[sys_openat] O_NOATIME requires ownership or root privileges");
+                return Err(Errno::EPERM);
+            }
+        }
+
         let inode = dentry.inode()?;
+
+        if unlikely(inode.symlink().is_some() && flags.contains(FileFlags::O_NOFOLLOW)) {
+            error!(
+                "[sys_openat] O_NOFOLLOW can not use on symlink file {}",
+                dentry.path()
+            );
+            return Err(Errno::ELOOP);
+        }
+
+        if unlikely(
+            inode.file_type() == InodeMode::FIFO
+                && flags.contains(FileFlags::O_WRONLY)
+                && flags.contains(FileFlags::O_NONBLOCK),
+        ) {
+            return Err(Errno::ENXIO);
+        }
+
         if flags.contains(FileFlags::O_TRUNC) {
             inode.set_size(0);
             inode.truncate(0).await?;
         }
-        if flags.contains(FileFlags::O_DIRECTORY) && inode.file_type() != InodeMode::DIR {
-            return Err(Errno::ENOTDIR);
+        if flags.contains(FileFlags::O_DIRECTORY) {
+            if unlikely(inode.file_type() != InodeMode::DIR) {
+                return Err(Errno::ENOTDIR);
+            }
+        }
+
+        if inode.file_type() == InodeMode::DIR {
+            if unlikely(flags.contains(FileFlags::O_RDWR) || flags.contains(FileFlags::O_WRONLY)) {
+                error!("[sys_openat] O_DIRECTORY cannot be used with write access");
+                return Err(Errno::EISDIR);
+            }
         }
 
         let file = dentry.open(&flags)?;
@@ -255,7 +302,7 @@ impl Syscall<'_> {
         let buf_slice = user_ptr.as_slice_mut_checked(len).await?;
 
         if !file.meta().readable() {
-            return Err(Errno::EINVAL);
+            return Err(Errno::EBADF);
         }
 
         let read_fut = file.read(buf_slice);
@@ -309,7 +356,7 @@ impl Syscall<'_> {
         // let file_name = file.dentry().path()?;
         // info!("[sys_pread64] file_name: {:?}", file_name);
         if !file.meta().readable() {
-            return Err(Errno::EINVAL);
+            return Err(Errno::EBADF);
         }
         let user_ptr = UserPtr::<u8>::new(buf);
         let buf_slice = user_ptr.as_slice_mut_checked(len).await?;
@@ -329,7 +376,7 @@ impl Syscall<'_> {
         let buf_slice = user_ptr.as_slice_const_checked(len).await?;
 
         if !file.meta().writable() {
-            return Err(Errno::EINVAL);
+            return Err(Errno::EBADF);
         }
 
         let write_fut = file.write(buf_slice);
@@ -386,7 +433,7 @@ impl Syscall<'_> {
         // let file_name = file.dentry().path()?;
         // info!("[sys_pwrite64] file_name: {:?}", file_name);
         if !file.meta().writable() {
-            return Err(Errno::EINVAL);
+            return Err(Errno::EBADF);
         }
         let user_ptr = UserPtr::<u8>::new(buf);
         let buf_slice = user_ptr.as_slice_const_checked(len).await?;

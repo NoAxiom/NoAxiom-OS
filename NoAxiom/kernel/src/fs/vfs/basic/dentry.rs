@@ -318,15 +318,9 @@ impl dyn Dentry {
         }
 
         let inode = self.inode().expect("should have inode!");
-        // the mid dentry MUST have a inode
-        if inode.file_type() != InodeMode::DIR {
-            error!("[walk_path] {} is not a dir", self.name());
-            return Err(Errno::ENOTDIR);
-        }
-        // check search access, todo: add likely
         if let Some(task) = task {
             if task.fsuid() != 0 {
-                if !self.can_search(task) {
+                if unlikely(!self.can_search(task)) {
                     error!("[walk_path] has no search access");
                     return Err(Errno::EACCES);
                 }
@@ -348,6 +342,10 @@ impl dyn Dentry {
                 if let Some(symlink_path) = inode.symlink() {
                     let (tar, new_jumps) = self.__symlink_jump(task, &symlink_path, jumps + 1)?;
                     return tar.__walk_path(task, path, step + 1, new_jumps);
+                }
+                if inode.file_type() != InodeMode::DIR {
+                    error!("[walk_path] {} is not a dir", self.name());
+                    return Err(Errno::ENOTDIR);
                 }
                 if let Some(child) = self.get_child(name) {
                     return child.__walk_path(task, path, step + 1, jumps);
