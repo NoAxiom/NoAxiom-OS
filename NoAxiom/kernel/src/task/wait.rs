@@ -62,10 +62,11 @@ impl Future for WaitChildFuture<'_> {
                     Some(child) => {
                         // time statistic
                         let child_tid = child.tid();
+                        let exit_code = child.pcb().exit_code();
                         self.task
                             .time_stat_mut()
                             .add_child_time(child.time_stat().child_time());
-                        Poll::Ready(Ok((pcb.exit_code(), child_tid)))
+                        Poll::Ready(Ok((exit_code, child_tid)))
                     }
                     None => Poll::Pending,
                 }

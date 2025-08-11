@@ -168,9 +168,9 @@ impl Syscall<'_> {
         .await??;
         self.task.pcb().signals.remove_sigchld();
         if status.is_non_null() {
-            trace!(
-                "[sys_wait4]: write exit_code at status_addr = {:#x}, value: ",
-                status.va_addr().raw(),
+            debug!(
+                "[sys_wait4]: write exit_code at status_addr = {:#x}, value: {:#x}",
+                status.va_addr().raw(), exit_code.inner()
             );
             status.write(exit_code.inner()).await?;
             trace!("[sys_wait4]: write exit code {:#x}", exit_code.inner());

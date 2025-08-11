@@ -4,9 +4,7 @@ impl Task {
     /// exit current task
     pub fn terminate(&self, exit_code: ExitCode) {
         let mut pcb = self.pcb();
-        if self.is_group_leader() {
-            pcb.set_exit_code(exit_code);
-        }
+        pcb.set_exit_code(exit_code);
         pcb.set_status(TaskStatus::Terminated, self.tif_mut());
     }
 

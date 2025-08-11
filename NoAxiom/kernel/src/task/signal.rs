@@ -305,8 +305,11 @@ impl Task {
     fn sig_default_coredump(&self, si: &SigInfo) {
         let errno = si.errno;
         let signal = si.signal;
-        debug!("[sig_default_coredump] coredump the process");
         let exit_code = ExitCode::new(errno).signaled(signal).core_dumped();
+        debug!(
+            "[sig_default_coredump] coredump the process, exit_code: {:#x}",
+            exit_code.inner()
+        );
         self.terminate_group(exit_code);
     }
     /// ignore the signal
