@@ -163,6 +163,7 @@ impl Dentry for Ext4Dentry {
             trace!("[ext4] drop ext4");
             drop(ext4);
             let new_inode = Ext4DirInode::new(super_block.clone(), new_dir_inode, mode);
+            new_inode.set_loaded(true); // use this to prevent the trash ext4_rs bug
             Ok(self
                 .into_dyn()
                 .add_child_with_inode(name, Arc::new(new_inode)))
