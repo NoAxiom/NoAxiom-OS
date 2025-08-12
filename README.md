@@ -4,7 +4,7 @@
 
 [原项目](https://github.com/NoAxiom/NoAxiom-OS)（包含submodule）
 
-[初赛汇报](./docs/NoAxiom_OS_Primary_Report.pdf)
+[决赛第一阶段汇报](./docs/final_preview.pdf)
 
 [初赛PPT与演示视频](https://pan.baidu.com/s/1aj0eP2t-oPZIlO7OO4S8pA?pwd=kkxz)
 
