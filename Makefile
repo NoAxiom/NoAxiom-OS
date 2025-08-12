@@ -22,7 +22,6 @@ export RESET := "\e[0m"
 export RELEASE ?= false
 export TOOLCHAIN_DIR := $(ROOT)/$(UTILS)/toolchain
 export FEAT_ON_QEMU ?= true
-export FINAL_CASES ?= false
 export DEBUG_UNALIGN=1
 
 # Arch config
@@ -64,7 +63,7 @@ endif
 # Test and fs image config
 TEST_DIR := $(ROOT)/$(PROJECT)-OS-Test
 export IMG_SUFFIX := 
-ifeq ($(FINAL_CASES),true) # Musl
+ifeq ($(TESTCASES),final) # Musl
 export IMG_SUFFIX := -final
 endif
 RAW_FS_IMG := $(TEST_DIR)/$(TEST_TYPE)/img/fs-$(ARCH_NAME)$(IMG_SUFFIX).img
@@ -155,6 +154,7 @@ run: backup
 	@echo -e $(NORMAL)"Qemu launched. Log is saved to: $(LOG_SAVE_PATH)"$(RESET)
 	@$(QEMU) $(QFLAGS) $(RUN_OPTION)
 	@echo -e $(NORMAL)"Qemu exited. Log is saved to: $(LOG_SAVE_PATH)"$(RESET)
+	@$(MAKE) backup CHECK_IMG=false
 
 
 TEST_2K1000_DIR := $(ROOT)/$(UTILS)/la-2k1000-sim

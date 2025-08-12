@@ -1938,6 +1938,46 @@ impl Syscall<'_> {
         }
         Ok(0)
     }
+
+    // todo: implement the actual sync_file_range logic
+    pub fn sys_sync_file_range(
+        &self,
+        fd: usize,
+        offset: isize,
+        nbytes: isize,
+        flags: i32,
+    ) -> SyscallResult {
+        info!(
+            "[sys_sync_file_range] fd: {}, offset: {}, nbytes: {}, flags: {}",
+            fd, offset, nbytes, flags
+        );
+        const SYNC_FILE_RANGE_WAIT_BEFORE: i32 = 1;
+        const SYNC_FILE_RANGE_WRITE: i32 = 2;
+        const SYNC_FILE_RANGE_WAIT_AFTER: i32 = 4;
+        if offset < 0 || nbytes < 0 {
+            error!("[sys_sync_file_range] negative offset or nbytes");
+            return Err(Errno::EINVAL);
+        }
+        let valid_flags =
+            SYNC_FILE_RANGE_WAIT_BEFORE | SYNC_FILE_RANGE_WRITE | SYNC_FILE_RANGE_WAIT_AFTER;
+
+        if (flags & !valid_flags) != 0 {
+            error!("[sys_sync_file_range] invalid flags: {:#x}", flags);
+            return Err(Errno::EINVAL);
+        }
+        let file = self.task.fd_table().get(fd).ok_or(Errno::EBADF)?;
+        debug!(
+            "[sys_sync_file_range] file: {}, offset: {}, nbytes: {}, flags: {}",
+            file.name(),
+            offset,
+            nbytes,
+            flags
+        );
+        if file.inode().file_type() == InodeMode::CHAR {
+            return Err(Errno::ESPIPE);
+        }
+        return Err(Errno::EINVAL);
+    }
 }
 
 #[inline(always)]
