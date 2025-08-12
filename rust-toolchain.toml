@@ -1,6 +1,6 @@
 [toolchain]
 profile = "minimal"
-channel = "nightly-2024-05-02"
+channel = "nightly-2024-05-01"
 components = [
     "rustfmt",
     "rustc",
