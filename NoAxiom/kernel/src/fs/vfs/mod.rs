@@ -57,10 +57,6 @@ pub async fn vfs_init() {
         .await
         .expect("load root dir failed");
 
-    // let passwd = Path::from_or_create(String::from("/etc/passwd"),
-    // InodeMode::FILE).await; passwd.dentry().open().expect("open /etc/passwd
-    // failed");
-
     info!("[fs] create /bin");
     kcreate(
         "/bin",

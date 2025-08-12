@@ -100,7 +100,9 @@ impl<'a> Syscall<'a> {
             SYS_RECVMMSG =>     self.sys_recvmmsg(args[0], args[1], args[2], args[3] as i32).await,
             SYS_SENDMSG =>      self.sys_sendmsg(args[0], args[1], args[2] as i32).await,
             SYS_SENDMMSG =>     self.sys_sendmmsg(args[0], args[1], args[2], args[3] as i32).await,
-            
+            SYS_SETDOMAINNAME => self.sys_setdomainname(args[0], args[1]),
+            SYS_SETHOSTNAME =>  self.sys_sethostname(args[0], args[1]),
+
             // process
             SYS_GETUID =>               self.sys_getuid(),
             SYS_GETEUID =>              self.sys_geteuid(),

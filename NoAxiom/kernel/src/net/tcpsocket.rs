@@ -17,12 +17,12 @@ use crate::{
     constant::net::TCP_CONSTANTS,
     include::{
         io::PollEvent,
-        net::{PosixIpProtocol, ShutdownType, SocketOptions, SocketType},
+        net::{ShutdownType, SocketOptions, SocketType},
         result::Errno,
     },
     sched::utils::yield_now,
     syscall::SysResult,
-    utils::{crossover::intermit, hack::is_ltp},
+    utils::hack::is_ltp,
 };
 
 #[derive(PartialEq, Debug)]

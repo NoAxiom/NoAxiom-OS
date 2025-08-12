@@ -567,4 +567,64 @@ impl Syscall<'_> {
 
         Ok(0)
     }
+
+    pub fn sys_setdomainname(&self, domainname: usize, len: usize) -> SyscallResult {
+        info!(
+            "[sys_setdomainname] domainname is {:?} len is {:?}",
+            domainname, len
+        );
+        if (len as isize) < 0 || (len as isize) > 64 {
+            return Err(Errno::EINVAL);
+        }
+        if (domainname as *const u8).is_null() {
+            return Err(Errno::EFAULT);
+        }
+
+        let (egid, euid) = (self.task.egid(), self.task.euid());
+        debug!(
+            "[sys_setdomainname]task egid {:?},task euid {:?}",
+            egid, euid
+        );
+        if egid != 0 || euid != 0 {
+            return Err(Errno::EPERM);
+        }
+
+        // let mut kernel_domainname: alloc::vec::Vec<u8> = vec![0; len];
+        // copy_from_user(domainname, kernel_domainname.as_mut_ptr(), len)?;
+        // error!("[sys_setdomainname] domainname is {:?}", kernel_domainname);
+
+        // let file = path_openat("/etc/domainname", OpenFlags::O_CLOEXEC, AT_FDCWD,
+        // 0)?; let offset = file.get_offset();
+        // let clean_vec = vec![0; offset as usize];
+        // file.pwrite(clean_vec.as_slice(), 0)?;
+        // file.pwrite(kernel_domainname.as_slice(), 0)?;
+        Ok(0)
+    }
+
+    pub fn sys_sethostname(&self, hostname: usize, len: usize) -> SyscallResult {
+        info!(
+            "[sys_sethostname] hostname is {:?} len is {:?}",
+            hostname, len
+        );
+        if (len as isize) < 0 || (len as isize) > 64 {
+            return Err(Errno::EINVAL);
+        }
+        if (hostname as *const u8).is_null() {
+            return Err(Errno::EFAULT);
+        }
+        let (egid, euid) = (self.task.egid(), self.task.euid());
+        debug!(
+            "[sys_setdomainname]task egid {:?},task euid {:?}",
+            egid, euid
+        );
+        if egid != 0 || euid != 0 {
+            return Err(Errno::EPERM);
+        }
+        // let mut kernel_hostname: Vec<u8> = vec![0; len];
+        // copy_from_user(hostname, kernel_hostname.as_mut_ptr(), len)?;
+        // error!("[sys_sethostname] hostname is {:?}", kernel_hostname);
+        // let file = path_openat("/etc/hostname", OpenFlags::O_CLOEXEC, AT_FDCWD, 0)?;
+        // file.pwrite(kernel_hostname.as_slice(), 0)?;
+        Ok(0)
+    }
 }
