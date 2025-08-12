@@ -9,7 +9,7 @@ pub const IPC_PRIVATE: usize = 0;
 pub const IPC_NEW: usize = IPC_PRIVATE;
 
 pub const SHM_MIN: usize = 1;
-pub const SHM_MAX: usize = 4096;
+pub const SHM_MAX: usize = 4096 * 1024;
 
 pub struct IpcPerm {
     pub __key: usize,             /* Key */
