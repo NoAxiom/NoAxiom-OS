@@ -334,8 +334,10 @@ impl Syscall<'_> {
         for i in 0..iovcnt {
             let iov_ptr = UserPtr::<Iovec>::new(iovp + i * Iovec::size());
             iov_ptr.as_slice_const_checked(Iovec::size()).await?;
-
             let iov = iov_ptr.read().await?;
+            if iov.iov_len == 0 {
+                continue;
+            }
             let buf_ptr = UserPtr::<u8>::new(iov.iov_base);
             let buf_slice = buf_ptr.as_slice_mut_checked(iov.iov_len).await?;
             read_size += file.read(buf_slice).await?;
@@ -396,7 +398,7 @@ impl Syscall<'_> {
         if !file.meta().readable() {
             return Err(Errno::EBADF);
         }
-        if (offset as isize) < 0 {
+        if (offset as isize) < 0 || iovcnt > (i32::MAX as usize) {
             error!("[sys_pread64] offset is negative or too large: {}", offset);
             return Err(Errno::EINVAL);
         }
@@ -408,17 +410,54 @@ impl Syscall<'_> {
 
         let mut offset = offset;
         let mut read_size = 0;
+        let mut tot_iovlen = 0;
         for i in 0..iovcnt {
             let iov_ptr = UserPtr::<Iovec>::new(iovp + i * Iovec::size());
-            iov_ptr.as_slice_const_checked(Iovec::size()).await?;
-
             let iov = iov_ptr.read().await?;
+            tot_iovlen += iov.iov_len;
+            if iov.iov_len == 0 {
+                continue;
+            }
+            if tot_iovlen > (isize::MAX as usize) {
+                error!("[sys_pwritev] total length of iovec exceeds ssize_t max");
+                return Err(Errno::EINVAL);
+            }
+            if offset.checked_add(iov.iov_len).is_none() {
+                return Err(Errno::EINVAL);
+            }
+
             let buf_ptr = UserPtr::<u8>::new(iov.iov_base);
             let buf_slice = buf_ptr.as_slice_mut_checked(iov.iov_len).await?;
-            read_size += file.read_at(offset, buf_slice).await?;
-            offset += read_size as usize;
+            let current_read = file.read_at(offset, buf_slice).await?;
+            read_size += current_read;
+            offset += current_read as usize;
         }
         Ok(read_size)
+    }
+
+    pub async fn sys_preadv2(
+        &self,
+        fd: usize,
+        iovp: usize,
+        iovcnt: usize,
+        offset: usize,
+        flags: i32,
+    ) -> SyscallResult {
+        info!(
+            "[sys_preadv2] fd: {}, iovp: {:#x}, iovcnt: {}, offset: {}, flags: {}",
+            fd, iovp, iovcnt, offset, flags
+        );
+        if offset as isize == -1 {
+            let fd_table = self.task.fd_table();
+            let file = fd_table.get(fd).ok_or(Errno::EBADF)?;
+            drop(fd_table);
+            let pos = file.pos();
+            let ret = self.sys_preadv(fd, iovp, iovcnt, pos).await?;
+            file.seek(SeekFrom::Current(ret as i64))?;
+            Ok(ret)
+        } else {
+            self.sys_preadv(fd, iovp, iovcnt, offset).await
+        }
     }
 
     /// Write data to a file descriptor
@@ -530,8 +569,8 @@ impl Syscall<'_> {
         if !file.meta().writable() {
             return Err(Errno::EBADF);
         }
-        if (offset as isize) < 0 {
-            error!("[sys_pread64] offset is negative or too large: {}", offset);
+        if (offset as isize) < 0 || iovcnt > (i32::MAX as usize) {
+            error!("[sys_pwritev] offset is negative or too large: {}", offset);
             return Err(Errno::EINVAL);
         }
         match file.meta().inode.file_type() {
@@ -542,20 +581,57 @@ impl Syscall<'_> {
 
         let mut write_size = 0;
         let mut offset = offset;
+        let mut tot_iovlen = 0;
         for i in 0..iovcnt {
             let iov_ptr = UserPtr::<Iovec>::new(iovp + i * Iovec::size());
             iov_ptr.as_slice_const_checked(Iovec::size()).await?;
 
             let iov = iov_ptr.read().await?;
+            tot_iovlen += iov.iov_len;
             if iov.iov_len == 0 {
                 continue;
             }
+            if tot_iovlen > (isize::MAX as usize) {
+                error!("[sys_pwritev] total length of iovec exceeds ssize_t max");
+                return Err(Errno::EINVAL);
+            }
+            if offset.checked_add(iov.iov_len).is_none() {
+                return Err(Errno::EINVAL);
+            }
+
             let buf_ptr = UserPtr::<u8>::new(iov.iov_base);
             let buf_slice = buf_ptr.as_slice_const_checked(iov.iov_len).await?;
-            write_size += file.write_at(offset, buf_slice).await?;
-            offset += write_size as usize;
+            let cur_write_size = file.write_at(offset, buf_slice).await?;
+            write_size += cur_write_size;
+            offset += cur_write_size as usize;
         }
         Ok(write_size)
+    }
+
+    pub async fn sys_pwritev2(
+        &self,
+        fd: usize,
+        iovp: usize,
+        iovcnt: usize,
+        offset: usize,
+        flags: i32,
+    ) -> SyscallResult {
+        info!(
+            "[sys_pwritev2] fd: {}, iovp: {:#x}, iovcnt: {}, offset: {}, flags: {}",
+            fd, iovp, iovcnt, offset, flags
+        );
+
+        if offset as isize == -1 {
+            let fd_table = self.task.fd_table();
+            let file = fd_table.get(fd).ok_or(Errno::EBADF)?;
+            drop(fd_table);
+            let pos = file.pos();
+            let ret = self.sys_pwritev(fd, iovp, iovcnt, pos).await?;
+            file.seek(SeekFrom::Current(ret as i64))?;
+            Ok(ret)
+        } else {
+            self.sys_pwritev(fd, iovp, iovcnt, offset).await
+        }
     }
 
     /// Create a directory
