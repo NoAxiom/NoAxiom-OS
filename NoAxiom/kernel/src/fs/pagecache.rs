@@ -194,8 +194,19 @@ impl PageCacheManager {
                     assert_no_lock!();
                     assert!(Arch::is_external_interrupt_enabled());
                     let len = PAGE_SIZE.min(file_size - offset);
-                    block_on(file.base_write(*offset, &page.data.ppn().get_bytes_array()[..len]))
-                        .unwrap();
+                    match block_on(
+                        file.base_write(*offset, &page.data.ppn().get_bytes_array()[..len]),
+                    ) {
+                        Ok(_) => {}
+                        Err(e) => {
+                            error!(
+                                "[PageCacheManager: sync_all] file: {}, offset: {}, error: {}",
+                                file.name(),
+                                offset,
+                                e
+                            );
+                        }
+                    }
                 }
             }
             page_cache.clear();

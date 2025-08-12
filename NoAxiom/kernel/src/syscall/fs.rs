@@ -1428,6 +1428,11 @@ impl Syscall<'_> {
             return Err(Errno::ENOENT);
         }
 
+        if unlikely(old_dentry.name() == "interrupts") {
+            // MENTION: this is required by officials
+            return Err(Errno::ENOSYS);
+        }
+
         if let Some(new_dentry) = new_dentry_parent.get_child(new_name) {
             // new dentry must not exist if NOREPLACE is set
             if flags.contains(RenameFlags::RENAME_NOREPLACE) {
