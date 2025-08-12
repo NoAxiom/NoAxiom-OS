@@ -9,6 +9,11 @@ replace-with = "vendored-sources"
 git = "https://github.com/YuXuaann/virtio-drivers-async"
 replace-with = "vendored-sources"
 
+[source."git+https://github.com/YuXuaann/virtio-drivers-async?branch=virtio-driver-0.9.0-nightly"]
+git = "https://github.com/YuXuaann/virtio-drivers-async"
+branch = "virtio-driver-0.9.0-nightly"
+replace-with = "vendored-sources"
+
 [source."git+https://github.com/os-module/kernel-sync.git"]
 git = "https://github.com/os-module/kernel-sync.git"
 replace-with = "vendored-sources"
