@@ -219,6 +219,10 @@ impl Syscall<'_> {
                 }
                 Ok(dentry)
             } else {
+                if dentry.inode()?.file_type() != InodeMode::DIR {
+                    error!("[sys_openat] O_CREATE can only be used on directories");
+                    return Err(Errno::ENOTDIR);
+                }
                 dentry.clone().create(name, mode | InodeMode::FILE).await
             }
         } else {
