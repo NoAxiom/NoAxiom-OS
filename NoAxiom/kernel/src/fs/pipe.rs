@@ -401,7 +401,8 @@ impl File for PipeFile {
     async fn base_read(&self, _offset: usize, buf: &mut [u8]) -> SyscallResult {
         assert!(self.is_read_end());
         debug!("[pipe] {} read, {}", self.meta.dentry().name(), buf.len());
-        PipeReadFuture::new(buf.len(), self.buffer.clone()).await?;
+        let non_block = self.meta.is_nonblocking();
+        PipeReadFuture::new(buf.len(), self.buffer.clone(), non_block).await?;
         let mut buffer = self.buffer.lock();
         let ret = buffer.read(buf);
         if ret != 0 {
@@ -415,7 +416,8 @@ impl File for PipeFile {
     async fn base_write(&self, _offset: usize, buf: &[u8]) -> SyscallResult {
         assert!(self.is_write_end());
         debug!("[pipe] {} write, {}", self.meta.dentry().name(), buf.len());
-        PipeWriteFuture::new(buf.len(), self.buffer.clone()).await?;
+        let non_block = self.meta.is_nonblocking();
+        PipeWriteFuture::new(buf.len(), self.buffer.clone(), non_block).await?;
         let mut buffer = self.buffer.lock();
         let ret = buffer.write(buf);
         if ret != 0 {
@@ -495,13 +497,15 @@ impl Drop for PipeFile {
 struct PipeReadFuture {
     read_len: usize,
     pipe_buffer: Arc<SpinLock<PipeBuffer>>,
+    non_block: bool,
 }
 
 impl PipeReadFuture {
-    fn new(read_len: usize, pipe_buffer: Arc<SpinLock<PipeBuffer>>) -> Self {
+    fn new(read_len: usize, pipe_buffer: Arc<SpinLock<PipeBuffer>>, non_block: bool) -> Self {
         Self {
             read_len,
             pipe_buffer,
+            non_block,
         }
     }
 }
@@ -514,8 +518,11 @@ impl Future for PipeReadFuture {
         let mut buffer = self.pipe_buffer.lock();
         if buffer.write_end {
             // only continue if it can be read
+            debug!("[PipeReadFile] available: {}", buffer.read_available());
             if buffer.read_available() {
                 Poll::Ready(Ok(()))
+            } else if self.non_block {
+                Poll::Ready(Err(Errno::EAGAIN))
             } else {
                 buffer.add_read_event(self.read_len, cx.waker().clone());
                 Poll::Pending
@@ -530,13 +537,15 @@ impl Future for PipeReadFuture {
 struct PipeWriteFuture {
     write_len: usize,
     pipe_buffer: Arc<SpinLock<PipeBuffer>>,
+    non_block: bool,
 }
 
 impl PipeWriteFuture {
-    fn new(write_len: usize, pipe_buffer: Arc<SpinLock<PipeBuffer>>) -> Self {
+    fn new(write_len: usize, pipe_buffer: Arc<SpinLock<PipeBuffer>>, non_block: bool) -> Self {
         Self {
             write_len,
             pipe_buffer,
+            non_block,
         }
     }
 }
@@ -548,11 +557,13 @@ impl Future for PipeWriteFuture {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut buffer = self.pipe_buffer.lock();
         if buffer.read_end {
-            trace!("[PipeWriteFile] has read end");
+            debug!("[PipeWriteFile] available: {}", buffer.write_available());
             // only continue if it can be written
             if buffer.write_available() {
                 trace!("[PipeWriteFile] write available");
                 Poll::Ready(Ok(()))
+            } else if self.non_block {
+                Poll::Ready(Err(Errno::EAGAIN))
             } else {
                 trace!("[PipeWriteFile] write pending, save waker");
                 buffer.add_write_event(self.write_len, cx.waker().clone());

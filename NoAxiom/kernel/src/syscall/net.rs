@@ -460,11 +460,20 @@ impl Syscall<'_> {
     pub async fn sys_socketpair(
         &self,
         _domain: isize,
-        _type: isize,
+        socket_type: isize,
         _protocol: isize,
         sv: usize,
     ) -> SyscallResult {
-        let (read_end, write_end) = PipeFile::new_pipe(&FileFlags::O_RDWR);
+        // Extract flags from socket_type
+        let flags = socket_type & !0xf; // Get the upper bits (flags)
+        let has_nonblock = (flags & (SOCK_NONBLOCK as isize)) != 0;
+        
+        let mut file_flags = FileFlags::O_RDWR;
+        if has_nonblock {
+            file_flags |= FileFlags::O_NONBLOCK;
+        }
+        
+        let (read_end, write_end) = PipeFile::new_pipe(&file_flags);
 
         let user_ptr = UserPtr::<i32>::new(sv);
         let buf_slice = user_ptr.as_slice_mut_checked(2).await?;

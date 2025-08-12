@@ -86,6 +86,11 @@ impl FileMeta {
         flags |= FileFlags::O_NONBLOCK;
         self.set_flags(flags);
     }
+    pub fn is_nonblocking(&self) -> bool {
+        let flags =
+            FileFlags::from_bits(self.flags.load(Ordering::SeqCst)).unwrap_or(FileFlags::empty());
+        flags.contains(FileFlags::O_NONBLOCK)
+    }
 }
 
 #[async_trait]
