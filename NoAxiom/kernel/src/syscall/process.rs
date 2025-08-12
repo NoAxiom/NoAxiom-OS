@@ -905,4 +905,74 @@ impl Syscall<'_> {
         suid.try_write(task.suid()).await?;
         Ok(0)
     }
+
+    pub fn sys_setfsuid(&self, fsuid: i32) -> SyscallResult {
+        log::info!("[sys_setfsuid] fsuid: {}", fsuid);
+        let task = self.task;
+        let origin_fsuid = task.fsuid() as i32;
+        if task.euid() == 0 {
+            log::warn!(
+                "[sys_setfsuid] task{} is root, set fsuid to {}",
+                task.tid(),
+                fsuid
+            );
+            if fsuid != -1 {
+                task.set_fsuid(fsuid as u32);
+            }
+        } else {
+            if fsuid != task.uid() as i32
+                && fsuid != task.euid() as i32
+                && fsuid != task.suid() as i32
+                && fsuid != task.fsuid() as i32
+            {
+                log::warn!(
+                    "[sys_setfsuid] task{} is not root, set fsuid to {}",
+                    task.tid(),
+                    fsuid
+                );
+                return Ok(origin_fsuid as isize);
+            } else {
+                log::warn!("[sys_setfsuid] task{} set fsuid to {}", task.tid(), fsuid);
+                if fsuid != -1 {
+                    task.set_fsuid(fsuid as u32);
+                }
+            }
+        }
+        Ok(origin_fsuid as isize)
+    }
+
+    pub fn sys_setfsgid(&self, fsgid: i32) -> SyscallResult {
+        log::info!("[sys_setfsgid] fsgid: {}", fsgid);
+        let task = self.task;
+        let origin_fsgid = task.fsgid() as i32;
+        if task.euid() == 0 {
+            if fsgid != -1 {
+                log::warn!(
+                    "[sys_setfsgid] task{} is root, set fsgid to {}",
+                    task.tid(),
+                    fsgid
+                );
+                task.set_fsgid(fsgid as u32);
+            }
+        } else {
+            if fsgid != task.gid() as i32
+                && fsgid != task.egid() as i32
+                && fsgid != task.sgid() as i32
+                && fsgid != task.fsgid() as i32
+            {
+                log::warn!(
+                    "[sys_setfsgid] task{} is not root, set fsgid to {}",
+                    task.tid(),
+                    fsgid
+                );
+                return Ok(origin_fsgid as isize);
+            } else {
+                log::warn!("[sys_setfsgid] task{} set fsgid to {}", task.tid(), fsgid);
+                if fsgid != -1 {
+                    task.set_fsgid(fsgid as u32);
+                }
+            }
+        }
+        Ok(origin_fsgid as isize)
+    }
 }

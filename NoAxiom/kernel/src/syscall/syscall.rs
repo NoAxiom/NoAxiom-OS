@@ -118,6 +118,8 @@ impl<'a> Syscall<'a> {
             SYS_GETRESGID =>            self.sys_getresgid(args[0], args[1], args[2]).await,
             SYS_SETGROUPS =>            self.sys_setgroups(args[0], args[1]).await,
             SYS_GETGROUPS =>            self.sys_getgroups(args[0], args[1]).await,
+            SYS_SETFSGID =>             self.sys_setfsgid(args[0] as i32),
+            SYS_SETFSUID =>             self.sys_setfsuid(args[0] as i32),
             SYS_EXIT =>                 self.sys_exit(args[0] as i32),
             SYS_EXIT_GROUP =>           self.sys_exit_group(args[0] as i32),
             SYS_CLONE =>                self.sys_clone(&args).await,
