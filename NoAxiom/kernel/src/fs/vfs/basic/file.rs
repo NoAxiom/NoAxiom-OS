@@ -8,6 +8,7 @@ use alloc::{
 };
 use core::{
     hash::{Hash, Hasher},
+    intrinsics::unlikely,
     sync::atomic::{AtomicI32, AtomicUsize, Ordering},
     task::Waker,
 };
@@ -346,9 +347,20 @@ impl dyn File {
     }
 
     pub async fn write(self: &Arc<dyn File>, buf: &[u8]) -> SyscallResult {
-        let offset = self.meta().pos.load(Ordering::Acquire);
+        let flags = self.flags();
+        let offset = if unlikely(flags.contains(FileFlags::O_APPEND)) {
+            // For O_APPEND, always write at the end of the file
+            self.size()
+        } else {
+            self.meta().pos.load(Ordering::Acquire)
+        };
+
         let len = self.write_at(offset, buf).await?;
-        self.meta().pos.fetch_add(len as usize, Ordering::Release);
+
+        // Update file position to the end of the written data
+        self.meta()
+            .pos
+            .store(offset + len as usize, Ordering::Release);
         Ok(len)
     }
     #[inline(always)]
