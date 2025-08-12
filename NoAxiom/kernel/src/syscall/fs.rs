@@ -326,6 +326,10 @@ impl Syscall<'_> {
         // let file_name = file.dentry().path()?;
         // info!("[sys_readv] file_name: {:?}", file_name);
 
+        if !file.meta().readable() {
+            return Err(Errno::EBADF);
+        }
+
         let mut read_size = 0;
         for i in 0..iovcnt {
             let iov_ptr = UserPtr::<Iovec>::new(iovp + i * Iovec::size());
@@ -358,9 +362,63 @@ impl Syscall<'_> {
         if !file.meta().readable() {
             return Err(Errno::EBADF);
         }
+        if (offset as isize) < 0 {
+            error!("[sys_pread64] offset is negative or too large: {}", offset);
+            return Err(Errno::EINVAL);
+        }
+        match file.meta().inode.file_type() {
+            InodeMode::DIR => return Err(Errno::EISDIR),
+            InodeMode::FIFO => return Err(Errno::ESPIPE),
+            _ => {}
+        }
+
         let user_ptr = UserPtr::<u8>::new(buf);
         let buf_slice = user_ptr.as_slice_mut_checked(len).await?;
         file.read_at(offset, buf_slice).await
+    }
+
+    pub async fn sys_preadv(
+        &self,
+        fd: usize,
+        iovp: usize,
+        iovcnt: usize,
+        offset: usize,
+    ) -> SyscallResult {
+        info!(
+            "[sys_preadv] fd: {}, iovp: {:#x}, iovcnt: {}, offset: {}",
+            fd, iovp, iovcnt, offset
+        );
+        let fd_table = self.task.fd_table();
+        let file = fd_table.get(fd).ok_or(Errno::EBADF)?;
+        drop(fd_table);
+        // let file_name = file.dentry().path()?;
+        // info!("[sys_pread64] file_name: {:?}", file_name);
+        if !file.meta().readable() {
+            return Err(Errno::EBADF);
+        }
+        if (offset as isize) < 0 {
+            error!("[sys_pread64] offset is negative or too large: {}", offset);
+            return Err(Errno::EINVAL);
+        }
+        match file.meta().inode.file_type() {
+            InodeMode::DIR => return Err(Errno::EISDIR),
+            InodeMode::FIFO => return Err(Errno::ESPIPE),
+            _ => {}
+        }
+
+        let mut offset = offset;
+        let mut read_size = 0;
+        for i in 0..iovcnt {
+            let iov_ptr = UserPtr::<Iovec>::new(iovp + i * Iovec::size());
+            iov_ptr.as_slice_const_checked(Iovec::size()).await?;
+
+            let iov = iov_ptr.read().await?;
+            let buf_ptr = UserPtr::<u8>::new(iov.iov_base);
+            let buf_slice = buf_ptr.as_slice_mut_checked(iov.iov_len).await?;
+            read_size += file.read_at(offset, buf_slice).await?;
+            offset += read_size as usize;
+        }
+        Ok(read_size)
     }
 
     /// Write data to a file descriptor
@@ -400,6 +458,10 @@ impl Syscall<'_> {
         // let file_name = file.dentry().path()?;
         // info!("[sys_writev] file_name: {:?}", file_name);
 
+        if !file.meta().writable() {
+            return Err(Errno::EBADF);
+        }
+
         let mut write_size = 0;
         for i in 0..iovcnt {
             let iov_ptr = UserPtr::<Iovec>::new(iovp + i * Iovec::size());
@@ -435,9 +497,65 @@ impl Syscall<'_> {
         if !file.meta().writable() {
             return Err(Errno::EBADF);
         }
+        if (offset as isize) < 0 {
+            error!("[sys_pread64] offset is negative or too large: {}", offset);
+            return Err(Errno::EINVAL);
+        }
+        match file.meta().inode.file_type() {
+            InodeMode::DIR => return Err(Errno::EISDIR),
+            InodeMode::FIFO => return Err(Errno::ESPIPE),
+            _ => {}
+        }
         let user_ptr = UserPtr::<u8>::new(buf);
         let buf_slice = user_ptr.as_slice_const_checked(len).await?;
         file.write_at(offset, buf_slice).await
+    }
+
+    pub async fn sys_pwritev(
+        &self,
+        fd: usize,
+        iovp: usize,
+        iovcnt: usize,
+        offset: usize,
+    ) -> SyscallResult {
+        info!(
+            "[sys_pwritev] fd: {}, iovp: {:#x}, iovcnt: {}, offset: {}",
+            fd, iovp, iovcnt, offset
+        );
+        let fd_table = self.task.fd_table();
+        let file = fd_table.get(fd).ok_or(Errno::EBADF)?;
+        drop(fd_table);
+        // let file_name = file.dentry().path()?;
+        // info!("[sys_pwritev] file_name: {:?}", file_name);
+        if !file.meta().writable() {
+            return Err(Errno::EBADF);
+        }
+        if (offset as isize) < 0 {
+            error!("[sys_pread64] offset is negative or too large: {}", offset);
+            return Err(Errno::EINVAL);
+        }
+        match file.meta().inode.file_type() {
+            InodeMode::DIR => return Err(Errno::EISDIR),
+            InodeMode::FIFO => return Err(Errno::ESPIPE),
+            _ => {}
+        }
+
+        let mut write_size = 0;
+        let mut offset = offset;
+        for i in 0..iovcnt {
+            let iov_ptr = UserPtr::<Iovec>::new(iovp + i * Iovec::size());
+            iov_ptr.as_slice_const_checked(Iovec::size()).await?;
+
+            let iov = iov_ptr.read().await?;
+            if iov.iov_len == 0 {
+                continue;
+            }
+            let buf_ptr = UserPtr::<u8>::new(iov.iov_base);
+            let buf_slice = buf_ptr.as_slice_const_checked(iov.iov_len).await?;
+            write_size += file.write_at(offset, buf_slice).await?;
+            offset += write_size as usize;
+        }
+        Ok(write_size)
     }
 
     /// Create a directory
