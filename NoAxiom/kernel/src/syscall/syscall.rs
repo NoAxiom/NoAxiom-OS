@@ -96,7 +96,11 @@ impl<'a> Syscall<'a> {
             SYS_GETPEERNAME =>  self.sys_getpeername(args[0], args[1], args[2]).await,
             SYS_SETSOCKOPT =>   self.sys_setsockopt(args[0], args[1], args[2], args[3], args[4]).await,
             SYS_GETSOCKOPT =>   self.sys_getsockopt(args[0], args[1], args[2], args[3], args[4]).await,
-
+            SYS_RECVMSG =>      self.sys_recvmsg(args[0], args[1], args[2] as i32).await,
+            SYS_RECVMMSG =>     self.sys_recvmmsg(args[0], args[1], args[2], args[3] as i32).await,
+            SYS_SENDMSG =>      self.sys_sendmsg(args[0], args[1], args[2] as i32).await,
+            SYS_SENDMMSG =>     self.sys_sendmmsg(args[0], args[1], args[2], args[3] as i32).await,
+            
             // process
             SYS_GETUID =>               self.sys_getuid(),
             SYS_GETEUID =>              self.sys_geteuid(),

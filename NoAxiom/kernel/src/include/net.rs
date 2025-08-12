@@ -3,7 +3,7 @@ use smoltcp::wire::{IpAddress, IpEndpoint, Ipv4Address, Ipv6Address};
 use strum::FromRepr;
 
 use super::result::Errno;
-use crate::syscall::SysResult;
+use crate::{include::fs::Iovec, syscall::SysResult};
 
 pub const SOCK_NONBLOCK: i32 = 0x800;
 pub const SOCK_CLOEXEC: i32 = 0x80000;
@@ -523,8 +523,8 @@ impl TryFrom<usize> for SocketLevel {
 
 ///为每个level建立一个配置enum
 #[repr(usize)]
-#[allow(non_camel_case_types)]
 #[derive(FromRepr, Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(non_camel_case_types)]
 pub enum IpOption {
     //设置多播数据的发送出口网络接口,设置多播接口中从哪个接口发送对应数据包
     IP_MULTICAST_IF = 32,
@@ -539,4 +539,16 @@ pub enum IpOption {
     IP_PKTINFO = 11,
     MCAST_JOIN_GROUP = 42,
     MCAST_LEAVE_GROUP = 45,
+}
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct MessageHeaderRaw {
+    pub name: *mut u8, // 对应 sockaddr 或者 AF_ALG 下的 SockAddrAlg
+    pub name_len: u32, // name 缓冲区的大小
+    pub iovec: *mut Iovec,
+    pub iovec_len: i32,   // iovec 数量
+    pub control: *mut u8, // 控制消息 (cmsg) 缓冲区
+    pub control_len: u32, // control 缓冲区的大小
+    pub flags: i32,       // recvmsg/sendmsg 时的 flags
 }

@@ -1499,6 +1499,46 @@ impl Syscall<'_> {
         Ok(0)
     }
 
+    pub async fn sys_truncate(&self, path: usize, len: isize) -> SyscallResult {
+        const MAX_FILE_SIZE: usize = 16 * 1024 * 1024;
+        let path = read_path(path)?;
+        info!("[sys_truncate] path: {:?}, len: {}", path, len);
+
+        if len < 0 {
+            error!("[sys_truncate] negative len");
+            return Err(Errno::EINVAL);
+        }
+        if len >= MAX_FILE_SIZE as isize {
+            error!("[sys_truncate] len exceeds maximum file size");
+            return Err(Errno::EFBIG);
+        }
+
+        let searchflags = SearchFlags::empty();
+        let dentry = get_dentry(self.task, AT_FDCWD, &path, &searchflags)?;
+        let inode = dentry.inode()?;
+        if inode.file_type() == InodeMode::DIR {
+            error!("[sys_truncate] truncate on directory");
+            return Err(Errno::EISDIR);
+        }
+
+        dentry.check_access(self.task, W_OK, true)?;
+        let file = dentry.open(&FileFlags::empty())?;
+        let len = len as usize;
+        let size = inode.size();
+        if size < len {
+            if len - size <= 4096 {
+                // fixme: where are not clean?
+                file.write_at(size, &vec![0u8; len - size]).await?;
+            }
+            inode.set_size(len);
+        } else {
+            file.truncate_pagecache(len);
+            inode.set_size(len);
+            inode.truncate(len).await?;
+        }
+        Ok(0)
+    }
+
     /// Truncate a file to a specified length
     /// todo: FIXME!
     pub async fn sys_ftruncate(&self, fd: usize, length: usize) -> SyscallResult {
@@ -1529,13 +1569,12 @@ impl Syscall<'_> {
                 file.write_at(size, &vec![0u8; length - size]).await?;
             }
             file.inode().set_size(length);
-            Ok(0)
         } else {
             file.truncate_pagecache(length);
             file.inode().set_size(length);
             file.inode().truncate(length).await?;
-            Ok(0)
         }
+        Ok(0)
     }
 
     /// splice data from one file descriptor to another
