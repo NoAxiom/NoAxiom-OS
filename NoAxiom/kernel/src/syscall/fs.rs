@@ -653,6 +653,10 @@ impl Syscall<'_> {
             warn!("[sys_mkdirat] dir already exists: {}", name);
             return Err(Errno::EEXIST);
         } else {
+            if dentry.inode()?.file_type() != InodeMode::DIR {
+                error!("[sys_mkdirat] O_CREATE can only be used on directories");
+                return Err(Errno::ENOTDIR);
+            }
             dentry.clone().create(name, mode | InodeMode::DIR).await?;
         }
         Ok(0)
