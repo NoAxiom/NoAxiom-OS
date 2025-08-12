@@ -1517,6 +1517,10 @@ impl Syscall<'_> {
             error!("[sys_truncate] len exceeds maximum file size");
             return Err(Errno::EFBIG);
         }
+        if path == "" {
+            error!("[sys_truncate] path is empty");
+            return Err(Errno::ENOENT);
+        }
 
         let searchflags = SearchFlags::empty();
         let dentry = get_dentry(self.task, AT_FDCWD, &path, &searchflags)?;

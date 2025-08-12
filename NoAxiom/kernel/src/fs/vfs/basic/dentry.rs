@@ -318,14 +318,6 @@ impl dyn Dentry {
         }
 
         let inode = self.inode().expect("should have inode!");
-        if let Some(task) = task {
-            if task.fsuid() != 0 {
-                if unlikely(!self.can_search(task)) {
-                    error!("[walk_path] has no search access");
-                    return Err(Errno::EACCES);
-                }
-            }
-        }
 
         let entry = path[step];
         match entry {
@@ -343,9 +335,21 @@ impl dyn Dentry {
                     let (tar, new_jumps) = self.__symlink_jump(task, &symlink_path, jumps + 1)?;
                     return tar.__walk_path(task, path, step + 1, new_jumps);
                 }
+                // Check if this is a directory BEFORE checking permissions
+                // This ensures ENOTDIR takes precedence over EACCES
                 if inode.file_type() != InodeMode::DIR {
                     error!("[walk_path] {} is not a dir", self.name());
                     return Err(Errno::ENOTDIR);
+                }
+
+                // Only check search permissions after confirming it's a directory
+                if let Some(task) = task {
+                    if task.fsuid() != 0 {
+                        if unlikely(!self.can_search(task)) {
+                            error!("[walk_path] has no search access");
+                            return Err(Errno::EACCES);
+                        }
+                    }
                 }
                 if let Some(child) = self.get_child(name) {
                     return child.__walk_path(task, path, step + 1, jumps);

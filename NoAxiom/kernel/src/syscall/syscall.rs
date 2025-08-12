@@ -71,6 +71,7 @@ impl<'a> Syscall<'a> {
             SYS_LSEEK =>            self.sys_lseek(args[0], args[1] as isize, args[2]),
             SYS_RENAMEAT2 =>        self.sys_renameat2(args[0] as isize, args[1], args[2] as isize, args[3], args[4] as i32).await,
             SYS_COPY_FILE_RANGE =>  self.sys_copy_file_range(args[0], args[1], args[2], args[3], args[4], args[5] as i32).await,
+            SYS_TRUNCATE =>         self.sys_truncate(args[0], args[1] as isize).await,
             SYS_FTRUNCATE64 =>      self.sys_ftruncate(args[0], args[1]).await,
             SYS_SPLICE =>           self.sys_splice(args[0], args[1], args[2], args[3], args[4], args[5]).await,
             SYS_FALLOCATE =>        self.sys_fallocate(args[0], args[1] as i32, args[2] as isize, args[3] as isize),
