@@ -4,7 +4,8 @@ members = ["kernel"]
 resolver = "2"
 
 [workspace.dependencies]
-log = "0.4.22"
+# log = { version = "0.4.22", features = ["release_max_level_off"] }
+log = { version = "0.4.22" }
 bitflags = "2.6.0"
 arch = { path = "lib/arch" }
 kfuture = { path = "lib/kfuture" }
@@ -26,7 +27,6 @@ virtio-drivers = { git = "https://github.com/YuXuaann/virtio-drivers-async", bra
 #     "alloc",
 #     "embedded-io",
 # ] }
-
 [profile.release]
 debug = true
 # 优化级别,最低是0,最高是3, 0方便debug

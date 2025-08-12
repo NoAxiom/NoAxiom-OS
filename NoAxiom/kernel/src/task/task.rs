@@ -365,6 +365,10 @@ impl Task {
     /// check user permisson when accessing target task from current task
     pub fn check_user_permission(&self, target: &Arc<Task>) -> bool {
         let sender = self;
+        if sender.tid() == target.tid() {
+            // same task, no need to check permission
+            return true;
+        }
         let sender_info = self.user_id();
         let sender_uid = sender_info.uid();
         let sender_euid = sender_info.euid();
