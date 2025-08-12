@@ -51,8 +51,9 @@ impl ShmManager {
         let task = current_task().unwrap();
         let pid = task.pid();
         let mode = CreateMode::from_bits((shmflags & 0o777) as u32).unwrap();
-        let uid = task.uid();
-        let gid = task.gid();
+        let user_id = task.user_id();
+        let uid = user_id.uid();
+        let gid = user_id.gid();
         let perm = IpcPerm {
             __key: key,
             uid,

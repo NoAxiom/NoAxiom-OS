@@ -75,14 +75,15 @@ impl File for StatusFile {
         let ppid = 0;
 
         let tracerpid = 0; // 跟踪此进程的进程 PID（如果未被跟踪，则为 0）
-        let uid = task.uid();
-        let euid = task.euid();
-        let suid = task.suid();
-        let fsuid = task.fsuid();
-        let gid = task.gid();
-        let egid = task.egid();
-        let sgid = task.sgid();
-        let fsgid = task.fsgid();
+        let user_id = task.user_id();
+        let uid = user_id.uid();
+        let euid = user_id.euid();
+        let suid = user_id.suid();
+        let fsuid = user_id.fsuid();
+        let gid = user_id.gid();
+        let egid = user_id.egid();
+        let sgid = user_id.sgid();
+        let fsgid = user_id.fsgid();
         let fdsize = task.fd_table().rlimit().rlim_cur as usize;
         let groups = String::new();
         let nstgid = task.tgid(); // pid 所属的每个 PID 命名空间中的线程组 ID

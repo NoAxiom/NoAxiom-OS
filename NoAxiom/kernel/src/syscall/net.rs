@@ -580,7 +580,8 @@ impl Syscall<'_> {
             return Err(Errno::EFAULT);
         }
 
-        let (egid, euid) = (self.task.egid(), self.task.euid());
+        let user_id = self.task.user_id();
+        let (egid, euid) = (user_id.egid(), user_id.euid());
         debug!(
             "[sys_setdomainname]task egid {:?},task euid {:?}",
             egid, euid
@@ -612,7 +613,8 @@ impl Syscall<'_> {
         if (hostname as *const u8).is_null() {
             return Err(Errno::EFAULT);
         }
-        let (egid, euid) = (self.task.egid(), self.task.euid());
+        let user_id = self.task.user_id();
+        let (egid, euid) = (user_id.egid(), user_id.euid());
         debug!(
             "[sys_setdomainname]task egid {:?},task euid {:?}",
             egid, euid

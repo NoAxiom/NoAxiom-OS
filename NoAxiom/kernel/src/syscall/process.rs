@@ -496,18 +496,19 @@ impl Syscall<'_> {
 
     pub fn sys_setuid(&self, uid: u32) -> SyscallResult {
         info!("[sys_setuid] set uid to {}", uid);
-        if self.task.euid() == 0 {
+        let mut user_id = self.task.user_id();
+        if user_id.euid() == 0 {
             warn!(
                 "[sys_setuid] task {} is root, set uid to {}",
                 self.task.tid(),
                 uid
             );
-            self.task.set_uid(uid);
-            self.task.set_euid(uid);
-            self.task.set_suid(uid);
-            self.task.set_fsuid(uid);
+            user_id.set_uid(uid);
+            user_id.set_euid(uid);
+            user_id.set_suid(uid);
+            user_id.set_fsuid(uid);
         } else {
-            if uid != self.task.uid() && uid != self.task.suid() {
+            if uid != user_id.uid() && uid != user_id.suid() {
                 warn!(
                     "[sys_setuid] task {} is not root, set uid to {}",
                     self.task.tid(),
@@ -516,8 +517,8 @@ impl Syscall<'_> {
                 return Err(Errno::EPERM);
             } else {
                 warn!("[sys_setuid] task {} set uid to {}", self.task.tid(), uid);
-                self.task.set_euid(uid);
-                self.task.set_fsuid(uid);
+                user_id.set_euid(uid);
+                user_id.set_fsuid(uid);
             }
         }
         Ok(0)
@@ -525,18 +526,19 @@ impl Syscall<'_> {
 
     pub fn sys_setgid(&self, gid: u32) -> SyscallResult {
         info!("[sys_setgid] set gid to {}", gid);
-        if self.task.euid() == 0 {
+        let mut user_id = self.task.user_id();
+        if user_id.euid() == 0 {
             warn!(
                 "[sys_setgid] task {} is root, set gid to {}",
                 self.task.tid(),
                 gid
             );
-            self.task.set_gid(gid);
-            self.task.set_egid(gid);
-            self.task.set_sgid(gid);
-            self.task.set_fsgid(gid);
+            user_id.set_gid(gid);
+            user_id.set_egid(gid);
+            user_id.set_sgid(gid);
+            user_id.set_fsgid(gid);
         } else {
-            if gid != self.task.gid() && gid != self.task.sgid() {
+            if gid != user_id.gid() && gid != user_id.sgid() {
                 warn!(
                     "[sys_setgid] task {} is not root, set gid to {}",
                     self.task.tid(),
@@ -545,31 +547,27 @@ impl Syscall<'_> {
                 return Err(Errno::EPERM);
             } else {
                 warn!("[sys_setgid] task {} set gid to {}", self.task.tid(), gid);
-                self.task.set_egid(gid);
-                self.task.set_fsgid(gid);
+                user_id.set_egid(gid);
+                user_id.set_fsgid(gid);
             }
         }
         Ok(0)
     }
 
     pub fn sys_getuid(&self) -> SyscallResult {
-        info!("[sys_getuid] get uid: {}", self.task.uid());
-        Ok(self.task.uid() as isize)
+        Ok(self.task.user_id().uid() as isize)
     }
 
     pub fn sys_geteuid(&self) -> SyscallResult {
-        info!("[sys_geteuid] get euid: {}", self.task.euid());
-        Ok(self.task.euid() as isize)
+        Ok(self.task.user_id().euid() as isize)
     }
 
     pub fn sys_getgid(&self) -> SyscallResult {
-        info!("[sys_getgid] get gid: {}", self.task.gid());
-        Ok(self.task.gid() as isize)
+        Ok(self.task.user_id().gid() as isize)
     }
 
     pub fn sys_getegid(&self) -> SyscallResult {
-        info!("[sys_getegid] get egid: {}", self.task.egid());
-        Ok(self.task.egid() as isize)
+        Ok(self.task.user_id().egid() as isize)
     }
 
     pub async fn sys_setgroups(&self, size: usize, list: usize) -> SyscallResult {
@@ -578,7 +576,7 @@ impl Syscall<'_> {
         if size > NGROUPS_MAX {
             return Err(Errno::EINVAL);
         }
-        if self.task.euid() != 0 {
+        if self.task.user_id().euid() != 0 {
             return Err(Errno::EPERM);
         }
 
@@ -623,34 +621,26 @@ impl Syscall<'_> {
     /// ref: RocketOS
     pub fn sys_setreuid(&self, ruid: i32, euid: i32) -> SyscallResult {
         info!("[sys_setreuid] ruid: {}, euid: {}", ruid, euid);
-        let origin_uid = self.task.uid() as i32;
-        let origin_euid = self.task.euid() as i32;
-        let origin_suid = self.task.suid() as i32;
-        if self.task.euid() == 0 {
-            warn!(
-                "[sys_setreuid] task{} is root, set ruid: {}, euid: {}",
-                self.task.tid(),
-                ruid,
-                euid
-            );
+        let mut user_id = self.task.user_id();
+        let origin_uid = user_id.uid() as i32;
+        let origin_euid = user_id.euid() as i32;
+        let origin_suid = user_id.suid() as i32;
+        if user_id.euid() == 0 {
+            warn!("[sys_setreuid] is root, set ruid: {}, euid: {}", ruid, euid);
             if ruid != -1 {
-                self.task.set_uid(ruid as u32);
+                user_id.set_uid(ruid as u32);
             }
             if euid != -1 {
-                self.task.set_euid(euid as u32);
-                self.task.set_fsuid(euid as u32);
+                user_id.set_euid(euid as u32);
+                user_id.set_fsuid(euid as u32);
             }
         } else {
             if ruid != -1 {
                 if ruid != origin_uid as i32 && ruid != origin_euid as i32 {
                     return Err(Errno::EPERM);
                 }
-                warn!(
-                    "[sys_setreuid] task{} is not root, set ruid: {}",
-                    self.task.tid(),
-                    ruid,
-                );
-                self.task.set_uid(ruid as u32);
+                warn!("[sys_setreuid] is not root, set ruid: {}", ruid);
+                user_id.set_uid(ruid as u32);
             }
             if euid != -1 {
                 if euid != origin_uid as i32
@@ -659,102 +649,80 @@ impl Syscall<'_> {
                 {
                     return Err(Errno::EPERM);
                 }
-                warn!(
-                    "[sys_setreuid] task{} is not root, set euid: {}",
-                    self.task.tid(),
-                    euid,
-                );
-                self.task.set_euid(euid as u32);
-                self.task.set_fsuid(euid as u32);
+                warn!("[sys_setreuid] is not root, set euid: {}", euid);
+                user_id.set_euid(euid as u32);
+                user_id.set_fsuid(euid as u32);
             }
         }
         if ruid != -1 || (euid != -1 && euid != origin_uid as i32) {
-            self.task.set_suid(self.task.euid() as u32);
+            let tmp_euid = user_id.euid();
+            user_id.set_suid(tmp_euid as u32);
         }
         Ok(0)
     }
 
-    /// ref: RocketOS
     pub fn sys_setregid(&self, rgid: i32, egid: i32) -> SyscallResult {
         info!("[sys_setregid] rgid: {}, egid: {}", rgid, egid);
-        let origin_gid = self.task.gid() as i32;
-        let origin_sgid = self.task.sgid() as i32;
+        let mut user_id = self.task.user_id();
+        let origin_gid = user_id.gid() as i32;
+        let origin_sgid = user_id.sgid() as i32;
         error!(
-            "[sys_setregid] task {} origin_gid: {}, origin_sgid: {}",
-            self.task.tid(),
-            origin_gid,
-            origin_sgid
+            "[sys_setregid] origin_gid: {}, origin_sgid: {}",
+            origin_gid, origin_sgid
         );
-        if self.task.euid() == 0 {
-            warn!(
-                "[sys_setregid] task{} is root, set rgid: {}, egid: {}",
-                self.task.tid(),
-                rgid,
-                egid
-            );
+        if user_id.euid() == 0 {
+            warn!("[sys_setregid] is root, set rgid: {}, egid: {}", rgid, egid);
             if rgid != -1 {
-                self.task.set_gid(rgid as u32);
+                user_id.set_gid(rgid as u32);
             }
             if egid != -1 {
-                self.task.set_egid(egid as u32);
-                self.task.set_fsgid(egid as u32);
+                user_id.set_egid(egid as u32);
+                user_id.set_fsgid(egid as u32);
             }
         } else {
             if rgid != -1 {
                 if rgid != origin_sgid as i32 && rgid != origin_gid as i32 {
                     return Err(Errno::EPERM);
                 }
-                warn!(
-                    "[sys_setregid] task{} is not root, set rgid: {}",
-                    self.task.tid(),
-                    rgid,
-                );
-                self.task.set_gid(rgid as u32);
+                warn!("[sys_setregid] is not root, set rgid: {}", rgid);
+                user_id.set_gid(rgid as u32);
             }
             if egid != -1 {
                 if egid != origin_gid as i32 && egid != origin_sgid as i32 {
                     return Err(Errno::EPERM);
                 }
-                warn!(
-                    "[sys_setregid] task{} is not root, set egid: {}",
-                    self.task.tid(),
-                    egid,
-                );
-                self.task.set_egid(egid as u32);
-                self.task.set_fsgid(egid as u32);
+                warn!("[sys_setregid] is not root, set egid: {}", egid);
+                user_id.set_egid(egid as u32);
+                user_id.set_fsgid(egid as u32);
             }
         }
         if rgid != -1 || (egid != -1 && egid != origin_gid as i32) {
-            self.task.set_sgid(self.task.egid() as u32);
+            let tmp_egid = user_id.egid();
+            user_id.set_sgid(tmp_egid as u32);
         }
         Ok(0)
     }
 
-    /// ref: RocketOS
     pub fn sys_setresuid(&self, ruid: i32, euid: i32, suid: i32) -> SyscallResult {
         info!(
             "[sys_setreuid] ruid: {}, euid: {}, suid: {}",
             ruid, euid, suid
         );
-        let origin_uid = self.task.uid() as i32;
-        let origin_euid = self.task.euid() as i32;
-        let origin_suid = self.task.suid() as i32;
-        if self.task.euid() == 0 {
-            warn!(
-                "[sys_setreuid] task{} is root, set ruid: {}, euid: {}",
-                self.task.tid(),
-                ruid,
-                euid
-            );
+        let mut user_id = self.task.user_id();
+        let origin_uid = user_id.uid() as i32;
+        let origin_euid = user_id.euid() as i32;
+        let origin_suid = user_id.suid() as i32;
+        if user_id.euid() == 0 {
+            warn!("[sys_setreuid] is root, set ruid: {}, euid: {}", ruid, euid);
             if ruid != -1 {
-                self.task.set_uid(ruid as u32);
+                user_id.set_uid(ruid as u32);
             }
             if euid != -1 {
-                self.task.set_euid(euid as u32);
-                self.task.set_fsuid(euid as u32);
+                user_id.set_euid(euid as u32);
+                user_id.set_fsuid(euid as u32);
             }
             if suid != -1 {
-                self.task.set_suid(suid as u32);
+                user_id.set_suid(suid as u32);
             }
         } else {
             if ruid != -1 {
@@ -764,12 +732,8 @@ impl Syscall<'_> {
                 {
                     return Err(Errno::EPERM);
                 }
-                warn!(
-                    "[sys_setreuid] task{} is not root, set ruid: {}",
-                    self.task.tid(),
-                    ruid,
-                );
-                self.task.set_uid(ruid as u32);
+                warn!("[sys_setreuid] is not root, set ruid: {}", ruid);
+                user_id.set_uid(ruid as u32);
             }
             if euid != -1 {
                 if euid != origin_uid as i32
@@ -778,13 +742,9 @@ impl Syscall<'_> {
                 {
                     return Err(Errno::EPERM);
                 }
-                warn!(
-                    "[sys_setreuid] task{} is not root, set euid: {}",
-                    self.task.tid(),
-                    euid,
-                );
-                self.task.set_euid(euid as u32);
-                self.task.set_fsuid(euid as u32);
+                warn!("[sys_setreuid] is not root, set euid: {}", euid);
+                user_id.set_euid(euid as u32);
+                user_id.set_fsuid(euid as u32);
             }
             if suid != -1 {
                 if suid != origin_uid as i32
@@ -793,42 +753,33 @@ impl Syscall<'_> {
                 {
                     return Err(Errno::EPERM);
                 }
-                warn!(
-                    "[sys_setreuid] task{} is not root, set suid: {}",
-                    self.task.tid(),
-                    suid,
-                );
-                self.task.set_suid(suid as u32);
+                warn!("[sys_setreuid] is not root, set suid: {}", suid);
+                user_id.set_suid(suid as u32);
             }
         }
         Ok(0)
     }
 
-    /// ref: RocketOS
     pub fn sys_setresgid(&self, rgid: i32, egid: i32, sgid: i32) -> SyscallResult {
         info!(
             "[sys_setregid] rgid: {}, egid: {}, sgid: {}",
             rgid, egid, sgid
         );
-        let origin_gid = self.task.gid() as i32;
-        let origin_egid = self.task.egid() as i32;
-        let origin_sgid = self.task.sgid() as i32;
-        if self.task.euid() == 0 {
-            warn!(
-                "[sys_setregid] task{} is root, set rgid: {}, egid: {}",
-                self.task.tid(),
-                rgid,
-                egid
-            );
+        let mut user_id = self.task.user_id();
+        let origin_gid = user_id.gid() as i32;
+        let origin_egid = user_id.egid() as i32;
+        let origin_sgid = user_id.sgid() as i32;
+        if user_id.euid() == 0 {
+            warn!("[sys_setregid] is root, set rgid: {}, egid: {}", rgid, egid);
             if rgid != -1 {
-                self.task.set_gid(rgid as u32);
+                user_id.set_gid(rgid as u32);
             }
             if egid != -1 {
-                self.task.set_egid(egid as u32);
-                self.task.set_fsgid(egid as u32);
+                user_id.set_egid(egid as u32);
+                user_id.set_fsgid(egid as u32);
             }
             if sgid != -1 {
-                self.task.set_sgid(sgid as u32);
+                user_id.set_sgid(sgid as u32);
             }
         } else {
             if rgid != -1 {
@@ -838,12 +789,8 @@ impl Syscall<'_> {
                 {
                     return Err(Errno::EPERM);
                 }
-                warn!(
-                    "[sys_setregid] task{} is not root, set rgid: {}",
-                    self.task.tid(),
-                    rgid,
-                );
-                self.task.set_gid(rgid as u32);
+                warn!("[sys_setregid] is not root, set rgid: {}", rgid);
+                user_id.set_gid(rgid as u32);
             }
             if egid != -1 {
                 if egid != origin_gid as i32
@@ -852,13 +799,9 @@ impl Syscall<'_> {
                 {
                     return Err(Errno::EPERM);
                 }
-                warn!(
-                    "[sys_setregid] task{} is not root, set egid: {}",
-                    self.task.tid(),
-                    egid,
-                );
-                self.task.set_egid(egid as u32);
-                self.task.set_fsgid(egid as u32);
+                warn!("[sys_setregid] is not root, set egid: {}", egid);
+                user_id.set_egid(egid as u32);
+                user_id.set_fsgid(egid as u32);
             }
             if sgid != -1 {
                 if sgid != origin_gid as i32
@@ -867,12 +810,8 @@ impl Syscall<'_> {
                 {
                     return Err(Errno::EPERM);
                 }
-                warn!(
-                    "[sys_setregid] task{} is not root, set sgid: {}",
-                    self.task.tid(),
-                    sgid,
-                );
-                self.task.set_sgid(sgid as u32);
+                warn!("[sys_setregid] is not root, set sgid: {}", sgid);
+                user_id.set_sgid(sgid as u32);
             }
         }
         Ok(0)
@@ -883,58 +822,52 @@ impl Syscall<'_> {
             "[sys_getresgid] rgid: {:#x}, egid: {:#x}, sgid: {:#x}",
             rgid, egid, sgid
         );
+        let user_id = self.task.user_id();
         let rgid = UserPtr::<u32>::new(rgid);
         let egid = UserPtr::<u32>::new(egid);
         let sgid = UserPtr::<u32>::new(sgid);
-        rgid.try_write(self.task.gid()).await?;
-        egid.try_write(self.task.egid()).await?;
-        sgid.try_write(self.task.sgid()).await?;
+        rgid.try_write(user_id.gid()).await?;
+        egid.try_write(user_id.egid()).await?;
+        sgid.try_write(user_id.sgid()).await?;
         Ok(0)
     }
+
     pub async fn sys_getresuid(&self, ruid: usize, euid: usize, suid: usize) -> SyscallResult {
         info!(
             "[sys_getresuid] ruid: {}, euid: {}, suid: {}",
             ruid, euid, suid
         );
-        let task = self.task;
+        let user_id = self.task.user_id();
         let ruid = UserPtr::<u32>::new(ruid);
         let euid = UserPtr::<u32>::new(euid);
         let suid = UserPtr::<u32>::new(suid);
-        ruid.try_write(task.uid()).await?;
-        euid.try_write(task.euid()).await?;
-        suid.try_write(task.suid()).await?;
+        ruid.try_write(user_id.uid()).await?;
+        euid.try_write(user_id.euid()).await?;
+        suid.try_write(user_id.suid()).await?;
         Ok(0)
     }
 
     pub fn sys_setfsuid(&self, fsuid: i32) -> SyscallResult {
         log::info!("[sys_setfsuid] fsuid: {}", fsuid);
-        let task = self.task;
-        let origin_fsuid = task.fsuid() as i32;
-        if task.euid() == 0 {
-            log::warn!(
-                "[sys_setfsuid] task{} is root, set fsuid to {}",
-                task.tid(),
-                fsuid
-            );
+        let mut user_id = self.task.user_id();
+        let origin_fsuid = user_id.fsuid() as i32;
+        if user_id.euid() == 0 {
+            log::warn!("[sys_setfsuid] is root, set fsuid to {}", fsuid);
             if fsuid != -1 {
-                task.set_fsuid(fsuid as u32);
+                user_id.set_fsuid(fsuid as u32);
             }
         } else {
-            if fsuid != task.uid() as i32
-                && fsuid != task.euid() as i32
-                && fsuid != task.suid() as i32
-                && fsuid != task.fsuid() as i32
+            if fsuid != user_id.uid() as i32
+                && fsuid != user_id.euid() as i32
+                && fsuid != user_id.suid() as i32
+                && fsuid != user_id.fsuid() as i32
             {
-                log::warn!(
-                    "[sys_setfsuid] task{} is not root, set fsuid to {}",
-                    task.tid(),
-                    fsuid
-                );
+                log::warn!("[sys_setfsuid] is not root, set fsuid to {}", fsuid);
                 return Ok(origin_fsuid as isize);
             } else {
-                log::warn!("[sys_setfsuid] task{} set fsuid to {}", task.tid(), fsuid);
+                log::warn!("[sys_setfsuid] set fsuid to {}", fsuid);
                 if fsuid != -1 {
-                    task.set_fsuid(fsuid as u32);
+                    user_id.set_fsuid(fsuid as u32);
                 }
             }
         }
@@ -943,33 +876,25 @@ impl Syscall<'_> {
 
     pub fn sys_setfsgid(&self, fsgid: i32) -> SyscallResult {
         log::info!("[sys_setfsgid] fsgid: {}", fsgid);
-        let task = self.task;
-        let origin_fsgid = task.fsgid() as i32;
-        if task.euid() == 0 {
+        let mut user_id = self.task.user_id();
+        let origin_fsgid = user_id.fsgid() as i32;
+        if user_id.euid() == 0 {
             if fsgid != -1 {
-                log::warn!(
-                    "[sys_setfsgid] task{} is root, set fsgid to {}",
-                    task.tid(),
-                    fsgid
-                );
-                task.set_fsgid(fsgid as u32);
+                log::warn!("[sys_setfsgid] is root, set fsgid to {}", fsgid);
+                user_id.set_fsgid(fsgid as u32);
             }
         } else {
-            if fsgid != task.gid() as i32
-                && fsgid != task.egid() as i32
-                && fsgid != task.sgid() as i32
-                && fsgid != task.fsgid() as i32
+            if fsgid != user_id.gid() as i32
+                && fsgid != user_id.egid() as i32
+                && fsgid != user_id.sgid() as i32
+                && fsgid != user_id.fsgid() as i32
             {
-                log::warn!(
-                    "[sys_setfsgid] task{} is not root, set fsgid to {}",
-                    task.tid(),
-                    fsgid
-                );
+                log::warn!("[sys_setfsgid] is not root, set fsgid to {}", fsgid);
                 return Ok(origin_fsgid as isize);
             } else {
-                log::warn!("[sys_setfsgid] task{} set fsgid to {}", task.tid(), fsgid);
+                log::warn!("[sys_setfsgid] set fsgid to {}", fsgid);
                 if fsgid != -1 {
-                    task.set_fsgid(fsgid as u32);
+                    user_id.set_fsgid(fsgid as u32);
                 }
             }
         }

@@ -344,7 +344,7 @@ impl dyn Dentry {
 
                 // Only check search permissions after confirming it's a directory
                 if let Some(task) = task {
-                    if task.fsuid() != 0 {
+                    if task.user_id().fsuid() != 0 {
                         if unlikely(!self.can_search(task)) {
                             error!("[walk_path] has no search access");
                             return Err(Errno::EACCES);
@@ -500,8 +500,13 @@ impl dyn Dentry {
         access: i32,
         is_fs: bool,
     ) -> SysResult<()> {
-        let uid = if is_fs { task.fsuid() } else { task.uid() };
-        let gid = if is_fs { task.fsgid() } else { task.gid() };
+        let user_id = task.user_id();
+        let (uid, gid) = if is_fs {
+            (user_id.fsuid(), user_id.fsgid())
+        } else {
+            (user_id.uid(), user_id.gid())
+        };
+
         let dentry = self;
         let inode = self.inode()?;
         let pri = inode.privilege();
@@ -560,7 +565,8 @@ impl dyn Dentry {
     }
 
     pub fn can_search(self: &Arc<Self>, task: &Arc<Task>) -> bool {
-        let (euid, egid) = { (task.fsuid(), task.fsgid()) };
+        let user_id = task.user_id();
+        let (euid, egid) = { (user_id.fsuid(), user_id.fsgid()) };
         if euid == 0 {
             return true;
         }

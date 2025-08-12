@@ -174,7 +174,8 @@ impl dyn Inode {
         let inode_mode = self.meta().inode_mode.load(Ordering::SeqCst);
         let mut mode = mode;
         if mode & S_ISGID != 0 {
-            let (fsuid, fsgid) = (task.fsuid(), task.fsgid());
+            let user_id = task.user_id();
+            let (fsuid, fsgid) = (user_id.fsuid(), user_id.fsgid());
             if fsuid != 0 && fsgid != self.gid() as u32 {
                 warn!(
                     "[set_permission] S_ISGID clear! fsuid: {}, fsgid: {}, gid: {}",
@@ -256,8 +257,9 @@ impl dyn Inode {
     /// ref: RocketOS
     /// change the owner and group of a file
     pub fn chown(&self, task: &Arc<Task>, uid: u32, gid: u32) -> SysResult<()> {
-        let euid = task.fsuid();
-        let egid = task.fsgid();
+        let user_id = task.user_id();
+        let euid = user_id.fsuid();
+        let egid = user_id.fsgid();
         let mut mode = self.inode_mode();
         info!(
             "[chown] euid: {}, egid: {}, uid: {}, gid: {}, mode: {:?}",
@@ -333,8 +335,9 @@ impl dyn Inode {
     }
 
     pub fn check_search_permission(&self, task: &Arc<Task>) -> bool {
-        let euid = task.fsuid();
-        let egid = task.fsgid();
+        let user_id = task.user_id();
+        let euid = user_id.fsuid();
+        let egid = user_id.fsgid();
         if euid == 0 {
             return true;
         }

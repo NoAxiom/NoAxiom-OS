@@ -1,5 +1,5 @@
 use alloc::sync::Arc;
-use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use core::sync::atomic::{AtomicBool, Ordering};
 
 use arch::{Arch, ArchMemory};
 use include::errno::{Errno, SyscallResult};
@@ -143,14 +143,7 @@ impl Task {
                 }),
                 futex: self.futex.clone(),
                 itimer: self.itimer.clone(),
-                uid: AtomicU32::new(self.uid()),
-                gid: AtomicU32::new(self.gid()),
-                fsuid: AtomicU32::new(self.fsuid()),
-                fsgid: AtomicU32::new(self.fsgid()),
-                euid: AtomicU32::new(self.euid()),
-                egid: AtomicU32::new(self.egid()),
-                suid: AtomicU32::new(self.suid()),
-                sgid: AtomicU32::new(self.sgid()),
+                user_id: Mutable::new(self.user_id.lock().clone()),
                 sup_groups,
             });
             new_thread.thread_group.lock().insert(&new_thread);
@@ -189,14 +182,7 @@ impl Task {
                 }),
                 futex: Shared::new(FutexQueue::new()),
                 itimer: Shared::new(ITimerManager::new()),
-                uid: AtomicU32::new(self.uid()),
-                gid: AtomicU32::new(self.gid()),
-                fsuid: AtomicU32::new(self.fsuid()),
-                fsgid: AtomicU32::new(self.fsgid()),
-                euid: AtomicU32::new(self.euid()),
-                egid: AtomicU32::new(self.egid()),
-                suid: AtomicU32::new(self.suid()),
-                sgid: AtomicU32::new(self.sgid()),
+                user_id: Mutable::new(self.user_id.lock().clone()),
                 sup_groups,
             });
             new_process.thread_group().insert(&new_process);

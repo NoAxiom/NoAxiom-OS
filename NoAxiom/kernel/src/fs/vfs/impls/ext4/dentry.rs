@@ -118,7 +118,9 @@ impl Dentry for Ext4Dentry {
 
             // Determine the correct uid and gid for the new file
             let new_inode = if let Some(task) = current_task() {
-                let uid = task.fsuid(); // New file gets creator's uid
+                let user_id = task.user_id();
+                let uid = user_id.fsuid(); // New file gets creator's uid
+                let fsgid = user_id.fsgid();
 
                 // For gid: check if parent directory has setgid bit
                 let parent_inode = self.into_dyn().inode()?;
@@ -133,7 +135,7 @@ impl Dentry for Ext4Dentry {
                     parent_inode.gid()
                 } else {
                     // Otherwise use creator's gid
-                    task.fsgid()
+                    fsgid
                 };
                 debug!(
                     "[ext4] setting file owner: uid={}, gid={}, parent_mode={:?}",

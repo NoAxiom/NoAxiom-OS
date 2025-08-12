@@ -4,7 +4,7 @@ use alloc::{string::String, sync::Arc, vec::Vec};
 use core::{
     intrinsics::unlikely,
     marker::PhantomData,
-    sync::atomic::{AtomicBool, AtomicU32, AtomicUsize},
+    sync::atomic::{AtomicBool, AtomicUsize},
     task::Waker,
 };
 
@@ -26,7 +26,7 @@ use crate::{
     mm::{memory_set::MemorySet, user_ptr::UserPtr},
     sched::sched_entity::{SchedEntity, SchedPrio},
     signal::{sig_action::SigActionList, sig_set::SigMask, sig_stack::UContext},
-    task::futex::FutexPrivateQueue,
+    task::{futex::FutexPrivateQueue, taskid::TaskUserId},
     time::{time_info::TimeInfo, timer::ITimerManager},
 };
 
@@ -64,22 +64,8 @@ pub struct Task {
     // mutable
     /// task control block inner, protected by lock
     pub(super) pcb: Mutable<PCB>,
-    /// user id
-    pub(super) uid: AtomicU32,
-    /// group id
-    pub(super) gid: AtomicU32,
-    /// user id - file system
-    pub(super) fsuid: AtomicU32,
-    /// group id - file system
-    pub(super) fsgid: AtomicU32,
-    /// user id - effective
-    pub(super) euid: AtomicU32,
-    /// group id - effective
-    pub(super) egid: AtomicU32,
-    /// user id - saved
-    pub(super) suid: AtomicU32,
-    /// group id - saved
-    pub(super) sgid: AtomicU32,
+    /// user ids for permission check
+    pub(super) user_id: Mutable<TaskUserId>,
     /// supplementary groups
     pub(super) sup_groups: Mutable<Vec<u32>>,
 
@@ -153,72 +139,8 @@ impl Task {
         self.pgid.store(pgid, core::sync::atomic::Ordering::SeqCst);
     }
 
-    /// uid & gid
-    #[inline(always)]
-    pub fn uid(&self) -> u32 {
-        self.uid.load(core::sync::atomic::Ordering::SeqCst)
-    }
-    #[inline(always)]
-    pub fn gid(&self) -> u32 {
-        self.gid.load(core::sync::atomic::Ordering::SeqCst)
-    }
-    #[inline(always)]
-    pub fn fsuid(&self) -> u32 {
-        self.fsuid.load(core::sync::atomic::Ordering::SeqCst)
-    }
-    #[inline(always)]
-    pub fn fsgid(&self) -> u32 {
-        self.fsgid.load(core::sync::atomic::Ordering::SeqCst)
-    }
-    #[inline(always)]
-    pub fn set_uid(&self, uid: u32) {
-        self.uid.store(uid, core::sync::atomic::Ordering::SeqCst);
-    }
-    #[inline(always)]
-    pub fn set_gid(&self, gid: u32) {
-        self.gid.store(gid, core::sync::atomic::Ordering::SeqCst);
-    }
-    #[inline(always)]
-    pub fn set_fsuid(&self, fsuid: u32) {
-        self.fsuid
-            .store(fsuid, core::sync::atomic::Ordering::SeqCst);
-    }
-    #[inline(always)]
-    pub fn set_fsgid(&self, fsgid: u32) {
-        self.fsgid
-            .store(fsgid, core::sync::atomic::Ordering::SeqCst);
-    }
-    #[inline(always)]
-    pub fn euid(&self) -> u32 {
-        self.euid.load(core::sync::atomic::Ordering::SeqCst)
-    }
-    #[inline(always)]
-    pub fn egid(&self) -> u32 {
-        self.egid.load(core::sync::atomic::Ordering::SeqCst)
-    }
-    #[inline(always)]
-    pub fn set_euid(&self, euid: u32) {
-        self.euid.store(euid, core::sync::atomic::Ordering::SeqCst);
-    }
-    #[inline(always)]
-    pub fn set_egid(&self, egid: u32) {
-        self.egid.store(egid, core::sync::atomic::Ordering::SeqCst);
-    }
-    #[inline(always)]
-    pub fn suid(&self) -> u32 {
-        self.suid.load(core::sync::atomic::Ordering::SeqCst)
-    }
-    #[inline(always)]
-    pub fn set_suid(&self, suid: u32) {
-        self.suid.store(suid, core::sync::atomic::Ordering::SeqCst);
-    }
-    #[inline(always)]
-    pub fn sgid(&self) -> u32 {
-        self.sgid.load(core::sync::atomic::Ordering::SeqCst)
-    }
-    #[inline(always)]
-    pub fn set_sgid(&self, sgid: u32) {
-        self.sgid.store(sgid, core::sync::atomic::Ordering::SeqCst);
+    pub fn user_id(&self) -> SpinLockGuard<TaskUserId> {
+        self.user_id.lock()
     }
     #[inline(always)]
     pub fn sup_groups(&self) -> SpinLockGuard<Vec<u32>> {
@@ -443,10 +365,12 @@ impl Task {
     /// check user permisson when accessing target task from current task
     pub fn check_user_permission(&self, target: &Arc<Task>) -> bool {
         let sender = self;
-        let sender_uid = sender.uid();
-        let sender_euid = sender.euid();
-        let target_uid = target.uid();
-        let target_suid = target.suid();
+        let sender_info = self.user_id();
+        let sender_uid = sender_info.uid();
+        let sender_euid = sender_info.euid();
+        let target_info = target.user_id();
+        let target_uid = target_info.uid();
+        let target_suid = target_info.suid();
         return sender.tgid() == target.tgid()
             || sender_euid == 0
             || sender_euid == target_suid

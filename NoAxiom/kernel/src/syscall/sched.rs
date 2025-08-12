@@ -139,19 +139,19 @@ impl Syscall<'_> {
             }
             PriorityWhich::User => {
                 let uid = if who == 0 {
-                    self.task.uid()
+                    self.task.user_id().uid()
                 } else {
                     who as u32
                 };
                 for (_tid, task) in TASK_MANAGER.0.lock().iter_mut() {
-                    let task = task.upgrade().ok_or(Errno::ESRCH)?;
-                    if task.uid() != uid {
+                    let target = task.upgrade().ok_or(Errno::ESRCH)?;
+                    if target.user_id().uid() != uid {
                         continue;
                     }
-                    if !self.task.check_user_permission(&task) {
+                    if !self.task.check_user_permission(&target) {
                         return Err(Errno::EPERM);
                     }
-                    task.sched_entity_mut().try_set_nice(prio)?;
+                    target.sched_entity_mut().try_set_nice(prio)?;
                 }
                 Ok(0)
             }
@@ -190,13 +190,13 @@ impl Syscall<'_> {
             }
             PriorityWhich::User => {
                 let uid = if who == 0 {
-                    self.task.uid()
+                    self.task.user_id().uid()
                 } else {
                     who as u32
                 };
                 for (_tid, target) in TASK_MANAGER.0.lock().iter_mut() {
                     let target = target.upgrade().ok_or(Errno::ESRCH)?;
-                    if target.uid() != uid {
+                    if target.user_id().uid() != uid {
                         continue;
                     }
                     if !self.task.check_user_permission(&target) {

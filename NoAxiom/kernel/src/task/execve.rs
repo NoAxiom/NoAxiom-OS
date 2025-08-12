@@ -1,5 +1,5 @@
 use alloc::{string::String, sync::Arc, vec::Vec};
-use core::{intrinsics::unlikely, ptr::null, sync::atomic::AtomicU32};
+use core::{intrinsics::unlikely, ptr::null};
 
 use arch::{Arch, ArchInfo, ArchTrapContext, TrapContext};
 use include::errno::SysResult;
@@ -28,7 +28,7 @@ use crate::{
         manager::{ThreadGroup, PROCESS_GROUP_MANAGER, TASK_MANAGER},
         pcb::PCB,
         task::{Mutable, Shared, ThreadOnly},
-        taskid::tid_alloc,
+        taskid::{tid_alloc, TaskUserId},
         tcb::TCB,
         Task,
     },
@@ -75,14 +75,7 @@ impl Task {
             }),
             futex: Shared::new(FutexQueue::new()),
             itimer: Shared::new(ITimerManager::new()),
-            uid: AtomicU32::new(0),               // default user id
-            gid: AtomicU32::new(0),               // default group id
-            fsuid: AtomicU32::new(0),             // default fs user id
-            fsgid: AtomicU32::new(0),             // default fs group id
-            euid: AtomicU32::new(0),              // default effective user id
-            egid: AtomicU32::new(0),              // default effective group id
-            suid: AtomicU32::new(0),              // default saved user id
-            sgid: AtomicU32::new(0),              // default saved group id
+            user_id: Mutable::new(TaskUserId::default()),
             sup_groups: Mutable::new(Vec::new()), // default supplementary groups
         });
         task.thread_group().insert(&task);

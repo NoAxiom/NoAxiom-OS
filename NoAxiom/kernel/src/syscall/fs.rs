@@ -169,7 +169,7 @@ impl Syscall<'_> {
             error!("[sys_chroot] chroot path must be searchable");
             return Err(Errno::EACCES);
         }
-        if self.task.fsuid() != 0 {
+        if self.task.user_id().fsuid() != 0 {
             error!("[sys_chroot] only root can chroot");
             return Err(Errno::EPERM);
         }
@@ -231,7 +231,7 @@ impl Syscall<'_> {
 
         if unlikely(flags.contains(FileFlags::O_NOATIME)) {
             let inode = dentry.inode()?;
-            let task_uid = self.task.fsuid();
+            let task_uid = self.task.user_id().fsuid();
 
             if task_uid != 0 && task_uid != inode.uid() {
                 error!("[sys_openat] O_NOATIME requires ownership or root privileges");
