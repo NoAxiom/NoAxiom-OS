@@ -1,10 +1,14 @@
 # NoAxiom-OS
 
-[初赛汇报](./NoAxiom_OS_Report.pdf)
+## 赛事相关
 
-[ppt / 演示视频 网盘链接](https://pan.baidu.com/s/1aj0eP2t-oPZIlO7OO4S8pA?pwd=kkxz)
+[原项目](https://github.com/NoAxiom/NoAxiom-OS)（包含submodule）
 
-## 概述
+[初赛汇报](./docs/NoAxiom_OS_Primary_Report.pdf)
+
+[初赛PPT与演示视频](https://pan.baidu.com/s/1aj0eP2t-oPZIlO7OO4S8pA?pwd=kkxz)
+
+## 项目概述
 
 ### 系统简介
 
@@ -16,11 +20,11 @@ NoAxiom 操作系统整体分为以下四个层次：**机器层**、**硬件抽
 
 ### 架构分层说明
 
-#### 🗲 机器层（Machine Layer）
+#### 机器层（Machine Layer）
 
 目标是支持多平台多架构（如 RISC-V64 与 LoongArch64），同时适配 QEMU 虚拟机与物理开发板平台。这些被统一归为机器层，并由上层的硬件抽象层统一封装。
 
-#### 🗲 硬件抽象层（HAL, Hardware Abstraction Layer）
+#### 硬件抽象层（HAL, Hardware Abstraction Layer）
 
 该层抽象底层硬件，向上提供统一接口，主要子模块如下：
 
@@ -29,7 +33,7 @@ NoAxiom 操作系统整体分为以下四个层次：**机器层**、**硬件抽
 3. **内存抽象层**：封装架构/平台相关的内存初始化逻辑，提供统一访存接口。
 4. **驱动抽象层**：启动时自动设备嗅探与注册，支持设备树与中断注册（如 RISC-V 下的 PLIC）。
 
-#### 🗲 内核实现层（Kernel Implementation Layer）
+#### 内核实现层（Kernel Implementation Layer）
 
 基于 HAL 提供的接口，内核实现各类功能子模块，并向用户提供统一系统调用接口。主要子模块包括：
 
@@ -41,7 +45,7 @@ NoAxiom 操作系统整体分为以下四个层次：**机器层**、**硬件抽
 6. **时间管理**：支持可靠的定时功能。
 7. **网络模块**：实现 TCP/UDP、支持 IPv4/IPv6，具备高并发性能。
 
-#### 🗲 用户应用层（User Application Layer）
+#### 用户应用层（User Application Layer）
 
 提供用户程序运行支持，初始进程 ELF 文件内嵌于内核中，赛事测试样例运行于此层。
 
