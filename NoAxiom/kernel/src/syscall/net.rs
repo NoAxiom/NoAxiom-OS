@@ -8,8 +8,9 @@ use crate::{
     include::{
         fs::{FdFlags, FileFlags},
         net::{
-            AddressFamily, PosixSocketOption, PosixSocketType, PosixTcpSocketOptions, ShutdownType,
-            SockAddr, SocketLevel, SOCK_CLOEXEC, SOCK_NONBLOCK,
+            AddressFamily, MessageHeaderRaw, PosixSocketOption, PosixSocketType,
+            PosixTcpSocketOptions, ShutdownType, SockAddr, SocketLevel, SOCK_CLOEXEC,
+            SOCK_NONBLOCK,
         },
         result::Errno,
     },
@@ -467,12 +468,12 @@ impl Syscall<'_> {
         // Extract flags from socket_type
         let flags = socket_type & !0xf; // Get the upper bits (flags)
         let has_nonblock = (flags & (SOCK_NONBLOCK as isize)) != 0;
-        
+
         let mut file_flags = FileFlags::O_RDWR;
         if has_nonblock {
             file_flags |= FileFlags::O_NONBLOCK;
         }
-        
+
         let (read_end, write_end) = PipeFile::new_pipe(&file_flags);
 
         let user_ptr = UserPtr::<i32>::new(sv);
@@ -491,6 +492,79 @@ impl Syscall<'_> {
             "[sys_socketpair as sys_pipe2]: read fd {}, write fd {}",
             read_fd, write_fd
         );
+        Ok(0)
+    }
+
+    // todo: implement sendmsg and recvmsg
+    pub async fn sys_sendmsg(&self, socketfd: usize, msg_ptr: usize, flags: i32) -> SyscallResult {
+        info!(
+            "[sys_sendmsg]: socketfd: {}, msg_ptr: {}, flag: {}",
+            socketfd, msg_ptr, flags
+        );
+
+        let _file = self.task.fd_table().get(socketfd).ok_or(Errno::EBADF)?;
+        let ptr = UserPtr::<MessageHeaderRaw>::new(msg_ptr);
+        let _message = ptr.read().await?;
+
+        Ok(0)
+    }
+
+    pub async fn sys_sendmmsg(
+        &self,
+        socketfd: usize,
+        msg_ptr: usize,
+        n: usize,
+        flags: i32,
+    ) -> SyscallResult {
+        info!(
+            "[sys_sendmmsg]: socketfd: {}, msg_ptr: {}, flag: {}",
+            socketfd, msg_ptr, flags
+        );
+
+        let _file = self.task.fd_table().get(socketfd).ok_or(Errno::EBADF)?;
+        for i in 0..n {
+            let ptr = UserPtr::<MessageHeaderRaw>::new(
+                msg_ptr + i * core::mem::size_of::<MessageHeaderRaw>(),
+            );
+            let _message = ptr.read().await?;
+        }
+
+        Ok(0)
+    }
+
+    pub async fn sys_recvmsg(&self, socketfd: usize, msg_ptr: usize, flags: i32) -> SyscallResult {
+        info!(
+            "[sys_recvmsg]: socketfd: {}, msg_ptr: {}, flag: {}",
+            socketfd, msg_ptr, flags
+        );
+
+        let _file = self.task.fd_table().get(socketfd).ok_or(Errno::EBADF)?;
+        let ptr = UserPtr::<MessageHeaderRaw>::new(msg_ptr);
+        let _message = ptr.read().await?;
+
+        Ok(0)
+    }
+
+    pub async fn sys_recvmmsg(
+        &self,
+        socketfd: usize,
+        msg_ptr: usize,
+        n: usize,
+        flags: i32,
+    ) -> SyscallResult {
+        info!(
+            "[sys_recvmmsg]: socketfd: {}, msg_ptr: {}, flag: {}",
+            socketfd, msg_ptr, flags
+        );
+
+        let _file = self.task.fd_table().get(socketfd).ok_or(Errno::EBADF)?;
+        for i in 0..n {
+            let ptr = UserPtr::<MessageHeaderRaw>::new(
+                msg_ptr + i * core::mem::size_of::<MessageHeaderRaw>(),
+            );
+            let _message = ptr.read().await?;
+        }
+
         Ok(0)
     }
 }
