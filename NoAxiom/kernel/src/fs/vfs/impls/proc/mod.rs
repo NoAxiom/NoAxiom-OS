@@ -11,6 +11,7 @@ use crate::{
         impls::{
             proc::{
                 interrupts::{dentry::InterruptsDentry, inode::InterruptsInode},
+                maps::{dentry::MapsDentry, inode::MapsInode},
                 mounts::inode::MountsInode,
             },
             ramfs::{
@@ -26,6 +27,7 @@ use crate::{
 mod exe;
 pub mod filesystem;
 mod interrupts;
+mod maps;
 mod meminfo;
 mod mounts;
 pub mod status;
@@ -119,12 +121,12 @@ pub async fn init(fs_root: Arc<dyn Dentry>) -> SysResult<()> {
     self_dentry.add_child(status_dentry);
 
     info!("[fs] create /proc/self/maps");
-    let maps_dentry = Arc::new(RamFsDentry::new(
+    let maps_dentry = Arc::new(MapsDentry::new(
         Some(self_dentry.clone()),
         "maps",
         fs_root.super_block(),
     ));
-    let maps_inode = Arc::new(RamFsFileInode::new(fs_root.super_block(), 0));
+    let maps_inode = Arc::new(MapsInode::new(fs_root.super_block()));
     maps_dentry.into_dyn().set_inode(maps_inode);
     self_dentry.add_child(maps_dentry);
 
