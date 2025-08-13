@@ -106,9 +106,6 @@ impl Task {
         };
 
         if let Some(file) = file.as_ref() {
-            if !prot.contains(MmapProts::PROT_READ) {
-                return_errno!(Errno::EACCES);
-            }
             let file_flags = file.flags();
             debug!(
                 "[mmap] file: {}, flags: {:?}, prot: {:?}",
@@ -116,6 +113,9 @@ impl Task {
                 file_flags,
                 prot
             );
+            if prot.contains(MmapProts::PROT_READ) && !file.meta().readable() {
+                return_errno!(Errno::EACCES);
+            }
             if file_flags.contains(FileFlags::O_WRONLY) {
                 return_errno!(Errno::EACCES);
             }
