@@ -5,8 +5,9 @@ include config.mk
 export PROJECT := NoAxiom
 export MODE := release
 export KERNEL := kernel
-export TEST_TYPE ?= custom
-export ARCH_NAME ?= riscv64
+export TEST_TYPE  ?= official
+export TEST_STAGE ?= pre-2025
+export ARCH_NAME  ?= riscv64
 export LIB_NAME ?= musl
 export INIT_PROC ?= busybox
 export ON_SCREEN ?= false
@@ -62,13 +63,7 @@ endif
 
 # Test and fs image config
 TEST_DIR := $(ROOT)/$(PROJECT)-OS-Test
-export IMG_SUFFIX := 
-ifeq ($(TESTCASES),final) # Musl
-export IMG_SUFFIX := -final
-endif
-RAW_FS_IMG := $(TEST_DIR)/$(TEST_TYPE)/img/fs-$(ARCH_NAME)$(IMG_SUFFIX).img
-FS_IMG_DIR := $(TEST_DIR)/$(TEST_TYPE)/tmp-img
-FS_IMG := $(TEST_DIR)/$(TEST_TYPE)/tmp-img/fs-$(ARCH_NAME)$(IMG_SUFFIX).fs.img
+FS_IMG := $(TEST_DIR)/$(TEST_TYPE)/tmp-img/fs-$(SIMPLE_ARCH_NAME)-$(TEST_STAGE).img
 
 # Qemu flags config
 QFLAGS := 
@@ -134,13 +129,8 @@ asm-user:
 
 asm-all: asm asm-user
 
-$(RAW_FS_IMG):
-	@echo -e $(NORMAL)"Building FS Image..."$(RESET)
-	+cd $(TEST_DIR) && $(MAKE)
-
-backup: $(RAW_FS_IMG)
-	@echo -e $(NORMAL)"Backing up FS Image..."$(RESET)
-	+@cd $(TEST_DIR) && $(MAKE) check
+extract:
+	+@cd $(TEST_DIR) && $(MAKE) extract
 
 LOG_SAVE_PATH := log/$(shell date +%m_%d-%H_%M).log
 RUN_OPTION := 
@@ -149,13 +139,11 @@ RUN_OPTION += | tee $(LOG_SAVE_PATH)
 else ifeq ($(ON_SCREEN),false)
 RUN_OPTION += > $(LOG_SAVE_PATH)
 endif
-run: backup
+run: extract
 	@cp $(KERNEL_BIN) kernel-qemu
 	@echo -e $(NORMAL)"Qemu launched. Log is saved to: $(LOG_SAVE_PATH)"$(RESET)
 	@$(QEMU) $(QFLAGS) $(RUN_OPTION)
 	@echo -e $(NORMAL)"Qemu exited. Log is saved to: $(LOG_SAVE_PATH)"$(RESET)
-	@$(MAKE) backup CHECK_IMG=false
-
 
 TEST_2K1000_DIR := $(ROOT)/$(UTILS)/la-2k1000-sim
 test_2k1000:
@@ -197,11 +185,10 @@ gdb:
 
 clean:
 	@rm -f $(FS_IMG)
-	@rm -rf $(TEST_DIR)/build
-	@rm -rf $(TEST_DIR)/riscv64
 	@rm -f ./kernel-rv
 	@rm -f ./kernel-la
 	@cd $(PROJECT) && cargo clean
+	@cd $(TEST_DIR) && $(MAKE) clean
 
 vendor:
 	@cd $(PROJECT) && cargo clean
