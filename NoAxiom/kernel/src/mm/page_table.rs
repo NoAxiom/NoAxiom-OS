@@ -159,9 +159,6 @@ impl PageTable {
     pub fn unmap(&mut self, vpn: VirtPageNum) {
         // warn!("unmap vpn: {:#x}", vpn.0);
         if let Some(pte) = self.find_pte(vpn) {
-            if !pte.is_allocated() {
-                error!("{:?} is invalid before unmapping", vpn);
-            }
             pte.reset();
         }
     }

@@ -6,6 +6,7 @@ use super::Task;
 use crate::{
     config::mm::USER_HEAP_SIZE,
     include::{
+        fs::FileFlags,
         mm::{MmapFlags, MmapProts},
         result::Errno,
     },
@@ -71,7 +72,7 @@ impl Task {
         if !flags.contains(MmapFlags::MAP_ANONYMOUS)
             && (fd as usize >= fd_table.table.len() || fd_table.table[fd as usize].is_none())
         {
-            return Err(Errno::EBADF);
+            return_errno!(Errno::EBADF);
         }
 
         // get start_va
@@ -82,6 +83,16 @@ impl Task {
         }
 
         // if contains fix flag, should remove the existing mapping
+        if flags.contains(MmapFlags::MAP_FIXED_NOREPLACE) {
+            if memory_set
+                .mmap_manager
+                .mmap_map
+                .iter()
+                .any(|(vpn, _)| vpn.as_va_usize() == start_va.raw())
+            {
+                return_errno!(Errno::EEXIST);
+            }
+        }
         if flags.contains(MmapFlags::MAP_FIXED) {
             start_va = VirtAddr::from(addr);
             memory_set.mmap_manager.remove(start_va, length)?;
@@ -91,8 +102,33 @@ impl Task {
         let file = if flags.contains(MmapFlags::MAP_ANONYMOUS) {
             None
         } else {
-            fd_table.get(fd as usize)
+            Some(fd_table.get(fd as usize).ok_or(Errno::EBADF)?)
         };
+
+        if let Some(file) = file.as_ref() {
+            if !prot.contains(MmapProts::PROT_READ) {
+                return_errno!(Errno::EACCES);
+            }
+            let file_flags = file.flags();
+            debug!(
+                "[mmap] file: {}, flags: {:?}, prot: {:?}",
+                file.name(),
+                file_flags,
+                prot
+            );
+            if file_flags.contains(FileFlags::O_WRONLY) {
+                return_errno!(Errno::EACCES);
+            }
+            if flags.contains(MmapFlags::MAP_SHARED)
+                && prot.contains(MmapProts::PROT_WRITE)
+                && !file_flags.contains(FileFlags::O_RDWR)
+            {
+                return_errno!(Errno::EACCES);
+            }
+            if prot.contains(MmapProts::PROT_WRITE) && file_flags.contains(FileFlags::O_APPEND) {
+                return_errno!(Errno::EACCES);
+            }
+        }
 
         // push mmap range (without immediate mapping)
         debug!(
@@ -113,12 +149,12 @@ impl Task {
             return res;
         }
         for (vpn, mmap_page) in memory_set.mmap_manager.mmap_map.iter() {
-            let tmp = vpn.as_va_usize();
+            let va = vpn.as_va_usize();
             let perm = mmap_page.get_maps_string();
             res.push_str(&format!(
                 "{:08x}-{:08x} {:4} {:08x} {:5} {:5} {}\n",
-                tmp,
-                tmp + PAGE_SIZE,
+                va,
+                va + PAGE_SIZE,
                 perm,
                 mmap_page.offset,
                 "00:00",

@@ -39,8 +39,16 @@ impl Syscall<'_> {
         let length = align_ceil(length, PAGE_SIZE);
         let prot = MmapProts::from_bits_truncate(prot);
         let flags = MmapFlags::from_bits_truncate(flags);
-        if addr % PAGE_SIZE != 0 || length == 0 {
-            return Err(Errno::EINVAL);
+        info!(
+            "[sys_mmap] addr: {:#x}, length: {:#x}, prot: {:?}, flags: {:?}, fd: {}, offset: {:#x}",
+            addr, length, prot, flags, fd, offset
+        );
+        if addr % PAGE_SIZE != 0
+            || length == 0
+            || (addr == 0 && flags.contains(MmapFlags::MAP_FIXED))
+            || !(flags.contains(MmapFlags::MAP_SHARED) || flags.contains(MmapFlags::MAP_PRIVATE))
+        {
+            return_errno!(Errno::EINVAL);
         }
         let res = self.task.mmap(addr, length, prot, flags, fd, offset)?;
         Ok(res as isize)
@@ -48,11 +56,15 @@ impl Syscall<'_> {
 
     pub fn sys_munmap(&self, start: usize, length: usize) -> SyscallResult {
         warn!("sys_munmap: start: {:#x}, length: {:#x}", start, length);
-        self.task
-            .memory_set()
-            .lock()
-            .mmap_manager
-            .remove(VirtAddr::from(start), length)?;
+        let start_va = VirtAddr::from(start);
+        let end_va = VirtAddr::from(start + length);
+        let mut ms = self.task.memory_set().lock();
+        ms.mmap_manager.remove(VirtAddr::from(start), length)?;
+        let vpn_range = VpnRange::new_from_va(start_va, end_va)?;
+        for vpn in vpn_range {
+            ms.page_table().unmap(vpn);
+        }
+        Arch::tlb_flush();
         Ok(0)
     }
 

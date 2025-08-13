@@ -56,6 +56,8 @@ bitflags! {
         /// Anonymous mapping, initialize the memory space that is all 0.
         /// When fd is -1 and MAP_ANONYMOUS flag exists, mmap will create an anonymous mapping
         const MAP_ANONYMOUS = 0x20;
+
+        const MAP_FIXED_NOREPLACE = 0x100000;
     }
 }
 
