@@ -152,7 +152,7 @@ impl<'a> Syscall<'a> {
             SYS_RT_SIGPENDING => self.sys_sigpending(args[0]).await,
 
             // mm
-            SYS_MEMBARRIER =>   Self::empty_syscall("membarrier", 0), // fixme: should impl this in multicore
+            SYS_MEMBARRIER =>   Self::empty_syscall("membarrier", 0),
             SYS_MADVISE =>      Self::sys_madvise(args[0], args[1], args[2] as i32),
             SYS_BRK =>          self.sys_brk(args[0]),
             SYS_MMAP =>         self.sys_mmap(args[0],args[1],args[2],args[3],args[4] as isize, args[5]),
@@ -178,6 +178,9 @@ impl<'a> Syscall<'a> {
             SYS_GETTIMEOFDAY =>     Self::sys_gettimeofday(args[0]).await,
             SYS_NANOSLEEP =>        self.sys_nanosleep(args[0], args[1]).await,
             SYS_CLOCK_GETTIME =>    self.sys_clock_gettime(args[0], args[1]).await,
+            SYS_CLOCK_SETTIME =>    self.sys_clock_settime(args[0], args[1]).await,
+            SYS_ADJTIMEX =>         self.sys_adjtimex(args[0]).await,
+            SYS_CLOCK_ADJTIME =>    self.sys_clock_adjtime(args[0], args[1]).await,
             SYS_CLOCK_NANOSLEEP =>  self.sys_clock_nanosleep(args[0], args[1], args[2], args[3]).await,
             SYS_CLOCK_GETRES =>     self.sys_clock_getres(args[0] as _, args[1]).await,
             SYS_SETITIMER =>        self.sys_setitimer(args[0] as _, args[1] as _, args[2] as _).await,
@@ -193,7 +196,6 @@ impl<'a> Syscall<'a> {
             // empty syscall
             SYS_GET_MEMPOLICY =>   Self::empty_syscall("SYS_GET_MEMPOLICY", 0),
             SYS_MLOCK =>           Self::empty_syscall("SYS_MLOCK", 0),
-            SYS_ADJTIMEX =>        Self::empty_syscall("SYS_ADJTIMEX", 0),
             SYS_CAPGET =>          Self::empty_syscall("SYS_CAPGET", 0),
             SYS_BPF =>             Self::empty_syscall("SYS_BPF", 0),
             SYS_KEYCTL =>          Self::empty_syscall("SYS_KEYCTL", 0),

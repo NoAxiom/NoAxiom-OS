@@ -4,6 +4,8 @@ use core::{
 };
 
 use arch::{Arch, ArchTime};
+use bitflags::bitflags;
+use include::errno::{Errno, SysResult};
 use strum::FromRepr;
 
 use crate::constant::time::USEC_PER_SEC;
@@ -17,6 +19,13 @@ pub struct TimeSpec {
 }
 
 impl TimeSpec {
+    pub fn new_bare() -> Self {
+        Self {
+            tv_sec: 0,
+            tv_nsec: 0,
+        }
+    }
+
     pub fn into_ms(&self) -> usize {
         self.tv_sec * 1_000 + self.tv_nsec / 1_000_000
     }
@@ -32,6 +41,7 @@ impl TimeSpec {
         (self.tv_sec as isize >= 0)
             && (self.tv_nsec as isize >= 0)
             && (self.tv_nsec < 1_000_000_000)
+            && (self.tv_sec <= usize::MAX / 1_000_000_000)
     }
 
     pub const fn size() -> usize {
@@ -171,6 +181,14 @@ pub struct ITimerVal {
     /// time until next expiration
     pub it_value: TimeVal,
 }
+impl ITimerVal {
+    pub fn check(&self) -> SysResult<()> {
+        if !(self.it_interval.usec < 1_000_000 && self.it_value.usec < 1_000_000) {
+            return Err(Errno::EINVAL);
+        }
+        Ok(())
+    }
+}
 
 /// the size of interval timer is 3
 pub const ITIMER_COUNT: usize = 3;
@@ -184,4 +202,65 @@ pub enum ITimerType {
     Virtual = 1,
     /// profiling timer
     Prof = 2,
+}
+
+struct LinuxTimeZone {
+    tz_minuteswest: usize, /* minutes west of Greenwich */
+    tz_dsttime: usize,     /* type of DST correction */
+}
+
+#[derive(Clone, Copy, Debug)]
+#[repr(C)]
+pub struct LinuxTimex {
+    pub modes: u32,
+    _pad0: u32,
+
+    pub offset: i64,
+    pub freq: i64,
+    pub maxerror: i64,
+    pub esterror: i64,
+
+    pub status: i32,
+    _pad1: u32,
+
+    pub constant: i64,
+    pub precision: i64,
+    pub tolerance: i64,
+
+    pub time: TimeVal,
+
+    pub tick: i64,
+    pub ppsfreq: i64,
+    pub jitter: i64,
+    pub shift: i32,
+    _pad2: u32,
+
+    pub stabil: i64,
+    pub jitcnt: i64,
+    pub calcnt: i64,
+    pub errcnt: i64,
+    pub stbcnt: i64,
+
+    pub tai: i32,
+
+    _pad_last: [u32; 11],
+}
+
+bitflags! {
+    #[derive(Clone, Copy, Debug)]
+    pub struct TimexModes: u32 {
+        const ADJ_OFFSET            = 0x0001;
+        const ADJ_FREQUENCY         = 0x0002;
+        const ADJ_MAXERROR          = 0x0004;
+        const ADJ_ESTERROR          = 0x0008;
+        const ADJ_STATUS            = 0x0010;
+        const ADJ_TIMECONST         = 0x0020;
+        const ADJ_TAI               = 0x0080;
+        const ADJ_SETOFFSET         = 0x0100;
+        const ADJ_MICRO             = 0x1000;
+        const ADJ_NANO              = 0x2000;
+        const ADJ_TICK              = 0x4000;
+        const ADJ_OFFSET_SINGLESHOT = 0x8001;
+        const ADJ_OFFSET_SS_READ    = 0xa001;
+    }
 }

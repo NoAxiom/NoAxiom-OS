@@ -7,7 +7,7 @@ use super::{Syscall, SyscallResult};
 use crate::{
     include::{
         process::TaskFlags,
-        time::{ITimerType, ITimerVal, TimeSpec, TimeVal, ITIMER_COUNT, TMS},
+        time::{ITimerType, ITimerVal, LinuxTimex, TimeSpec, TimeVal, ITIMER_COUNT, TMS},
     },
     mm::user_ptr::UserPtr,
     return_errno,
@@ -17,6 +17,7 @@ use crate::{
         gettime::{get_time_duration, get_time_ms, get_timeval},
         timeout::sleep_now,
         timer::{ITimer, ITimerReal, Timer, TIMER_MANAGER},
+        timex::{adjtimex, LAST_TIMEX},
     },
 };
 
@@ -105,6 +106,52 @@ impl Syscall<'_> {
         ts.write(TimeSpec::from(time)).await?;
         Ok(0)
     }
+
+    pub async fn sys_clock_settime(&self, clockid: usize, timespec: usize) -> SyscallResult {
+        let timespec = UserPtr::<TimeSpec>::new(timespec);
+        if timespec.is_null() {
+            return Ok(0);
+        }
+        let _ = ClockId::from_repr(clockid).ok_or(Errno::EINVAL)?;
+        Ok(0)
+    }
+
+    pub async fn sys_adjtimex(&self, buf: usize) -> SyscallResult {
+        if buf == 0 || buf as isize == -1 {
+            return Err(Errno::EFAULT);
+        }
+        let ptr = UserPtr::<LinuxTimex>::new(buf);
+        ptr.check_write().await?;
+        let mut kernel_timex = ptr.read().await?;
+        if kernel_timex.modes == 0x8000 {
+            return Err(Errno::EINVAL);
+        }
+        if kernel_timex.modes == 0 {
+            let last = LAST_TIMEX
+                .lock()
+                .clone()
+                .unwrap_or(unsafe { core::mem::zeroed() });
+            ptr.write(last).await?;
+            return Ok(0);
+        }
+        if kernel_timex.modes != 0 && self.task.user_id().euid() != 0 {
+            return Err(Errno::EPERM);
+        }
+        let res = adjtimex(&mut kernel_timex)?;
+        kernel_timex.tick = 10000;
+        UserPtr::<LinuxTimex>::new(buf).write(kernel_timex).await?;
+        Ok(res)
+    }
+
+    pub async fn sys_clock_adjtime(&self, clockid: usize, buf: usize) -> SyscallResult {
+        if buf == 0 {
+            return Err(Errno::EINVAL);
+        }
+        let _ = ClockId::from_repr(clockid).ok_or(Errno::EINVAL)?;
+        // todo: impl for different clockids
+        self.sys_adjtimex(buf).await
+    }
+
     pub async fn sys_clock_nanosleep(
         &self,
         _clock_id: usize,
@@ -189,6 +236,7 @@ impl Syscall<'_> {
         let old_value = UserPtr::<ITimerVal>::new(old_value);
         let itimer_type = ITimerType::from_repr(which).ok_or(Errno::EINVAL)?;
         let new_value = new_value.read().await?;
+        new_value.check()?;
         let mut manager = self.task.itimer();
         let old_itimer = manager.get(which);
         match itimer_type {
