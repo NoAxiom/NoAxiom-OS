@@ -1,4 +1,6 @@
-use alloc::sync::Arc;
+use alloc::{string::String, sync::Arc};
+
+use config::mm::PAGE_SIZE;
 
 use super::Task;
 use crate::{
@@ -101,5 +103,29 @@ impl Task {
             .mmap_manager
             .insert(start_va, length, prot, flags, offset, file)?;
         Ok(res)
+    }
+
+    pub fn get_maps_string(&self) -> String {
+        // fixme: this impl is incorrect
+        let mut res = String::new();
+        let memory_set = self.memory_set().lock();
+        if memory_set.mmap_manager.mmap_map.is_empty() {
+            return res;
+        }
+        for (vpn, mmap_page) in memory_set.mmap_manager.mmap_map.iter() {
+            let tmp = vpn.as_va_usize();
+            let perm = mmap_page.get_maps_string();
+            res.push_str(&format!(
+                "{:08x}-{:08x} {:4} {:08x} {:5} {:5} {}\n",
+                tmp,
+                tmp + PAGE_SIZE,
+                perm,
+                mmap_page.offset,
+                "00:00",
+                0,
+                ""
+            ));
+        }
+        res
     }
 }

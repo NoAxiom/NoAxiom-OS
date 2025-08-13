@@ -1,4 +1,4 @@
-use alloc::{boxed::Box, string::String, sync::Arc};
+use alloc::boxed::Box;
 use core::task::Waker;
 
 use async_trait::async_trait;
@@ -9,12 +9,7 @@ use crate::{
     fs::vfs::basic::file::{File, FileMeta},
     include::io::PollEvent,
     syscall::{SysResult, SyscallResult},
-    task::Task,
 };
-
-fn get_maps(task: &Arc<Task>) -> String {
-    String::new()
-}
 
 pub struct MapsFile {
     meta: FileMeta,
@@ -33,12 +28,13 @@ impl File for MapsFile {
     }
 
     async fn base_read(&self, offset: usize, buf: &mut [u8]) -> SyscallResult {
-        let content = get_maps(current_task().expect("must have current task"));
+        let task = current_task().unwrap();
+        let content = task.get_maps_string();
 
-        debug!(
-            "[MapsFile::base_read]: offset: {}, content: {:?}",
-            offset, content
-        );
+        // debug!(
+        //     "[MapsFile::base_read]: offset: {}, content: {:?}",
+        //     offset, content
+        // );
 
         let bytes = content.as_bytes();
         let content_len = bytes.len();

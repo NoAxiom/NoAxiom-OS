@@ -1,4 +1,4 @@
-use alloc::{collections::btree_map::BTreeMap, sync::Arc};
+use alloc::{collections::btree_map::BTreeMap, string::String, sync::Arc};
 
 use arch::ArchPageTableEntry;
 use include::errno::Errno;
@@ -51,6 +51,30 @@ impl MmapPage {
         }
         self.valid = true;
         Ok(())
+    }
+    pub fn get_maps_string(&self) -> String {
+        let mut res = String::new();
+        if self.prot.contains(MmapProts::PROT_READ) {
+            res.push('r');
+        } else {
+            res.push('-');
+        }
+        if self.prot.contains(MmapProts::PROT_WRITE) {
+            res.push('w');
+        } else {
+            res.push('-');
+        }
+        if self.prot.contains(MmapProts::PROT_EXEC) {
+            res.push('x');
+        } else {
+            res.push('-');
+        }
+        if self.flags.contains(MmapFlags::MAP_SHARED) {
+            res.push('s');
+        } else {
+            res.push('p');
+        }
+        res
     }
 }
 
