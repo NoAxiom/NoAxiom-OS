@@ -52,7 +52,7 @@ impl File for MapsFile {
         unreachable!()
     }
     async fn base_write(&self, _offset: usize, _buf: &[u8]) -> SyscallResult {
-        unreachable!("write to meminfo");
+        unreachable!("write to MapsFile");
     }
     async fn load_dir(&self) -> SysResult<()> {
         Err(Errno::ENOTDIR)
@@ -64,6 +64,6 @@ impl File for MapsFile {
         Err(Errno::ENOTTY)
     }
     fn poll(&self, _req: &PollEvent, _waker: Waker) -> PollEvent {
-        unreachable!("MemInfoFile::poll not supported now");
+        unreachable!("MapsFile::poll not supported now");
     }
 }
