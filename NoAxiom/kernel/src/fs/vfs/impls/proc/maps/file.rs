@@ -35,7 +35,10 @@ impl File for MapsFile {
     async fn base_read(&self, offset: usize, buf: &mut [u8]) -> SyscallResult {
         let content = get_maps(current_task().expect("must have current task"));
 
-        debug!("[MapsFile::base_read]: offset: {}, buf: {:?}", offset, buf);
+        debug!(
+            "[MapsFile::base_read]: offset: {}, content: {:?}",
+            offset, content
+        );
 
         let bytes = content.as_bytes();
         let content_len = bytes.len();
