@@ -57,6 +57,13 @@ bitflags! {
         /// When fd is -1 and MAP_ANONYMOUS flag exists, mmap will create an anonymous mapping
         const MAP_ANONYMOUS = 0x20;
 
+        const MAP_SHARED_VALIDATE = 0x3;
+        const MAP_DENYWRITE = 0x800;
+        const MAP_GROWSDOWN = 0x100;
+        const MAP_LOCKED = 0x2000;
+        const MAP_NORESERVE = 0x4000;
+        const MAP_POPULATE = 0x8000;
+        const MAP_STACK = 0x20000;
         const MAP_FIXED_NOREPLACE = 0x100000;
     }
 }

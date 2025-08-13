@@ -38,7 +38,11 @@ impl Syscall<'_> {
     ) -> SyscallResult {
         let length = align_ceil(length, PAGE_SIZE);
         let prot = MmapProts::from_bits_truncate(prot);
-        let flags = MmapFlags::from_bits_truncate(flags);
+        const MAP_SHARED_VALIDATE: usize = 0x3;
+        let flags = MmapFlags::from_bits(flags).ok_or(match flags & MAP_SHARED_VALIDATE != 0 {
+            true => Errno::EOPNOTSUPP,
+            false => Errno::EINVAL,
+        })?;
         info!(
             "[sys_mmap] addr: {:#x}, length: {:#x}, prot: {:?}, flags: {:?}, fd: {}, offset: {:#x}",
             addr, length, prot, flags, fd, offset
