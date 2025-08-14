@@ -78,6 +78,28 @@ pub fn kdelete(path: &str) {
     let parent = root_dentry()
         .walk_path_no_checksearch(&paths)
         .expect("walk path failed");
+
+    /* The following comments is used for ALL normal files,
+     * but we only used kdelete in the ramfs, so we can ignore
+     * problem.
+     */
+
+    // let dentry = parent.get_child(name).expect("must have the child");
+    // let mut w_guard = crate::fs::pagecache::get_pagecache_wguard();
+    // let file = dentry
+    //     .clone()
+    //     .open(&FileFlags::empty())
+    //     .expect("must open succeed");
+    // w_guard.mark_deleted(&file);
+
+    // block_on(
+    //     dentry
+    //         .inode()
+    //         .unwrap()
+    //         .set_state(crate::fs::vfs::basic::inode::InodeState::Deleted),
+    // );
+
+    parent.remove_child(name);
     block_on(
         parent
             .clone()
@@ -86,7 +108,6 @@ pub fn kdelete(path: &str) {
             .delete_child(name),
     )
     .expect("delete failed");
-    parent.remove_child(name);
 }
 
 /// the async version of kcreate
@@ -125,7 +146,7 @@ pub fn resolve_path(path: &str) -> SysResult<Vec<&str>> {
 ///
 /// return the components as a vector of strings, the last component is special
 /// listed
-fn resolve_path2<'a>(path: &'a str) -> SysResult<(Vec<&'a str>, Option<&'a str>)> {
+pub fn resolve_path2<'a>(path: &'a str) -> SysResult<(Vec<&'a str>, Option<&'a str>)> {
     let mut paths = resolve_path(path)?;
     let last = paths.pop();
     Ok((paths, last))

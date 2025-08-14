@@ -405,13 +405,13 @@ impl dyn File {
         children.insert(".".to_string(), DENTRY_HERE.clone());
         children.insert("..".to_string(), DENTRY_FRONT.clone());
         let offset = self.meta().pos.load(Ordering::Relaxed);
-        for dentry in children.values().skip(offset) {
+        for (name, dentry) in children.iter().skip(offset) {
             if dentry.is_negative() {
                 self.seek(SeekFrom::Current(1))?;
                 continue;
             }
             // align to 8 bytes
-            let c_name_len = dentry.name().len() + 1;
+            let c_name_len = name.len() + 1;
             let rec_len = (LEN_BEFORE_NAME + c_name_len + 7) & !0x7;
             let inode = dentry.inode()?;
             let linux_dirent = LinuxDirent64::new(
@@ -435,7 +435,7 @@ impl dyn File {
                 ptr.copy_from_nonoverlapping(&linux_dirent, 1);
             }
             buf_it[LEN_BEFORE_NAME..LEN_BEFORE_NAME + c_name_len - 1]
-                .copy_from_slice(dentry.name().as_bytes());
+                .copy_from_slice(name.as_bytes());
             buf_it[LEN_BEFORE_NAME + c_name_len - 1] = b'\0';
             buf_it = &mut buf_it[rec_len..];
             writen_len += rec_len;

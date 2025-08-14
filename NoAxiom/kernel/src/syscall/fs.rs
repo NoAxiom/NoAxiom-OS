@@ -1,4 +1,7 @@
-use alloc::{string::String, sync::Arc};
+use alloc::{
+    string::{String, ToString},
+    sync::Arc,
+};
 use core::intrinsics::unlikely;
 
 use include::errno::SysResult;
@@ -13,7 +16,7 @@ use crate::{
     },
     fs::{
         fdtable::RLimit,
-        path::{get_dentry, get_dentry_parent, kcreate_async},
+        path::{get_dentry, get_dentry_parent, kcreate_async, resolve_path2},
         pipe::PipeFile,
     },
     include::{
@@ -263,6 +266,7 @@ impl Syscall<'_> {
         }
         if flags.contains(FileFlags::O_DIRECTORY) {
             if unlikely(inode.file_type() != InodeMode::DIR) {
+                error!("[sys_openat] O_DIRECTORY can only be used on directories");
                 return Err(Errno::ENOTDIR);
             }
         }
@@ -1112,14 +1116,19 @@ impl Syscall<'_> {
             dirfd, path, flags
         );
         let dentry = get_dentry(self.task, dirfd, &path, &searchflags)?;
-        if unlikely(dentry.name() == "interrupts") {
+        let mut name = resolve_path2(&path)?.1.unwrap_or(".");
+        if name == "." {
+            // fixme: doesn't consider the rename situation
+            name = dentry.name();
+        }
+        if unlikely(name == "interrupts") {
             // MENTION: this is required by official
             return Err(Errno::ENOSYS);
         }
         let inode = if let Ok(inode) = dentry.inode() {
             inode
         } else {
-            warn!("[sys_unlinkat] {} is negative", dentry.name());
+            warn!("[sys_unlinkat] {} is negative", name);
             return Ok(0);
         };
         let mut nlink = inode.meta().inner.lock().nlink;
@@ -1145,7 +1154,7 @@ impl Syscall<'_> {
             inode
                 .set_state(crate::fs::vfs::basic::inode::InodeState::Deleted)
                 .await;
-            parent.remove_child(&dentry.name()).unwrap();
+            parent.remove_child(&name).unwrap();
             parent
                 .open(&FileFlags::empty())
                 .unwrap()
@@ -1437,9 +1446,12 @@ impl Syscall<'_> {
         }
 
         let searchflags = SearchFlags::empty();
-        let old_dentry = get_dentry(self.task, old_dirfd, &old_path, &searchflags)?;
+        // fixme: maybe the old_name and the new_name is "."
+        let (old_dentry_parent, old_name) =
+            get_dentry_parent(self.task, old_dirfd, &old_path, &searchflags)?;
         let (new_dentry_parent, new_name) =
             get_dentry_parent(self.task, new_dirfd, &new_path, &searchflags)?;
+        let old_dentry = old_dentry_parent.get_child(old_name).ok_or(Errno::ENOENT)?;
 
         if old_dentry.is_negative() {
             error!("[sys_renameat2] oldpath does not exist");
@@ -1502,22 +1514,11 @@ impl Syscall<'_> {
         // old one
         // todo: support the real fs rename, mention that ext4_rs doesn't support rename
         let parent = old_dentry.parent().ok_or(Errno::ENOENT)?;
-        let old_inode = old_dentry.inode().unwrap();
-        parent
-            .clone()
-            .create(new_name, old_inode.inode_mode())
-            .await?;
-        let new_dentry = parent.get_child(new_name).unwrap();
-        new_dentry.set_inode(old_inode);
-
-        let old_name = old_dentry.name();
-        parent
-            .clone()
-            .open(&FileFlags::empty())
-            .unwrap()
-            .delete_child(old_name)
-            .await?;
-        parent.remove_child(old_dentry.name()).unwrap();
+        if let Some(value) = parent.remove_child(old_name) {
+            parent.children().insert(new_name.to_string(), value);
+        } else {
+            unreachable!();
+        }
 
         Ok(0)
     }
