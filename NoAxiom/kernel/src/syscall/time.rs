@@ -10,7 +10,6 @@ use crate::{
         time::{ITimerType, ITimerVal, LinuxTimex, TimeSpec, TimeVal, ITIMER_COUNT, TMS},
     },
     mm::user_ptr::UserPtr,
-    return_errno,
     sched::utils::realtime,
     time::{
         clock::{ClockId, CLOCK_MANAGER},
@@ -273,7 +272,7 @@ impl Syscall<'_> {
         let mut manager = self.task.itimer();
         let old_itimer = manager.get(which);
         match itimer_type {
-            ITimerType::Real => {
+            _ => {
                 debug!(
                     "[sys_setitimer] set ITIMER_REAL, new_value: {:?}",
                     new_value
@@ -290,9 +289,9 @@ impl Syscall<'_> {
                     TIMER_MANAGER.add_timer(timer);
                 }
                 old_value.try_write(old).await?;
-            }
-            ITimerType::Virtual => return_errno!(Errno::EINVAL, "ITIMER_VIRTUAL is unimplemented"),
-            ITimerType::Prof => return_errno!(Errno::EINVAL, "ITIMER_PROF is unimplemented"),
+            } /* ITimerType::Virtual => return_errno!(Errno::EINVAL, "ITIMER_VIRTUAL is
+               * unimplemented"), ITimerType::Prof => return_errno!(Errno::EINVAL,
+               * "ITIMER_PROF is unimplemented"), */
         };
         Ok(0)
     }
