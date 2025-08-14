@@ -31,6 +31,7 @@ mod maps;
 mod meminfo;
 mod mounts;
 pub mod status;
+pub mod stat;
 mod superblock;
 
 pub use interrupts::inc_interrupts_count;

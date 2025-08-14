@@ -373,11 +373,18 @@ impl Syscall<'_> {
                 yield_now().await;
                 Ok(res as isize)
             }
-            FutexOps::FutexRequeue => {
+            FutexOps::FutexRequeue | FutexOps::FutexCmpRequeue => {
                 warn!(
-                    "[sys_futex] futex requeue: uaddr={:#x}, uaddr2={:#x}, val={}, val2={}",
-                    uaddr, uaddr2, val, val2
+                    "[sys_futex] futex requeue: uaddr={:#x}, uaddr2={:#x}, val={}, val2={}, val3={}",
+                    uaddr, uaddr2, val, val2, val3
                 );
+                if matches!(option, FutexOps::FutexCmpRequeue) {
+                    // check val3
+                    let ptr = UserPtr::<u32>::new(uaddr);
+                    if unsafe { ptr.atomic_load_acquire() } != val3 as u32 {
+                        return_errno!(Errno::EAGAIN);
+                    }
+                }
                 match flags.is_private() {
                     true => {
                         let old_pa = FutexAddr::new_private(uaddr);

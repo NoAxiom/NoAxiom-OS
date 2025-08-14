@@ -77,6 +77,12 @@ pub async fn interruptable<T>(
 
     // set new mask
     if let Some(new_mask) = new_mask {
+        debug!(
+            "[intable] TID{} set mask old: {} -> new: {}",
+            task.tid(),
+            task.sig_mask().debug_info_short(),
+            new_mask.debug_info_short()
+        );
         task.swap_in_sigmask(new_mask.without_kill());
         task.tif_mut().insert(TaskFlags::TIF_RESTORE_SIGMASK);
     }

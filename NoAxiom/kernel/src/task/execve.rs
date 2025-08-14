@@ -11,7 +11,10 @@ use crate::{
         path::{get_dentry, kcreate, kdelete},
         vfs::{
             basic::{dentry::Dentry, file::File},
-            impls::proc::status::{dentry::StatusDentry, inode::StatusInode},
+            impls::proc::{
+                stat::{dentry::ProcStatDentry, inode::ProcStatInode},
+                status::{dentry::StatusDentry, inode::StatusInode},
+            },
             root_dentry,
         },
     },
@@ -92,17 +95,25 @@ impl Task {
             InodeMode::DIR | InodeMode::from_bits(0o755).unwrap(),
         );
 
-        /* add some files */
-        // add stat
-        let stat = Arc::new(StatusDentry::new(
+        // /proc/<pid>/status
+        let status = Arc::new(StatusDentry::new(
+            Some(ret.clone()),
+            "status",
+            ret.super_block(),
+        ));
+        let statinode = Arc::new(StatusInode::new(ret.super_block()));
+        status.into_dyn().set_inode(statinode);
+        ret.add_child(status);
+
+        // /proc/<pid>/stat
+        let stat = Arc::new(ProcStatDentry::new(
             Some(ret.clone()),
             "stat",
             ret.super_block(),
         ));
-        let statinode = Arc::new(StatusInode::new(ret.super_block()));
+        let statinode = Arc::new(ProcStatInode::new(ret.super_block()));
         stat.into_dyn().set_inode(statinode);
         ret.add_child(stat);
-        // todo: add more
 
         ret
     }
