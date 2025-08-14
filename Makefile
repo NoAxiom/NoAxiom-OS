@@ -284,6 +284,9 @@ board-rv-asm:
 	@echo "Building RISC-V64 kernel for board..."
 	@make asm $(RV_BOARD_QARGS)
 
+parse-ltp:
+	cd $(USER_PROJECT) && make parse
+
 all: build-all
 	@echo "Kernel build finished. See output elf in kernel-rv & kernel-la"
 
