@@ -67,11 +67,11 @@ impl Syscall<'_> {
     pub async fn sys_clock_gettime(&self, clockid: usize, tp: usize) -> SyscallResult {
         let ts = UserPtr::<TimeSpec>::from(tp);
         let clockid = ClockId::from_repr(clockid).ok_or(Errno::EINVAL)?;
-        debug!(
-            "[sys_clock_gettime] clock_id: {:?}, ts_addr: {:#x}",
-            clockid,
-            ts.addr(),
-        );
+        // debug!(
+        //     "[sys_clock_gettime] clock_id: {:?}, ts_addr: {:#x}",
+        //     clockid,
+        //     ts.addr(),
+        // );
         use ClockId::*;
         let time = match clockid {
             CLOCK_PROCESS_CPUTIME_ID => {
@@ -82,19 +82,19 @@ impl Syscall<'_> {
                         cpu_time += task.time_stat().cpu_time();
                     }
                 }
-                debug!("[sys_clock_gettime] get process cpu time: {:?}", cpu_time);
+                // debug!("[sys_clock_gettime] get process cpu time: {:?}", cpu_time);
                 cpu_time
             }
             CLOCK_THREAD_CPUTIME_ID => {
                 let cpu_time = self.task.time_stat().cpu_time();
-                debug!("[sys_clock_gettime] get process cpu time: {:?}", cpu_time);
+                // debug!("[sys_clock_gettime] get process cpu time: {:?}", cpu_time);
                 cpu_time
             }
             _ => match CLOCK_MANAGER.lock().0.get(&clockid) {
                 Some(clock) => {
                     let dev_time = get_time_duration();
                     let clock_time = dev_time + *clock;
-                    debug!("[sys_clock_gettime] get time {:?}", clock_time);
+                    // debug!("[sys_clock_gettime] get time {:?}", clock_time);
                     clock_time
                 }
                 None => {
@@ -113,22 +113,30 @@ impl Syscall<'_> {
             return Ok(0);
         }
         let clockid = ClockId::from_repr(clockid).ok_or(Errno::EINVAL)?;
-        match CLOCK_MANAGER.lock().0.get_mut(&clockid) {
-            Some(clock) => {
-                let time = timespec.read().await?;
-                if !time.is_valid() {
-                    return Err(Errno::EINVAL);
+        match clockid {
+            ClockId::CLOCK_MONOTONIC
+            | ClockId::CLOCK_MONOTONIC_RAW
+            | ClockId::CLOCK_MONOTONIC_COARSE => {
+                // These clocks are read-only, cannot set time
+                return Err(Errno::EINVAL);
+            }
+            _ => match CLOCK_MANAGER.lock().0.get_mut(&clockid) {
+                Some(clock) => {
+                    let time = timespec.read().await?;
+                    if !time.is_valid() {
+                        return Err(Errno::EINVAL);
+                    }
+                    let dev_time = get_time_duration();
+                    let req_time: Duration = time.into();
+                    *clock = req_time.saturating_sub(dev_time);
+                    info!("[sys_clock_settime] set clock {:?} to {:?}", clockid, clock);
+                    Ok(0)
                 }
-                let dev_time = get_time_duration();
-                let req_time: Duration = time.into();
-                *clock = req_time.saturating_sub(dev_time);
-                info!("[sys_clock_settime] set clock {:?} to {:?}", clockid, clock);
-                Ok(0)
-            }
-            None => {
-                error!("[sys_clock_settime] Cannot find the clock: {:?}", clockid);
-                Err(Errno::EINVAL)
-            }
+                None => {
+                    error!("[sys_clock_settime] Cannot find the clock: {:?}", clockid);
+                    Err(Errno::EINVAL)
+                }
+            },
         }
     }
 
