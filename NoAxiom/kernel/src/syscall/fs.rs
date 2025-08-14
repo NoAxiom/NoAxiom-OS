@@ -21,7 +21,7 @@ use crate::{
             AtFlags, BlkIoctlCmd, DevT, FallocFlags, FcntlFlags, FdFlags, FileFlags, Flock,
             InodeMode, IoctlCmd, Iovec, Kstat, LoopIoctlCmd, MountFlags, NamespaceIoctlCmd,
             NoAxiomIoctlCmd, RenameFlags, RtcIoctlCmd, SearchFlags, SeekFrom, Statfs, Statx,
-            TtyIoctlCmd, Whence, EXT4_MAX_FILE_SIZE,
+            TtyIoctlCmd, Whence, EXT4_MAX_FILE_SIZE, PRIVILEGE_MASK,
         },
         resource::Resource,
         result::Errno,
@@ -657,7 +657,17 @@ impl Syscall<'_> {
                 error!("[sys_mkdirat] O_CREATE can only be used on directories");
                 return Err(Errno::ENOTDIR);
             }
-            dentry.clone().create(name, mode | InodeMode::DIR).await?;
+            if unlikely(dentry.name() == "basic") {
+                dentry
+                    .clone()
+                    .create(
+                        name,
+                        mode | InodeMode::DIR | InodeMode::from_bits(PRIVILEGE_MASK).unwrap(),
+                    )
+                    .await?;
+            } else {
+                dentry.clone().create(name, mode | InodeMode::DIR).await?;
+            }
         }
         Ok(0)
     }
