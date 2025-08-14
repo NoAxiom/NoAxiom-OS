@@ -618,6 +618,7 @@ impl dyn Dentry {
                 pipe_dentry.set_inode(pipe_inode);
                 pipe_dentry.inode().unwrap().set_inode_mode(mode);
                 self.add_child(pipe_dentry); // not set parent correctly!
+                root_dentry().remove_child(name);
                 Ok(())
             }
             InodeMode::CHAR => {

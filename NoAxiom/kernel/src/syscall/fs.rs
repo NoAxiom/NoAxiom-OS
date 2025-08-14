@@ -1923,6 +1923,11 @@ impl Syscall<'_> {
             DevT::new(dev)
         };
 
+        if parent.get_child(name).is_some() {
+            warn!("[sys_mknodat] file already exists: {}", name);
+            return Err(Errno::EEXIST);
+        }
+
         if mode.contains(InodeMode::FILE) {
             parent.create(name, mode).await?;
         } else {
