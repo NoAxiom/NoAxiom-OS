@@ -178,12 +178,17 @@ impl Syscall<'_> {
 
     pub async fn sys_clock_nanosleep(
         &self,
-        _clock_id: usize,
+        clockid: usize,
         flags: usize,
         request: usize,
         remain: usize,
     ) -> SyscallResult {
         pub const TIMER_ABSTIME: usize = 1;
+        let clockid = ClockId::from_repr(clockid).ok_or(Errno::EOPNOTSUPP)?;
+        match clockid {
+            ClockId::CLOCK_REALTIME | ClockId::CLOCK_MONOTONIC => {}
+            _ => return Err(Errno::EOPNOTSUPP),
+        }
         let request = UserPtr::<TimeSpec>::new(request);
         let remain = UserPtr::<TimeSpec>::new(remain);
         let request_timespec = request.read().await?;
@@ -207,9 +212,13 @@ impl Syscall<'_> {
             }
         })
         .await;
-        self.task.tcb_mut().flags.remove(TaskFlags::TIF_SIGPENDING);
+        let is_intr = self.task.tif().contains(TaskFlags::TIF_SIGPENDING);
+        self.task.tif_mut().remove(TaskFlags::TIF_SIGPENDING);
         if !remain.is_null() {
             remain.write(remain_time.into()).await?;
+        }
+        if is_intr {
+            return Err(Errno::EINTR);
         }
         Ok(0)
     }
