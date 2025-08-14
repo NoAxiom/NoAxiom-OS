@@ -100,8 +100,13 @@ impl Syscall<'_> {
     pub async fn sys_sched_getparam(&self, pid: usize, param: usize) -> SyscallResult {
         let param = UserPtr::<SchedParam>::new(param);
         let user_param = param.get_ref_mut().await?;
+        let task = if pid == 0 {
+            self.task
+        } else {
+            &TASK_MANAGER.get(pid).ok_or(Errno::ESRCH)?
+        };
         if let Some(user_param) = user_param {
-            user_param.set_priority(1);
+            user_param.set_priority(task.sched_entity().nice as isize);
         }
         Ok(0)
     }
