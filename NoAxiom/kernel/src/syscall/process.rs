@@ -71,10 +71,16 @@ impl Syscall<'_> {
     }
 
     /// clone3
-    pub async fn sys_clone3(&self, cl_args: usize, _size: usize) -> SyscallResult {
+    pub async fn sys_clone3(&self, cl_args: usize, size: usize) -> SyscallResult {
         let cl_args = UserPtr::<CloneArgs>::new(cl_args);
+        const MINIMAL_CLARGS_SIZE: usize = core::mem::size_of::<u64>() * 8;
+        if size < MINIMAL_CLARGS_SIZE {
+            return Err(Errno::EINVAL);
+        }
+        if size > core::mem::size_of::<CloneArgs>() {
+            return Err(Errno::EFAULT);
+        }
         let cl_args = cl_args.read().await?;
-        warn!("[sys_clone3] cl_args: {:#x?}", cl_args);
         self.task.do_fork(cl_args).await
     }
 

@@ -2,7 +2,7 @@ use alloc::sync::Arc;
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use arch::{Arch, ArchMemory};
-use include::errno::{Errno, SyscallResult};
+use include::errno::{Errno, SysResult, SyscallResult};
 
 use crate::{
     include::process::{CloneArgs, CloneFlags},
@@ -30,28 +30,26 @@ impl Task {
     pub async fn do_fork(self: &Arc<Self>, args: CloneArgs) -> SyscallResult {
         let flags = args.flags as usize;
         let flags = CloneFlags::from_bits(flags & !0xff).ok_or(Errno::EINVAL)?;
-        let new_task = self.inner_fork(flags);
+        let has_stack = args.stack != 0;
+        if has_stack && args.stack_size == 0 {
+            return Err(Errno::EINVAL);
+        }
+        let new_task = self.inner_fork(flags)?;
         let new_tid = new_task.tid();
         let new_cx = new_task.trap_context_mut();
-        let stack = args.stack as usize + args.stack_size as usize;
-        let ptid = args.parent_tid as usize;
-        let ctid = args.child_tid as usize;
-        let tls = args.tls as usize;
-        debug!(
-            "[sys_fork] flags: {:?} stack: {:#x} ptid: {:#x} tls: {:#x} ctid: {:#x}",
-            flags, stack, ptid, tls, ctid
-        );
+        info!("[sys_fork] flags: {:?}, args: {:#x?}", flags, args);
         use arch::TrapArgs::*;
-        if stack != 0 {
-            new_cx[SP] = stack;
+        if has_stack {
+            new_cx[SP] = args.stack as usize;
         }
         if flags.contains(CloneFlags::SETTLS) {
-            new_cx[TLS] = tls;
+            new_cx[TLS] = args.tls as usize;
         }
         if flags.contains(CloneFlags::PARENT_SETTID) {
-            let ptid = UserPtr::<usize>::new(ptid);
+            let ptid = UserPtr::<usize>::new(args.parent_tid as usize);
             ptid.write(new_tid).await?;
         }
+        let ctid = args.child_tid as usize;
         if flags.contains(CloneFlags::CHILD_SETTID) {
             new_task.tcb_mut().set_child_tid = Some(ctid);
         }
@@ -80,19 +78,22 @@ impl Task {
         Ok(new_tid as isize)
     }
 
-    fn inner_fork(self: &Arc<Task>, flags: CloneFlags) -> Arc<Self> {
+    fn inner_fork(self: &Arc<Task>, flags: CloneFlags) -> SysResult<Arc<Self>> {
+        let sa_list = if flags.contains(CloneFlags::SIGHAND) {
+            if !flags.contains(CloneFlags::VM) {
+                return Err(Errno::EINVAL);
+            }
+            self.sa_list.clone()
+        } else {
+            Shared::new(self.sa_list.lock().clone())
+        };
+
         let memory_set = if flags.contains(CloneFlags::VM) {
             self.memory_set().clone()
         } else {
             let new_memory_set = self.memory_set().lock().clone_cow();
             Arch::tlb_flush();
             Shared::new(new_memory_set)
-        };
-
-        let sa_list = if flags.contains(CloneFlags::SIGHAND) {
-            self.sa_list.clone()
-        } else {
-            Shared::new(self.sa_list.lock().clone())
         };
 
         let fd_table = if flags.contains(CloneFlags::FILES) {
@@ -191,7 +192,7 @@ impl Task {
             PROCESS_GROUP_MANAGER.lock().insert(&new_process);
             new_process
         };
-        res
+        Ok(res)
     }
 
     /// wait child to exit or execve for CloneFlags::VFORK
