@@ -333,7 +333,7 @@ impl dyn Dentry {
             name => {
                 if let Some(symlink_path) = inode.symlink() {
                     let (tar, new_jumps) = self.__symlink_jump(task, &symlink_path, jumps + 1)?;
-                    return tar.__walk_path(task, path, step + 1, new_jumps);
+                    return tar.__walk_path(task, path, step, new_jumps);
                 }
                 // Check if this is a directory BEFORE checking permissions
                 // This ensures ENOTDIR takes precedence over EACCES
@@ -464,6 +464,8 @@ impl dyn Dentry {
             error!("[Vfs::symlink] {} is not a dir", self.name());
             return Err(Errno::ENOTDIR);
         }
+
+        // todo: check existed
 
         let son = self
             .clone()

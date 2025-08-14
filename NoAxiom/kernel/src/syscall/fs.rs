@@ -1767,6 +1767,11 @@ impl Syscall<'_> {
         Ok(0)
     }
 
+    pub fn sys_faccessat2(&self, fd: usize, path: usize, mode: i32, flags: i32) -> SyscallResult {
+        warn!("[sys_faccessat2] using sys_faccessat");
+        self.sys_faccessat(fd, path, mode, flags)
+    }
+
     pub async fn sys_copy_file_range(
         &self,
         fd_in: usize,

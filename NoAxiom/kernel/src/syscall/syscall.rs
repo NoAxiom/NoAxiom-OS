@@ -66,7 +66,7 @@ impl<'a> Syscall<'a> {
             SYS_IOCTL =>            self.sys_ioctl(args[0], args[1], args[2]).await,
             SYS_SENDFILE =>         self.sys_sendfile(args[0], args[1], args[2], args[3]).await,
             SYS_FACCESSAT =>        self.sys_faccessat(args[0], args[1], args[2]as i32, args[3] as i32),
-            SYS_FACCESSAT2 =>       self.sys_faccessat(args[0], args[1], args[2]as i32, args[3] as i32),
+            SYS_FACCESSAT2 =>       self.sys_faccessat2(args[0], args[1], args[2]as i32, args[3] as i32),
             SYS_UTIMENSAT =>        self.sys_utimensat(args[0] as isize, args[1], args[2], args[3] as i32).await,
             SYS_LSEEK =>            self.sys_lseek(args[0], args[1] as isize, args[2]),
             SYS_RENAMEAT2 =>        self.sys_renameat2(args[0] as isize, args[1], args[2] as isize, args[3], args[4] as i32).await,
