@@ -2,6 +2,7 @@ use alloc::sync::Arc;
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use arch::{Arch, ArchMemory};
+use config::mm::PAGE_SIZE;
 use include::errno::{Errno, SysResult, SyscallResult};
 
 use crate::{
@@ -12,6 +13,7 @@ use crate::{
         spawn::spawn_utask,
         utils::{suspend_now, take_waker},
     },
+    signal::signal::Signal,
     task::{
         context::TaskTrapContext,
         futex::FutexQueue,
@@ -34,7 +36,19 @@ impl Task {
         if has_stack && args.stack_size == 0 {
             return Err(Errno::EINVAL);
         }
+        if args.stack_size % PAGE_SIZE as u64 != 0 {
+            return Err(Errno::EINVAL);
+        }
+        if flags.contains(CloneFlags::THREAD) && !flags.contains(CloneFlags::SIGHAND) {
+            return Err(Errno::EINVAL);
+        }
+        let exit_signal = if args.exit_signal != 0 {
+            Some(Signal::from_repr(args.exit_signal as usize).ok_or(Errno::EINVAL)?)
+        } else {
+            None
+        };
         let new_task = self.inner_fork(flags)?;
+        new_task.tcb_mut().exit_signal = exit_signal;
         let new_tid = new_task.tid();
         let new_cx = new_task.trap_context_mut();
         info!("[sys_fork] flags: {:?}, args: {:#x?}", flags, args);

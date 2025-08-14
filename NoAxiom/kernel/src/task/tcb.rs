@@ -7,7 +7,7 @@ use super::context::TaskTrapContext;
 use crate::{
     include::{process::TaskFlags, syscall_id::SyscallID},
     mm::user_ptr::UserPtr,
-    signal::{sig_set::SigMask, sig_stack::UContext},
+    signal::{sig_set::SigMask, sig_stack::UContext, signal::Signal},
 };
 
 pub struct TCB {
@@ -21,6 +21,7 @@ pub struct TCB {
     pub clear_child_tid: Option<usize>, // clear tid address
     pub current_syscall: SyscallID,     // current syscall id
     pub vfork_wait: Option<VforkInfo>,  // vfork wait flag, used for vfork clone
+    pub exit_signal: Option<Signal>,    // exit signal, set by clone
 }
 
 impl Default for TCB {
@@ -36,6 +37,7 @@ impl Default for TCB {
             clear_child_tid: None,
             current_syscall: SyscallID::NO_SYSCALL,
             vfork_wait: None,
+            exit_signal: None,
         }
     }
 }
