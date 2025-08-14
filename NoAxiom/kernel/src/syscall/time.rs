@@ -67,7 +67,7 @@ impl Syscall<'_> {
     pub async fn sys_clock_gettime(&self, clockid: usize, tp: usize) -> SyscallResult {
         let ts = UserPtr::<TimeSpec>::from(tp);
         let clockid = ClockId::from_repr(clockid).ok_or(Errno::EINVAL)?;
-        trace!(
+        debug!(
             "[sys_clock_gettime] clock_id: {:?}, ts_addr: {:#x}",
             clockid,
             ts.addr(),
@@ -82,19 +82,19 @@ impl Syscall<'_> {
                         cpu_time += task.time_stat().cpu_time();
                     }
                 }
-                trace!("[sys_clock_gettime] get process cpu time: {:?}", cpu_time);
+                debug!("[sys_clock_gettime] get process cpu time: {:?}", cpu_time);
                 cpu_time
             }
             CLOCK_THREAD_CPUTIME_ID => {
                 let cpu_time = self.task.time_stat().cpu_time();
-                trace!("[sys_clock_gettime] get process cpu time: {:?}", cpu_time);
+                debug!("[sys_clock_gettime] get process cpu time: {:?}", cpu_time);
                 cpu_time
             }
             _ => match CLOCK_MANAGER.lock().0.get(&clockid) {
                 Some(clock) => {
                     let dev_time = get_time_duration();
                     let clock_time = dev_time + *clock;
-                    trace!("[sys_clock_gettime] get time {:?}", clock_time);
+                    debug!("[sys_clock_gettime] get time {:?}", clock_time);
                     clock_time
                 }
                 None => {
@@ -112,8 +112,24 @@ impl Syscall<'_> {
         if timespec.is_null() {
             return Ok(0);
         }
-        let _ = ClockId::from_repr(clockid).ok_or(Errno::EINVAL)?;
-        Ok(0)
+        let clockid = ClockId::from_repr(clockid).ok_or(Errno::EINVAL)?;
+        match CLOCK_MANAGER.lock().0.get_mut(&clockid) {
+            Some(clock) => {
+                let time = timespec.read().await?;
+                if !time.is_valid() {
+                    return Err(Errno::EINVAL);
+                }
+                let dev_time = get_time_duration();
+                let req_time: Duration = time.into();
+                *clock = req_time.saturating_sub(dev_time);
+                info!("[sys_clock_settime] set clock {:?} to {:?}", clockid, clock);
+                Ok(0)
+            }
+            None => {
+                error!("[sys_clock_settime] Cannot find the clock: {:?}", clockid);
+                Err(Errno::EINVAL)
+            }
+        }
     }
 
     pub async fn sys_adjtimex(&self, buf: usize) -> SyscallResult {
