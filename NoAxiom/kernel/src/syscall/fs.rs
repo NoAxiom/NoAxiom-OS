@@ -1754,7 +1754,7 @@ impl Syscall<'_> {
 
     /// check user's permissions of a file relative to a directory file
     /// descriptor
-    pub fn sys_faccessat(&self, fd: usize, path: usize, mode: i32, flags: i32) -> SyscallResult {
+    pub fn sys_faccessat2(&self, fd: usize, path: usize, mode: i32, flags: i32) -> SyscallResult {
         let is_fs = flags & AT_EACCESS != 0;
         let path = read_path(path)?;
         let supported_flags = AT_EACCESS | 0x1000 | 0x100 | 0x60 | 0x2 | 0xfffe | 0x1;
@@ -1778,9 +1778,9 @@ impl Syscall<'_> {
         Ok(0)
     }
 
-    pub fn sys_faccessat2(&self, fd: usize, path: usize, mode: i32, flags: i32) -> SyscallResult {
-        warn!("[sys_faccessat2] using sys_faccessat");
-        self.sys_faccessat(fd, path, mode, flags)
+    pub fn sys_faccessat(&self, fd: usize, path: usize, mode: i32) -> SyscallResult {
+        warn!("[sys_faccessat] using sys_faccessat2");
+        self.sys_faccessat2(fd, path, mode, 0)
     }
 
     pub async fn sys_copy_file_range(
