@@ -162,13 +162,8 @@ impl SigActionList {
     }
     pub fn reset(&mut self) {
         for (index, action) in self.actions.iter_mut().enumerate() {
-            match action.handler {
-                SAHandlerType::User { .. } => {
-                    let signal = unsafe { Signal::from_raw_sa_index(index) };
-                    action.handler = SAHandlerType::new_default(signal);
-                }
-                _ => {}
-            }
+            let signal = unsafe { Signal::from_raw_sa_index(index) };
+            action.handler = SAHandlerType::new_default(signal);
         }
     }
 }
