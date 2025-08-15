@@ -23,15 +23,15 @@ use crate::{
 #[no_mangle]
 pub async fn user_trap_handler(task: &Arc<Task>, trap_type: TrapType) {
     Arch::disable_interrupt();
-    trace!("[trap_handler] call trap handler");
+    // trace!("[trap_handler] call trap handler");
 
     // check if need schedule
     if unlikely(task.need_resched()) {
-        trace!(
-            "task {} time_stat timeup by time = {:?}",
-            task.tid(),
-            task.time_stat(),
-        );
+        // trace!(
+        //     "task {} time_stat timeup by time = {:?}",
+        //     task.tid(),
+        //     task.time_stat(),
+        // );
         task.yield_now().await;
     }
 

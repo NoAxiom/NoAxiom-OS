@@ -9,8 +9,8 @@ use memory::{address::VirtAddr, frame::frame_alloc};
 
 use super::{address::VirtPageNum, memory_set::MemorySet};
 use crate::{
-    cpu::current_task, include::result::Errno, mm::page_table::PageTable, sched::utils::yield_now,
-    syscall::SysResult, task::Task,
+    include::result::Errno, mm::page_table::PageTable, sched::utils::yield_now, syscall::SysResult,
+    task::Task,
 };
 
 /// # memory validate
@@ -37,65 +37,65 @@ pub async fn validate(
     if let Some(pte) = pte {
         let flags = pte.flags();
         if flags.contains(MappingFlags::COW) {
-            trace!("[validate] realloc COW, vpn={:#x}", vpn.raw());
+            // trace!("[validate] realloc COW, vpn={:#x}", vpn.raw());
             memory_set.lock().realloc_cow(vpn, pte)?;
             Ok(())
         } else if matches!(pf, PageFaultType::StorePageFault(_)) {
-            error!(
-                "[validate] store at invalid area, flags: {:?}, tid: {}",
-                flags,
-                current_task().unwrap().tid(),
-            );
+            // error!(
+            //     "[validate] store at invalid area, flags: {:?}, tid: {}",
+            //     flags,
+            //     current_task().unwrap().tid(),
+            // );
             Err(Errno::EFAULT)
         } else {
-            error!(
-                "[validate] unknown error, vpn: {:#x}, flag: {:?}, trap_type: {:#x?}, pte_raw: {:#x}",
-                vpn.raw(),
-                flags,
-                pf,
-                pte.0
-            );
+            // error!(
+            //     "[validate] unknown error, vpn: {:#x}, flag: {:?}, trap_type: {:#x?},
+            // pte_raw: {:#x}",     vpn.raw(),
+            //     flags,
+            //     pf,
+            //     pte.0
+            // );
             Err(Errno::EFAULT)
         }
     } else {
         let mut ms = memory_set.lock();
         if ms.stack.vpn_range.is_in_range(vpn) {
-            let task = current_task().unwrap();
-            trace!(
-                "[validate] stack, tid: {}, vpn: {:#x?}, epc: {:#x}",
-                task.tid(),
-                vpn.raw(),
-                task.trap_context()[arch::TrapArgs::EPC],
-            );
+            // let task = cpu::current_task().unwrap();
+            // trace!(
+            //     "[validate] stack, tid: {}, vpn: {:#x?}, epc: {:#x}",
+            //     task.tid(),
+            //     vpn.raw(),
+            //     task.trap_context()[arch::TrapArgs::EPC],
+            // );
             ms.lazy_alloc_stack(vpn)?;
             Ok(())
         } else if ms.brk.area.vpn_range.is_in_range(vpn) {
-            trace!(
-                "[validate] brk, tid: {}, vpn: {:x?}, epc: {:#x}",
-                current_task().unwrap().tid(),
-                vpn.raw(),
-                current_task().unwrap().trap_context()[arch::TrapArgs::EPC],
-            );
+            // trace!(
+            //     "[validate] brk, tid: {}, vpn: {:x?}, epc: {:#x}",
+            //     current_task().unwrap().tid(),
+            //     vpn.raw(),
+            //     current_task().unwrap().trap_context()[arch::TrapArgs::EPC],
+            // );
             ms.lazy_alloc_brk(vpn)?;
             Ok(())
         } else if ms.mmap_manager.is_in_space(vpn) {
-            trace!(
-                "[validate] mmap, tid: {}, vpn: {:x?}, epc: {:#x}",
-                current_task().unwrap().tid(),
-                vpn.raw(),
-                current_task().unwrap().trap_context()[arch::TrapArgs::EPC],
-            );
+            // trace!(
+            //     "[validate] mmap, tid: {}, vpn: {:x?}, epc: {:#x}",
+            //     current_task().unwrap().tid(),
+            //     vpn.raw(),
+            //     current_task().unwrap().trap_context()[arch::TrapArgs::EPC],
+            // );
             // lazy alloc mmap
             if !ms.mmap_manager.frame_trackers.contains_key(&vpn) {
                 let mut mmap_page = ms.mmap_manager.mmap_map.get(&vpn).cloned().unwrap();
                 let pte_flags: MappingFlags = MappingFlags::from(mmap_page.prot) | MappingFlags::U;
                 if !flag_match_with_trap_type(pte_flags, pf) {
-                    error!(
-                        "[validate] prot mismatch, vpn: {:#x}, prot: {:?}, trap_type: {:?}",
-                        vpn.raw(),
-                        mmap_page.prot,
-                        pf
-                    );
+                    // error!(
+                    //     "[validate] prot mismatch, vpn: {:#x}, prot: {:?}, trap_type: {:?}",
+                    //     vpn.raw(),
+                    //     mmap_page.prot,
+                    //     pf
+                    // );
                     return Err(Errno::EFAULT);
                 }
 
@@ -107,20 +107,20 @@ pub async fn validate(
                 mmap_page.lazy_map_page(kvpn).await?;
                 let ms = memory_set.lock();
                 ms.page_table().map(vpn, ppn, pte_flags);
-                info!(
-                    "mmap done! vpn: {:#x}, ppn: {:#x}, pte: {:?}",
-                    vpn.raw(),
-                    ppn.raw(),
-                    pte_flags
-                );
+                // info!(
+                //     "mmap done! vpn: {:#x}, ppn: {:#x}, pte: {:?}",
+                //     vpn.raw(),
+                //     ppn.raw(),
+                //     pte_flags
+                // );
                 Arch::tlb_flush();
                 drop(ms);
             } else {
                 // todo: use suspend
-                warn!(
-                    "[lazy_alloc_mmap] page {:x?} already mapped, yield for it",
-                    vpn
-                );
+                // warn!(
+                //     "[lazy_alloc_mmap] page {:x?} already mapped, yield for it",
+                //     vpn
+                // );
                 while PageTable::from_ppn(Arch::current_root_ppn())
                     .find_pte(vpn)
                     .is_none()
@@ -130,7 +130,7 @@ pub async fn validate(
             }
             Ok(())
         } else {
-            error!("[validate] not in any area, vpn: {:#x}", vpn.raw());
+            // error!("[validate] not in any area, vpn: {:#x}", vpn.raw());
             Err(Errno::EFAULT)
         }
     }
@@ -141,14 +141,14 @@ impl Task {
         self: &Arc<Self>,
         addr: usize,
         pf: PageFaultType,
-        is_blockon: bool,
+        _is_blockon: bool,
     ) -> SysResult<()> {
-        trace!(
-            "[memory_validate] {:x?} at user_pc={:#x}, is_kernel: {}",
-            pf,
-            self.trap_context()[arch::TrapArgs::EPC],
-            is_blockon,
-        );
+        // trace!(
+        //     "[memory_validate] {:x?} at user_pc={:#x}, is_kernel: {}",
+        //     pf,
+        //     self.trap_context()[arch::TrapArgs::EPC],
+        //     is_blockon,
+        // );
         let ms = self.memory_set();
         let vpn = VirtAddr::from(addr).floor();
         let pt = PageTable::from_ppn(Arch::current_root_ppn());

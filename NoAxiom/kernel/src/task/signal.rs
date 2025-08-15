@@ -203,14 +203,14 @@ impl Task {
                     error!("[recv_siginfo] thread group is empty, tid: {}", self.tid());
                     return false;
                 }
-                for it in tg.iter() {
-                    let task = it.1.upgrade().unwrap();
-                    trace!(
-                        "[recv_siginfo] tid: {}, might recv signal {:?}",
-                        task.tid(),
-                        si.signal,
-                    );
-                }
+                // for it in tg.iter() {
+                // let task = it.1.upgrade().unwrap();
+                // trace!(
+                //     "[recv_siginfo] tid: {}, might recv signal {:?}",
+                //     task.tid(),
+                //     si.signal,
+                // );
+                // }
                 for task in tg.iter() {
                     if let Some(task) = task.1.upgrade() {
                         if task.try_recv_siginfo_inner(si, false) {

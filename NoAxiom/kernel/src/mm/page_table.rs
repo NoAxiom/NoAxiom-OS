@@ -98,7 +98,7 @@ impl PageTable {
                 result = Some(pte);
                 break;
             }
-            trace!("pte addr: {:#x}", pte as *mut PageTableEntry as usize);
+            // trace!("pte addr: {:#x}", pte as *mut PageTableEntry as usize);
             if !pte.is_allocated() {
                 let frame = frame_alloc().unwrap();
                 *pte = PageTableEntry::new(frame.ppn().raw(), pte_flags!(PT));

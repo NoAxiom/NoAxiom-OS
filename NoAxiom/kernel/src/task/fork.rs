@@ -2,7 +2,6 @@ use alloc::sync::Arc;
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use arch::{Arch, ArchMemory};
-use config::mm::PAGE_SIZE;
 use include::{
     errno::{Errno, SysResult, SyscallResult},
     return_errno,
@@ -75,7 +74,7 @@ impl Task {
             new_task.tcb_mut().clear_child_tid = Some(ctid);
         }
         new_cx[RES] = 0;
-        trace!("[sys_fork] new task context: {:?}", new_cx);
+        // trace!("[sys_fork] new task context: {:?}", new_cx);
         info!(
             "[sys_fork] parent: TID{} child: TID{}",
             self.tid(),

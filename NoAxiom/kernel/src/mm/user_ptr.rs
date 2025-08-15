@@ -271,7 +271,7 @@ impl<T> UserPtr<T> {
             if cross_flag {
                 block_on(u_ptr.read())?;
             }
-            trace!("[as_vec_while] ptr: {:#x}", ptr);
+            // trace!("[as_vec_while] ptr: {:#x}", ptr);
             let value = unsafe { &*(ptr as *const T) };
             if checker(value) {
                 break;
@@ -355,7 +355,7 @@ impl UserPtr<u8> {
     /// get user string
     pub fn get_cstr(&self) -> SysResult<String> {
         let slice = self.clone_as_vec_until(|&c: &u8| c as char == '\0')?;
-        trace!("slice: {:?}", slice);
+        // trace!("slice: {:?}", slice);
         let res = unsafe { String::from_utf8_unchecked(Vec::from(slice)) };
         Ok(res)
     }
@@ -402,11 +402,11 @@ impl UserPtr<UserPtr<u8>> {
         let mut ptr = self.clone();
         let mut res = Vec::new();
         while !ptr.is_null() && !ptr.read().await?.is_null() {
-            trace!(
-                "ptr_addr: {:#}, value: {:#}",
-                ptr.va_addr().raw(),
-                ptr.read().await?.va_addr().raw()
-            );
+            // trace!(
+            //     "ptr_addr: {:#}, value: {:#}",
+            //     ptr.va_addr().raw(),
+            //     ptr.read().await?.va_addr().raw()
+            // );
             let data = ptr.read().await?.get_cstr()?;
             res.push(data);
             ptr.inc(1);
