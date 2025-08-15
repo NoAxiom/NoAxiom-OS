@@ -39,7 +39,7 @@ fn kernel_exception_handler(exception: ExceptionType) {
                         current_syscall(),
                     );
                     match block_on(task.memory_validate(addr, pf, true)) {
-                        Ok(_) => {} // trace!("[memory_validate] success in kernel_trap_handler"),
+                        Ok(_) => trace!("[memory_validate] success in kernel_trap_handler"),
                         Err(_) => panic!("memory_validate failed"),
                     }
                 } else {

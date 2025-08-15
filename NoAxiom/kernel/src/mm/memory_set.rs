@@ -17,7 +17,7 @@ use super::{
     shm::{ShmInfo, ShmTracker},
 };
 use crate::{
-    config::mm::{PAGE_SIZE, USER_STACK_SIZE},
+    config::mm::{PAGE_SIZE, PAGE_WIDTH, USER_STACK_SIZE},
     fs::{
         path::kopen,
         vfs::basic::{dentry::Dentry, file::File},
@@ -197,22 +197,22 @@ impl MemorySet {
         mut map_area: MapArea,
         data_info: Option<MapAreaLoadDataInfo<'_>>,
     ) -> SysResult<()> {
-        // trace!(
-        //     "push_area: [{:#X}, {:#X})",
-        //     map_area.vpn_range().start().raw() << PAGE_WIDTH,
-        //     map_area.vpn_range().end().raw() << PAGE_WIDTH
-        // );
+        trace!(
+            "push_area: [{:#X}, {:#X})",
+            map_area.vpn_range().start().raw() << PAGE_WIDTH,
+            map_area.vpn_range().end().raw() << PAGE_WIDTH
+        );
         map_area.map_each(self.page_table())?;
-        // let pte = self
-        //     .page_table()
-        //     .find_pte(map_area.vpn_range().start())
-        //     .unwrap();
-        // trace!(
-        //     "create pte: ppn: {:#x}, flags: {:?}, raw_flag: {:?}",
-        //     pte.ppn(),
-        //     pte.flags(),
-        //     pte.raw_flag(),
-        // );
+        let pte = self
+            .page_table()
+            .find_pte(map_area.vpn_range().start())
+            .unwrap();
+        trace!(
+            "create pte: ppn: {:#x}, flags: {:?}, raw_flag: {:?}",
+            pte.ppn(),
+            pte.flags(),
+            pte.raw_flag(),
+        );
         if let Some(data_info) = data_info {
             map_area.load_data(self.page_table(), data_info);
         }
@@ -443,7 +443,7 @@ impl MemorySet {
         }
 
         // reserve 20% more frames for later use
-        // trace!("frame_req_num: {}", frame_req_num);
+        trace!("frame_req_num: {}", frame_req_num);
         if !can_frame_alloc_loosely(frame_req_num) {
             return_errno!(Errno::ENOMEM, "no enough frames to load elf");
         }
@@ -555,7 +555,7 @@ impl MemorySet {
     /// and mark the new memory set as copy-on-write
     /// used in sys_fork
     pub fn clone_cow(&mut self) -> Self {
-        // trace!("[clone_cow] start");
+        trace!("[clone_cow] start");
         let mut new_set = Self::new_user_space();
         fn remap_cow(
             old_set: &MemorySet,
@@ -723,7 +723,7 @@ impl MemorySet {
         let old_flags = pte.flags();
         let new_flags = flags_switch_to_rw(&old_flags);
         if frame_refcount(old_ppn) == 1 {
-            // trace!("[realloc_cow] refcount is 1, set flags to RW: {new_flags:?}");
+            trace!("[realloc_cow] refcount is 1, set flags to RW: {new_flags:?}");
             self.page_table().set_flags(vpn, new_flags);
         } else {
             let frame = frame_alloc().unwrap();
@@ -754,12 +754,12 @@ impl MemorySet {
             }
             self.page_table()
                 .remap_cow(vpn, new_ppn, old_ppn, new_flags);
-            // trace!(
-            //     "[realloc_cow] done, old: {:#x}, new: {:#x}, flag: {:?}",
-            //     old_ppn.raw(),
-            //     new_ppn.raw(),
-            //     new_flags,
-            // );
+            trace!(
+                "[realloc_cow] done, old: {:#x}, new: {:#x}, flag: {:?}",
+                old_ppn.raw(),
+                new_ppn.raw(),
+                new_flags,
+            );
         }
         Arch::tlb_flush();
         Ok(())

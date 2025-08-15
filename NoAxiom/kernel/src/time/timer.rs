@@ -124,6 +124,7 @@ impl TimerManager {
         while let Some(timer) = timers.peek() {
             let current_time = get_time_duration();
             if current_time >= timer.0.expire {
+                trace!("timers len {}", timers.len());
                 debug!(
                     "[Timer Manager] there is a timer expired, current:{:?}, expire:{:?}",
                     current_time, timer.0.expire
