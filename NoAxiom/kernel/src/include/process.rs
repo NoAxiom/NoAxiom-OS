@@ -1,5 +1,5 @@
 use bitflags::bitflags;
-use config::mm::{KERNEL_STACK_SIZE, PAGE_SIZE, USER_STACK_SIZE};
+use config::mm::USER_STACK_SIZE;
 
 bitflags! {
     #[derive(Debug, Clone, Copy)]
@@ -280,5 +280,30 @@ bitflags! {
         const TIF_STATUS_CHANGED = 1 << 6;
         /// in sigaction handling
         const TIF_IN_SIGACTION   = 1 << 7;
+    }
+}
+
+// fixme: this struct is different from Linux
+// in linux it's pid is after version
+#[derive(Clone, Copy, Debug)]
+pub struct UserCapHeader {
+    pub version: u32, // version of the capability header
+    pub pid: u32,     // pid of the process for which capabilities are being set
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct UserCapData {
+    pub effective: u32,   // effective capabilities
+    pub permitted: u32,   // permitted capabilities
+    pub inheritable: u32, // inheritable capabilities
+}
+
+impl UserCapData {
+    pub fn new() -> Self {
+        Self {
+            effective: 0,
+            permitted: u32::MAX,
+            inheritable: u32::MAX,
+        }
     }
 }

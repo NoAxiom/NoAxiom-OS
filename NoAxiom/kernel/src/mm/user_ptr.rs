@@ -389,6 +389,7 @@ impl UserPtr<u8> {
     /// get string from u8 ptr
     /// this function only requires read permission
     pub fn get_string_from_ptr(&self) -> SysResult<String> {
+        warn!("using deprecated function get_string_from_ptr");
         let checker = |&c: &u8| c == 0;
         let slice = self.clone_as_vec_until(checker)?;
         let res = unsafe { String::from_utf8_unchecked(Vec::from(slice)) };

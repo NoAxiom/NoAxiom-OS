@@ -139,6 +139,8 @@ impl<'a> Syscall<'a> {
             SYS_FUTEX =>                self.sys_futex(args[0] as _, args[1] as _, args[2] as _, args[3] as _, args[4] as _, args[5] as _).await,
             SYS_SETSID =>               self.sys_setsid(),
             SYS_GETRUSAGE =>            self.sys_getrusage(args[0] as _, args[1]).await,
+            SYS_CAPGET =>               self.sys_capget(args[0], args[1]).await,
+            SYS_CAPSET =>               self.sys_capset(args[0], args[1]).await,
             
             // signal
             SYS_SIGTIMEDWAIT =>  self.sys_sigtimedwait(args[0], args[1], args[2]).await,
@@ -197,7 +199,6 @@ impl<'a> Syscall<'a> {
             // empty syscall
             SYS_GET_MEMPOLICY =>   Self::empty_syscall("SYS_GET_MEMPOLICY", 0),
             SYS_MLOCK =>           Self::empty_syscall("SYS_MLOCK", 0),
-            SYS_CAPGET =>          Self::empty_syscall("SYS_CAPGET", 0),
             SYS_BPF =>             Self::empty_syscall("SYS_BPF", 0),
             SYS_KEYCTL =>          Self::empty_syscall("SYS_KEYCTL", 0),
 

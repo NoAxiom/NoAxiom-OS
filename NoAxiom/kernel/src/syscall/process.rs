@@ -13,7 +13,7 @@ use crate::{
         process::{
             robust_list::RobustList,
             rusage::{Rusage, RUSAGE_SELF},
-            CloneArgs, PidSel, WaitOption,
+            CloneArgs, PidSel, UserCapData, UserCapHeader, WaitOption,
         },
         result::Errno,
         time::TimeSpec,
@@ -912,5 +912,73 @@ impl Syscall<'_> {
             }
         }
         Ok(origin_fsgid as isize)
+    }
+
+    pub async fn sys_capset(&self, header: usize, data: usize) -> SyscallResult {
+        if data == 0 {
+            return Ok(0);
+        }
+        let header_ptr = UserPtr::<UserCapHeader>::new(header);
+        let header = header_ptr.read().await?;
+        let data = UserPtr::<UserCapData>::new(data).read().await?;
+        debug!("[sys_capget] header: {:?}, data: {:?}", header, data);
+        match header.version {
+            0x19980330 | 0x20071026 | 0x20080522 => {}
+            _ => {
+                header_ptr
+                    .write(UserCapHeader {
+                        version: 0x20080522,
+                        pid: 0,
+                    })
+                    .await?;
+                return_errno!(Errno::EINVAL);
+            }
+        }
+        if (header.pid as i32) < 0 {
+            return Err(Errno::EINVAL);
+        }
+        let task = if header.pid == 0 {
+            self.task
+        } else {
+            &TASK_MANAGER.get(header.pid as usize).ok_or(Errno::ESRCH)?
+        };
+        let current = task.tcb().cap;
+        if (data.effective & !current.permitted) != 0
+            || (data.permitted & !current.permitted) != 0
+            || (data.inheritable & !current.inheritable) != 0
+        {
+            return_errno!(Errno::EPERM);
+        }
+        task.tcb_mut().cap = data;
+        Ok(0)
+    }
+
+    pub async fn sys_capget(&self, header: usize, data_ptr: usize) -> SyscallResult {
+        let header_ptr = UserPtr::<UserCapHeader>::new(header);
+        let header = header_ptr.read().await?;
+        let data = UserPtr::<UserCapData>::new(data_ptr);
+        debug!("[sys_capget] header: {:?}", header);
+        match header.version {
+            0x19980330 | 0x20071026 | 0x20080522 => {}
+            _ => {
+                header_ptr
+                    .write(UserCapHeader {
+                        version: 0x20080522,
+                        pid: 0,
+                    })
+                    .await?;
+                return_errno!(Errno::EINVAL)
+            }
+        }
+        if (header.pid as i32) < 0 {
+            return Err(Errno::EINVAL);
+        }
+        let task = if header.pid == 0 {
+            self.task
+        } else {
+            &TASK_MANAGER.get(header.pid as usize).ok_or(Errno::ESRCH)?
+        };
+        data.write(task.tcb().cap).await?;
+        Ok(0)
     }
 }

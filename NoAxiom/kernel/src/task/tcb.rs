@@ -5,7 +5,10 @@ use arch::TrapContext;
 
 use super::context::TaskTrapContext;
 use crate::{
-    include::{process::TaskFlags, syscall_id::SyscallID},
+    include::{
+        process::{TaskFlags, UserCapData},
+        syscall_id::SyscallID,
+    },
     mm::user_ptr::UserPtr,
     signal::{sig_set::SigMask, sig_stack::UContext, signal::Signal},
 };
@@ -22,6 +25,7 @@ pub struct TCB {
     pub current_syscall: SyscallID,     // current syscall id
     pub vfork_wait: Option<VforkInfo>,  // vfork wait flag, used for vfork clone
     pub exit_signal: Option<Signal>,    // exit signal, set by clone
+    pub cap: UserCapData,               // kernel capabilities
 }
 
 impl Default for TCB {
@@ -38,6 +42,7 @@ impl Default for TCB {
             current_syscall: SyscallID::NO_SYSCALL,
             vfork_wait: None,
             exit_signal: None,
+            cap: UserCapData::new(),
         }
     }
 }
