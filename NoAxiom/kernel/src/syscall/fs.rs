@@ -841,7 +841,7 @@ impl Syscall<'_> {
                 return file.ioctl(request, arg);
             }
             IoctlCmd::Rtc(x) => match x {
-                RtcIoctlCmd::RTCRDTIME => {
+                RtcIoctlCmd::RTCRDTIME | RtcIoctlCmd::RTCRDTIME2 => {
                     return file.ioctl(request, arg);
                 }
             },

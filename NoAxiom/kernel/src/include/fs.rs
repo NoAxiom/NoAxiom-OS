@@ -614,6 +614,7 @@ pub enum TtyIoctlCmd {
 pub enum RtcIoctlCmd {
     /// Get the current RTC time at usize.
     RTCRDTIME = 0xffffffff80247009,
+    RTCRDTIME2 = 0x80247009,
 }
 
 #[derive(FromRepr, Debug)]
