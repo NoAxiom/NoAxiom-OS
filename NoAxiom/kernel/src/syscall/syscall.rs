@@ -192,6 +192,7 @@ impl<'a> Syscall<'a> {
             SYS_SYSLOG =>          Self::sys_syslog(args[0] as u32, args[1], args[2]).await,
             SYS_SYSTEMSHUTDOWN =>  Self::sys_systemshutdown(),
             SYS_GETRANDOM =>       self.sys_getrandom(args[0], args[1], args[2]).await,
+            SYS_ADD_KEY =>         self.sys_add_key(args[0], args[1], args[2], args[3], args[4]).await,
 
             // empty syscall
             SYS_GET_MEMPOLICY =>   Self::empty_syscall("SYS_GET_MEMPOLICY", 0),
@@ -199,7 +200,6 @@ impl<'a> Syscall<'a> {
             SYS_CAPGET =>          Self::empty_syscall("SYS_CAPGET", 0),
             SYS_BPF =>             Self::empty_syscall("SYS_BPF", 0),
             SYS_KEYCTL =>          Self::empty_syscall("SYS_KEYCTL", 0),
-            SYS_ADD_KEY =>         Self::empty_syscall("SYS_ADD_KEY", 0),
 
             // unsupported
             _ => {
