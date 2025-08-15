@@ -3,7 +3,10 @@ use core::sync::atomic::{AtomicBool, Ordering};
 
 use arch::{Arch, ArchMemory};
 use config::mm::PAGE_SIZE;
-use include::errno::{Errno, SysResult, SyscallResult};
+use include::{
+    errno::{Errno, SysResult, SyscallResult},
+    return_errno,
+};
 
 use crate::{
     include::process::{CloneArgs, CloneFlags},
@@ -33,11 +36,12 @@ impl Task {
         let flags = args.flags as usize;
         let flags = CloneFlags::from_bits(flags & !0xff).ok_or(Errno::EINVAL)?;
         let has_stack = args.stack != 0;
+        // debug!("[sys_fork] args: {:#x?}", args);
         if has_stack && args.stack_size == 0 {
             return Err(Errno::EINVAL);
         }
-        if args.stack_size % PAGE_SIZE as u64 != 0 {
-            return Err(Errno::EINVAL);
+        if args.stack_size & 8 as u64 != 0 {
+            return_errno!(Errno::EINVAL);
         }
         if flags.contains(CloneFlags::THREAD) && !flags.contains(CloneFlags::SIGHAND) {
             return Err(Errno::EINVAL);
