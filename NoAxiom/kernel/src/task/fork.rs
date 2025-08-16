@@ -2,11 +2,7 @@ use alloc::sync::Arc;
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use arch::{Arch, ArchMemory};
-use config::mm::PAGE_SIZE;
-use include::{
-    errno::{Errno, SysResult, SyscallResult},
-    return_errno,
-};
+use include::errno::{Errno, SysResult, SyscallResult};
 
 use crate::{
     include::process::{CloneArgs, CloneFlags},
@@ -35,14 +31,6 @@ impl Task {
     pub async fn do_fork(self: &Arc<Self>, args: CloneArgs) -> SyscallResult {
         let flags = args.flags as usize;
         let flags = CloneFlags::from_bits(flags & !0xff).ok_or(Errno::EINVAL)?;
-        let has_stack = args.stack != 0;
-        // debug!("[sys_fork] args: {:#x?}", args);
-        if has_stack && args.stack_size == 0 {
-            return Err(Errno::EINVAL);
-        }
-        if args.stack_size & 8 as u64 != 0 {
-            return_errno!(Errno::EINVAL);
-        }
         if flags.contains(CloneFlags::THREAD) && !flags.contains(CloneFlags::SIGHAND) {
             return Err(Errno::EINVAL);
         }
@@ -57,7 +45,7 @@ impl Task {
         let new_cx = new_task.trap_context_mut();
         info!("[sys_fork] flags: {:?}, args: {:#x?}", flags, args);
         use arch::TrapArgs::*;
-        if has_stack {
+        if args.stack != 0 {
             new_cx[SP] = args.stack as usize;
         }
         if flags.contains(CloneFlags::SETTLS) {

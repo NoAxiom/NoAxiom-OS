@@ -80,7 +80,17 @@ impl Syscall<'_> {
         if size > core::mem::size_of::<CloneArgs>() {
             return Err(Errno::EFAULT);
         }
-        let cl_args = cl_args.read().await?;
+        let mut cl_args = cl_args.read().await?;
+        if cl_args.stack != 0 && cl_args.stack_size == 0 {
+            return Err(Errno::EINVAL);
+        }
+        if cl_args.stack_size & 7 as u64 != 0 {
+            return Err(Errno::EINVAL);
+        }
+        // stack points at the lowest byte of the stack
+        // which is different from legacy clone
+        cl_args.stack += cl_args.stack_size;
+        cl_args.stack_size = 0;
         self.task.do_fork(cl_args).await
     }
 
