@@ -10,9 +10,11 @@ use crate::{
         basic::dentry::Dentry,
         impls::{
             proc::{
+                fd::{dentry::FdDentry, inode::FdDirInode},
                 interrupts::{dentry::InterruptsDentry, inode::InterruptsInode},
                 maps::{dentry::MapsDentry, inode::MapsInode},
                 mounts::inode::MountsInode,
+                stat::{dentry::ProcStatDentry, inode::ProcStatInode},
             },
             ramfs::{
                 dentry::RamFsDentry,
@@ -25,13 +27,14 @@ use crate::{
 };
 
 mod exe;
+mod fd;
 pub mod filesystem;
 mod interrupts;
 mod maps;
 mod meminfo;
 mod mounts;
-pub mod status;
 pub mod stat;
+pub mod status;
 mod superblock;
 
 pub use interrupts::inc_interrupts_count;
@@ -120,6 +123,26 @@ pub async fn init(fs_root: Arc<dyn Dentry>) -> SysResult<()> {
     let status_inode = Arc::new(StatusInode::new(fs_root.super_block()));
     status_dentry.into_dyn().set_inode(status_inode);
     self_dentry.add_child(status_dentry);
+
+    info!("[fs] create /proc/self/stat");
+    let stat_dentry = Arc::new(ProcStatDentry::new(
+        Some(self_dentry.clone()),
+        "stat",
+        fs_root.super_block(),
+    ));
+    let stat_inode = Arc::new(ProcStatInode::new(fs_root.super_block()));
+    stat_dentry.into_dyn().set_inode(stat_inode);
+    self_dentry.add_child(stat_dentry);
+
+    info!("[fs] create /proc/self/fd");
+    let fd_dentry = Arc::new(FdDentry::new(
+        Some(self_dentry.clone()),
+        "fd",
+        fs_root.super_block(),
+    ));
+    let fd_inode = Arc::new(FdDirInode::new(fs_root.super_block()));
+    fd_dentry.into_dyn().set_inode(fd_inode);
+    self_dentry.add_child(fd_dentry);
 
     info!("[fs] create /proc/self/maps");
     let maps_dentry = Arc::new(MapsDentry::new(
