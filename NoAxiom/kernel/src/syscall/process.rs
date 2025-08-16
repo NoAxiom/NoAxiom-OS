@@ -6,7 +6,7 @@ use config::task::BUSYBOX;
 use super::{Syscall, SyscallResult};
 use crate::{
     constant::fs::AT_FDCWD,
-    fs::path::get_dentry,
+    fs::{fdtable::RLimit, path::get_dentry},
     include::{
         fs::{FileFlags, SearchFlags},
         futex::{FutexFlags, FutexOps, FUTEX_BITSET_MATCH_ANY},
@@ -15,6 +15,7 @@ use crate::{
             rusage::{Rusage, RUSAGE_SELF},
             CloneArgs, PidSel, UserCapData, UserCapHeader, WaitOption,
         },
+        resource::RlimitResource,
         result::Errno,
         time::TimeSpec,
     },
@@ -989,6 +990,86 @@ impl Syscall<'_> {
             &TASK_MANAGER.get(header.pid as usize).ok_or(Errno::ESRCH)?
         };
         data.write(task.tcb().cap).await?;
+        Ok(0)
+    }
+
+    /// Get and set resource limits
+    pub async fn sys_prlimit64(
+        &self,
+        pid: usize,
+        resource: u32,
+        new_limit: usize,
+        old_limit: usize,
+    ) -> SyscallResult {
+        let task = if pid == 0 {
+            self.task
+        } else {
+            &TASK_MANAGER.get(pid).ok_or(Errno::ESRCH)?
+        };
+
+        let mut fd_table = task.fd_table();
+        let resource = RlimitResource::from_u32(resource)?;
+        let new_limit = UserPtr::<RLimit>::new(new_limit);
+        let old_limit = UserPtr::<RLimit>::new(old_limit);
+
+        if !old_limit.is_null() {
+            old_limit
+                .write(match resource {
+                    RlimitResource::NOFILE => fd_table.rlimit().clone(),
+                    RlimitResource::STACK => RLimit::default(),
+                    _ => RLimit::default(), //TODO: add rlimit for Task
+                })
+                .await?;
+        }
+
+        if !new_limit.is_null() {
+            info!(
+                "[sys_prlimit64] pid: {}, resource: {:?}, new_limit: {:?}",
+                pid,
+                resource,
+                new_limit.read().await?,
+            );
+            match resource {
+                RlimitResource::NOFILE => *fd_table.rlimit_mut() = new_limit.read().await?,
+                _ => {}
+            }
+        }
+        info!(
+            "[sys_prlimit64] pid: {}, resource: {:?} new_limit_addr: {:#x}, old_limit_addr: {:#x}",
+            pid,
+            resource,
+            new_limit.addr(),
+            old_limit.addr(),
+        );
+        Ok(0)
+    }
+
+    pub async fn sys_getrlimit(&self, resource: u32, rlimit: usize) -> SyscallResult {
+        let resource = RlimitResource::from_u32(resource)?;
+        let rlimit = UserPtr::<RLimit>::new(rlimit);
+        let currrent_rlimit = match resource {
+            RlimitResource::NOFILE => self.task.fd_table().rlimit().clone(),
+            _ => RLimit::default(),
+        };
+        rlimit.write(currrent_rlimit).await?;
+        Ok(0)
+    }
+
+    pub async fn sys_setrlimit(&self, resource: u32, rlimit: usize) -> SyscallResult {
+        let resource = RlimitResource::from_u32(resource)?;
+        let rlimit = UserPtr::<RLimit>::new(rlimit);
+        let limit = rlimit.read().await?;
+        info!(
+            "[sys_setrlimit] resource: {:?}, limit: {:?}",
+            resource, limit
+        );
+        if limit.rlim_cur > limit.rlim_max {
+            return_errno!(Errno::EINVAL);
+        }
+        match resource {
+            RlimitResource::NOFILE => *self.task.fd_table().rlimit_mut() = limit,
+            _ => {}
+        }
         Ok(0)
     }
 }

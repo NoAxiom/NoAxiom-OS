@@ -15,7 +15,6 @@ use crate::{
         STATX_TYPE, STATX_UID, UTIME_NOW, UTIME_OMIT, W_OK, X_OK,
     },
     fs::{
-        fdtable::RLimit,
         path::{get_dentry, get_dentry_parent, kcreate_async, resolve_path2},
         pipe::PipeFile,
     },
@@ -26,7 +25,6 @@ use crate::{
             NoAxiomIoctlCmd, RenameFlags, RtcIoctlCmd, SearchFlags, SeekFrom, Statfs, Statx,
             TtyIoctlCmd, Whence, EXT4_MAX_FILE_SIZE, PRIVILEGE_MASK,
         },
-        resource::Resource,
         result::Errno,
         time::TimeSpec,
     },
@@ -1161,59 +1159,6 @@ impl Syscall<'_> {
                 .delete_child(&dentry.name())
                 .await?;
         }
-        Ok(0)
-    }
-
-    /// Get and set resource limits
-    pub async fn sys_prlimit64(
-        &self,
-        pid: usize,
-        resource: u32,
-        new_limit: usize,
-        old_limit: usize,
-    ) -> SyscallResult {
-        let task = if pid == 0 {
-            self.task.clone()
-        } else if let Some(task) = crate::task::manager::TASK_MANAGER.get(pid) {
-            task
-        } else {
-            Err(Errno::ESRCH)?
-        };
-
-        let mut fd_table = task.fd_table();
-        let resource = Resource::from_u32(resource)?;
-        let new_limit = UserPtr::<RLimit>::new(new_limit);
-        let old_limit = UserPtr::<RLimit>::new(old_limit);
-
-        if !old_limit.is_null() {
-            old_limit
-                .write(match resource {
-                    Resource::NOFILE => fd_table.rlimit().clone(),
-                    Resource::STACK => RLimit::default(),
-                    _ => RLimit::default(), //TODO: add rlimit for Task
-                })
-                .await?;
-        }
-
-        if !new_limit.is_null() {
-            info!(
-                "[sys_prlimit64] pid: {}, resource: {:?}, new_limit: {:?}",
-                pid,
-                resource,
-                new_limit.read().await?,
-            );
-            match resource {
-                Resource::NOFILE => *fd_table.rlimit_mut() = new_limit.read().await?,
-                _ => {}
-            }
-        }
-        info!(
-            "[sys_prlimit64] pid: {}, resource: {:?} new_limit_addr: {:#x}, old_limit_addr: {:#x}",
-            pid,
-            resource,
-            new_limit.addr(),
-            old_limit.addr(),
-        );
         Ok(0)
     }
 
