@@ -418,7 +418,7 @@ impl dyn File {
                 inode.id() as u64,
                 offset as u64,
                 rec_len as u16,
-                (inode.file_type().bits() >> 8) as u8,
+                (inode.file_type().bits() >> 12) as u8,
             );
 
             debug!(
