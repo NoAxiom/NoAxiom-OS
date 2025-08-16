@@ -340,6 +340,8 @@ impl dyn File {
                 PageState::Shared
             };
             let page = w_guard.alloc(page_state);
+            self.base_read(offset_align, page.as_mut_bytes_array())
+                .await?;
             w_guard.fill_page(&self.clone(), offset_align, page);
         }
 
