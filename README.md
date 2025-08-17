@@ -4,9 +4,7 @@
 
 [原项目](https://github.com/NoAxiom/NoAxiom-OS)（包含submodule）
 
-[决赛第一阶段汇报](./docs/final_preview.pdf)
-
-[初赛PPT与演示视频](https://pan.baidu.com/s/1aj0eP2t-oPZIlO7OO4S8pA?pwd=kkxz)
+[决赛汇报](./docs/final.pdf)
 
 ## 项目概述
 
@@ -78,6 +76,8 @@ NoAxiom 操作系统整体分为以下四个层次：**机器层**、**硬件抽
 | **硬件抽象层** | - 自主支持 RISC-V64 和 LoongArch64<br>- 统一解耦的硬件接口设计<br>- 架构解耦的访存与中断机制                                                                      |
 | **设备驱动**  | - 多架构下的**设备嗅探机制**<br>- 异步块设备驱动<br>- **异步块缓存**支持                                                                                       |
 | **网络模块**  | - 支持 TCP/UDP 套接字<br>- 支持 IPv4/IPv6 协议<br>- 实现**端口复用**<br>- 支持等待过程的**异步让权**                                                            |
+
+[初赛PPT与演示视频](https://pan.baidu.com/s/1aj0eP2t-oPZIlO7OO4S8pA?pwd=kkxz)
 
 ---
 
