@@ -9,6 +9,8 @@ use smoltcp::{
 use crate::basic::{DevResult, Device};
 
 pub mod loopback;
+pub mod ls2k1000_gmac;
+mod utils;
 
 pub trait NetWorkDevice: Send + Sync + Device {
     /// get the MAC address of the network card

@@ -2,6 +2,7 @@ use crate::{
     basic::{DeviceTreeInfo, DeviceType},
     block::{ls_ahci::LsAhciDevice, vf2_sdcard::sdcard::VF2SdcardDevice},
     interrupt::plic::PlicDevice,
+    net::ls2k1000_gmac::impls::LsGmacDevice,
     probe::basic::DeviceConfigType,
 };
 
@@ -32,4 +33,5 @@ pub(super) const OF_INITIALIZERS: &[(&str, &DeviceType, &DeviceConfigType)] = &[
     device!(PlicDevice),
     device!(VF2SdcardDevice),
     device!(LsAhciDevice),
+    device!(LsGmacDevice),
 ];

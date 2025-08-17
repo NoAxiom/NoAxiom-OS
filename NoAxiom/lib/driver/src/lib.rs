@@ -3,6 +3,7 @@
 #![feature(trait_upcasting)]
 #![feature(impl_trait_in_assoc_type)]
 
+#[macro_use]
 extern crate alloc;
 
 pub mod basic;

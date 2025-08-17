@@ -24,8 +24,8 @@ lazy_static::lazy_static! {
     pub static ref UDP_PORT_MANAGER: Arc<SpinLock<PortManager>> = Arc::new(SpinLock::new(PortManager::new()));
     pub static ref NET_DEVICES: RwLock<BTreeMap<usize, &'static dyn NetWorkDevice>> = {
         let net_devices = RwLock::new(BTreeMap::new());
-        let dev = LoopBackDev::new();
-        DEV_BUS.add_network_device(dev);
+        // let dev = LoopBackDev::new();
+        // DEV_BUS.add_network_device(dev);
         net_devices.write().extend(
             DEV_BUS
                 .network

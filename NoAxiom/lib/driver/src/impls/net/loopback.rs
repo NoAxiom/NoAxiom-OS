@@ -1,19 +1,18 @@
 use alloc::string::String;
 use core::ops::DerefMut;
 
-use arch::{Arch, ArchTime};
 use include::errno::Errno;
 use ksync::mutex::SpinLock;
 use smoltcp::{
     iface::{self, Config, Interface},
     phy::{Device, Loopback, Medium},
-    time::Instant,
     wire::{EthernetAddress, IpAddress, IpCidr},
 };
 
 use super::NetWorkDevice;
-use crate::basic::{
-    DevResult, Device as BasicDevice, DeviceType as BasicDeviceType, NetDeviceType,
+use crate::{
+    basic::{DevResult, Device as BasicDevice, DeviceType as BasicDeviceType, NetDeviceType},
+    net::utils::get_time_instant,
 };
 
 pub struct LoopBackDev {
@@ -33,11 +32,7 @@ impl LoopBackDev {
                 Medium::Ip => Config::new(smoltcp::wire::HardwareAddress::Ip),
             };
             config.random_seed = 0x9898998;
-            let mut iface = Interface::new(
-                config,
-                &mut device,
-                Instant::from_millis(get_time_ms() as i64),
-            );
+            let mut iface = Interface::new(config, &mut device, get_time_instant());
             iface.update_ip_addrs(|ip_addrs| {
                 ip_addrs
                     .push(IpCidr::new(IpAddress::v4(127, 0, 0, 1), 24))
@@ -87,7 +82,7 @@ impl NetWorkDevice for LoopBackDev {
         let mut iface = self.interface.lock();
         let mut device_guard = self.dev.lock();
         let device = device_guard.deref_mut();
-        let res = iface.poll(Instant::from_millis(get_time_ms() as i64), device, sockets);
+        let res = iface.poll(get_time_instant(), device, sockets);
         if res {
             // log::info!("[LoopBackDev::poll] polled {res}");
             Ok(())
@@ -99,9 +94,4 @@ impl NetWorkDevice for LoopBackDev {
     fn inner_iface(&self) -> &SpinLock<Interface> {
         &self.interface
     }
-}
-
-pub fn get_time_ms() -> usize {
-    const MSEC_PER_SEC: usize = 1000;
-    arch::Arch::get_time() / (Arch::get_freq() / MSEC_PER_SEC)
 }

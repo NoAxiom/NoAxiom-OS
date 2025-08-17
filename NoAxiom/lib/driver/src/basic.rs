@@ -32,7 +32,7 @@ pub enum NetDeviceType {
     LoopBack,
     Virtio,
     PhysRV,
-    PhysLA,
+    LsGmac,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

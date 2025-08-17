@@ -43,7 +43,7 @@ fn kernel_exception_handler(exception: ExceptionType) {
                         Err(_) => panic!("memory_validate failed"),
                     }
                 } else {
-                    panic!("page fault without task running, addr: {:#x}", addr);
+                    panic!("page fault without task running, addr: {:#x?}", exception);
                 }
             }
             _ => panic!("unsupported page fault type: {:?}", pf),

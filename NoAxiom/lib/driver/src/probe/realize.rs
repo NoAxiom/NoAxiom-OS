@@ -11,6 +11,7 @@ use crate::{
     },
     interrupt::plic::PlicDevice,
     manager::{get_int_ctrl_dev, set_int_ctrl_dev, DEV_BUS},
+    net::ls2k1000_gmac::impls::LsGmacDevice,
 };
 
 fn virtio_mmio_realize(config: &DeviceConfig) {
@@ -129,9 +130,18 @@ fn of_realize(config: &DeviceConfig) {
                 NetDeviceType::Virtio => {
                     log::warn!("[platform] UNEXPECTED realize virtio net device!!! SKIP device realization");
                 }
-                _ => {
-                    log::warn!("[platform] UNKNOWN network device!!!");
+                NetDeviceType::LsGmac => {
+                    if let Some(dev) = LsGmacDevice::new(config.region.addr) {
+                        log::info!(
+                            "[platform] realize lsgmac network device: type {:?} @ addr: {:#x}, size: {:#x}",
+                            net_type,
+                            config.region.addr,
+                            config.region.size
+                        );
+                        DEV_BUS.add_network_device(dev);
+                    }
                 }
+                _ => log::warn!("[platform] UNKNOWN network device!!!"),
             }
         }
         DeviceType::Interrupt(interrupt_type) => match interrupt_type {
