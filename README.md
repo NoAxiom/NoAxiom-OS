@@ -6,6 +6,21 @@
 
 [决赛汇报](./docs/final.pdf)
 
+### 决赛情况
+比赛结束时，总分位列第7；性能相关测试点总分位列第2
+![alt text](docs/asserts/rank.png)
+
+`iperf`性能测试点总分位列第1，榜上唯一超越基准分数
+![alt text](docs/asserts/rank-iperf.png)
+
+
+`cyclic`、`iozone`、`lmbench`、`netperf`性能测试点总分均位列第2，其中`cyclic`测试点只有两个队伍实现，下面列举部分
+![alt text](docs/asserts/rank-cyclic.png)
+![alt text](docs/asserts/rank-iozone.png)
+![alt text](docs/asserts/rank-lmbench.png)
+![alt text](docs/asserts/rank-netperf.png)
+
+
 ## 项目概述
 
 ### 系统简介
