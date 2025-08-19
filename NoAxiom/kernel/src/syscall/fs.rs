@@ -1184,9 +1184,9 @@ impl Syscall<'_> {
                 Ok(0)
             }
             FcntlFlags::F_SETFD => {
-                let arg = FileFlags::from_bits_retain(arg as i32);
-                let fd_flags = FdFlags::from(&arg);
-                fd_table.set_fdflag(fd, &fd_flags);
+                if arg == FdFlags::FD_CLOEXEC.bits() {
+                    fd_table.set_fdflag(fd, &FdFlags::FD_CLOEXEC);
+                }
                 Ok(0)
             }
             FcntlFlags::F_GETFD => {
