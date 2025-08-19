@@ -61,7 +61,7 @@ impl Task {
     pub fn mmap(
         &self,
         addr: usize,
-        length: usize,
+        mut length: usize,
         prot: MmapProts,
         flags: MmapFlags,
         fd: isize,
@@ -69,7 +69,12 @@ impl Task {
     ) -> SysResult<usize> {
         // check file validity, and fetch file from fd_table
         const LENGTH_OFFSET: usize = 4096 * 32;
-        let length = length + LENGTH_OFFSET;
+        let qwq = if flags.contains(MmapFlags::MAP_STACK) {
+            length += LENGTH_OFFSET;
+            true
+        } else {
+            false
+        };
         let fd_table = self.fd_table();
         if !flags.contains(MmapFlags::MAP_ANONYMOUS)
             && (fd as usize >= fd_table.table.len() || fd_table.table[fd as usize].is_none())
@@ -137,10 +142,13 @@ impl Task {
             "[mmap] addr: {:#x}, start_va: {:#x}, length: {:#x}, prot: {:?}, flags: {:?}, fd: {}, offset: {:#x}",
             addr, start_va.raw(), length, prot, flags, fd, offset
         );
-        let res = memory_set
+        let mut res = memory_set
             .mmap_manager
             .insert(start_va, length, prot, flags, offset, file)?;
-        Ok(res + LENGTH_OFFSET)
+        if qwq {
+            res += LENGTH_OFFSET
+        }
+        Ok(res)
     }
 
     pub fn get_maps_string(&self) -> String {
