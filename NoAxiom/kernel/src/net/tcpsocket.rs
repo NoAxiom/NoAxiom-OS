@@ -412,6 +412,8 @@ impl Socket for TcpSocket {
         drop(iface_inner);
 
         let mut retry_cnt = 0;
+        const MAX_CONNECT_RETRIES: u32 = 100;
+
         loop {
             poll_ifaces();
             let mut sockets = SOCKET_SET.lock();
@@ -433,9 +435,12 @@ impl Socket for TcpSocket {
             match local_socket.state() {
                 tcp::State::Closed => {
                     retry_cnt += 1;
-                    if retry_cnt > 100 && is_ltp() {
-                        error!("[Tcp {}] connect loop: Closed and Refused", self.handles[0]);
-                        return Err(Errno::ECONNREFUSED);
+                    if retry_cnt > MAX_CONNECT_RETRIES {
+                        error!(
+                            "[Tcp {}] connect timeout: connection refused after {} retries",
+                            self.handles[0], MAX_CONNECT_RETRIES
+                        );
+                        return Err(Errno::ETIMEDOUT);
                     }
                     error!("[Tcp {}] connect loop: Closed", self.handles[0]);
                     let driver_write_guard = NET_DEVICES.write();

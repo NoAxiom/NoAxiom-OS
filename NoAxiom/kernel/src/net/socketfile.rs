@@ -96,6 +96,7 @@ impl Sock {
             Sock::Tcp(socket) => socket.write(buf, remote).await,
             Sock::Udp(socket) => {
                 if let Some(r) = remote {
+                    debug!("[Udp {}] write to: {:?}", socket.handle, r);
                     socket.connect(r).await?;
                 }
                 socket.write(buf, remote).await

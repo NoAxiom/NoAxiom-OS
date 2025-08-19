@@ -229,6 +229,7 @@ impl SockAddr {
         }
     }
     pub fn from_endpoint(endpoint: IpEndpoint) -> Self {
+        debug!("[SockAddr::from_endpoint] endpoint: {:?}", endpoint);
         match endpoint.addr {
             IpAddress::Ipv4(v4) => Self {
                 addr_ipv4: SockAddrIpv4 {
@@ -238,15 +239,33 @@ impl SockAddr {
                     sin_zero: [0; 8],
                 },
             },
-            IpAddress::Ipv6(v6) => Self {
-                addr_ipv6: SockAddrIpv6 {
-                    sin6_family: AddressFamily::AF_INET6 as u16,
-                    sin6_port: endpoint.port.to_be(),
-                    sin6_flowinfo: 0,
-                    sin6_addr: v6.0,
-                    sin6_scope_id: 0,
-                },
-            },
+            IpAddress::Ipv6(v6) => {
+                // 检查是否是IPv4映射的IPv6地址
+                let is_v4_mapped = v6.0[0..12] == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff];
+
+                if is_v4_mapped {
+                    // 如果是IPv4映射的IPv6地址，提取IPv4部分
+                    let ipv4_bytes = [v6.0[12], v6.0[13], v6.0[14], v6.0[15]];
+                    Self {
+                        addr_ipv4: SockAddrIpv4 {
+                            sin_family: AddressFamily::AF_INET as u16,
+                            sin_port: endpoint.port.to_be(),
+                            sin_addr: u32::from_be_bytes(ipv4_bytes).to_be(),
+                            sin_zero: [0; 8],
+                        },
+                    }
+                } else {
+                    Self {
+                        addr_ipv6: SockAddrIpv6 {
+                            sin6_family: AddressFamily::AF_INET6 as u16,
+                            sin6_port: endpoint.port.to_be(),
+                            sin6_flowinfo: 0,
+                            sin6_addr: v6.0,
+                            sin6_scope_id: 0,
+                        },
+                    }
+                }
+            }
         }
     }
 }

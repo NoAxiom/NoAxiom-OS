@@ -68,6 +68,10 @@ impl Syscall<'_> {
     /// Create a pipe
     pub async fn sys_pipe2(&self, pipe: usize, flags: i32) -> SyscallResult {
         let flags = FileFlags::from_bits(flags).ok_or(Errno::EINVAL)?;
+        if flags.contains(FileFlags::O_DIRECT) {
+            error!("[sys_pipe2] O_DIRECT is not supported for pipes currently!");
+            return Err(Errno::EINVAL);
+        }
         let (read_end, write_end) = PipeFile::new_pipe(&flags);
         let flags = FdFlags::from(&flags);
 

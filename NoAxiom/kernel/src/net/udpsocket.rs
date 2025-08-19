@@ -1,5 +1,5 @@
 use alloc::{boxed::Box, vec};
-use core::task::Waker;
+use core::{error, f32::consts::E, task::Waker};
 
 use async_trait::async_trait;
 use smoltcp::{
@@ -244,11 +244,14 @@ impl Socket for UdpSocket {
     ///
     /// return: whether the operation is successful
     async fn connect(&mut self, remote: IpEndpoint) -> SysResult<()> {
-        assert!(
-            !remote.addr.is_unspecified(),
-            "[Udp {}] remote endpoint is unspecified",
-            self.handle
-        );
+        if remote.addr.is_unspecified() {
+            error!(
+                "[Udp {}] remote endpoint {:?} is unspecified",
+                self.handle, remote
+            );
+            return Err(Errno::EINVAL);
+        }
+
         assert_ne!(remote.port, 0, "[Udp {}] remote port is 0", self.handle);
         self.remote_endpoint = Some(remote);
 
