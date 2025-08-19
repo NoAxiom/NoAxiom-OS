@@ -130,7 +130,11 @@ pub async fn validate(
             }
             Ok(())
         } else {
-            error!("[validate] not in any area, vpn: {:#x}", vpn.raw());
+            error!(
+                "[validate] not in any area, vpn: {:#x}, cx: {:#x?}",
+                vpn.raw(),
+                current_task().map(|t| t.trap_context())
+            );
             Err(Errno::EFAULT)
         }
     }

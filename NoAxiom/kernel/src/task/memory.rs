@@ -68,6 +68,8 @@ impl Task {
         offset: usize,
     ) -> SysResult<usize> {
         // check file validity, and fetch file from fd_table
+        const LENGTH_OFFSET: usize = 4096 * 32;
+        let length = length + LENGTH_OFFSET;
         let fd_table = self.fd_table();
         if !flags.contains(MmapFlags::MAP_ANONYMOUS)
             && (fd as usize >= fd_table.table.len() || fd_table.table[fd as usize].is_none())
@@ -138,7 +140,7 @@ impl Task {
         let res = memory_set
             .mmap_manager
             .insert(start_va, length, prot, flags, offset, file)?;
-        Ok(res)
+        Ok(res + LENGTH_OFFSET)
     }
 
     pub fn get_maps_string(&self) -> String {

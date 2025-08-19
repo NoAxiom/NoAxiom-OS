@@ -252,7 +252,7 @@ impl CloneArgs {
             parent_tid: ptid as u64,
             exit_signal: 0,
             stack: stack as u64,
-            stack_size: USER_STACK_SIZE as u64,
+            stack_size: 0,
             tls: tls as u64,
             set_tid: 0,
             set_tid_size: 0,

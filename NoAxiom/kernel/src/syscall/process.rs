@@ -91,7 +91,6 @@ impl Syscall<'_> {
         // stack points at the lowest byte of the stack
         // which is different from legacy clone
         cl_args.stack += cl_args.stack_size;
-        cl_args.stack_size = 0;
         self.task.do_fork(cl_args).await
     }
 
