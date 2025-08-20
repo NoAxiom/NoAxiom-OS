@@ -19,6 +19,7 @@ use crate::{
         sig_detail::{SigDetail, SigKillDetail},
         sig_info::{RawSigInfo, SigCode, SigInfo},
         sig_set::SigSet,
+        sig_stack::SigAltStack,
         signal::Signal,
     },
     task::manager::{PROCESS_GROUP_MANAGER, TASK_MANAGER},
@@ -281,6 +282,18 @@ impl Syscall<'_> {
         let set = UserPtr::<SigSet>::new(set);
         let sigset = self.task.pcb().signals.pending_set;
         set.write(sigset).await?;
+        Ok(0)
+    }
+
+    pub async fn sys_sigaltstack(&self, new: usize, old: usize) -> SyscallResult {
+        let new = UserPtr::<SigAltStack>::new(new).read().await?;
+        let old = UserPtr::<SigAltStack>::new(old);
+        let task_old = self.task.pcb().sig_stack.replace(new);
+        if let Some(task_old) = task_old {
+            old.write(task_old).await?;
+        } else {
+            // old.write(SigAltStack::default()).await?;
+        }
         Ok(0)
     }
 }

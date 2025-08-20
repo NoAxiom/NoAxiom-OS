@@ -154,6 +154,7 @@ impl<'a> Syscall<'a> {
             SYS_SIGSUSPEND =>    self.sys_sigsuspend(args[0]).await,
             SYS_TGKILL =>        self.sys_tgkill(args[0], args[1], args[2]),
             SYS_RT_SIGPENDING => self.sys_sigpending(args[0]).await,
+            SYS_SIGALTSTACK =>   self.sys_sigaltstack(args[0], args[1]).await,
 
             // mm
             SYS_MEMBARRIER =>   Self::empty_syscall("membarrier", 0),
