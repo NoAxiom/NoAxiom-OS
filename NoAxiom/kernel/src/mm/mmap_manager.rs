@@ -2,6 +2,7 @@ use alloc::{collections::btree_map::BTreeMap, string::String, sync::Arc};
 
 use arch::ArchPageTableEntry;
 use include::errno::Errno;
+use kfuture::block::block_on;
 
 use super::{
     address::{VirtAddr, VirtPageNum, VpnRange},
@@ -26,8 +27,8 @@ pub struct MmapPage {
     /// mmap flags
     pub flags: MmapFlags,
 
-    /// validity, indicating whether the page is acutally mapped
-    pub valid: bool,
+    /// kernel vpn with validity, indicating whether the page is acutally mapped
+    pub kvpn: Option<VirtPageNum>,
 
     /// mmapped file
     pub file: Option<Arc<dyn File>>,
@@ -38,18 +39,36 @@ pub struct MmapPage {
 
 impl MmapPage {
     /// mmap alloc
-    pub async fn lazy_map_page(&mut self, kernel_vpn: VirtPageNum) -> SysResult<()> {
+    pub async fn lazy_map_page(&mut self, kvpn: VirtPageNum) -> SysResult<()> {
         if let Some(file) = self.file.clone() {
             let buf_slice: &mut [u8] = unsafe {
-                core::slice::from_raw_parts_mut(kernel_vpn.as_va_usize() as *mut u8, PAGE_SIZE)
+                core::slice::from_raw_parts_mut(kvpn.as_va_usize() as *mut u8, PAGE_SIZE)
             };
             warn!("mmap read file, offset: {:#x}", self.offset);
-            let res = with_interrupt_on!(file.read_at(self.offset, buf_slice).await);
+            let res = with_interrupt_on!(block_on(file.read_at(self.offset, buf_slice)));
             if let Err(res) = res {
                 error!("ERROR at mmap read file, msg: {:?}", res);
             }
         }
-        self.valid = true;
+        self.kvpn = Some(kvpn);
+        Ok(())
+    }
+    /// msync
+    pub async fn msync(&mut self) -> SysResult<()> {
+        if let Some(file) = self.file.clone()
+            && self.prot.contains(MmapProts::PROT_WRITE)
+        {
+            if let Some(kvpn) = self.kvpn {
+                let buf_slice: &mut [u8] = unsafe {
+                    core::slice::from_raw_parts_mut(kvpn.as_va_usize() as *mut u8, PAGE_SIZE)
+                };
+                warn!("mmap write file, offset: {:#x}", self.offset);
+                let res = with_interrupt_on!(file.write_at(self.offset, buf_slice).await);
+                if let Err(res) = res {
+                    error!("ERROR at mmap write file, msg: {:?}", res);
+                }
+            }
+        }
         Ok(())
     }
     pub fn get_maps_string(&self) -> String {
@@ -75,6 +94,12 @@ impl MmapPage {
             res.push('p');
         }
         res
+    }
+}
+
+impl Drop for MmapPage {
+    fn drop(&mut self) {
+        let _ = block_on(self.msync());
     }
 }
 
@@ -146,7 +171,7 @@ impl MmapManager {
             let mmap_page = MmapPage {
                 prot,
                 flags,
-                valid: false,
+                kvpn: None,
                 file: file.clone(),
                 offset,
             };

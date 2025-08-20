@@ -25,7 +25,7 @@ use crate::{
     include::{process::TaskFlags, sched::CpuMask},
     mm::{memory_set::MemorySet, user_ptr::UserPtr},
     sched::sched_entity::{SchedEntity, SchedPrio},
-    signal::{sig_action::SigActionList, sig_set::SigMask, sig_stack::UContext, signal::Signal},
+    signal::{sig_action::SigActionList, sig_set::SigMask, sig_stack::UContext},
     task::{futex::FutexPrivateQueue, taskid::TaskUserId},
     time::{time_info::TimeInfo, timer::ITimerManager},
 };

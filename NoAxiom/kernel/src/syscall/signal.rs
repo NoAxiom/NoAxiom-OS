@@ -289,6 +289,12 @@ impl Syscall<'_> {
         let new = UserPtr::<SigAltStack>::new(new).read().await?;
         let old = UserPtr::<SigAltStack>::new(old);
         let task_old = self.task.pcb().sig_stack.replace(new);
+        debug!(
+            "[sys_sigaltstack] tid: {}, new: {:?}, old: {:?}",
+            self.task.tid(),
+            new,
+            task_old
+        );
         if let Some(task_old) = task_old {
             old.write(task_old).await?;
         } else {

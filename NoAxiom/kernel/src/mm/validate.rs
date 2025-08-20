@@ -40,22 +40,32 @@ pub async fn validate(
             trace!("[validate] realloc COW, vpn={:#x}", vpn.raw());
             memory_set.lock().realloc_cow(vpn, pte)?;
             Ok(())
-        } else if matches!(pf, PageFaultType::StorePageFault(_)) {
-            error!(
-                "[validate] store at invalid area, flags: {:?}, tid: {}",
-                flags,
-                current_task().unwrap().tid(),
-            );
-            Err(Errno::EFAULT)
         } else {
-            error!(
-                "[validate] unknown error, vpn: {:#x}, flag: {:?}, trap_type: {:#x?}, pte_raw: {:#x}",
-                vpn.raw(),
-                flags,
-                pf,
-                pte.0
-            );
-            Err(Errno::EFAULT)
+            if flag_match_with_trap_type(flags, pf) {
+                error!(
+                    "[validate] page fault with valid flags, re-flush TLB now, vpn: {:#x}, flags: {:?}, trap_type: {:?}",
+                    vpn.raw(), flags, pf
+                );
+                Arch::tlb_flush();
+                return Ok(());
+            }
+            if matches!(pf, PageFaultType::StorePageFault(_)) {
+                error!(
+                    "[validate] store at invalid area, flags: {:?}, tid: {}",
+                    flags,
+                    current_task().unwrap().tid(),
+                );
+                Err(Errno::EFAULT)
+            } else {
+                error!(
+                    "[validate] unknown error, vpn: {:#x}, flag: {:?}, trap_type: {:#x?}, pte_raw: {:#x}",
+                    vpn.raw(),
+                    flags,
+                    pf,
+                    pte.0
+                );
+                Err(Errno::EFAULT)
+            }
         }
     } else {
         let mut ms = memory_set.lock();

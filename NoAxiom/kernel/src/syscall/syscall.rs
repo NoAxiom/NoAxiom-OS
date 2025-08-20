@@ -28,7 +28,7 @@ impl<'a> Syscall<'a> {
             SYS_UMASK =>            Self::empty_syscall("umask", 0xfff),
             SYS_SYNC =>             Self::empty_syscall("sync", 0),
             SYS_FSYNC =>            Self::empty_syscall("fsync", 0),
-            SYS_MSYNC =>            Self::empty_syscall("msync", 0),
+            SYS_MSYNC =>            unimplemented!("[syscall] SYS_MSYNC is not implemented yet!"),
             SYS_READ =>             self.sys_read(args[0], args[1], args[2]).await,
             SYS_READV =>            self.sys_readv(args[0], args[1], args[2]).await,
             SYS_PREAD64 =>          self.sys_pread64(args[0], args[1], args[2], args[3]).await,
