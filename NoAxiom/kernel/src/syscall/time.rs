@@ -297,7 +297,8 @@ impl Syscall<'_> {
     }
 
     pub async fn sys_timer_gettime(&self, timerid: ITimerID, curr_value: usize) -> SyscallResult {
-        self.sys_getitimer(timerid, curr_value).await
+        Ok(0)
+        // self.sys_getitimer(timerid, curr_value).await
     }
 
     pub async fn sys_timer_settime(
@@ -307,6 +308,7 @@ impl Syscall<'_> {
         new_value: usize,
         old_value: usize,
     ) -> SyscallResult {
-        self.sys_setitimer(timerid, new_value, old_value).await
+        Ok(0)
+        // self.sys_setitimer(timerid, new_value, old_value).await
     }
 }

@@ -192,7 +192,8 @@ impl Task {
                 // is process (send signal to thread group)
                 if !self.is_group_leader() {
                     error!(
-                        "send signal to thread group {}, while {} is not group leader",
+                        "send {:?} to thread group {}, while {} is not group leader",
+                        si,
                         self.tgid(),
                         self.tid()
                     );
@@ -231,7 +232,10 @@ impl Task {
     /// a raw siginfo receiver without thread checked
     fn try_recv_siginfo_inner(self: &Arc<Task>, info: SigInfo, forced: bool) -> bool {
         let mut pcb = self.pcb();
-        if self.sig_mask().contains_signal(info.signal) && !forced {
+        if (self.sig_mask().contains_signal(info.signal)
+            || !pcb.signals.should_wake.contains_signal(info.signal))
+            && !forced
+        {
             return false;
         }
         let signal = info.signal;
