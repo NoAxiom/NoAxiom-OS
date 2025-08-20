@@ -286,6 +286,17 @@ impl Syscall<'_> {
     }
 
     pub async fn sys_sigaltstack(&self, new: usize, old: usize) -> SyscallResult {
+        if new == 0 {
+            self.task.pcb().sig_stack = None;
+            let task_old = self.task.pcb().sig_stack.take();
+            let old = UserPtr::<SigAltStack>::new(old);
+            if let Some(task_old) = task_old {
+                old.write(task_old).await?;
+            } else {
+                // old.write(SigAltStack::default()).await?;
+            }
+            return Ok(0);
+        }
         let new = UserPtr::<SigAltStack>::new(new).read().await?;
         let old = UserPtr::<SigAltStack>::new(old);
         let task_old = self.task.pcb().sig_stack.replace(new);
