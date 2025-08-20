@@ -190,6 +190,8 @@ impl<'a> Syscall<'a> {
             SYS_CLOCK_GETRES =>     self.sys_clock_getres(args[0] as _, args[1]).await,
             SYS_SETITIMER =>        self.sys_setitimer(args[0] as _, args[1] as _, args[2] as _).await,
             SYS_GETITIMER =>        self.sys_getitimer(args[0] as _, args[1] as _).await,
+            SYS_TIMER_SETTIME =>    self.sys_timer_settime(args[0], args[1] as _, args[2], args[3]).await,
+            SYS_TIMER_GETTIME =>    self.sys_timer_gettime(args[0], args[1]).await,
 
             // system / others
             SYS_SYSINFO =>         Self::empty_syscall("info", 0),
@@ -209,7 +211,7 @@ impl<'a> Syscall<'a> {
             _ => {
                 #[cfg(feature = "debug_sig")]
                 {
-                    println!(
+                    error!(
                         "\x1B[91m[kernel] unsupported syscall id: {:?}, tid: {}, args: {:x?}\x1B[0m",
                         id, self.task.tid(), args
                     );

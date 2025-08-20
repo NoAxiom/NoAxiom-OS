@@ -15,7 +15,7 @@ use crate::{
         clock::{ClockId, CLOCK_MANAGER},
         gettime::{get_time_duration, get_time_ms, get_timeval},
         timeout::sleep_now,
-        timer::{ITimer, ITimerReal, Timer, TIMER_MANAGER},
+        timer::{ITimer, ITimerID, ITimerReal, Timer, TIMER_MANAGER},
         timex::{adjtimex, LAST_TIMEX},
     },
 };
@@ -294,5 +294,19 @@ impl Syscall<'_> {
                * "ITIMER_PROF is unimplemented"), */
         };
         Ok(0)
+    }
+
+    pub async fn sys_timer_gettime(&self, timerid: ITimerID, curr_value: usize) -> SyscallResult {
+        self.sys_getitimer(timerid, curr_value).await
+    }
+
+    pub async fn sys_timer_settime(
+        &self,
+        timerid: ITimerID,
+        flags: usize,
+        new_value: usize,
+        old_value: usize,
+    ) -> SyscallResult {
+        self.sys_setitimer(timerid, new_value, old_value).await
     }
 }
