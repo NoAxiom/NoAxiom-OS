@@ -128,19 +128,19 @@ impl dyn Dentry {
     }
     /// Set the inode of the dentry
     pub fn set_inode(&self, inode: Arc<dyn Inode>) {
-        if self.meta().inode.lock().is_some() {
-            assert_eq!(
-                inode.file_type(),
-                self.inode().unwrap().file_type(),
-                "{}",
-                format!(
-                    "replace inode in {}, type: {:?}",
-                    self.name(),
-                    self.inode().unwrap().file_type()
-                )
-            );
-            return;
-        }
+        // if self.meta().inode.lock().is_some() {
+        //     assert_eq!(
+        //         inode.file_type(),
+        //         self.inode().unwrap().file_type(),
+        //         "{}",
+        //         format!(
+        //             "replace inode in {}, type: {:?}",
+        //             self.name(),
+        //             self.inode().unwrap().file_type()
+        //         )
+        //     );
+        //     return;
+        // }
         *self.meta().inode.lock() = Some(inode);
     }
     /// Check if the dentry is negative
@@ -441,6 +441,10 @@ impl dyn Dentry {
                 old.name(),
                 self.name()
             );
+            let inode = target.inode()?;
+            inode.meta().inner.lock().nlink;
+            inode.meta().inner.lock().nlink += 1;
+            old.set_inode(inode);
             return Err(Errno::EEXIST);
         }
 
