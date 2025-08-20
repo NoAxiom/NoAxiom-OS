@@ -6,6 +6,8 @@
 
 [决赛汇报](./docs/final.pdf)
 
+[现场赛汇报](./docs/live-report.pdf)
+
 [初赛PPT与演示视频](https://pan.baidu.com/s/1aj0eP2t-oPZIlO7OO4S8pA?pwd=kkxz)
 
 ### 决赛情况
