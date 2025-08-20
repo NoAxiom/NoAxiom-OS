@@ -1180,6 +1180,8 @@ impl Syscall<'_> {
         info!("[sys_fcntl] fd: {fd}, cmd: {op:?}, arg: {flags:?}");
         match op {
             FcntlFlags::F_SETFL => {
+                let mut flags = file.flags();
+                flags |= flags;
                 file.meta().set_flags(flags);
                 Ok(0)
             }
