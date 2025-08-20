@@ -34,6 +34,7 @@ bitflags! {
         const O_RDWR      = 1 << 1;
         const O_CREATE    = 1 << 6;
         const O_EXCL      = 1 << 7;
+        const O_NOCTTY    = 1 << 8;
         const O_TRUNC     = 1 << 9;
         const O_APPEND    = 1 << 10;
         const O_NONBLOCK  = 1 << 11;
@@ -723,6 +724,37 @@ impl Termios {
         }
     }
 
+    // Add method to create raw mode termios for vim
+    pub fn raw_mode() -> Self {
+        Self {
+            iflag: 0,      // Disable input processing
+            oflag: 0,      // Disable output processing
+            cflag: 0o2277, // Keep control flags
+            lflag: 0,      // Disable canonical mode, echo, signals
+            line: 0,
+            cc: [
+                3,   // VINTR Ctrl-C
+                28,  // VQUIT
+                127, // VERASE
+                21,  // VKILL
+                4,   // VEOF Ctrl-D
+                0,   // VTIME
+                1,   // VMIN
+                0,   // VSWTC
+                17,  // VSTART
+                19,  // VSTOP
+                26,  // VSUSP Ctrl-Z
+                255, // VEOL
+                18,  // VREPAINT
+                15,  // VDISCARD
+                23,  // VWERASE
+                22,  // VLNEXT
+                255, // VEOL2
+                0, 0,
+            ],
+        }
+    }
+
     #[allow(unused)]
     pub fn is_icrnl(&self) -> bool {
         const ICRNL: u32 = 0o0000400;
@@ -733,6 +765,23 @@ impl Termios {
     pub fn is_echo(&self) -> bool {
         const ECHO: u32 = 0o0000010;
         self.lflag & ECHO != 0
+    }
+
+    #[allow(unused)]
+    pub fn is_icanon(&self) -> bool {
+        const ICANON: u32 = 0o0000002;
+        self.lflag & ICANON != 0
+    }
+
+    #[allow(unused)]
+    pub fn is_raw_mode(&self) -> bool {
+        // Check if this is raw mode (no canonical processing, no echo, minimal flags)
+        const ICANON: u32 = 0o0000002;
+        const ECHO: u32 = 0o0000010;
+        const ISIG: u32 = 0o0000001;
+
+        // Raw mode typically has lflag = 0 or very minimal flags
+        (self.lflag & (ICANON | ECHO | ISIG)) == 0 && self.iflag == 0
     }
 }
 
@@ -748,11 +797,19 @@ pub struct WinSize {
 impl WinSize {
     pub fn new() -> Self {
         Self {
-            ws_row: 67,
-            ws_col: 120,
+            ws_row: 24, // Standard terminal height
+            ws_col: 80, // Standard terminal width
             ws_xpixel: 0,
             ws_ypixel: 0,
         }
+    }
+
+    pub fn rows(&self) -> u16 {
+        self.ws_row
+    }
+
+    pub fn cols(&self) -> u16 {
+        self.ws_col
     }
 }
 
