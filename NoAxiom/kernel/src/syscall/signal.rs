@@ -290,7 +290,7 @@ impl Syscall<'_> {
             let task_old = self.task.pcb().sig_stack.take();
             let old = UserPtr::<SigAltStack>::new(old);
             if let Some(task_old) = task_old {
-                old.write(task_old).await?;
+                old.try_write(task_old).await?;
             } else {
                 // old.write(SigAltStack::default()).await?;
             }
@@ -306,7 +306,7 @@ impl Syscall<'_> {
             task_old
         );
         if let Some(task_old) = task_old {
-            old.write(task_old).await?;
+            old.try_write(task_old).await?;
         } else {
             // old.write(SigAltStack::default()).await?;
         }
