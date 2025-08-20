@@ -143,7 +143,8 @@ impl<'a> Syscall<'a> {
             SYS_GETRUSAGE =>            self.sys_getrusage(args[0] as _, args[1]).await,
             SYS_CAPGET =>               self.sys_capget(args[0], args[1]).await,
             SYS_CAPSET =>               self.sys_capset(args[0], args[1]).await,
-            
+            SYS_PRCTL =>                self.sys_prctl(),
+
             // signal
             SYS_SIGTIMEDWAIT =>  self.sys_sigtimedwait(args[0], args[1], args[2]).await,
             SYS_SIGACTION =>     self.sys_sigaction(args[0], args[1], args[2]).await,
