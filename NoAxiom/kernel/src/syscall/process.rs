@@ -1072,4 +1072,8 @@ impl Syscall<'_> {
         }
         Ok(0)
     }
+
+    pub fn sys_prctl(&self) -> SyscallResult {
+        Err(Errno::ENOSYS)
+    }
 }
