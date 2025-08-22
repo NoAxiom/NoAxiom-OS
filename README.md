@@ -1,35 +1,24 @@
 # NoAxiom-OS
 
+![NoAxiom_Structure](./docs/assets/noaxiom_structure.svg)
+
 ## 赛事相关
 
-[原项目](https://github.com/NoAxiom/NoAxiom-OS)（包含submodule）
+[决赛汇报文档](./docs/final.pdf)
 
-[决赛汇报](./docs/final.pdf)
+[现场赛汇报文档](./docs/live-report/live-report.pdf)
 
-[现场赛汇报](./docs/live-report.pdf)
+[决赛汇报PPT](./docs/final-slide.pdf)
 
-[初赛PPT与演示视频](https://pan.baidu.com/s/1aj0eP2t-oPZIlO7OO4S8pA?pwd=kkxz)
+[决赛信息汇总](./docs/final-ranks/final-ranks.md)
 
-### 决赛情况
-比赛结束时，总分位列第7；性能相关测试点总分位列第2
-![alt text](docs/asserts/rank.png)
-
-`iperf`性能测试点总分位列第1，榜上唯一超越基准分数
-![alt text](docs/asserts/rank-iperf.png)
-
-
-`cyclic`、`iozone`、`lmbench`、`netperf`性能测试点总分均位列第2，其中`cyclic`测试点只有两个队伍实现，下面列举部分
-![alt text](docs/asserts/rank-cyclic.png)
-![alt text](docs/asserts/rank-iozone.png)
-![alt text](docs/asserts/rank-lmbench.png)
-![alt text](docs/asserts/rank-netperf.png)
-
+[初赛信息汇总](./docs/primary/primary-info.md)
 
 ## 项目概述
 
 ### 系统简介
 
-[NoAxiom 操作系统](https://github.com/NoAxiom/NoAxiom-OS)是由杭州电子科技大学[NoAxiom团队](https://github.com/NoAxiom)开发的一款基于 Rust 的宏内核操作系统，能够在 RISC-V64 和 LoongArch64 两种架构上运行。系统采用 Rust 的无栈协程与异步语法实现了**异步调度**，在 I/O 方面具备优秀性能。
+[NoAxiom 操作系统](https://github.com/NoAxiom/NoAxiom-OS)是由杭州电子科技大学[NoAxiom团队](https://github.com/NoAxiom)开发的一款基于 Rust 的宏内核操作系统。NoAxiom自主实现了一套完整的硬件抽象HAL层，能够在不修改内核代码的情况下，同时于 RISC-V64 和 LoongArch64 两种架构上运行。此外，NoAxiom采用 Rust 的无栈协程与异步语法实现了**异步调度**，在 I/O 方面具备优秀性能。
 
 ### 系统整体架构
 

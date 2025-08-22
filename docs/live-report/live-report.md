@@ -2,7 +2,7 @@
 
 ## 总体完成情况
 
-![alt text](on-site-assets/rank.png)
+![alt text](assets/rank.png)
 
 NoAxiom OS在2025年全国大学生系统能力大赛OS赛道现场赛中，成功完成了绝大部分测试点，在不同架构的qemu虚拟环境与物理上板环境下均取得了60分的成绩，在跨平台运行场景下体现了卓越稳定性。总体排名第三。
 
@@ -32,7 +32,7 @@ NoAxiom在LS2k1000上板测试当中获得了60分的成绩，位列全部队伍
 
 最终我们在la上板测试中，成为第一个上板拿到最高分60的队伍。
 
-![alt text](on-site-assets/la-rank.png)
+![alt text](assets/la-rank.png)
 
 ### 文件系统缓存一致性
 
@@ -205,4 +205,4 @@ fn __walk_path(
      - Rustc可以启动运行，但最终会显示rust核心程序panic
      - 通过Debug日志调试，我们最终发现使用pipe行为的socketpair系统调用，导致后续出现了pipe的读写端异常的bug，因时间有限，在现场赛结尾时才发现此bug，没有时间继续调试，bug示意如下
      
-![Pipe Bug示意图](./on-site-assets/pipe-bug.png)
+![Pipe Bug示意图](./assets/pipe-bug.png)
