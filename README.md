@@ -16,6 +16,8 @@
 
 [初赛信息汇总](./docs/primary/primary-info.md)
 
+[赛时仓库链接](https://gitlab.eduxiji.net/T202510336995214/noaxiom)
+
 ## 项目概述
 
 ### 系统简介
